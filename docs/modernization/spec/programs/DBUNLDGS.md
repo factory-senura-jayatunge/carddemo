@@ -29,7 +29,7 @@ data_stores:
 calls: [CBLTDLI]
 transfers_to: []
 invoked_by: [UNLDGSAM.JCL]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DBUNLDGS: Pending authorization database unload to GSAM files (UNLDGSAM)
@@ -116,9 +116,9 @@ flowchart TD
 
 #### BR-DBUL-001 · Summaries
 - **When:** `GN PAUTSUM0` returns spaces. Summaries come in root key order (ascending account ID, HIDAM `DBPAUTP0.dbd:18, 28-30`).
-- **Then:** if `PA-ACCT-ID` (`S9(11) COMP-3`) is numeric, insert the 100-byte segment into the root GSAM file (SE-DBUL-001) and read its details (BR-DBUL-002). If it is not numeric (for example the all-spaces root in the sample data), the summary and its details are skipped without a message (DEF-DBUL-002).
+- **Then:** if `PA-ACCT-ID` (`S9(11) COMP-3`) is numeric, insert the 100-byte segment into the root GSAM file (SE-DBUL-001) and read its details (BR-DBUL-002). If it is not numeric (for example the all-spaces root in the sample data), the summary and its details are skipped without a message (DEF-DBUL-002). The `MOVE PA-ACCT-ID TO ROOT-SEG-KEY` (`:239`) runs before the test (`:241`); that it does not raise a data exception on invalid packed bytes depends on the compiler options (platform-inferred).
 - **Source:** `:232-248`, `CIPAUSMY.cpy:19`
-- **Fidelity:** must-preserve · **Confidence:** reviewed
+- **Fidelity:** must-preserve · **Confidence:** reviewed (no abend on the earlier move: platform-inferred)
 
 #### BR-DBUL-002 · Details
 - **When:** after a written summary.

@@ -35,7 +35,7 @@ data_stores:
 calls: []
 transfers_to: [COPAUS1C, COMEN01C, COSGN00C]
 invoked_by: [COMEN01C, COPAUS1C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COPAUS0C: Pending authorization summary screen (CPVS)

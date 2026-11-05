@@ -35,7 +35,7 @@ data_stores:
 calls: [MQOPEN, MQGET, MQPUT1, MQCLOSE]
 transfers_to: []
 invoked_by: [CICS MQ trigger monitor]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COPAUA0C: Card authorization decision (CP00)

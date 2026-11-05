@@ -20,7 +20,7 @@ data_stores:
   - {dd: OUTFIL1, dataset: AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO, entity: ENT-AUTH-ROOT-FILE, access: [create, write-sequential]}
   - {dd: OUTFIL2, dataset: AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO, entity: ENT-AUTH-CHILD-FILE, access: [create, write-sequential]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # UNLDPADB: Pending authorization database unload to sequential files

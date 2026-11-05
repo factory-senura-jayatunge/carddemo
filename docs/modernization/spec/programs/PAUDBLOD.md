@@ -25,7 +25,7 @@ data_stores:
 calls: [CBLTDLI]
 transfers_to: []
 invoked_by: [LOADPADB.JCL]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # PAUDBLOD: Pending authorization database reload from sequential files (LOADPADB)

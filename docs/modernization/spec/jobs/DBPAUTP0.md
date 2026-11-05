@@ -19,7 +19,7 @@ data_stores:
   - {dd: DDPAUTX0, dataset: OEM.IMS.IMSP.PAUTHDBX, entity: ENT-AUTH-INDEX, access: [read]}
   - {dd: DFSURGU1, dataset: AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0, access: [create, write-sequential]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DBPAUTP0: Pending authorization database unload (HD unload utility)

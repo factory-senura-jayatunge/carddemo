@@ -22,7 +22,7 @@ data_stores:
 calls: []
 transfers_to: []
 invoked_by: [COPAUS1C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COPAUS2C: Fraud record in Db2 (linked from the authorization detail screen)

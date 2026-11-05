@@ -24,7 +24,7 @@ data_stores:
 calls: []
 transfers_to: []
 invoked_by: [CBPAUP0J.jcl]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBPAUP0C: Expired pending authorization purge (CBPAUP0J)

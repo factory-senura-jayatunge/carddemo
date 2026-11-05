@@ -19,7 +19,7 @@ data_stores:
   - {dd: PASFILOP, dataset: AWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM, entity: ENT-AUTH-ROOT-FILE, access: [write-sequential]}
   - {dd: PADFILOP, dataset: AWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM, entity: ENT-AUTH-CHILD-GSAM, access: [write-sequential]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # UNLDGSAM: Pending authorization database unload to GSAM files

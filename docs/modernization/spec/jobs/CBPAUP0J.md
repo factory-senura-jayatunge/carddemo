@@ -19,7 +19,7 @@ data_stores:
   - {name: DBPAUTP0, pcb: PAUTBPCB, entity: ENT-AUTH-SUMMARY, access: [get-next, delete]}
   - {name: DBPAUTP0, pcb: PAUTBPCB, entity: ENT-AUTH-DETAIL, access: [get-next-within-parent, delete]}
 invoked_by: [CA-7 trigger from CLOSEFIL, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBPAUP0J: Expired pending authorization purge job

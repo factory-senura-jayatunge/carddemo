@@ -25,7 +25,7 @@ data_stores:
 calls: [CBLTDLI]
 transfers_to: []
 invoked_by: [UNLDPADB.JCL]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # PAUDBUNL: Pending authorization database unload to sequential files (UNLDPADB)
@@ -114,9 +114,9 @@ flowchart TD
 
 #### BR-PDUL-002 · Summaries with an invalid account ID are skipped
 - **When:** `PA-ACCT-ID` (`S9(11) COMP-3`) is not numeric, that is, its 6 bytes are not valid packed decimal (for example the all-spaces root in the sample data).
-- **Then:** nothing is written for the summary and its details are not read; no message (DEF-PDUL-002).
-- **Source:** `:232-237`, `CIPAUSMY.cpy:19`
-- **Fidelity:** must-preserve · **Confidence:** reviewed
+- **Then:** nothing is written for the summary and its details are not read; no message (DEF-PDUL-002). The `MOVE PA-ACCT-ID TO ROOT-SEG-KEY` (`:230`) runs before the test (`:232`); that it does not raise a data exception on invalid packed bytes depends on the compiler options (platform-inferred).
+- **Source:** `:230-237`, `CIPAUSMY.cpy:19`
+- **Fidelity:** must-preserve · **Confidence:** reviewed (no abend on the earlier move: platform-inferred)
 
 #### BR-PDUL-003 · Detail records with parent key
 - **When:** after a written summary.

@@ -29,7 +29,7 @@ data_stores:
 calls: [COPAUS2C]
 transfers_to: [COPAUS0C]
 invoked_by: [COPAUS0C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COPAUS1C: Authorization detail screen and fraud marking (CPVD)

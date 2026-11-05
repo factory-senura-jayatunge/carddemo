@@ -19,7 +19,7 @@ data_stores:
   - {name: DBPAUTP0, pcb: PAUTBPCB, entity: ENT-AUTH-SUMMARY, access: [insert, get-unique]}
   - {name: DBPAUTP0, pcb: PAUTBPCB, entity: ENT-AUTH-DETAIL, access: [insert]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # LOADPADB: Pending authorization database reload
