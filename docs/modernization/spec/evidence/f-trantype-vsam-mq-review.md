@@ -93,7 +93,7 @@ The same misreading also affected section 4.3, the module extraction notes, sect
   - `TR_DESCRIPTION` stored length.
   - Seed citations corrected.
   - file:line citations instead of spec section references in the edges table.
-  - The -911 caveat on PINV-f-02.
+  - The -911 caveat on PINV-f-02 (now INV-018).
   - The PF3 return COTRTUPC → COTRTLIC.
 
 ## Rejected finding
@@ -150,4 +150,4 @@ These checks cover the COBOL language behaviour only. CICS, Db2 and MQ behaviour
 
 ## Cross-area links
 
-DEF-TTLS-017 and DEF-TTUP-017 refer to area A's DEF-ADMN-001 and PINV-a-signon-admin-01. The interactions file adds PINV-f-06. These IDs resolve only once area A (branch `nl/A`) is merged. The full `check_spec.py` run passed with 0 errors and 0 warnings on a temporary tree made of nl/F, origin/modernization and nl/A.
+DEF-TTLS-017 and DEF-TTUP-017 refer to area A's DEF-ADMN-001 and to catalog invariant INV-006. INV-006 merges area A's proposal PINV-a-signon-admin-01 with area F's PINV-f-06 (interactions file). Before area A (branch `nl/A`) was merged, these IDs did not resolve on nl/F alone. The full `check_spec.py` run passed with 0 errors and 0 warnings on a temporary tree made of nl/F, origin/modernization and nl/A.
