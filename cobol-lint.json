@@ -5,10 +5,12 @@
   "tab_width_reason": "CUSTREC.cpy was written with 4-column tabs; CBSTM03A (which copies it) only compiles with -ftab-width=4. Used by the cobc check and by `fix` when expanding tabs.",
   "baseline": "cobol-lint-baseline.json",
   "paths": {
-    "programs": {"globs": ["app/cbl/*", "app/app-*/cbl/*"], "extensions": [".cbl"]},
+    "programs": {"globs": ["app/cbl/*", "app/app-*/cbl/*", "tools/shims/*", "tools/drivers/*"], "extensions": [".cbl"],
+      "reason": "tools/shims (Language Environment and MVS service stand-ins) and tools/drivers are COBOL compiled into the local GnuCOBOL build, so they follow the same rules as app/."},
     "copybooks": {"globs": ["app/cpy/*", "app/cpy-bms/*", "app/app-*/cpy/*", "app/app-*/cpy-bms/*", "app/app-*/dcl/*"], "extensions": [".cpy", ".dcl"]},
     "jcl": {"globs": ["app/jcl/*", "app/proc/*", "app/app-*/jcl/*"], "extensions": [".jcl", ".prc"]},
-    "exclude": [],
+    "exclude": ["tools/templates/*"],
+    "exclude_reason": "tools/templates/*.in are COBOL skeletons with @PLACEHOLDER@ tokens that tools/carddemo.py fills in per data set; they are not valid COBOL before substitution.",
     "generated": ["app/cpy-bms/*", "app/app-*/cpy-bms/*"],
     "generated_reason": "cpy-bms members are symbolic maps generated from the BMS sources in bms/; their repetition is produced by the BMS assembler, so duplicate-block skips them."
   },
