@@ -161,7 +161,7 @@ stateDiagram-v2
 
 #### BR-USRU-001 · Fetch a user
 - **When:** Enter (or the first entry from the list), user ID filled in.
-- **Then:** the record with key = user ID exactly as typed is read (no upper-casing, so `user0001` is not found). Its first name, last name, password and type are put in the form and the message `Press PF5 key to save your updates ...` is shown in neutral (white) colour. The read takes an update lock that is released when the task ends a moment later (DEF-USRU-009).
+- **Then:** the record with key = user ID exactly as typed is read (the program does not upper-case it, so `user0001` is not found unless the terminal translates input to upper case; the CSD sets no such translation for `CU02`). Its first name, last name, password and type are put in the form and the message `Press PF5 key to save your updates ...` is shown in neutral (white) colour. The read takes an update lock that is released when the task ends a moment later (DEF-USRU-009).
 - **Source:** `:157-172, 322-339`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -259,12 +259,12 @@ stateDiagram-v2
 | filled | one blank | not done | - | - | first missing field's message |
 | filled | all filled | NORMAL | no | not done | `Please modify to update ...` (red) |
 | filled | all filled | NORMAL | yes | NORMAL | `User <id> has been updated ...` (green) |
-| filled | all filled | NORMAL | yes | other | `Unable to Update User...` |
-| filled | all filled | NOTFND or other | (compared with stale data, normally yes) | fails (no record held) | `Unable to Update User...` (DEF-USRU-002) |
+| filled | all filled | NORMAL | yes | other | `Unable to Update User...` (neutral, NUM-USRU-004) |
+| filled | all filled | NOTFND or other | (compared with the uninitialised record area, normally yes) | fails (no record held) | `Unable to Update User...` (red; DEF-USRU-002) |
 
 ### 8.3 Message catalog
 
-Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted.
+Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted; after a successful READ in the same task it is neutral until a later message sets it again (NUM-USRU-004). The cursor goes to the first field in map order whose length was set to -1 in the task (NUM-USRU-004), so on the fetch path it is always on the user ID.
 
 | Text (exact) | Cause | Cursor | Item |
 | :-- | :-- | :-- | :-- |
@@ -274,17 +274,17 @@ Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted.
 | `Password can NOT be empty...` | save, password blank | password | VAL-USRU-002 |
 | `User Type can NOT be empty...` | save, type blank | user type | VAL-USRU-002 |
 | `Press PF5 key to save your updates ...` (neutral) | record read | user ID | BR-USRU-001 |
-| `User ID NOT found...` | READ or REWRITE NOTFND | user ID | VAL-USRU-003, ERR-USRU-001 |
-| `Unable to lookup User...` | READ other response | first name | ERR-USRU-001 |
+| `User ID NOT found...` | READ NOTFND (red), REWRITE NOTFND (neutral) | user ID | VAL-USRU-003, ERR-USRU-001, ERR-USRU-002 |
+| `Unable to lookup User...` | READ other response | user ID on fetch, first name on save | ERR-USRU-001 |
 | `Please modify to update ...` (red) | save without change | first name | BR-USRU-004 |
 | `User <id> has been updated ...` (green) | rewritten | first name | BR-USRU-003 |
-| `Unable to Update User...` | REWRITE other response | first name | ERR-USRU-002 |
+| `Unable to Update User...` | REWRITE other response; neutral after a successful READ, red after a failed one (DEF-USRU-002) | first name, or user ID after a READ NOTFND | ERR-USRU-002 |
 | `Invalid key pressed. Please see below...` | wrong key | not set | VAL-USRU-004 |
 
 ## 9. Side effects
 
 #### SE-USRU-001 · Read the user record for update
-- **What:** READ UPDATE `USRSEC` by the typed 8-character user ID into the 80-byte record, on every fetch and every save. The exclusive lock lasts until the rewrite or the end of the task; it never spans two screens.
+- **What:** READ UPDATE `USRSEC` by the typed 8-character user ID into the 80-byte record, on every fetch and every save. The exclusive lock lasts until the rewrite or the end of the task; it never spans two screens, but it does survive a PF3 transfer in the same task (DEF-USRU-010). `USRSEC` is defined with `STRINGS(1)` in LSR pool 1 (`app/csd/CARDDEMO.CSD:89-91`), so the held request can also hold the file's only VSAM string.
 - **Source:** `:322-331`
 - **Fidelity:** must-preserve (read), incidental (lock in the fetch path) · **Confidence:** reviewed; lock duration platform-inferred
 
@@ -301,7 +301,7 @@ Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted.
 | :-- | :-- |
 | NORMAL | `Press PF5 key to save your updates ...` (neutral), form sent |
 | NOTFND | `User ID NOT found...`, cursor on user ID, error flag |
-| other (NOTOPEN in the batch window, ...) | log line, `Unable to lookup User...`, cursor on first name, error flag |
+| other (NOTOPEN in the batch window, ...) | log line, `Unable to lookup User...`, error flag; cursor on the user ID on the fetch path (already -1 at `:153`), on first name on the save path (`:211`) |
 
 On save the error flag does not stop the comparison and rewrite that follow (DEF-USRU-002).
 - **Source:** `:333-353`
@@ -312,14 +312,14 @@ On save the error flag does not stop the comparison and rewrite that follow (DEF
 | Response | Effect |
 | :-- | :-- |
 | NORMAL | green `User <id> has been updated ...` |
-| NOTFND | `User ID NOT found...`, cursor on user ID |
-| other (for example INVREQ when no record is held) | log line, `Unable to Update User...`, cursor on first name |
+| NOTFND (practically unreachable after a held read) | `User ID NOT found...`, cursor on user ID, neutral colour |
+| other (for example INVREQ when no record is held) | log line, `Unable to Update User...`, cursor on first name (on user ID if the READ was NOTFND); neutral when the READ succeeded, red when it failed |
 
 - **Source:** `:368-390`
 - **Fidelity:** must-preserve · **Confidence:** reviewed; INVREQ case platform-inferred
 
 #### ERR-USRU-003 · Unchecked commands
-- **What:** the RECEIVE MAP response is not tested; SEND and XCTL have no RESP and there is no HANDLE CONDITION.
+- **What:** the RECEIVE MAP response is not tested; SEND and XCTL have no RESP and there is no HANDLE CONDITION. With Clear or a PA key the RECEIVE gets MAPFAIL, the key falls to VAL-USRU-004, and the screen is sent from a map area that nothing filled in this task (low-value fields are not sent).
 - **Source:** `:283-291, 258-261, 272-278`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
@@ -334,7 +334,7 @@ On save the error flag does not stop the comparison and rewrite that follow (DEF
 
 | Boundary | Contract |
 | :-- | :-- |
-| Entry | XCTL from `COADM01C` (160 bytes) or `COUSR00C` (194 bytes, selected user ID at offset 187). No authorisation check. |
+| Entry | XCTL from `COADM01C` (160 bytes) or `COUSR00C` (194 bytes, selected user ID in bytes 187-194 counted from 1). No authorisation check. |
 | Exit | XCTL to the caller (PF3) or `COADM01C` (PF12) with the 194-byte commarea, context 0, the list's paging fields unchanged. |
 | Data | Rewrites ENT-USER-SECURITY records in place; the key cannot be changed. |
 
@@ -346,7 +346,7 @@ On save the error flag does not stop the comparison and rewrite that follow (DEF
 - **Confidence:** reviewed
 
 #### NUM-USRU-002 · Confirmation text
-- `User ` + user ID up to the first space + ` has been updated ...`.
+- `User ` + user ID up to the first space + ` has been updated ...`. The key is used exactly as typed, so `AB CD` gives `User AB has been updated ...` and a leading space gives `User  has been updated ...`.
 - **Source:** `:372-375`
 - **Confidence:** runtime-verified (GnuCOBOL STRING test)
 
@@ -354,17 +354,23 @@ On save the error flag does not stop the comparison and rewrite that follow (DEF
 - Date `mm/dd/yy`, time `hh:mm:ss`, from `FUNCTION CURRENT-DATE`.
 - **Source:** `:296-315`
 
+#### NUM-USRU-004 · Cursor and message colour carry-over
+- The map is sent with `CURSOR` and no value, so BMS puts the cursor on the first field in map order whose length is -1; the user ID comes before first name. The fetch path sets the user ID to -1 at `:153` and the save path sets first name at `:211`; later `MOVE -1 TO FNAMEL` (`:351, 388`) move the cursor only when the user ID is not already -1.
+- A successful READ sets the message colour to neutral (`:338`); only the green confirmation (`:371`) and the red `Please modify` (`:241`) set it again. So REWRITE errors after a successful READ appear in neutral, not in the map's red.
+- **Source:** `:150-153, 211, 277, 338, 344, 351, 381, 388`
+- **Confidence:** reviewed; BMS symbolic cursor rule platform-inferred
+
 ## 13. Known defects and oddities
 
 None of these were changed in this branch (`COUSR02C.cbl` is not touched after the original import; `CHANGELOG.md` "Fixed" lists only batch and JCL fixes).
 
 #### DEF-USRU-001 · PF3 saves silently
-- PF3 is "save and exit": it saves (or fails to save, or refuses because a field is blank or nothing changed) and then transfers at once, so the result message is never seen. An administrator who only wanted to leave after a fetch gets `Please modify to update ...` discarded, which is harmless; one who changed a field gets it saved without confirmation.
+- PF3 is "save and exit": it saves (or fails to save, or refuses because a field is blank or nothing changed) and then transfers at once, so the result message is never seen. An administrator who only wanted to leave after a fetch gets `Please modify to update ...` discarded; the visible effect is nil, but the record stays held across the transfer (DEF-USRU-010). One who changed a field gets it saved without confirmation.
 - **Source:** `:111-119`
 - **Status:** open · **Fidelity:** defect-decide (Q-USRU-001) · **Confidence:** reviewed
 
 #### DEF-USRU-002 · Save continues after a failed read
-- When the save's READ UPDATE returns NOTFND or an error, the program still compares and, because the record area holds stale data, normally tries a REWRITE without holding a record. CICS rejects it (INVREQ) and the administrator sees `Unable to Update User...` instead of `User ID NOT found...`.
+- When the save's READ UPDATE returns NOTFND or an error, the program still compares and, because the record area was never filled in this task (`SEC-USER-DATA` has no VALUE clauses, `app/cpy/CSUSR01Y.cpy:17-23`; only the key was moved in at `:216`), normally tries a REWRITE without holding a record. CICS rejects it (INVREQ) and the administrator sees `Unable to Update User...` instead of `User ID NOT found...`.
 - **Source:** `:215-237, 340-352, 383-389`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (flow), platform-inferred (INVREQ)
 
@@ -379,7 +385,7 @@ None of these were changed in this branch (`COUSR02C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** defect-decide (Q-SGN-002, Q-USRA-001) · **Confidence:** reviewed
 
 #### DEF-USRU-005 · [security] The stored password is sent to the terminal
-- Every fetch puts the user's plain-text password into the dark password field. It is not visible, but it is in the 3270 data stream and in the terminal buffer, so any administrator (or anyone with an emulator trace) can read every user's password. The password is not needed to change the other fields; the save requires it to be present.
+- Every fetch puts the user's plain-text password into the dark password field. It is not visible, but it is in the 3270 data stream and in the terminal buffer, so any administrator (or anyone with an emulator trace) can read every user's password. Because the field is `FSET`, the password also comes back from the terminal on every Enter or PF key and is sent out again on every send that reuses the received values. The password is not needed to change the other fields; the save requires it to be present.
 - **Source:** `:169`; `app/bms/COUSR02.bms:130-134`
 - **Status:** open · **Fidelity:** defect-decide (Q-USRU-002) · **Confidence:** reviewed; terminal buffer exposure platform-inferred
 
@@ -399,9 +405,19 @@ None of these were changed in this branch (`COUSR02C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-USRU-009 · Update lock taken for display
-- The fetch uses READ UPDATE although it only displays; the lock is released when the task returns, so the only effect is a short exclusive lock that can make a concurrent sign-on or update wait.
+- The fetch uses READ UPDATE although it only displays; the lock is released when the task returns. The effect is a short exclusive hold that can make a concurrent update of the same user wait, and, because `USRSEC` has `STRINGS(1)`, possibly a concurrent sign-on or list as well (a plain READ does not wait for a record lock, but it may wait for the file's only string).
 - **Source:** `:322-331`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
+
+#### DEF-USRU-010 · Record held across the PF3 transfer
+- On PF3, when the save's READ UPDATE succeeded but nothing changed (the usual "just leave" case) or the REWRITE failed, the program transfers by XCTL in the same task while the record is still held. If the caller is `COUSR00C`, its first entry browses `USRSEC` (STARTBR, READNEXT) in that same task (`app/cbl/COUSR00C.cbl:115-118`); with `STRINGS(1)` the browse may have to wait for the string its own task holds. Whether CICS waits, fails the browse or lets it through depends on string management for the LSR pool. When the caller is `COADM01C` the hold ends with the task.
+- **Source:** `:111-119, 236-243, 250-261`; `app/csd/CARDDEMO.CSD:89-91`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (low)
+
+#### DEF-USRU-011 · [security] No password rules
+- Any non-blank value of 1 to 8 characters is accepted as the new password, although the screen label says `(8 Char)`; there is no length, complexity or reuse check (the only check is for blank, `:198`). Same as user add (DEF-USRA-003).
+- **Source:** `:198-203, 227-230`; `app/bms/COUSR02.bms:135-139`
+- **Status:** open · **Fidelity:** defect-decide (Q-SGN-001) · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -419,7 +435,7 @@ A reimplementation must reproduce: which record is changed and with which values
 | --: | :-- | :-- | :-- |
 | S1 | admin menu | option 3 | empty form, cursor on user ID |
 | S2 | form | `USER0001`, Enter | `LAWRENCE`, `THOMAS`, type `U`, password field holds `PASSWORD`; neutral `Press PF5 key to save your updates ...` |
-| S3 | form | `user0001`, Enter | `User ID NOT found...` |
+| S3 | form | `user0001`, Enter (terminal without upper-case translation) | `User ID NOT found...` |
 | S4 | S2 | PF5 without changes | red `Please modify to update ...`, nothing written |
 | S5 | S2 | last name `THOMSON`, PF5 | record rewritten with `THOMSON`; green `User USER0001 has been updated ...` |
 | S6 | S2 | first name blank, PF5 | `First Name can NOT be empty...` |
@@ -438,7 +454,7 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | (data division) | 33-76 | §4.3, §5 |
 | `MAIN-PARA` | 82-138 | FLOW-USRU-001..007, BR-USRU-002, BR-USRU-005, VAL-USRU-004 |
 | `PROCESS-ENTER-KEY` | 143-172 | BR-USRU-001, VAL-USRU-001, DEF-USRU-008 |
-| `UPDATE-USER-INFO` | 177-245 | BR-USRU-003, BR-USRU-004, VAL-USRU-001, VAL-USRU-002, NUM-USRU-001, DEF-USRU-002..004 |
+| `UPDATE-USER-INFO` | 177-245 | BR-USRU-003, BR-USRU-004, VAL-USRU-001, VAL-USRU-002, NUM-USRU-001, NUM-USRU-004, DEF-USRU-002..004, DEF-USRU-010, DEF-USRU-011 |
 | `RETURN-TO-PREV-SCREEN` | 250-261 | FLOW-USRU-002, FLOW-USRU-006, BR-USRU-005 |
 | `SEND-USRUPD-SCREEN` | 266-278 | FLOW-USRU-008 |
 | `RECEIVE-USRUPD-SCREEN` | 283-291 | ERR-USRU-003 |

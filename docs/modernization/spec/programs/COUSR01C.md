@@ -166,7 +166,7 @@ The values typed so far are sent back, including the password into its dark fiel
 
 #### VAL-USRA-002 · User ID must be new
 - **When:** the write returns DUPREC (or DUPKEY): a record with this key already exists.
-- **Then:** message `User ID already exist...` (sic), cursor on user ID, form sent with the typed values; nothing is changed.
+- **Then:** message `User ID already exist...` (sic), form sent with the typed values; nothing is changed. The cursor ends on first name, not user ID: the validation's WHEN OTHER branch already set the first-name length to -1 (`:149`), the duplicate branch adds user ID (`:265`), and BMS places the cursor on the first field in map order with length -1, which is first name (row 8, above user ID on row 11; `app/bms/COUSR01.bms:84, 111`).
 - **Source:** `:260-266`
 - **Fidelity:** must-preserve · **Confidence:** reviewed; DUPREC for a KSDS primary key platform-inferred
 
@@ -233,7 +233,7 @@ Messages appear in `ERRMSG` (row 23, red unless noted).
 | `Password can NOT be empty...` | password blank | password | VAL-USRA-001 |
 | `User Type can NOT be empty...` | type blank | user type | VAL-USRA-001 |
 | `User <id> has been added ...` (green) | added | first name | BR-USRA-002 |
-| `User ID already exist...` | duplicate key | user ID | VAL-USRA-002 |
+| `User ID already exist...` | duplicate key | first name (VAL-USRA-002) | VAL-USRA-002 |
 | `Unable to Add User...` | other WRITE response | first name | ERR-USRA-001 |
 | `Invalid key pressed. Please see below...` | wrong key | first name | VAL-USRA-003 |
 
@@ -258,7 +258,7 @@ Messages appear in `ERRMSG` (row 23, red unless noted).
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### ERR-USRA-002 · Unchecked commands
-- **What:** the RECEIVE MAP response is not tested; SEND and XCTL have no RESP and there is no HANDLE CONDITION, so failures there abend the task.
+- **What:** the RECEIVE MAP response is not tested; SEND and XCTL have no RESP and there is no HANDLE CONDITION, so failures there abend the task. With Clear or a PA key the RECEIVE gets MAPFAIL, the key falls to VAL-USRA-003, and the form is sent from a map area that nothing filled in this task, so the typed values are lost.
 - **Source:** `:201-209, 175-178, 190-196`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
@@ -280,7 +280,7 @@ Messages appear in `ERRMSG` (row 23, red unless noted).
 ## 12. Numeric, date and format details
 
 #### NUM-USRA-001 · Field padding
-- Each screen field arrives left-justified and padded with spaces to its length (first and last name 20, user ID and password 8, type 1) and is stored with the same length, so no truncation happens. Leading spaces typed by the user are kept and become part of the key or the name.
+- Each screen field arrives left-justified and padded with spaces to its length (first and last name 20, user ID and password 8, type 1) and is stored with the same length, so no truncation happens. Leading spaces typed by the user are kept and become part of the key or the name; leading nulls (positions skipped without typing) are not sent by the terminal, so the data then shifts left.
 - **Source:** `:154-158`; `app/cpy/CSUSR01Y.cpy:17-23`
 - **Confidence:** platform-inferred (BMS input padding)
 
@@ -313,12 +313,12 @@ None of these were changed in this branch (`COUSR01C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** defect-decide (Q-SGN-001) · **Confidence:** reviewed
 
 #### DEF-USRA-004 · Record filler written uninitialised
-- The 23-byte filler at the end of the record is never set, so whatever the task's working storage holds (normally low-values) is written into the file.
+- The 23-byte filler at the end of the record is never set, so whatever the task's working storage holds is written into the file. Its content is not guaranteed: `CU01` is defined `STORAGECLEAR(NO)` (`app/csd/CARDDEMO.CSD:459-461`) and the field has no VALUE clause, so it depends on compiler and LE storage options.
 - **Source:** `:153-159`; `app/cpy/CSUSR01Y.cpy:23`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
 
 #### DEF-USRA-005 · [security] No check that the operator is an administrator; no audit
-- The program never reads `CDEMO-USER-TYPE` and records neither who created the user nor when. See DEF-ADMN-001.
+- The program never reads `CDEMO-USER-TYPE` and records neither who created the user nor when. Because any type can be stored and sign-on sends type `A` users to the admin menu (`app/cbl/COSGN00C.cbl:230-234`), anyone who reaches `CU01` with a commarea can create an administrator and sign on with it: a privilege escalation path. See DEF-ADMN-001.
 - **Source:** `:78-105`
 - **Status:** open · **Fidelity:** defect-decide (Q-ADMN-001) · **Confidence:** reviewed
 
@@ -336,6 +336,11 @@ None of these were changed in this branch (`COUSR01C.cbl` is not touched after t
 - `User ID already exist...` (grammar). The 80-character message work field is longer than the 78-character screen field; no message is that long.
 - **Source:** `:263`
 - **Status:** open (cosmetic) · **Fidelity:** incidental · **Confidence:** reviewed
+
+#### DEF-USRA-009 · User IDs with spaces are accepted
+- The user ID is stored exactly as received (`:154`), so leading or embedded spaces become part of the key (`AB CD`, ` AB`). Such users show a truncated ID in the confirmation (NUM-USRA-002), and a leading space sorts them before every other user in the list.
+- **Source:** `:130-135, 154`
+- **Status:** open · **Fidelity:** defect-decide (Q-USRA-001) · **Confidence:** reviewed; terminal handling of leading blanks platform-inferred (NUM-USRA-001)
 
 ## 14. Open questions
 
@@ -369,7 +374,7 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | :-- | :-- | :-- |
 | (data division) | 33-65 | §4.3, §5 |
 | `MAIN-PARA` | 71-110 | FLOW-USRA-001..006, VAL-USRA-003 |
-| `PROCESS-ENTER-KEY` | 115-160 | VAL-USRA-001, BR-USRA-001, DEF-USRA-001..004 |
+| `PROCESS-ENTER-KEY` | 115-160 | VAL-USRA-001, BR-USRA-001, DEF-USRA-001..004, DEF-USRA-009 |
 | `RETURN-TO-PREV-SCREEN` | 165-178 | FLOW-USRA-002, FLOW-USRA-005 |
 | `SEND-USRADD-SCREEN` | 184-196 | FLOW-USRA-007 |
 | `RECEIVE-USRADD-SCREEN` | 201-209 | ERR-USRA-002 |

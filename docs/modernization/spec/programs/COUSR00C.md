@@ -100,12 +100,12 @@ ENT-COMMAREA (160 bytes) followed by the 34-byte list extension ENT-COMMAREA-USE
 | `CDEMO-CU00-USRID-LAST` | yes | yes | user ID in row 10 of the page shown (unchanged when the page has fewer than 10 rows); start key for PF8 |
 | `CDEMO-CU00-PAGE-NUM` | yes | yes | page number, `9(08)` |
 | `CDEMO-CU00-NEXT-PAGE-FLG` | yes | yes | `Y` = a next page exists |
-| `CDEMO-CU00-USR-SEL-FLG` | no | yes | selection code of the marked row |
+| `CDEMO-CU00-USR-SEL-FLG` | yes (within the task, `:187-189`) | yes | selection code of the marked row |
 | `CDEMO-CU00-USR-SELECTED` | no | yes | user ID of the marked row; read by `COUSR02C` and `COUSR03C` |
 
 ### 4.4 Console output
 
-When a browse command fails with an unexpected response, the program writes `RESP:` and `REAS:` followed by the two binary response codes to the CICS log (`:608, 642, 676`). No user data is written.
+When a browse command fails with an unexpected response, the program writes `RESP:` and `REAS:` followed by the decimal values of the two binary response fields to the region's job log (LE standard output, not the CICS system log) (`:608, 642, 676`). No user data is written.
 
 ## 5. Data used
 
@@ -151,7 +151,7 @@ stateDiagram-v2
 1. Find the first row, 1 to 10, whose selection field is not blank; remember its code and user ID (151-185).
 2. If a code and a user ID were found: `U`/`u` transfer to update, `D`/`d` transfer to delete, other code: VAL-USRL-001 (187-216). Processing continues after VAL-USRL-001.
 3. Start key = search user ID, or low-values when it is blank (218-222).
-4. Page number = 0; build the page forward (227-228, FLOW-USRL-005 steps 2-6); clear the search field (230-232).
+4. Page number = 0; build the page forward (227-228, FLOW-USRL-005 steps 2-6). The search field is cleared inside the page build before its send (328); the second clear (230-232) runs after the screen was sent and only affects the extra send of the first entry.
 
 **Page forward (PROCESS-PAGE-FORWARD, lines 282-331)**
 
@@ -205,7 +205,7 @@ stateDiagram-v2
 
 #### BR-USRL-006 · Page number
 - **When:** a page is shown.
-- **Then:** Enter and every entry set the page number to 0 and the forward build makes it 1 (or leaves 0 when no user was found). PF8 adds 1 when it shows at least one row. PF7 subtracts 1, or sets 1 when the page shown is the first of the file. The number counts pages from where the list was started, so after a search the first page shown is page 1 whatever its position in the file.
+- **Then:** Enter and every entry set the page number to 0 and the forward build makes it 1 (it stays 0 only when STARTBR fails, in which case no page is shown). PF8 adds 1 when it shows at least one row. PF7 subtracts 1 when a record exists before the new first row, sets 1 when the new page is the first of the file, and leaves the number unchanged when the beginning of the file is reached while filling the rows (DEF-USRL-011). The number counts pages from where the list was started, so after a search the first page shown is page 1 whatever its position in the file.
 - **Source:** `:227, 308-323, 362-372`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -253,7 +253,7 @@ stateDiagram-v2
 
 #### FLOW-USRL-004 · PF7, previous page
 - **When:** PF7.
-- **Then:** start key = `CDEMO-CU00-USRID-FIRST` (low-values if blank); next-page flag = `Y`. Page number above 1: section 6 "Page backward". Otherwise VAL-USRL-003. Going back from page 2 to page 1 ends at the beginning of the file, so the final screen carries `You have reached the top of the page...`.
+- **Then:** start key = `CDEMO-CU00-USRID-FIRST` (low-values if blank); next-page flag = `Y`. Page number above 1: section 6 "Page backward". Otherwise VAL-USRL-003. Going back from page 2 to page 1 shows `You have reached the top of the page...` only when the list was started at the first user; after a search, page 1 can start in the middle of the file, the look-behind read finds a record, the page number goes to 1 and no message is shown.
 - **Source:** `:128-129, 237-255, 336-379`
 
 #### FLOW-USRL-005 · PF8, next page
@@ -284,10 +284,11 @@ stateDiagram-v2
 | PF8, flag `Y` | NORMAL | more than 10 after the last row | next 10, page + 1, flag `Y` |
 | PF8, flag `Y` | NORMAL | 1-10 after the last row | rows filled, page + 1, flag `N`, bottom message |
 | PF8, flag `Y` | NORMAL | none after the last row | blank list, page unchanged, flag `N`, bottom message (DEF-USRL-002) |
-| PF8, flag `Y`, last ID blank | NOTFND (high-values) | - | abend (DEF-USRL-001) |
+| PF8, flag `Y`, last ID blank | start key high-values; most likely NORMAL, positioned at the end of the file | none | skip read gets ENDFILE: bottom message, rows as received, page unchanged, flag `N`; no abend expected (DEF-USRL-001, platform-inferred) |
 | PF7, page > 1 | NORMAL | 10 before the first row, more before | previous 10, page - 1 |
 | PF7, page > 1 | NORMAL | 10 before the first row, none before | previous 10, page 1, `You have reached the top of the page...` |
 | PF7, page > 1 | NORMAL | fewer than 10 before | rows at the bottom, top rows blank, page unchanged, top message (DEF-USRL-011) |
+| PF7, page > 1 | NOTFND (every user from the first-row key on was deleted) | - | READPREV on a browse that never started (`Unable to lookup User...`), then the ENDBR abend (DEF-USRL-001) |
 
 ### 8.3 Message catalog
 
@@ -312,7 +313,7 @@ All messages appear in `ERRMSG` (row 23, red), informational ones included.
 - **Fidelity:** must-preserve (result), incidental (number of reads) · **Confidence:** reviewed
 
 #### SE-USRL-002 · Backward browse
-- **What:** STARTBR at `CDEMO-CU00-USRID-FIRST`, then READPREV: 1 skip read, up to 10 row reads and 1 look-behind read, then ENDBR. The first READPREV after STARTBR returns the record at the start key itself, which is why it is skipped.
+- **What:** STARTBR at `CDEMO-CU00-USRID-FIRST`, then READPREV: 1 skip read, up to 10 row reads and 1 look-behind read, then ENDBR. The first READPREV after STARTBR returns the record at the start key itself, which is why it is skipped. If that user was deleted between tasks, the STARTBR positions on a different key and the first READPREV most likely returns NOTFND, which shows `Unable to lookup User...` (ERR-USRL-002).
 - **Source:** `:338-374, 653-682, 687-691`
 - **Fidelity:** must-preserve (result) · **Confidence:** reviewed; READPREV positioning platform-inferred
 
@@ -323,7 +324,7 @@ All messages appear in `ERRMSG` (row 23, red), informational ones included.
 | Response | Effect |
 | :-- | :-- |
 | NORMAL | browse continues |
-| NOTFND (no user ID at or after the start key) | `You are at the top of the page...`, cursor on the search field, screen sent; the end-of-file flag is set but the error flag is not, so the page build goes on: with PF8 it issues a READNEXT on a browse that never started (response other, `Unable to lookup User...`), and in every case it ends with an ENDBR that has no RESP option, which raises INVREQ and abends the task (DEF-USRL-001) |
+| NOTFND (no user ID at or after the start key) | `You are at the top of the page...`, cursor on the search field, screen sent; the end-of-file flag is set but the error flag is not, so the page build goes on: with PF8 it issues a READNEXT, and on the PF7 path a READPREV, on a browse that never started (response other, `Unable to lookup User...`), and in every case it ends with an ENDBR that has no RESP option, which raises INVREQ and abends the task (DEF-USRL-001) |
 | other (for example NOTOPEN in the batch window) | log line, `Unable to lookup User...`, screen sent, error flag set; no ENDBR; normal return |
 
 - **Source:** `:597-614, 284-331, 687-691`
@@ -342,7 +343,7 @@ All messages appear in `ERRMSG` (row 23, red), informational ones included.
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### ERR-USRL-003 · Unchecked commands
-- **What:** the RECEIVE MAP response is not tested; ENDBR, the XCTLs and the SENDs have no RESP and no HANDLE CONDITION exists, so any failure there abends the task.
+- **What:** the RECEIVE MAP response is not tested; ENDBR, the XCTLs and the SENDs have no RESP and no HANDLE CONDITION exists, so any failure there abends the task. With Clear or a PA key the RECEIVE gets MAPFAIL, the key falls to VAL-USRL-002, and the screen is sent from a map area that nothing filled in this task: the list and page number come back blank, while the paging keys in the commarea are kept, so PF7 and PF8 still work.
 - **Source:** `:549-557, 687-691, 196-209, 514-517`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
@@ -378,7 +379,7 @@ sequenceDiagram
 | :-- | :-- |
 | Entry | XCTL from `COADM01C` with the 160-byte commarea; no authorisation is checked (Q-ADMN-001). |
 | Data | `USRSEC` read-only here; ordering is the EBCDIC byte order of the user ID (NUM-USRL-002), which a store on an ASCII or Unicode platform does not reproduce by default. |
-| Hand-over | `CDEMO-CU00-USR-SELECTED` (8) at commarea offset 187 to `COUSR02C`/`COUSR03C`; `CDEMO-FROM-PROGRAM` = `COUSR00C` makes them return here. |
+| Hand-over | `CDEMO-CU00-USR-SELECTED` (8) in commarea bytes 187-194 (counted from 1) to `COUSR02C`/`COUSR03C`; `CDEMO-FROM-PROGRAM` = `COUSR00C` makes them return here. |
 
 ## 12. Numeric, date and format details
 
@@ -401,14 +402,14 @@ sequenceDiagram
 None of these were changed in this branch (`COUSR00C.cbl` is not touched after the original import; `CHANGELOG.md` "Fixed" lists only batch and JCL fixes).
 
 #### DEF-USRL-001 · Abend when the browse start finds nothing
-- When STARTBR returns NOTFND, the program shows `You are at the top of the page...` but carries on and issues ENDBR on a browse that never started; ENDBR has no RESP option, so CICS raises INVREQ and abends the task (AEIP), and the pseudo-conversation is lost (the next key starts no CardDemo transaction). It happens for a search user ID greater than every user ID (for example `ZZZZZZZZ`), for an empty file, and for PF8 with a blank last user ID (DEF-USRL-002).
+- When STARTBR returns NOTFND, the program shows `You are at the top of the page...` but carries on and issues ENDBR on a browse that never started; ENDBR has no RESP option, so CICS raises INVREQ and abends the task (AEIP), and the pseudo-conversation is lost (the next key starts no CardDemo transaction). It happens for a search user ID greater than every user ID (for example `ZZZZZZZZ`; in EBCDIC digits sort above letters, so `99999999` is the safer example), for an empty file, and for PF7 when every user from the first-row key on was deleted. PF8 with a blank last user ID starts at high-values; CICS most likely treats a full-length X'FF' key as "position at the end of the file" (NORMAL, then ENDFILE on the first read), so that case probably ends with the bottom message and no abend (Q-USRL-003).
 - **Source:** `:600-606, 286-290, 325, 687-691`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-USRL-002 · PF7 on page 1 sets the next-page flag
-- PF7 sets the next-page flag to `Y` before checking the page number. After PF7 on a list that fits on one page, PF8 no longer says "already at the bottom": with exactly 10 users it shows an empty list with `You have reached the bottom of the page...`; with fewer than 10 users, entered from the admin menu, the last user ID is blank, the browse starts at high-values and the task abends (DEF-USRL-001).
+- PF7 sets the next-page flag to `Y` before checking the page number. After PF7 on a list that fits on one page, PF8 no longer says "already at the bottom": with exactly 10 users it shows an empty list with `You have reached the bottom of the page...`; with fewer than 10 users, entered from the admin menu, the last user ID is blank and the browse starts at high-values, which most likely ends with the bottom message and the list unchanged (DEF-USRL-001).
 - **Source:** `:245, 248-255, 262-266, 288-296`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (logic), platform-inferred (abend)
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (logic), platform-inferred (high-values start)
 
 #### DEF-USRL-003 · Informational messages look like errors
 - All messages, including "reached the bottom" on a complete one-page list, are shown in bright red. With the 10 seed users the very first screen already reads `You have reached the bottom of the page...`. `You are at the top of the page...` is shown when a search finds nothing, which is not what it means.
@@ -446,14 +447,34 @@ None of these were changed in this branch (`COUSR00C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-USRL-010 · Several screen sends per task
-- The end-of-file and error branches send the screen immediately (with a partial page and, on the first send, no page number), and the page is sent again at the end; the first entry sends it once more. Only the last send is visible after the task ends, but every send travels to the terminal.
+- The end-of-file and error branches send the screen immediately (with a partial page; on first entry without a page number, on re-entry with the previous page number, because `PAGENUM` is `FSET` and comes back from the terminal), and the page is sent again at the end; the first entry sends it once more. Only the last send is visible after the task ends, but every send travels to the terminal.
 - **Source:** `:119, 329, 377, 606, 640, 674`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-USRL-011 · Paging back can show a partial page
-- If fewer than 10 users precede the first row of the current page (for example after a search, or after deletions), PF7 fills rows from the bottom up, leaves the top rows blank and keeps the page number; the "top" message is shown.
+- If fewer than 10 users precede the first row of the current page, PF7 fills rows from the bottom up, leaves the top rows blank and keeps the page number; the "top" message is shown. A page above 1 is normally reached by PF8 from a full page, so this needs deletions between tasks, or the stale last-row key of DEF-USRL-014.
 - **Source:** `:352-372`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+
+#### DEF-USRL-012 · Selection marks survive paging and act on another user
+- `INITIALIZE-USER-DATA` clears the user ID, name and type columns but never the selection fields `SEL0001`-`SEL0010`, and the input and output map areas share storage. A mark typed on row 3 followed by PF7, PF8 or an invalid key is sent back on the new page; the next Enter then opens update or delete for whichever user is now in row 3. For `D` the delete function opens a different user than the one the administrator marked.
+- **Source:** `:151-209, 446-501`; `app/cpy-bms/COUSR00.CPY` (`COUSR0AO REDEFINES COUSR0AI`)
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+
+#### DEF-USRL-013 · [security] The selected user ID comes from the terminal
+- `CDEMO-CU00-USR-SELECTED` is taken from the protected, `FSET` row field returned by the terminal (`:154-181`), not from server-side state. A modified 3270 data stream can hand any user ID, including one not on the list, to update or delete.
+- **Source:** `:151-185`; `app/bms/COUSR00.bms` (`USRID01`-`USRID10`, `FSET`)
+- **Status:** open · **Fidelity:** defect-decide (Q-ADMN-001) · **Confidence:** reviewed; data-stream tampering platform-inferred
+
+#### DEF-USRL-014 · Stale first and last keys after a short page
+- `CDEMO-CU00-USRID-FIRST` is set only from row 1 and `CDEMO-CU00-USRID-LAST` only from row 10 (`:387-389, 433-435`). After a page with fewer than 10 rows, the last key still holds row 10 of an earlier full page. Combined with DEF-USRL-002 this pages from the old key: with 25 users, show page 1, search the 18th user (8 rows), press PF7 (top message, flag `Y`), then PF8: users 11-20 appear as page 2.
+- **Source:** `:245, 262-266, 384-441`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+
+#### DEF-USRL-015 · The search field is read only by Enter and cleared after each page
+- A search ID typed before PF7 or PF8 is ignored (only Enter reads it, `:218-222`). PF8 then blanks the field (`:328`); PF7 leaves it on screen, where it looks active but is not. Because every forward page clears it, a later Enter (including one with an invalid selection) restarts at the first user unless the ID is typed again, which reinforces DEF-USRL-006.
+- **Source:** `:218-222, 328`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -461,7 +482,7 @@ None of these were changed in this branch (`COUSR00C.cbl` is not touched after t
 | :-- | :-- | :-- |
 | Q-USRL-001 | Should the user search be case-insensitive and should it be a filter (prefix or contains) instead of a "start at" position? | business |
 | Q-USRL-002 | Must the target keep the EBCDIC user ID order (lower case, then upper case, then digits) for listing and paging, or is the target platform's natural order acceptable? | business |
-| Q-USRL-003 | On the mainframe: confirm that STARTBR without `GTEQ` or `EQUAL` positions at the first key equal to or greater than the start key, and that ENDBR after a NOTFND STARTBR abends with AEIP (DEF-USRL-001). | mainframe team |
+| Q-USRL-003 | On the mainframe: confirm that STARTBR without `GTEQ` or `EQUAL` positions at the first key equal to or greater than the start key, that ENDBR after a NOTFND STARTBR abends with AEIP, and how STARTBR behaves with an all-X'FF' (high-values) key (DEF-USRL-001, DEF-USRL-002). | mainframe team |
 
 ## 15. Equivalence contract
 
@@ -490,13 +511,13 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | :-- | :-- | :-- |
 | (data division) | 33-92 | §4.3, §5, DEF-USRL-009 |
 | `MAIN-PARA` | 98-144 | FLOW-USRL-001, FLOW-USRL-002, FLOW-USRL-006, FLOW-USRL-007, VAL-USRL-002 |
-| `PROCESS-ENTER-KEY` | 149-232 | FLOW-USRL-003, BR-USRL-002..005, VAL-USRL-001, DEF-USRL-004, DEF-USRL-006 |
+| `PROCESS-ENTER-KEY` | 149-232 | FLOW-USRL-003, BR-USRL-002..005, VAL-USRL-001, DEF-USRL-004, DEF-USRL-006, DEF-USRL-012, DEF-USRL-013, DEF-USRL-015 |
 | `PROCESS-PF7-KEY` | 237-255 | FLOW-USRL-004, VAL-USRL-003, DEF-USRL-002 |
 | `PROCESS-PF8-KEY` | 260-277 | FLOW-USRL-005, VAL-USRL-004 |
-| `PROCESS-PAGE-FORWARD` | 282-331 | SE-USRL-001, BR-USRL-001, BR-USRL-006, DEF-USRL-001 |
+| `PROCESS-PAGE-FORWARD` | 282-331 | SE-USRL-001, BR-USRL-001, BR-USRL-006, DEF-USRL-001, DEF-USRL-015 |
 | `PROCESS-PAGE-BACKWARD` | 336-379 | SE-USRL-002, BR-USRL-006, DEF-USRL-011 |
-| `POPULATE-USER-DATA` | 384-441 | BR-USRL-001 |
-| `INITIALIZE-USER-DATA` | 446-501 | BR-USRL-001, DEF-USRL-004 |
+| `POPULATE-USER-DATA` | 384-441 | BR-USRL-001, DEF-USRL-014 |
+| `INITIALIZE-USER-DATA` | 446-501 | BR-USRL-001, DEF-USRL-004, DEF-USRL-012 |
 | `RETURN-TO-PREV-SCREEN` | 506-517 | FLOW-USRL-002, FLOW-USRL-006 |
 | `SEND-USRLST-SCREEN` | 522-544 | FLOW-USRL-008, DEF-USRL-010 |
 | `RECEIVE-USRLST-SCREEN` | 549-557 | ERR-USRL-003 |

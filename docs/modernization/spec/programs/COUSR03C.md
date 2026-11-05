@@ -143,7 +143,7 @@ stateDiagram-v2
 
 #### BR-USRD-001 · Fetch a user
 - **When:** Enter (or the first entry from the list), user ID filled in.
-- **Then:** the record with key = user ID exactly as typed is read for update; first name, last name and type are shown, the password is not. Message `Press PF5 key to delete this user ...` in neutral (white). The lock ends with the task.
+- **Then:** the record with key = user ID exactly as typed is read for update (the program does not upper-case it; whether `user0004` is found depends on the terminal's upper-case translation, which the CSD does not set for `CU03`); first name, last name and type are shown, the password is not. Message `Press PF5 key to delete this user ...` in neutral (white). The lock ends with the task.
 - **Source:** `:156-169, 269-286`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -202,7 +202,7 @@ stateDiagram-v2
 - **Source:** `:109-110`
 
 #### FLOW-USRD-004 · PF5
-- **Then:** delete (section 6); the program stays on the (cleared) form.
+- **Then:** delete (section 6); the program stays on the form, which is cleared only when the DELETE succeeds (BR-USRD-004); after a validation, READ or DELETE failure the received values stay on it.
 - **Source:** `:121-122`
 
 #### FLOW-USRD-005 · PF4, clear
@@ -231,27 +231,27 @@ stateDiagram-v2
 | :-- | :-- | :-- | :-- |
 | blank | not done | not done | `User ID can NOT be empty...` |
 | filled | NORMAL | NORMAL | green `User <id> has been deleted ...`, form cleared |
-| filled | NORMAL | other | `Unable to Update User...` |
-| filled | NOTFND or other | attempted without a held record, fails | `Unable to Update User...` (DEF-USRD-002) |
+| filled | NORMAL | other | `Unable to Update User...` (neutral, NUM-USRD-003) |
+| filled | NOTFND or other | attempted without a held record, fails | `Unable to Update User...` (red; DEF-USRD-002) |
 
 ### 8.3 Message catalog
 
-Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted.
+Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted; after a successful READ in the same task it stays neutral until a later message sets it again (NUM-USRD-003). The cursor goes to the first field in map order whose length was set to -1; both the fetch and the delete path set the user ID to -1 first, so every message below leaves the cursor on the user ID (NUM-USRD-003).
 
 | Text (exact) | Cause | Cursor | Item |
 | :-- | :-- | :-- | :-- |
 | `User ID can NOT be empty...` | user ID blank | user ID | VAL-USRD-001 |
 | `Press PF5 key to delete this user ...` (neutral) | record read | user ID | BR-USRD-001 |
-| `User ID NOT found...` | READ or DELETE NOTFND | user ID | VAL-USRD-002, ERR-USRD-002 |
-| `Unable to lookup User...` | READ other response | first name | ERR-USRD-001 |
+| `User ID NOT found...` | READ NOTFND (red), DELETE NOTFND (neutral) | user ID | VAL-USRD-002, ERR-USRD-002 |
+| `Unable to lookup User...` | READ other response | user ID | ERR-USRD-001 |
 | `User <id> has been deleted ...` (green) | deleted | user ID | BR-USRD-004 |
-| `Unable to Update User...` | DELETE other response | first name | ERR-USRD-002, DEF-USRD-003 |
+| `Unable to Update User...` | DELETE other response; neutral after a successful READ, red after a failed one | user ID | ERR-USRD-002, DEF-USRD-003 |
 | `Invalid key pressed. Please see below...` | wrong key | not set | VAL-USRD-003 |
 
 ## 9. Side effects
 
 #### SE-USRD-001 · Read the user record for update
-- **What:** READ UPDATE `USRSEC` by the typed 8-character user ID, on every fetch and before every delete. The lock lasts until the delete or the end of the task.
+- **What:** READ UPDATE `USRSEC` by the typed 8-character user ID, on every fetch and before every delete. The lock lasts until the delete or the end of the task. `USRSEC` is defined with `STRINGS(1)` in LSR pool 1 (`app/csd/CARDDEMO.CSD:89-91`), so the held request can also hold the file's only VSAM string.
 - **Source:** `:269-278`
 - **Fidelity:** must-preserve (read), incidental (lock in the fetch path) · **Confidence:** reviewed; lock duration platform-inferred
 
@@ -268,7 +268,7 @@ Messages appear in `ERRMSG` (row 23). Colour is the map's red unless noted.
 | :-- | :-- |
 | NORMAL | `Press PF5 key to delete this user ...` (neutral), form sent |
 | NOTFND | `User ID NOT found...`, cursor on user ID, error flag |
-| other (NOTOPEN in the batch window, ...) | log line, `Unable to lookup User...`, cursor on first name, error flag |
+| other (NOTOPEN in the batch window, ...) | log line, `Unable to lookup User...`, error flag; cursor on the user ID (already -1 at `:152` or `:184`; the `MOVE -1 TO FNAMEL` at `:298` does not move it) |
 
 On PF5 the error flag does not stop the delete that follows (DEF-USRD-002).
 - **Source:** `:280-300`
@@ -279,14 +279,14 @@ On PF5 the error flag does not stop the delete that follows (DEF-USRD-002).
 | Response | Effect |
 | :-- | :-- |
 | NORMAL | BR-USRD-004 |
-| NOTFND | `User ID NOT found...`, cursor on user ID |
-| other (for example INVREQ when no record is held) | log line, `Unable to Update User...`, cursor on first name |
+| NOTFND (practically unreachable after a held read) | `User ID NOT found...`, cursor on user ID, neutral colour |
+| other (for example INVREQ when no record is held) | log line, `Unable to Update User...`, cursor on user ID (set at `:184`); neutral when the READ succeeded, red when it failed |
 
 - **Source:** `:313-336`
 - **Fidelity:** must-preserve · **Confidence:** reviewed; INVREQ case platform-inferred
 
 #### ERR-USRD-003 · Unchecked commands
-- **What:** the RECEIVE MAP response is not tested; SEND and XCTL have no RESP and there is no HANDLE CONDITION.
+- **What:** the RECEIVE MAP response is not tested; SEND and XCTL have no RESP and there is no HANDLE CONDITION. With Clear or a PA key the RECEIVE gets MAPFAIL, the key falls to VAL-USRD-003, and the screen is sent from a map area that nothing filled in this task.
 - **Source:** `:230-238, 205-208, 219-225`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
@@ -301,20 +301,26 @@ On PF5 the error flag does not stop the delete that follows (DEF-USRD-002).
 
 | Boundary | Contract |
 | :-- | :-- |
-| Entry | XCTL from `COADM01C` (160 bytes) or `COUSR00C` (194 bytes, selected user ID at offset 187). No authorisation check. |
+| Entry | XCTL from `COADM01C` (160 bytes) or `COUSR00C` (194 bytes, selected user ID in bytes 187-194 counted from 1). No authorisation check. |
 | Exit | XCTL to the caller (PF3) or `COADM01C` (PF12) with the 194-byte commarea, context 0. |
 | Data | Physically deletes ENT-USER-SECURITY records; no audit trail. |
 
 ## 12. Numeric, date and format details
 
 #### NUM-USRD-001 · Confirmation text
-- `User ` + user ID up to the first space + ` has been deleted ...`; `ADMIN003` gives `User ADMIN003 has been deleted ...` (GnuCOBOL STRING test).
+- `User ` + user ID up to the first space + ` has been deleted ...`; `ADMIN003` gives `User ADMIN003 has been deleted ...` (GnuCOBOL STRING test). The key is used exactly as typed, so `AB CD` gives `User AB has been deleted ...` and a leading space gives `User  has been deleted ...`.
 - **Source:** `:318-321`
 - **Confidence:** runtime-verified
 
 #### NUM-USRD-002 · Header date and time
 - Date `mm/dd/yy`, time `hh:mm:ss`, from `FUNCTION CURRENT-DATE`.
 - **Source:** `:243-262`
+
+#### NUM-USRD-003 · Cursor and message colour carry-over
+- The map is sent with `CURSOR` and no value, so BMS puts the cursor on the first field in map order whose length is -1; the user ID comes before first name. Both the fetch (`:152`) and the delete path (`:184`) set the user ID to -1 before any read, so the later `MOVE -1 TO FNAMEL` (`:298, 334`) never moves the cursor.
+- A successful READ sets the message colour to neutral (`:285`); only the green confirmation (`:317`) sets it again. So DELETE errors after a successful READ appear in neutral, not in the map's red.
+- **Source:** `:149-152, 181-184, 224, 285, 298, 317, 334`
+- **Confidence:** reviewed; BMS symbolic cursor rule platform-inferred
 
 ## 13. Known defects and oddities
 
@@ -336,7 +342,7 @@ None of these were changed in this branch (`COUSR03C.cbl` is not touched after t
 - **Status:** open (cosmetic) · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-USRD-004 · [security] No administrator check, no self or last-admin protection, no audit
-- The program never reads `CDEMO-USER-TYPE` or `CDEMO-USER-ID`. An administrator can delete their own user (their session continues until they sign off) and every other administrator, after which nobody can reach the admin menu (only a batch reload of `USRSEC` restores access, `app/jcl/DUSRSECJ.jcl:58-73`). No record of who deleted whom is kept.
+- The program never reads `CDEMO-USER-TYPE` or `CDEMO-USER-ID`. An administrator can delete their own user (their session continues until they sign off) and every other administrator, after which nobody can reach the admin menu (only a batch reload of `USRSEC` restores access, `app/jcl/DUSRSECJ.jcl:23-88`). No record of who deleted whom is kept.
 - **Source:** `:90-132, 307-311`
 - **Status:** open · **Fidelity:** defect-decide (Q-ADMN-001, Q-USRD-002) · **Confidence:** reviewed
 
@@ -373,7 +379,7 @@ A reimplementation must reproduce which record is deleted, the validation and me
 | S2 | form | `USER0004`, Enter | `AVERARDO`, `MAZZI`, `U`; neutral `Press PF5 key to delete this user ...` |
 | S3 | S2 | PF5 | `USER0004` deleted; green `User USER0004 has been deleted ...`; form empty |
 | S4 | form | `USER0005`, PF5 (no fetch) | `USER0005` deleted at once (DEF-USRD-001) |
-| S5 | form | `NOUSER01`, Enter | `User ID NOT found...` |
+| S5 | form | `NOUSER01`, Enter | `User ID NOT found...`, cursor on user ID |
 | S6 | form | `NOUSER01`, PF5 | `Unable to Update User...` (DEF-USRD-002) |
 | S7 | user list | `D` on `ADMIN003` | form filled with `ADMIN003` at once |
 | S8 | S7 | PF3 | user list, page 1, nothing deleted |
@@ -394,7 +400,7 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | `SEND-USRDEL-SCREEN` | 213-225 | FLOW-USRD-009 |
 | `RECEIVE-USRDEL-SCREEN` | 230-238 | ERR-USRD-003 |
 | `POPULATE-HEADER-INFO` | 243-262 | FLOW-USRD-009, NUM-USRD-002 |
-| `READ-USER-SEC-FILE` | 267-300 | SE-USRD-001, ERR-USRD-001, VAL-USRD-002 |
+| `READ-USER-SEC-FILE` | 267-300 | SE-USRD-001, ERR-USRD-001, VAL-USRD-002, NUM-USRD-003 |
 | `DELETE-USER-SEC-FILE` | 305-336 | SE-USRD-002, ERR-USRD-002, BR-USRD-004, NUM-USRD-001, DEF-USRD-003 |
 | `CLEAR-CURRENT-SCREEN` | 341-344 | FLOW-USRD-005 |
 | `INITIALIZE-ALL-FIELDS` | 349-356 | FLOW-USRD-005, BR-USRD-004 |
