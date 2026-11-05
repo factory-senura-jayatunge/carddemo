@@ -9,8 +9,11 @@
       "reason": "tools/shims (Language Environment and MVS service stand-ins) and tools/drivers are COBOL compiled into the local GnuCOBOL build, so they follow the same rules as app/."},
     "copybooks": {"globs": ["app/cpy/*", "app/cpy-bms/*", "app/app-*/cpy/*", "app/app-*/cpy-bms/*", "app/app-*/dcl/*"], "extensions": [".cpy", ".dcl"]},
     "jcl": {"globs": ["app/jcl/*", "app/proc/*", "app/app-*/jcl/*"], "extensions": [".jcl", ".prc"]},
-    "exclude": ["tools/templates/*"],
-    "exclude_reason": "tools/templates/*.in are COBOL skeletons with @PLACEHOLDER@ tokens that tools/carddemo.py fills in per data set; they are not valid COBOL before substitution.",
+    "exclude": ["tools/templates/*", "tests/unit/cobol/*_test.cbl"],
+    "exclude_reasons": {
+      "tools/templates/*": "tools/templates/*.in are COBOL skeletons with @PLACEHOLDER@ tokens that tools/carddemo.py fills in per data set; they are not valid COBOL before substitution.",
+      "tests/unit/cobol/*_test.cbl": "Unit-test harness drivers, compiled only by tests/run_tests.py. Their *_test file names (and PROGRAM-IDs such as CBSTM03B-TEST) deliberately differ from 1-8 character mainframe member naming, so program-name-format and program-id-mismatch do not apply. They are also outside the program globs; the exclude keeps them out if the globs are widened."
+    },
     "generated": ["app/cpy-bms/*", "app/app-*/cpy-bms/*"],
     "generated_reason": "cpy-bms members are symbolic maps generated from the BMS sources in bms/; their repetition is produced by the BMS assembler, so duplicate-block skips them."
   },
