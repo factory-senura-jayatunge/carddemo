@@ -19,7 +19,7 @@ INVENTORY_TOOL := scripts/gen_inventory.py
 
 .DEFAULT_GOAL := help
 .PHONY: help check-toolchain build build-trace run-batch jobs list test coverage test-unit \
-	test-integration lint docs-check agents-md-check check package changelog clean
+	test-integration lint docs-check agents-md-check spec-check check package changelog clean
 
 help: ## Show the available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -73,8 +73,11 @@ docs-check: ## Fail if docs/inventory.md is stale (python3 scripts/gen_inventory
 agents-md-check: ## Check the commands and paths in AGENTS.md and the skills (python3 scripts/check_agents_md.py)
 	@$(PYTHON) scripts/check_agents_md.py
 
-check: ## lint + docs-check + agents-md-check + build + test; prints a summary and fails if any step failed or did not run
-	@$(PYTHON) tools/check.py lint docs-check agents-md-check build test
+spec-check: ## Check the NL specs in docs/modernization/spec (python3 docs/modernization/spec/tools/check_spec.py)
+	@$(PYTHON) docs/modernization/spec/tools/check_spec.py
+
+check: ## lint + docs-check + agents-md-check + spec-check + build + test; prints a summary and fails if any step failed or did not run
+	@$(PYTHON) tools/check.py lint docs-check agents-md-check spec-check build test
 
 package: build ## Archive build/release into dist/ with SHA256SUMS: make package VERSION=v1.0.0
 	@if [ -z "$(VERSION)" ]; then echo "usage: make package VERSION=v1.0.0"; exit 1; fi

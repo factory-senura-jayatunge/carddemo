@@ -259,6 +259,7 @@ Text fields are left-aligned and padded with spaces.
 | space or empty | Read the account with update; continue (shows the balance) | 182-184 |
 | anything else | Message `Invalid value. Valid values are (Y/N)...`, cursor on confirmation, send; stop | 185-190 |
 
+- **Source:** `:173-191, 552-566`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### VAL-BILL-003 · Account must exist

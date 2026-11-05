@@ -160,12 +160,34 @@ A spec moves from *draft* to *reviewed* when an independent reviewer has checked
 2. **Items** are level-4 headings `#### <KIND>-<UNIT>-<NNN> · <title>`, with `KIND` one of `BR VAL FLOW SE ERR NUM DEF`, `UNIT` equal to `unit_code` and `NNN` three digits. Open questions are table rows `| Q-<UNIT>-<NNN> | ... |`. IDs are unique.
 3. **References** to items (`BR-POST-001`, ranges such as `DEF-BILL-011..014`), entities (`ENT-ACCOUNT`) and invariants (`INV-001`) must resolve: items to any spec, entities to an `## ENT-<NAME> · ...` heading in `entities.md` or a proposal in `areas/`, invariants to `components.md`.
 4. **Source citations** are code spans of the form `` `path:lines` `` or `` `:lines` `` (primary source), where `lines` is `N`, `N-M` or a comma-separated list of those. `path` is repository-relative or a file name that is unique in the repository. Every line must exist in the file and `N <= M`. Each `BR`, `VAL`, `FLOW`, `SE`, `ERR` item has a `**Source:**` line (a warning otherwise).
-5. **Coverage** is section 16, a table whose rows are `` | `<PARAGRAPH>` | <start>-<end> | <items> | ``, plus free rows whose first cell is in parentheses, such as `(data division)`. For a COBOL primary source every paragraph and section of the PROCEDURE DIVISION has exactly one row; `start` is the line of its label, `end` is its last code line before the next label (comments and blank lines excluded); the items cell is not empty and every ID in it resolves. A row for a name that is not a paragraph is an error. For a JCL primary source the rows are the job steps (`//NAME EXEC`), with the same rules.
+5. **Coverage** is section 16, a table whose rows are `` | `<NAME>` | <start>-<end> | <items> | ``, plus free rows whose first cell is in parentheses, such as `(data division)` or `(job statement)`. Rows are matched to units by name and start line, so a name that occurs twice (two job steps called `STEP05`) has two rows in source order. The items cell is never empty and every ID in it resolves.
+   - **COBOL primary source:** every paragraph and section of the PROCEDURE DIVISION has exactly one row; `start` is the line of its label and `end` its last code line before the next label (comments and blank lines excluded). Code between `PROCEDURE DIVISION` and the first label needs a free row that includes its first line, such as `(procedure division main line)`.
+   - **JCL primary source** (job or procedure): every named step `//NAME EXEC` has exactly one row; `start` is the EXEC line and `end` the last line before the next EXEC that is not blank, not a `//*` comment and not a bare `//`. In-stream data and `/*` lines count.
+   - **CSD and schedule primary sources:** free rows, one per DEFINE or scheduler job; their line ranges are checked, their completeness is not (yet).
+   - A row for a name that is not a unit of the primary source, or with the wrong start or end, is an error.
 
-`--require-all` also fails when an in-scope source (every COBOL program under `app/`, every JCL member and procedure) has no spec; `--program NAME` limits the run to some specs; `--json FILE` writes the coverage report.
+`--require-all` also fails when an in-scope source (see "Job specs") has no spec; `--program NAME` limits the run to some specs; `--json FILE` writes the coverage report.
+
+## Job specs
+
+Job specs use the same 16 sections, read for JCL:
+
+| Section | For a job |
+| :-- | :-- |
+| 4 Interfaces | One DD table per step: DD name, dataset, DISP, DCB, what the program does with it. |
+| 6 Processing flow | A step table (step, program or utility, purpose, class *business* or *plumbing*) and a Mermaid diagram. |
+| 7 `BR` | Only for business steps; the program's own rules stay in its program spec and are referenced. |
+| 9 `SE` | Dataset effects: allocate, delete, define, REPRO, SORT, with the exact IDCAMS or SORT control statements quoted. |
+| 10 `ERR` | Step failure, COND and IF/THEN logic as it affects failure, restart. |
+| 12 `NUM` | Keys, record sizes, SORT fields, GDG limits, space. |
+| 16 Coverage | One row per step (rule 5). |
+
+File names: `jobs/<MEMBER>.md` for a JCL member; a procedure whose name is also a job gets the suffix `-PROC` (`jobs/TRANREPT-PROC.md`, id `TRANREPT-PROC`); the CSD is `jobs/CARDDEMO-CSD.md` (kind `csd`), the schedules `jobs/SCHED-CA7.md` and `jobs/SCHED-CONTROLM.md` (kind `schedule`). `jobs/README.md` is the operations view; it has no front matter and the checker skips it. Unit codes for jobs start with `J`.
+
+**What `--require-all` counts:** every COBOL program and assembler routine under `app/`, every member of a `jcl/` folder under `app/`, `app/proc`, every `*.csd` file and `app/scheduler`. It does not count `samples/jcl` and `samples/proc` (mainframe compile samples, not application behaviour; described in `jobs/README.md`), nor copybooks, DDL, DCL, DBD, PSB, control cards and data, which are described in `entities.md` and cited from the specs that use them.
 
 ## Scaling to the full inventory
 
-- One spec per COBOL program (44 under `app/`, base application and the three optional modules) and per JCL job or procedure that carries logic; copybooks, files, tables and segments go into `entities.md` as programs are processed.
+- One spec per COBOL program (44 under `app/`, base application and the three optional modules) and per JCL job, procedure, CSD and schedule; copybooks, files, tables and segments go into `entities.md` as programs are processed.
 - Online programs reuse the pilot's screen section; batch programs reuse the pilot's control-flow, side-effect and equivalence sections.
 - Equivalence checks: every batch program that runs locally gets a spec-only reimplementation compared with the runner, as in the pilot (`checks/`). Online programs get scenario tables (inputs, key, expected screen and data) that become acceptance tests for the React and Spring Boot rewrite.
