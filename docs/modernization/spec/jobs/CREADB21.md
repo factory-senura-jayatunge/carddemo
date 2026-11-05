@@ -23,7 +23,7 @@ data_stores:
 calls: [IKJEFT01, DSNTIAD, DSNTEP4, IEFBR14]
 transfers_to: []
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CREADB21: Create the transaction type Db2 database and load the seed data

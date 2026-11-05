@@ -18,7 +18,7 @@ data_stores:
 calls: [IKJEFT01, COBTUPDT]
 transfers_to: []
 invoked_by: [Control-M]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # MNTTRDB2: Weekly batch maintenance of the transaction type table

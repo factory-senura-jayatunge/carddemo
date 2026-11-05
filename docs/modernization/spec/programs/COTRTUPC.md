@@ -32,7 +32,7 @@ data_stores:
 calls: []
 transfers_to: [COADM01C, "<CDEMO-FROM-PROGRAM>"]
 invoked_by: [COADM01C, COTRTLIC]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COTRTUPC: Transaction type add, update and delete

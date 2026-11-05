@@ -16,7 +16,7 @@ data_stores: []
 calls: []
 transfers_to: []
 invoked_by: [installer]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CRDDEMOD-CSD: CICS resource definitions of the transaction type (Db2) module

@@ -21,7 +21,7 @@ data_stores:
 calls: [MQOPEN, MQGET, MQPUT, MQCLOSE]
 transfers_to: []
 invoked_by: ["CICS-MQ trigger monitor (CKTI), platform-inferred"]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COACCT01: Account inquiry over IBM MQ (CDRA)
@@ -574,6 +574,8 @@ sequenceDiagram
 | Q-MQAC-008 | Must the target keep the labelled text reply with unedited overpunched amounts, or may it send a structured reply? | architecture |
 
 ## 15. Equivalence contract
+
+The independent review of this spec is recorded in `docs/modernization/spec/evidence/f-trantype-vsam-mq-review.md`.
 
 A reimplementation must reproduce, for each request: which queue receives a message, the exact 1000 bytes of the reply or error record, the reply's message ID and correlation ID (BR-MQAC-005), the order of replies, and whether the request is consumed. It may differ in: console (DISPLAY) output, MQ context fields, the loop mechanics (5-second idle wait) as long as each request gets the same single reply, and the error records for platform failures (open, close, put) that the target replaces. These scenarios cannot run locally (no CICS, MQ or trigger monitor); they become acceptance tests for the target.
 

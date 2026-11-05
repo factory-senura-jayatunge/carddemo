@@ -24,7 +24,7 @@ calls: []
 transfers_to: []
 invoked_by: [MNTTRDB2.jcl]
 local_run: "not runnable locally (Db2 precompiler and Db2 needed)"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COBTUPDT: Batch transaction type maintenance (MNTTRDB2)

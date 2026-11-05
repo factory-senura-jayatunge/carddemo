@@ -33,7 +33,7 @@ data_stores:
 calls: [DSNTIAC]
 transfers_to: [COTRTUPC, COADM01C, "<CDEMO-FROM-PROGRAM>"]
 invoked_by: [COADM01C, COTRTUPC]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COTRTLIC: Transaction type list, update and delete (Db2)
@@ -821,6 +821,8 @@ None of these is changed in this branch.
 | Q-TTLS-007 | Fix the confirmation bypass of DEF-TTLS-003 (confirm action and row, not only row)? Expected yes. | business |
 
 ## 15. Equivalence contract
+
+The independent review of this spec is recorded in `docs/modernization/spec/evidence/f-trantype-vsam-mq-review.md`.
 
 A reimplementation must reproduce, for each scenario: the rows listed (codes, descriptions, order), the Db2 changes, the error and information texts, which rows are highlighted or editable, the page number and where the cursor is. It may differ in: the DSNTIAC part of Db2 messages, colours and attribute bytes, screen technology, and the clock values.
 

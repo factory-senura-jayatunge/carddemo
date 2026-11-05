@@ -19,7 +19,7 @@ data_stores:
 calls: [MQOPEN, MQGET, MQPUT, MQCLOSE]
 transfers_to: []
 invoked_by: ["CICS-MQ trigger monitor (CKTI), platform-inferred"]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CODATE01: System date and time inquiry over IBM MQ (CDRD)
@@ -409,6 +409,8 @@ sequenceDiagram
 | Q-MQDT-003 | Which contract is authoritative for existing requesters: the code (any request, 46-character text) or the README (`DATE` request with a request ID echoed in the response)? | business, integration owners |
 
 ## 15. Equivalence contract
+
+The independent review of this spec is recorded in `docs/modernization/spec/evidence/f-trantype-vsam-mq-review.md`.
 
 A reimplementation must reproduce, for each request: the queue receiving the message, the 1000-byte reply or error record, the reply's MsgId and CorrelId (BR-MQDT-003), and the order of replies. The date and time values may differ (clock), but their format and positions must match NUM-MQDT-001. Console output, MQ context and the 5-second loop mechanics may differ. These scenarios cannot run locally (no CICS, MQ or trigger monitor); they become acceptance tests for the target.
 

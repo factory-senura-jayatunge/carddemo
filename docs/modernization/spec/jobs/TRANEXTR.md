@@ -27,7 +27,7 @@ data_stores:
 calls: [IEBGENER, IEFBR14, IKJEFT01, DSNTIAUL]
 transfers_to: []
 invoked_by: [Control-M]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANEXTR: Weekly unload of the transaction type and category tables
