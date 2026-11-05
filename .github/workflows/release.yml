@@ -1,0 +1,72 @@
+# Tag-triggered release: push a tag like v1.2.0 to build, run the full check,
+# package build/release and publish a GitHub release whose notes come from
+# tools/changelog.py.
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-build:
+    name: release-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags and history for the release notes
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the dev container image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          tags: carddemo-dev:ci
+          load: true
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+      - name: make check (lint, docs-check, build, test)
+        run: tools/ci-run.sh make check
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        run: python3 tools/ci_summary.py >> "$GITHUB_STEP_SUMMARY"
+      - name: Package build/release
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          tools/ci-run.sh make package VERSION="$GITHUB_REF_NAME"
+      - name: Release notes
+        run: python3 tools/changelog.py --notes "$GITHUB_REF_NAME" > dist/RELEASE_NOTES.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: release-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes-file dist/RELEASE_NOTES.md \
+            dist/*.tar.gz dist/SHA256SUMS
