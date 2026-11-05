@@ -470,7 +470,7 @@ A reimplementation is equivalent when, for the same requests in the same order, 
 - the same conditions produce error log records with the same location, level and message; the task ends at the same critical errors;
 - incidental: the 501-request limit, the 5-second wait, the reply expiry, console and log formatting.
 
-Not runnable locally (CICS, IMS, MQ). Scenario checks: a request for card in ENT-CARD-XREF with no summary and amount ≤ account limit - balance → `00`, reason `0000`, new summary with count 1; amount > available → `05`, `4100`, summary declined count 1; unknown card as first request of a task → `05`, `3100`, no IMS change. Review record: `docs/modernization/spec/evidence/e-authorization-review.md`.
+Not runnable locally (CICS, IMS, MQ). Scenario checks: a request for card in ENT-CARD-XREF with no summary and amount ≤ account limit - balance → `00`, reason `0000`, new summary with count 1; amount > available → `05`, `4100`, summary declined count 1; unknown card as first request of a task → `05`, `3100`, no IMS change. Review record: `docs/modernization/spec/evidence/e-review.md`.
 
 ## 16. Paragraph coverage
 

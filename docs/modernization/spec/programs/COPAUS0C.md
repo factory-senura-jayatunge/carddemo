@@ -432,7 +432,7 @@ A reimplementation is equivalent when, for the same commarea, screen input, key 
 - no data is changed;
 - incidental: the exact number of screen sends per interaction, the cursor handling and the header-blanking of DEF-AUSM-006.
 
-Not runnable locally (CICS, IMS). Scenario check on the sample data: account 1 (ENT-AUTH-SUMMARY sample) shows its approved count and the first five of its details, newest key first. Review record: `docs/modernization/spec/evidence/e-authorization-review.md`.
+Not runnable locally (CICS, IMS). Scenario check on the sample data: account 1 (ENT-AUTH-SUMMARY sample) shows its approved count and the first five of its details, newest key first. Review record: `docs/modernization/spec/evidence/e-review.md`.
 
 ## 16. Paragraph coverage
 

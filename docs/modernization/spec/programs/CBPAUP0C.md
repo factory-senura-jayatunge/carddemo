@@ -165,7 +165,7 @@ flowchart TD
 - **When:** a detail has been read.
 - **Then:** its creation date is recovered as `99999 - PA-AUTH-DATE-9C` (a `YYDDD` number, ENT-AUTH-DETAIL) and its age is today's `YYDDD` (`ACCEPT ... FROM DAY`, 2-digit year) minus that number. Within one year this is the number of days. Across a year end it is not: the difference jumps by 1000 - 365 = 635 (or 634 after a leap year), so a detail from 31 December is 636 "days" old on 1 January (DEF-AUPG-004). A detail dated after today has a negative age.
 - **Source:** `:187, 280-282`
-- **Fidelity:** must-preserve (defect-decide for the year end, Q-AUPG-006) · **Confidence:** reviewed (arithmetic runtime-verified on GnuCOBOL, see `docs/modernization/spec/evidence/e-authorization-review.md`)
+- **Fidelity:** must-preserve (defect-decide for the year end, Q-AUPG-006) · **Confidence:** reviewed (arithmetic runtime-verified on GnuCOBOL, see `docs/modernization/spec/evidence/e-review.md`)
 
 #### BR-AUPG-002 · Expiry test
 - **When:** the age (BR-AUPG-001) is greater than or equal to the expiry days `WS-EXPIRY-DAYS`.
@@ -299,7 +299,7 @@ flowchart LR
   - Default `10` → `10      `: greater or equal only from 10,000,000.
 - So with the shipped card a checkpoint is taken after every 1,000 summaries plus at the end, and the `CHKP SUCCESS` line is printed after 1,000 checkpoints, in practice never.
 - **Source:** `:101, 103, 160, 201-206, 360`
-- **Confidence:** runtime-verified on GnuCOBOL 3.2 (`-std=ibm`), see `docs/modernization/spec/evidence/e-authorization-review.md`; z/OS result platform-inferred (same COBOL comparison rule).
+- **Confidence:** runtime-verified on GnuCOBOL 3.2 (`-std=ibm`), see `docs/modernization/spec/evidence/e-review.md`; z/OS result platform-inferred (same COBOL comparison rule).
 
 #### NUM-AUPG-003 · Count and amount arithmetic
 - Count subtraction on `S9(4) COMP` and amount subtraction on `S9(9)V99 COMP-3` (ENT-AUTH-SUMMARY) from `S9(10)V99` detail amounts, no rounding, no size-error clause. Results stay in memory only (DEF-AUPG-003), so overflow has no lasting effect.
@@ -371,7 +371,7 @@ A reimplementation is equivalent when, for the same database content, parameter 
 - the return code is 0, or 16 after the same failing call, with the same deletes applied before it;
 - console text, checkpoint IDs and the checkpoint frequency may differ (incidental), as long as deletes are committed at the end and at an error.
 
-Not runnable locally (IMS). A scenario check: on the 22 sample summaries (ENT-AUTH-SUMMARY sample data) with the shipped card, every detail dated on or before the run date and every summary is deleted, because every stored approved count equals the number of approved details. The root whose bytes are all spaces has a count of 16,448 (`X'4040'`) and no details, so it is kept. Review record: `docs/modernization/spec/evidence/e-authorization-review.md`.
+Not runnable locally (IMS). A scenario check: on the 22 sample summaries (ENT-AUTH-SUMMARY sample data) with the shipped card, every detail dated on or before the run date and every summary is deleted, because every stored approved count equals the number of approved details. The root whose bytes are all spaces has a count of 16,448 (`X'4040'`) and no details, so it is kept. Review record: `docs/modernization/spec/evidence/e-review.md`.
 
 ## 16. Paragraph coverage
 
