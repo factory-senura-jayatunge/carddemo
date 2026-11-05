@@ -24,7 +24,7 @@ data_stores:
 calls: []
 transfers_to: [COSGN00C, COMEN01C, COTRN01C]
 invoked_by: [COMEN01C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COTRN00C: Online transaction list
@@ -79,7 +79,7 @@ Source: `app/bms/COTRN00.bms:26-459`; symbolic map `app/cpy-bms/COTRN00.CPY:17-7
 | 4,65 | (label) | 5 | out | protected, bright, turquoise | `Page:` |
 | 4,71 | `PAGENUM` | 8 | out | protected, blue | page number, 8 digits (NUM-TRNL-003) |
 | 6,5 | (label) | 15 | out | protected, turquoise | `Search Tran ID:` |
-| 6,21 | `TRNIDIN` | 16 | in/out | **unprotected**, green, underlined, cursor | search transaction ID |
+| 6,21 | `TRNIDIN` | 16 | in/out | **unprotected**, green, underlined; no `IC`, the program sets the cursor here (`:105, 221`) | search transaction ID |
 | 8,2 / 8,8 / 8,27 / 8,38 / 8,67 | (labels) | 3 / 16 / 8 / 26 / 12 | out | protected | `Sel`, ` Transaction ID `, `  Date  `, `     Description          `, `   Amount   ` |
 | 9 | (labels) | | out | protected | dashes under each column |
 | 10-19,3 | `SEL0001` .. `SEL0010` | 1 | in/out | **unprotected**, green, underlined | selection, one per row |
@@ -99,7 +99,7 @@ The message work field is 80 characters (`:38`); the longest message is 44 chara
 | :-- | :-- | :-- | :-- | :-- |
 | `TRANSACT` | ENT-TRANSACTION | STARTBR, READNEXT, READPREV, ENDBR | `TRAN-ID` (16), full key | 591-600, 624-634, 658-668, 692-696 |
 
-The file is defined `RECOVERY(NONE)`, `READINTEG(UNCOMMITTED)` (`app/csd/CARDDEMO.CSD:76-87`); the browse sees uncommitted records of other tasks.
+The file is defined `RECOVERY(NONE)` and `RLSACCESS(NO)` (`app/csd/CARDDEMO.CSD:76-87`); its `READINTEG(UNCOMMITTED)` applies only to RLS access. A non-recoverable, non-RLS file has no commit scope, so the browse sees records written by other tasks as soon as they are written.
 
 ### 4.3 Commarea
 
@@ -208,7 +208,7 @@ Each arrow is one CICS task: receive the screen, act, send the screen, end with 
 | Description | the first 26 characters of `TRAN-DESC` (100) |
 | Amount | `TRAN-AMT` edited `+99999999.99`, 12 characters (NUM-TRNL-001) |
 
-Row 1's ID becomes `CDEMO-CT00-TRNID-FIRST` and row 10's ID becomes `CDEMO-CT00-TRNID-LAST`. A page with fewer than 10 rows leaves the last ID from the earlier page in place. Rows without a record are blank.
+Row 1's ID becomes `CDEMO-CT00-TRNID-FIRST` and row 10's ID becomes `CDEMO-CT00-TRNID-LAST`. A forward page with fewer than 10 rows keeps the previous last ID; a backward page that stops before row 1 keeps the previous first ID (only row 1 sets it, `:393`). Rows without a record are blank.
 - **Source:** `:381-445, 450-505`
 - **Fidelity:** must-preserve · **Confidence:** reviewed; the edit pattern is runtime-verified (NUM-TRNL-001)
 
@@ -220,13 +220,13 @@ Row 1's ID becomes `CDEMO-CT00-TRNID-FIRST` and row 10's ID becomes `CDEMO-CT00-
 
 #### BR-TRNL-004 · Page number
 - **When:** a page is listed.
-- **Then:** Enter sets the page number to 0 and the forward read adds 1, so the first page of any list (start of file or search result) is page 1. PF8 adds 1 when it shows a page; PF7 subtracts 1, but sets it to 1 when no record exists before the new page. The number is relative to where the list started: after a search, page 1 is the page that starts at the search ID, and PF7 from it says `You are already at the top of the page...` even if lower IDs exist (DEF-TRNL-008).
+- **Then:** Enter sets the page number to 0 and the forward read adds 1, so the first page of any list (start of file or search result) is page 1. PF8 adds 1 when it shows a page; PF7 subtracts 1, but sets it to 1 when no record exists before the new page; when the backward read reaches the start of the file before 10 rows, the look-behind is skipped and the page number is not changed (DEF-TRNL-008). The number is relative to where the list started: after a search, page 1 is the page that starts at the search ID, and PF7 from it says `You are already at the top of the page...` even if lower IDs exist (DEF-TRNL-008).
 - **Source:** `:224, 245-252, 305-320, 359-369`
 - **Fidelity:** must-preserve (shown to the user) · **Confidence:** reviewed
 
 #### BR-TRNL-005 · Next page indicator
 - **When:** a forward page is filled with 10 rows.
-- **Then:** one more record is read (look-ahead). Found: next page = yes. End of file: next page = no and the message `You have reached the bottom of the page...` is shown with the full page. A forward page with fewer than 10 rows always sets next page = no. PF7 always sets next page = yes before paging backward.
+- **Then:** one more record is read (look-ahead). Found: next page = yes. End of file: next page = no and the message `You have reached the bottom of the page...` is shown with the full page. A forward page with fewer than 10 rows always sets next page = no. PF7 always sets next page = yes, before the page-number test, so also when it only shows `You are already at the top of the page...`; this re-enables PF8 on a single last page (DEF-TRNL-012).
 - **Source:** `:242, 305-320`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -240,13 +240,13 @@ Row 1's ID becomes `CDEMO-CT00-TRNID-FIRST` and row 10's ID becomes `CDEMO-CT00-
 
 #### VAL-TRNL-001 · Search ID must be numeric
 - **When:** Enter is processed and the search field is not blank.
-- **Then:** if all 16 characters are digits, they are the start key. Otherwise: message `Tran ID must be Numeric ...`, cursor on the search field, screen sent with the rows as they were received; no new page is read (the browse is started with an unset key and not used, DEF-TRNL-009). A shorter number, such as `683580`, is not numeric because BMS pads the field with spaces (DEF-TRNL-006).
-- **Source:** `:206-219, 283`
+- **Then:** if all 16 characters are digits, they are the start key. Otherwise: message `Tran ID must be Numeric ...`, cursor on the search field, screen sent with the rows as they were received; no new page is read (the browse is started with an unset key and not used, DEF-TRNL-009). A shorter number, such as `683580`, is not numeric because BMS pads the field with spaces (DEF-TRNL-006). The page number in the commarea is still set to 0 (`:224`) and not incremented, while the screen keeps showing the old number: the next PF8 labels its page `00000001` and PF7 says `You are already at the top of the page...` (DEF-TRNL-009). The search field keeps the invalid value (`:227-228` is skipped).
+- **Source:** `:206-219, 224-229, 283`
 - **Fidelity:** must-preserve · **Confidence:** reviewed; padding platform-inferred
 
 #### VAL-TRNL-002 · Selection value
 - **When:** the first non-blank selection field holds anything other than `S` or `s`, and its row shows an ID.
-- **Then:** message `Invalid selection. Valid value is S`, cursor on the search field, and the Enter logic goes on: the list is read again from the start key and sent with this message, unless VAL-TRNL-001 replaces it.
+- **Then:** message `Invalid selection. Valid value is S`, cursor on the search field, and the Enter logic goes on: the list is read again from the start key and sent with this message, unless VAL-TRNL-001 or a page message (`You have reached the bottom of the page...`, `You are at the top of the page...`, VAL-TRNL-005) replaces it.
 - **Source:** `:196-203`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -267,7 +267,7 @@ Row 1's ID becomes `CDEMO-CT00-TRNID-FIRST` and row 10's ID becomes `CDEMO-CT00-
 | Situation | Message | What the user sees | Source |
 | :-- | :-- | :-- | :-- |
 | Forward read reaches the end of the file (within the page or in the look-ahead) | `You have reached the bottom of the page...` | the rows read so far, rest blank; next page = no | 639-645, 305-320 |
-| Backward read reaches the start of the file (within the page or in the look-behind) | `You have reached the top of the page...` | rows filled from row 10 upwards, rows above blank; page number set to 1 by the look-behind | 673-679, 359-369 |
+| Backward read reaches the start of the file (within the page or in the look-behind) | `You have reached the top of the page...` | rows filled from row 10 upwards, rows above blank; page number set to 1 when the look-behind reaches the start, unchanged when the start is reached within the page | 673-679, 359-369 |
 | Browse start finds no record at or above the key (search ID above the highest ID) | `You are at the top of the page...` | no rows read; see ERR-TRNL-003 | 605-611 |
 
 Each of these sends the screen at the moment it happens; the page logic then goes on and sends it again at the end of the page (DEF-TRNL-001), with the same message.
@@ -374,7 +374,7 @@ The program only reads. In execution order per page:
 - **Confidence:** reviewed
 
 #### ERR-TRNL-003 · Browse end after a failed browse start
-- **What:** when STARTBR returns NOTFND, the program does not set the error flag, so the page logic continues and issues ENDBR without a browse in progress. ENDBR has no RESP option; CICS raises INVREQ and, with no handler, abends the task (AEIP). The screen with `You are at the top of the page...` was already sent. This happens for a search ID above the highest ID in the file, and for PF8 when the last ID of the page was deleted in the meantime and no higher ID exists.
+- **What:** when STARTBR returns NOTFND, the program does not set the error flag, so the page logic continues and issues ENDBR without a browse in progress. ENDBR has no RESP option; CICS raises INVREQ and, with no handler, abends the task (AEIP). The screen with `You are at the top of the page...` was already sent. This happens for a search ID above the highest ID in the file. On PF8 (blank last ID, so start key high-values, or a deleted last ID with no higher ID) the skip READNEXT then runs with no browse open, gets INVREQ, which its RESP handles: the screen shows `Unable to lookup transaction...` before the ENDBR abend (DEF-TRNL-012).
 - **Source:** `:605-611, 322, 692-696`
 - **Confidence:** platform-inferred (Q-TRNL-003)
 
@@ -481,13 +481,13 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** defect-decide (Q-TRNL-001)
 
 #### DEF-TRNL-008 · Page numbers are relative to the search
-- After a search the first page is page 1, and PF7 from it reports `You are already at the top of the page...` although lower IDs exist. A backward page that runs into the start of the file before 10 rows (possible after a search that started mid-file, or after inserts) shows blank top rows and keeps its page number.
+- After a search the first page is page 1, and PF7 from it reports `You are already at the top of the page...` although lower IDs exist. A backward page that runs into the start of the file before 10 rows shows blank top rows and keeps its page number. This needs records before the current first ID to disappear (deletes by the batch) or a stale first ID in the commarea (BR-TRNL-002); a normal list always has at least 10 records before every page after page 1.
 - **Source:** `:224, 245-252, 343-369`
 - **Status:** open · **Fidelity:** defect-decide
 
 #### DEF-TRNL-009 · Non-numeric search leaves a browse open
-- After `Tran ID must be Numeric ...` the page logic still issues STARTBR with the key left in `TRAN-ID` (not set in this task) and then stops because the error flag is on; the browse is never ended (CICS ends it at task end). If that STARTBR returns NOTFND, its message `You are at the top of the page...` replaces the numeric-check message on a second screen.
-- **Source:** `:211-217, 225, 281-283`
+- After `Tran ID must be Numeric ...` the page logic still issues STARTBR with the key left in `TRAN-ID` (not set in this task) and then stops because the error flag is on; the browse is never ended (CICS ends it at task end). If that STARTBR returns NOTFND, its message `You are at the top of the page...` replaces the numeric-check message on a second screen. The commarea page number is also reset to 0 (VAL-TRNL-001).
+- **Source:** `:211-217, 224-225, 281-283`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred (content of the unset key)
 
 #### DEF-TRNL-010 · PF3 passes the 218-byte commarea to the menu
@@ -495,13 +495,28 @@ sequenceDiagram
 - **Source:** `:123-124, 518-521`
 - **Status:** open · **Fidelity:** incidental
 
+#### DEF-TRNL-011 · Selection marks survive paging
+- The row clearing (`INITIALIZE-TRAN-DATA`) blanks ID, date, description and amount, but not the selection fields, which are `FSET`. Only first entry clears them (`:114`). A typed `S` or `X` therefore stays on its row through PF7, PF8 and an Enter with an invalid selection, now next to a different transaction: `S` on row 3 followed by PF8 shows page 2 with `S` still on row 3, and the next Enter opens the transaction now in row 3.
+- **Source:** `:114, 450-505`
+- **Status:** open · **Fidelity:** defect-decide
+
+#### DEF-TRNL-012 · PF7 on the first page re-enables PF8
+- PF7 sets next page = yes before it tests the page number (`:242, 245`), so a PF7 on page 1 that only shows `You are already at the top of the page...` also allows a following PF8 when page 1 was the last page. That PF8 starts at the last ID of the page: with a full page of 10 rows the skip read finds it again, the next read reaches the end of the file, and the user sees blank rows, `You have reached the bottom of the page...` and page 1; with a shorter page the last ID is blank (start key high-values, ERR-TRNL-003, `Unable to lookup transaction...` then abend) or stale from an earlier page (the list jumps to the page after it, numbered 2).
+- **Source:** `:242-252, 259-268, 285-287`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed; abend platform-inferred (Q-TRNL-003)
+
+#### DEF-TRNL-013 · Paging when the first or last record of the page is gone
+- PF8 when the last ID of the page no longer exists: the browse starts at the next higher ID and the skip read discards it, so that record is never shown. PF7 when the first ID no longer exists: a READPREV right after a STARTBR on a missing key may return NOTFND, which ends in `Unable to lookup transaction...`. No online program deletes transactions; only a batch reload between two keys can cause this.
+- **Source:** `:285-287, 339-341, 591-600`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred (Q-TRNL-003)
+
 ## 14. Open questions
 
 | ID | Question | For |
 | :-- | :-- | :-- |
 | Q-TRNL-001 | Should the list show only the transactions of the signed-on user's accounts or cards (DEF-TRNL-007), and should admins see all? | business, security |
 | Q-TRNL-002 | Keep "Enter restarts at page 1" and the 16-digit search (DEF-TRNL-005, DEF-TRNL-006), or allow a partial ID search and keep the current page? | business |
-| Q-TRNL-003 | On the mainframe: does ENDBR after STARTBR NOTFND abend with AEIP (ERR-TRNL-003), and is EIBAID still PF5 after the XCTL from the view (DEF-TRNL-003)? | mainframe team |
+| Q-TRNL-003 | On the mainframe: does ENDBR after STARTBR NOTFND abend with AEIP (ERR-TRNL-003), is EIBAID still PF5 after the XCTL from the view (DEF-TRNL-003), and what does READPREV return right after a STARTBR on a key that does not exist (DEF-TRNL-013)? | mainframe team |
 | Q-TRNL-004 | Widen the amount column to show 9 integer digits (DEF-TRNL-002)? | business |
 
 ## 15. Equivalence contract
@@ -521,13 +536,15 @@ Start state for S2-S13: `TRANSACT` holds IDs `I1 < I2 < ... < I25` (25 records).
 | S7 | page 2 | PF7 | page `00000001`, rows I1-I10, `You have reached the top of the page...` |
 | S8 | page 1 | PF7 | `You are already at the top of the page...` |
 | S9 | any | Enter, search = I13 (16 digits) | page `00000001`, rows I13-I22 |
-| S10 | any | Enter, search `123` | `Tran ID must be Numeric ...`, rows unchanged |
+| S10 | any | Enter, search `123` | `Tran ID must be Numeric ...`, rows unchanged, search field keeps `123`, commarea page number 0 |
 | S11 | page 1 | `S` on row 3 + Enter | transfer to `COTRN01C` with `CDEMO-CT00-TRN-SELECTED` = I3 |
-| S12 | page 1 | `X` on row 3 + Enter | page `00000001` from the start key, `Invalid selection. Valid value is S` |
+| S12 | page 1 | `X` on row 3 + Enter | page `00000001` from the start key, `Invalid selection. Valid value is S`, the `X` stays on row 3 (DEF-TRNL-011) |
 | S13 | page 1 | PF5 | `Invalid key pressed. Please see below...` |
 | S14 | back from the view by PF5 | - | page `00000001`, rows I2-I11 (DEF-TRNL-003) |
 | S15 | any | PF3 | transfer to `COMEN01C` |
 | S16 | a record with amount 504.77, original timestamp `2022-06-10 19:27:53.000000`, description `Purchase at Abshire-Lowe` | listed | row shows `06/10/22`, `Purchase at Abshire-Lowe  `, `+00000504.77` |
+| S17 | page 1 | `S` on row 3 + PF8, then Enter | page `00000002` with `S` still on row 3; the Enter opens I13 (DEF-TRNL-011) |
+| S18 | single page with 10 records, next page no | PF7, then PF8 | `You are already at the top of the page...`; then blank rows, `You have reached the bottom of the page...`, page `00000001` (DEF-TRNL-012) |
 
 These scenarios cannot run locally (no CICS); they become acceptance tests for the target. Evidence: `evidence/c-transactions-review.md`.
 
@@ -538,12 +555,12 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | (data division) | 29-89 | §4.3, §5, NUM-TRNL-001, NUM-TRNL-003 |
 | `MAIN-PARA` | 95-141 | FLOW-TRNL-001..008, VAL-TRNL-003, DEF-TRNL-001, §6 Entry |
 | `PROCESS-ENTER-KEY` | 146-229 | BR-TRNL-001, BR-TRNL-003, BR-TRNL-004, VAL-TRNL-001, VAL-TRNL-002, FLOW-TRNL-010, DEF-TRNL-005, DEF-TRNL-006, DEF-TRNL-009 |
-| `PROCESS-PF7-KEY` | 234-252 | FLOW-TRNL-005, VAL-TRNL-004, BR-TRNL-005 |
-| `PROCESS-PF8-KEY` | 257-274 | FLOW-TRNL-006, VAL-TRNL-004 |
+| `PROCESS-PF7-KEY` | 234-252 | FLOW-TRNL-005, VAL-TRNL-004, BR-TRNL-005, DEF-TRNL-012 |
+| `PROCESS-PF8-KEY` | 257-274 | FLOW-TRNL-006, VAL-TRNL-004, DEF-TRNL-012, DEF-TRNL-013 |
 | `PROCESS-PAGE-FORWARD` | 279-328 | SE-TRNL-001, BR-TRNL-001, BR-TRNL-004, BR-TRNL-005, DEF-TRNL-003, §6 Page forward |
 | `PROCESS-PAGE-BACKWARD` | 333-376 | SE-TRNL-002, BR-TRNL-004, VAL-TRNL-005, DEF-TRNL-008, §6 Page backward |
 | `POPULATE-TRAN-DATA` | 381-445 | BR-TRNL-002, NUM-TRNL-001, NUM-TRNL-002, DEF-TRNL-002 |
-| `INITIALIZE-TRAN-DATA` | 450-505 | BR-TRNL-002 |
+| `INITIALIZE-TRAN-DATA` | 450-505 | BR-TRNL-002, DEF-TRNL-011 |
 | `RETURN-TO-PREV-SCREEN` | 510-521 | FLOW-TRNL-009, DEF-TRNL-010 |
 | `SEND-TRNLST-SCREEN` | 527-549 | FLOW-TRNL-011, VAL-TRNL-004 |
 | `RECEIVE-TRNLST-SCREEN` | 554-562 | ERR-TRNL-002 |

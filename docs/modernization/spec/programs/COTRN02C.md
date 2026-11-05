@@ -28,7 +28,7 @@ data_stores:
 calls: [CSUTLDTC]
 transfers_to: [COSGN00C, COMEN01C, "<CDEMO-FROM-PROGRAM>"]
 invoked_by: [COMEN01C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COTRN02C: Online transaction add

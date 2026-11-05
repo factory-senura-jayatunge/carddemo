@@ -25,7 +25,7 @@ data_stores:
 calls: [CSUTLDTC]
 transfers_to: [COSGN00C, COMEN01C]
 invoked_by: [COMEN01C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CORPT00C: Online transaction report request
@@ -85,7 +85,7 @@ Source: `app/bms/CORPT00.bms:19-228`; symbolic map `app/cpy-bms/CORPT00.CPY:17-2
 | 23,1 | `ERRMSG` | 78 | out | protected, bright, red (green on success) | message (section 8.2) |
 | 24,1 | (label) | 23 | out | protected, yellow | `ENTER=Continue  F3=Back` |
 
-Field definitions: `app/bms/CORPT00.bms:80-226`. The two `(MM/DD/YYYY)` labels have no `ATTRB` and get the BMS default (unprotected); they hold no data the program reads.
+Field definitions: `app/bms/CORPT00.bms:80-226`. The two `(MM/DD/YYYY)` labels have no `ATTRB` and get the BMS default (autoskip, normal intensity); they hold no data the program reads.
 
 ### 4.2 Transient data queue
 
@@ -138,6 +138,10 @@ stateDiagram-v2
     Submitted --> Error: Enter on the cleared screen
     Empty --> Menu: PF3 (FLOW-RPTS-004)
     Confirm --> Menu: PF3
+    Error --> Menu: PF3
+    Submitted --> Menu: PF3
+    Empty --> Error: other key (VAL-RPTS-006)
+    Confirm --> Error: other key
 ```
 
 **Entry (MAIN-PARA, lines 163-202)**
@@ -190,7 +194,7 @@ The first failing check sends its message and ends the task (FLOW-RPTS-006).
   2. `Y` or `y`: write the job (BR-RPTS-007).
   3. `N` or `n`: clear every input field and the message, cursor on Monthly, send; nothing written and no message shown (FLOW-RPTS-008).
   4. Anything else: VAL-RPTS-005.
-- The confirm field is tested after the dates, so a `Y` typed together with the selection submits the job on the first Enter. Monthly and yearly dates are computed again on each Enter, from the clock at that moment.
+- The confirm field is tested after the dates, so a `Y` typed together with the selection submits the job on the first Enter. Monthly and yearly dates are computed again on each Enter, from the clock at that moment. Nothing is kept between the prompt and the `Y`: the user can change the type or the dates before confirming, and the job uses the values on the screen at the Enter that carries the `Y`, checked again.
 - **Source:** `:462-494`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -288,7 +292,7 @@ Every message is shown in `ERRMSG` (row 23) in red, with the cursor on the field
 
 #### FLOW-RPTS-001 · No commarea
 - **When:** `EIBCALEN` = 0.
-- **Then:** transfer to `COSGN00C` (FLOW-RPTS-007).
+- **Then:** transfer to `COSGN00C` (FLOW-RPTS-007). The XCTL still passes the program's 160-byte commarea area, with only the routing fields and the context set; the rest was never received.
 - **Source:** `:172-174`
 
 #### FLOW-RPTS-002 · First entry
@@ -393,7 +397,7 @@ sequenceDiagram
 ```
 
 - **Inbound:** `COMEN01C` (option 9).
-- **Outbound:** `COMEN01C` (PF3), `COSGN00C` (no commarea), by XCTL; `CSUTLDTC` by CALL; the batch job `TRNRPT00` through the internal reader.
+- **Outbound:** `COMEN01C` (PF3), `COSGN00C` (when none was received), by XCTL; `CSUTLDTC` by CALL; the batch job `TRNRPT00` through the internal reader.
 - **Submitted job (owned by the batch area, specified there):** the job runs procedure `TRANREPT` from `AWS.M2.CARDDEMO.PROC`. Its steps unload `TRANSACT` to a backup generation (`STEP01R`), select and sort the transactions in the date range (`STEP05R`, symbols overridden by records 8-13) and print the report with `CBTRN03C` (`STEP10R`, `DATEPARM` overridden by records 14-16); the report goes to the data set `AWS.M2.CARDDEMO.TRANREPT(+1)`, not to a printer (`app/proc/TRANREPT.prc:21-78`). `CBTRN03C` reads the date pair as start (10), one character, end (10) (`app/cbl/CBTRN03C.cbl:122-125`).
 - **Shared data:** none read online. The job reads `TRANSACT` while CICS has it open (`DISP=SHR`), so it sees online adds and bill payments made before it runs.
 - **Contract with the batch area:** the step names `STEP05R` and `STEP10R`, the DD names `SYMNAMES` and `DATEPARM`, the symbol names and positions in records 9-12, and the date-pair layout of record 15 must match the procedure. A change on either side breaks the request silently: the program only knows that the records were queued.
@@ -410,7 +414,7 @@ sequenceDiagram
 ## 12. Numeric, date and format details
 
 #### NUM-RPTS-001 · Normalising the custom date parts
-- Each part is converted with `FUNCTION NUMVAL-C` and stored in an unsigned `PIC 99` (month, day) or `PIC 9999` (year), then moved back to the screen field. Observed with GnuCOBOL 3.2: `5 ` and ` 5` give `05`; `13` stays `13`; `ab` gives `00`; `1a` gives `01`; `-5` gives `05` (sign lost); `$5` gives `05` (currency sign allowed by `NUMVAL-C`); `22  ` gives `0022`; `abcd` gives `0000`. The `NUM` attribute of the fields restricts what a 3270 terminal accepts to digits, `.` and `-`, and BMS right-justifies and zero-fills a numeric field by default.
+- Each part is converted with `FUNCTION NUMVAL-C` and stored in an unsigned `PIC 99` (month, day) or `PIC 9999` (year), then moved back to the screen field. Observed with GnuCOBOL 3.2: `5 ` and ` 5` give `05`; `13` stays `13`; `ab` gives `00`; `1a` gives `01`; `-5` gives `05` (sign lost); `$5` gives `05` (currency sign allowed by `NUMVAL-C`); `22  ` and `  22` give `0022`; `abcd` gives `0000`; `.5` gives `00`; `5-` gives `05`; `-202` gives `0202`; `2 22` gives `0222` (GnuCOBOL accepts the embedded space; undefined on IBM). The `NUM` attribute of the fields restricts what a 3270 terminal accepts to digits, `.` and `-`, and BMS right-justifies and zero-fills a numeric field by default.
 - **Source:** `:74-75, 305-327`; `app/bms/CORPT00.bms:127-193`
 - **Confidence:** runtime-verified for GnuCOBOL; invalid-argument results on IBM COBOL and the BMS justification platform-inferred
 
@@ -420,8 +424,8 @@ sequenceDiagram
 - **Confidence:** runtime-verified
 
 #### NUM-RPTS-003 · Dates in the job
-- Both dates are 10-character text `YYYY-MM-DD`. The job compares them with the first 10 characters of `TRAN-PROC-TS` as characters (`TRAN-PROC-DT,305,10,CH` and the comparison in `CBTRN03C`), inclusive at both ends. A transaction whose processing date is the end date is included whatever its time.
-- **Source:** `:102-121`; `app/proc/TRANREPT.prc:40-46`; `app/cbl/CBTRN03C.cbl:173-174`
+- Both dates are 10-character text `YYYY-MM-DD`. The sort step selects the range, inclusive at both ends, comparing them as characters with the first 10 characters of `TRAN-PROC-TS` (`TRAN-PROC-DT,305,10,CH`). A transaction whose processing date is the end date is included whatever its time. `CBTRN03C` repeats the test, but an out-of-range record would end its report loop through `NEXT SENTENCE` (`app/cbl/CBTRN03C.cbl:173-177, 207`), not skip it; because the sort has already filtered the input, this never fires in the submitted job (for the batch area).
+- **Source:** `:102-121`; `app/proc/TRANREPT.prc:40-46`; `app/cbl/CBTRN03C.cbl:173-177`
 - **Confidence:** reviewed
 
 #### NUM-RPTS-004 · Clock
@@ -444,7 +448,7 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** defect-decide (Q-RPTS-002)
 
 #### DEF-RPTS-003 · Non-digit parts become zeros; the year checks are dead
-- Normalisation turns any input into digits (`ab` into `00`), so the `NOT NUMERIC` tests never fire and `Start Date - Not a valid Year...` and `End Date - Not a valid Year...` can never be shown. A non-digit month or day ends in `... - Not a valid date...` from the calendar check instead; a non-digit year becomes `0000` and is accepted (DEF-RPTS-002).
+- Normalisation turns any input into digits (`ab` into `00`), so the `NOT NUMERIC` tests never fire and `Start Date - Not a valid Year...` and `End Date - Not a valid Year...` can never be shown. A part with no leading digit becomes zeros: month `00` or day `00` then fails the calendar check with `... - Not a valid date...`, and year `0000` is accepted (DEF-RPTS-002). A part with a leading digit, such as `1a`, keeps that digit (`01`) and can pass (GnuCOBOL; undefined on IBM; the `NUM` attribute normally blocks letters).
 - **Source:** `:305-379`
 - **Status:** open · **Fidelity:** defect-decide
 
@@ -474,7 +478,7 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** defect-decide
 
 #### DEF-RPTS-009 · Unused and oversized declarations
-- `WS-TRANSACT-FILE`, `WS-TRANSACT-EOF`, `WS-SEND-ERASE-FLG` (never `N`), `WS-REC-COUNT`, `WS-TRAN-AMT`, `WS-TRAN-DATE` and the `CVTRA05Y` layout have no effect. `JOB-LINES` redefines the 17-record template as 1000 records; the loop relies on `/*EOF` to stop and would read past the template if that record were removed. The paragraph that writes the queue is named `WIRTE-JOBSUB-TDQ`.
+- `WS-TRANSACT-FILE`, `WS-TRANSACT-EOF`, `WS-SEND-ERASE-FLG` (never `N`), `WS-REC-COUNT`, `WS-TRAN-AMT`, `WS-TRAN-DATE` and the `CVTRA05Y` layout have no effect. `JOB-LINES` redefines the 17-record template as 1000 records, a level-02 `REDEFINES` larger than the item it redefines, so `JOB-DATA` occupies 80,000 bytes; the loop relies on `/*EOF` to stop and would read past the template if that record were removed. The paragraph that writes the queue is named `WIRTE-JOBSUB-TDQ`.
 - **Source:** `:40, 44-49, 56, 77-78, 126-127, 146, 498-499, 515`
 - **Status:** open · **Fidelity:** incidental
 
@@ -512,8 +516,8 @@ A reimplementation must reproduce, for each scenario, the message text and colou
 | S6 | any | Yearly `X`, confirm `y` | dates `2022-01-01` and `2022-12-31`; green `Yearly report submitted for printing ...` |
 | S7 | any | Monthly `X` and Custom `X`, confirm `Y` | monthly report (DEF-RPTS-010) |
 | S8 | any | Custom `X`, start month blank | `Start Date - Month can NOT be empty...` |
-| S9 | any | Custom, start `13/01/2022` | `Start Date - Not a valid Month...` |
-| S10 | any | Custom, start `02/30/2022` | `Start Date - Not a valid date...`, cursor on start month |
+| S9 | any | Custom, start `13/01/2022`, end `07/06/2022` | `Start Date - Not a valid Month...` |
+| S10 | any | Custom, start `02/30/2022`, end `07/06/2022` | `Start Date - Not a valid date...`, cursor on start month |
 | S11 | any | Custom, start `5/1/2022` (typed `5`, `1`), end `07/06/2022`, confirm blank | fields show `05`, `01`; `Please confirm to print the Custom report...` |
 | S12 | any | Custom, start `01/01/22`, end `07/06/2022`, confirm `Y` | accepted; record 15 `0022-01-01 2022-07-06` (DEF-RPTS-002) |
 | S13 | any | Custom, start `07/06/2022`, end `01/01/2022`, confirm `Y` | accepted and submitted (DEF-RPTS-001) |

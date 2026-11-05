@@ -24,7 +24,7 @@ data_stores:
 calls: []
 transfers_to: [COSGN00C, COMEN01C, COTRN00C, "<CDEMO-FROM-PROGRAM>"]
 invoked_by: [COMEN01C, COTRN00C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COTRN01C: Online transaction view
@@ -56,28 +56,28 @@ The transaction view shows every field of one transaction from the transaction m
 
 ### 4.1 Screen COTRN1A (mapset COTRN01), 24 x 80
 
-Source: `app/bms/COTRN01.bms:26-268`; symbolic map `app/cpy-bms/COTRN01.CPY:17-272`. Only the search field `TRNIDIN` and the message field are `FSET`; the detail fields are protected display fields that the terminal does not send back.
+Source: `app/bms/COTRN01.bms:26-268`; symbolic map `app/cpy-bms/COTRN01.CPY:17-272`. The search field `TRNIDIN`, the message field and the header fields (`app/bms/COTRN01.bms:34, 38, 47, 57, 61, 70`) are `FSET`; the detail fields are protected display fields without `FSET` that the terminal does not send back.
 
 | Row,Col | Field | Len | Direction | Attributes | Content |
 | :-- | :-- | --: | :-- | :-- | :-- |
 | 1,1-2,71 | header | | out | protected | `Tran:` `CT01`, titles (`app/cpy/COTTL01Y.cpy:18-22`), `Date:` mm/dd/yy, `Prog:` `COTRN01C`, `Time:` hh:mm:ss (`app/bms/COTRN01.bms:29-74`) |
-| 4,30 | (label) | 16 | out | protected, bright | `View Transaction` |
+| 4,30 | (label) | 16 | out | protected, bright, neutral | `View Transaction` |
 | 6,6 | (label) | 14 | out | protected, turquoise | `Enter Tran ID:` |
 | 6,21 | `TRNIDIN` | 16 | in/out | **unprotected**, green, underlined, initial cursor | transaction ID to look up |
-| 8,6 | (label) | 70 | out | protected | a line of dashes |
-| 10,6 / 10,22 | `Transaction ID:` / `TRNID` | 15 / 16 | out | protected, blue | `TRAN-ID` |
-| 10,45 / 10,58 | `Card Number:` / `CARDNUM` | 12 / 16 | out | protected, blue | `TRAN-CARD-NUM`, in full |
-| 12,6 / 12,15 | `Type CD:` / `TTYPCD` | 8 / 2 | out | protected, blue | `TRAN-TYPE-CD` |
-| 12,23 / 12,36 | `Category CD:` / `TCATCD` | 12 / 4 | out | protected, blue | `TRAN-CAT-CD` |
-| 12,46 / 12,54 | `Source:` / `TRNSRC` | 7 / 10 | out | protected, blue | `TRAN-SOURCE` |
-| 14,6 / 14,19 | `Description:` / `TDESC` | 12 / 60 | out | protected, blue | first 60 of the 100 characters of `TRAN-DESC` |
-| 16,6 / 16,14 | `Amount:` / `TRNAMT` | 7 / 12 | out | protected, blue | `TRAN-AMT` edited `+99999999.99` (NUM-TRNV-001) |
-| 16,31 / 16,42 | `Orig Date:` / `TORIGDT` | 10 / 10 | out | protected, blue | first 10 characters of `TRAN-ORIG-TS` |
-| 16,57 / 16,68 | `Proc Date:` / `TPROCDT` | 10 / 10 | out | protected, blue | first 10 characters of `TRAN-PROC-TS` |
-| 18,6 / 18,19 | `Merchant ID:` / `MID` | 12 / 9 | out | protected, blue | `TRAN-MERCHANT-ID` |
-| 18,33 / 18,48 | `Merchant Name:` / `MNAME` | 14 / 30 | out | protected, blue | first 30 of 50 characters |
-| 20,6 / 20,21 | `Merchant City:` / `MCITY` | 14 / 25 | out | protected, blue | first 25 of 50 characters |
-| 20,53 / 20,67 | `Merchant Zip:` / `MZIP` | 13 / 10 | out | protected, blue | `TRAN-MERCHANT-ZIP` |
+| 8,6 | (label) | 70 | out | protected, neutral | a line of dashes |
+| 10,6 / 10,22 | `Transaction ID:` / `TRNID` | 15 / 16 | out | protected; label turquoise, value blue | `TRAN-ID` |
+| 10,45 / 10,58 | `Card Number:` / `CARDNUM` | 12 / 16 | out | protected; label turquoise, value blue | `TRAN-CARD-NUM`, in full |
+| 12,6 / 12,15 | `Type CD:` / `TTYPCD` | 8 / 2 | out | protected; label turquoise, value blue | `TRAN-TYPE-CD` |
+| 12,23 / 12,36 | `Category CD:` / `TCATCD` | 12 / 4 | out | protected; label turquoise, value blue | `TRAN-CAT-CD` |
+| 12,46 / 12,54 | `Source:` / `TRNSRC` | 7 / 10 | out | protected; label turquoise, value blue | `TRAN-SOURCE` |
+| 14,6 / 14,19 | `Description:` / `TDESC` | 12 / 60 | out | protected; label turquoise, value blue | first 60 of the 100 characters of `TRAN-DESC` |
+| 16,6 / 16,14 | `Amount:` / `TRNAMT` | 7 / 12 | out | protected; label turquoise, value blue | `TRAN-AMT` edited `+99999999.99` (NUM-TRNV-001) |
+| 16,31 / 16,42 | `Orig Date:` / `TORIGDT` | 10 / 10 | out | protected; label turquoise, value blue | first 10 characters of `TRAN-ORIG-TS` |
+| 16,57 / 16,68 | `Proc Date:` / `TPROCDT` | 10 / 10 | out | protected; label turquoise, value blue | first 10 characters of `TRAN-PROC-TS` |
+| 18,6 / 18,19 | `Merchant ID:` / `MID` | 12 / 9 | out | protected; label turquoise, value blue | `TRAN-MERCHANT-ID` |
+| 18,33 / 18,48 | `Merchant Name:` / `MNAME` | 14 / 30 | out | protected; label turquoise, value blue | first 30 of 50 characters |
+| 20,6 / 20,21 | `Merchant City:` / `MCITY` | 14 / 25 | out | protected; label turquoise, value blue | first 25 of 50 characters |
+| 20,53 / 20,67 | `Merchant Zip:` / `MZIP` | 13 / 10 | out | protected; label turquoise, value blue | `TRAN-MERCHANT-ZIP` |
 | 23,1 | `ERRMSG` | 78 | out | protected, bright, red | message (section 8.3) |
 | 24,1 | (label) | 47 | out | protected, yellow | `ENTER=Fetch  F3=Back  F4=Clear  F5=Browse Tran.` |
 
@@ -257,7 +257,7 @@ All messages appear in `ERRMSG` (row 23), red.
 ## 9. Side effects
 
 #### SE-TRNV-001 · Read the transaction with an update lock
-- **What:** READ `TRANSACT` by the 16-byte `TRAN-ID` with UPDATE into `TRAN-RECORD` (350 bytes). No REWRITE or UNLOCK follows; CICS releases the record lock when the task ends, right after the screen is sent. While the lock is held, another task that reads the same record for update (view, or a writer) waits (DEF-TRNV-001).
+- **What:** READ `TRANSACT` by the 16-byte `TRAN-ID` with UPDATE into `TRAN-RECORD` (350 bytes). No REWRITE or UNLOCK follows; CICS releases the record lock when the task ends, right after the screen is sent. While the lock is held, another task that reads the same record for update (view, or a writer) waits (DEF-TRNV-001). On this non-RLS LSR file the exclusive control may extend to the whole control interval, so writes of other records in it, such as the next-higher ID added by COTRN02C or COBIL00C while the newest transaction is viewed, may wait as well.
 - **Source:** `:267-278`
 - **Confidence:** reviewed; lock duration platform-inferred
 
@@ -336,7 +336,7 @@ sequenceDiagram
 `COTRN01C.cbl` is unchanged by commit b5e0139; none of these is fixed in this branch.
 
 #### DEF-TRNV-001 · Update lock for a display
-- The record is read with UPDATE although the program never changes it. The lock lasts until the end of the task; a concurrent task reading the same record for update waits. The CSD defines no deadlock timeout for the CardDemo transactions (`DTIMOUT(NO)`, `app/csd/CARDDEMO.CSD:423`).
+- The record is read with UPDATE although the program never changes it. The lock lasts until the end of the task; a concurrent task reading the same record for update waits. The CSD defines no deadlock timeout for the CardDemo transactions (`DTIMOUT(NO)`, `app/csd/CARDDEMO.CSD:433`). Because the file is a non-RLS LSR file (`RLSACCESS(NO)`, `LSRPOOLNUM(1)`, `app/csd/CARDDEMO.CSD:77-78`), VSAM exclusive control may cover the whole control interval, so adds of neighbouring IDs (COTRN02C, COBIL00C) could also wait (platform-inferred, Q-TRNV-003).
 - **Source:** `:275`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
@@ -346,7 +346,7 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** defect-decide
 
 #### DEF-TRNV-003 · ID not checked or padded
-- A shorter ID (`683580`) is padded with spaces, not zeros, and is not found: `Transaction ID NOT found...`. Non-numeric input is accepted as a key and also ends in "not found".
+- A shorter ID (`683580`) is padded with spaces, not zeros, and is not found: `Transaction ID NOT found...`. Non-numeric input is accepted as a key and also ends in "not found". Because `TRNIDIN` is `FSET` and keeps the last ID, typing a shorter ID over it without erasing the rest of the field sends the new prefix followed by the end of the old ID.
 - **Source:** `:172`
 - **Status:** open · **Fidelity:** defect-decide
 

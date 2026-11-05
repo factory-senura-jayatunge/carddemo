@@ -21,7 +21,7 @@ data_stores: []
 calls: [CEEDAYS]
 transfers_to: []
 invoked_by: [COTRN02C, CORPT00C, COACTUPC]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CSUTLDTC: Date validation subroutine
@@ -236,7 +236,7 @@ sequenceDiagram
     D-->>C: result line, RETURN-CODE = severity
 ```
 
-- **Inbound:** `COTRN02C` (transaction add, picture `YYYY-MM-DD`, `app/cbl/COTRN02C.cbl:389-427`), `CORPT00C` (report request, `YYYY-MM-DD`, `app/cbl/CORPT00C.cbl:388-426`), `COACTUPC` (account update, `YYYYMMDD`, `app/cpy/CSUTLDPY.cpy:284-321`). All three read only the severity (positions 1-4) and, for the first two, the message number (positions 16-19); none reads the verdict text, the tested date or the picture.
+- **Inbound:** `COTRN02C` (transaction add, picture `YYYY-MM-DD`, `app/cbl/COTRN02C.cbl:389-427`), `CORPT00C` (report request, `YYYY-MM-DD`, `app/cbl/CORPT00C.cbl:388-426`), `COACTUPC` (account update, `YYYYMMDD`, `app/cpy/CSUTLDPY.cpy:284-321`). All three read the severity (positions 1-4) and the message number (positions 16-19): `COTRN02C` and `CORPT00C` test the message number for 2513, `COACTUPC` shows it in its error message (`app/cpy/CSUTLDPY.cpy:306-313`); none reads the verdict text, the tested date or the picture.
 - **Outbound:** `CEEDAYS` (IBM LE callable service; replaced locally by `tools/shims/CEEDAYS.cbl`).
 - **Shared data:** none.
 
@@ -301,7 +301,7 @@ CSUTLDTC is a pure function and the simplest seam in the application. A target r
 
 A reimplementation must give the same severity (positions 1-4) and message number (positions 16-19) for every input, and should give the same 80-byte line. It may differ in the return code (no caller reads it).
 
-The scenarios below were run on GnuCOBOL 3.2 (`-std=ibm -fsign=EBCDIC`) against `tools/shims/CEEDAYS.cbl` with the repository driver `tests/unit/cobol/csutldtc_test.cbl` and, for S14-S15, a driver that passes 8-byte fields followed by binary storage. S1-S2, S4, S8, S10, S12 and S13 are also asserted by `tests/unit/test_date_routines.py:77-99`. Because the stand-in is not LE, the expected results for IBM LE are platform-inferred where noted.
+The scenarios below were run on GnuCOBOL 3.2 (`-std=ibm -fsign=EBCDIC`) against `tools/shims/CEEDAYS.cbl` with the repository driver `tests/unit/cobol/csutldtc_test.cbl` and, for S14-S15, a driver that passes 8-byte fields followed by binary storage. S1-S2, S4, S6 (`2022-13-01` only), S8, S10, S12 and S13 (`YYYY-XX-DD` only) are also asserted by `tests/unit/test_date_routines.py:77-99`. Because the stand-in is not LE, the expected results for IBM LE are platform-inferred where noted.
 
 | # | Date (10) | Picture (10) | Severity / msg | Verdict | Note |
 | --: | :-- | :-- | :-- | :-- | :-- |
