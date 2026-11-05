@@ -89,6 +89,7 @@ A change is done when `make check` ends with `make check: OK`. It runs every ste
 | `docs/` | [Inventory](docs/inventory.md), [linting](docs/linting.md), [runbooks](docs/runbooks/README.md), [security](docs/security/secrets.md). |
 | `.github/workflows/` | `ci.yml` (jobs lint, docs-check, build-and-test), `release.yml` (`v*` tags), `label-sync.yml`, `agents-md.yml`. |
 | `.factory/skills/` | Step-by-step procedures for common tasks (listed below). |
+| `modernization/` | The modernized stack, in progress: local infrastructure (Docker Compose) and its own make targets. See [modernization/README.md](modernization/README.md). |
 
 Generated files, never edited by hand: `docs/inventory.md` (`python3 scripts/gen_inventory.py`), `CHANGELOG.md` (`make changelog`), `cobol-lint-baseline.json` (`python3 scripts/cobol_lint.py baseline`), and everything under `build/` and `dist/`.
 

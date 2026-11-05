@@ -1,0 +1,4 @@
+# Local settings and secrets; .env.example is the committed template.
+.env
+.env.*
+!.env.example

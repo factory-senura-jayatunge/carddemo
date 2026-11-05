@@ -1,0 +1,89 @@
+# Local infrastructure for the modernized CardDemo stack: SQL Server for the
+# application data, RabbitMQ for messaging and Postgres for Airflow's own
+# metadata (Airflow can't keep its metadata in SQL Server).
+#
+# Run it through the Makefile (`make up`, `make down`). Secrets come from
+# .env (git-ignored), which `make setup` creates from .env.example.
+#
+# Host ports default to values that don't collide with the standard ports
+# (1433, 5672, 15672, 5432), so the stack can run next to other local
+# containers. Everything binds to 127.0.0.1 only.
+
+name: carddemo-modern
+
+services:
+  mssql:
+    # 2025-CU10 = 17.0.5035.5. amd64 only; on Apple Silicon it runs under
+    # Rosetta (Colima with --vz-rosetta).
+    image: mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04@sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is not set in modernization/.env; run make setup}
+    ports:
+      - "127.0.0.1:${MSSQL_HOST_PORT:-21433}:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    mem_limit: 4g
+    healthcheck:
+      # SQLCMDPASSWORD keeps the password out of the sqlcmd command line.
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -l 5 -Q 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
+      start_interval: 3s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.4.0-management@sha256:af6f50d38098d8bd52fef7f3fa85015dd8b2bf6def58e995bf584ae9ba0f6407
+    # The node name (rabbit@<hostname>) selects the data directory in the
+    # volume, so it must stay the same when the container is recreated.
+    hostname: carddemo-modern-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-carddemo}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS is not set in modernization/.env; run make setup}
+    ports:
+      - "127.0.0.1:${RABBITMQ_AMQP_HOST_PORT:-25672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_HOST_PORT:-35672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/20-carddemo.conf:/etc/rabbitmq/conf.d/20-carddemo.conf:ro
+    mem_limit: 1g
+    healthcheck:
+      # Run the CLI as the rabbitmq user: as root it can create a root-owned
+      # .erlang.cookie before the first boot, and the server then fails with
+      # eacces.
+      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+      start_interval: 3s
+    restart: unless-stopped
+
+  airflow-db:
+    image: postgres:17.11@sha256:748a18a54d3842d43bc156f0840d78029b8d349e0feca98c12b9c4ce3404a6b3
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD is not set in modernization/.env; run make setup}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+    ports:
+      - "127.0.0.1:${AIRFLOW_DB_HOST_PORT:-25432}:5432"
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+      start_interval: 2s
+    restart: unless-stopped
+
+volumes:
+  mssql-data:
+  rabbitmq-data:
+  airflow-db-data:
