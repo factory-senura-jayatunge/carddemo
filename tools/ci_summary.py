@@ -20,7 +20,9 @@ def render(results: Path, slowest: int = 10) -> str:
     summary = json.loads((results / "summary.json").read_text())
     coverage = json.loads((results / "coverage.json").read_text())
     timings = json.loads((results / "timings.json").read_text())
-    ok = summary["failed"] == 0 and summary["coverage_percent"] >= summary["coverage_min"]
+    coverage_ok = (not summary.get("coverage_enforced", True)
+                   or summary["coverage_percent"] >= summary["coverage_min"])
+    ok = summary["failed"] == 0 and coverage_ok
     out = [f"## Tests: {'passed' if ok else 'FAILED'}", "",
            "| run | passed | failed | skipped | flaky | coverage | minimum | build | tests |",
            "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",

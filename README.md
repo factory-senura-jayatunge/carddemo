@@ -270,7 +270,7 @@ make test-integration
 make test TEST_ARGS="-k posttran"
 ```
 
-The suite (`tests/`) builds a `-ftrace` variant in `build/trace` and runs the jobs on the sample data plus targeted cases (each rejection rule, abends on missing input, the export/import round trip). It compares the results with expected values that `tests/oracle.py` computes independently from the copybook layouts. Tests run in parallel in random order; the seed is printed, and `CARDDEMO_TEST_SEED` repeats a run. A failing test is retried and reported as flaky if it then passes. The run fails if paragraph coverage drops below the minimum in `tests/test-config.toml`. Results go to `build/test-results/` (`junit.xml`, `coverage.json`, `timings.json`, `summary.json`).
+The suite (`tests/`) builds a `-ftrace` variant in `build/trace` and runs the jobs on the sample data plus targeted cases (each rejection rule, abends on missing input, the export/import round trip). It compares the results with expected values that `tests/oracle.py` computes independently from the copybook layouts. Tests run in parallel in random order; the seed is printed, and `CARDDEMO_TEST_SEED` repeats a run. A failing test is retried and reported as flaky if it then passes. A full run fails if paragraph coverage drops below the minimum in `tests/test-config.toml`. A run filtered with `-k` or `--suite` (including `make test-unit` and `make test-integration`) still reports coverage but does not enforce the minimum. Results go to `build/test-results/` (`junit.xml`, `coverage.json`, `timings.json`, `summary.json`).
 
 ### All checks
 

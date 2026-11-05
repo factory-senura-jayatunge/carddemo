@@ -9,7 +9,8 @@
   * retries a failing test; a test that fails and then passes is reported
     as FLAKY (not hidden), a test that fails every attempt fails the run
   * writes JUnit XML with per-test timings, a timing report, and paragraph
-    coverage; fails if coverage is below the configured minimum
+    coverage; a full run fails if coverage is below the configured minimum,
+    a run filtered with -k or --suite reports coverage without enforcing it
 
 Outputs go to build/test-results/ (override with --results).
 """
@@ -181,8 +182,7 @@ def coverage(trace_dir: Path) -> dict:
     return paracov.report(paracov.inventory(programs), paracov.reached(sorted(trace_dir.glob("*.trace"))))
 
 
-def main(argv: list[str] | None = None) -> int:
-    config = support.load_config()
+def build_parser(config: dict) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the CardDemo test suite")
     parser.add_argument("--suite", choices=["unit", "integration", "all"], default="all")
     parser.add_argument("-j", "--jobs", type=int, default=int(os.environ.get("CARDDEMO_TEST_JOBS", 0)) or os.cpu_count() or 2)
@@ -193,7 +193,36 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fail-on-flaky", action="store_true", default=os.environ.get("CARDDEMO_FAIL_ON_FLAKY") == "1")
     parser.add_argument("-k", dest="pattern", help="only run tests whose id contains this text")
     parser.add_argument("--results", type=Path, default=carddemo.build_root() / "test-results")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def is_filtered(args: argparse.Namespace) -> bool:
+    return bool(args.pattern) or args.suite != "all"
+
+
+def coverage_verdict(cov: dict, minimum: float, filtered: bool) -> tuple[bool, list[str]]:
+    """Whether coverage passes, and the lines that report it.
+
+    The minimum is set for the whole suite, so a filtered run would always
+    fall short; it reports coverage but only a full run enforces the minimum.
+    """
+    if filtered:
+        ok, status = True, "not enforced (filtered run)"
+    else:
+        ok = cov["percent"] >= minimum
+        status = "OK" if ok else "BELOW MINIMUM"
+    lines = [f"COVERAGE: {cov['covered_units']}/{cov['total_units']} program entries+paragraphs = "
+             f"{cov['percent']:.1f}% (minimum {minimum:.1f}%) {status}; "
+             f"{cov['programs_exercised']}/{len(cov['programs'])} programs exercised"]
+    if filtered:
+        lines.append("NOTE: the coverage minimum applies only to full runs (no -k or --suite filter).")
+    return ok, lines
+
+
+def main(argv: list[str] | None = None) -> int:
+    config = support.load_config()
+    args = build_parser(config).parse_args(argv)
+    filtered = is_filtered(args)
 
     suites = config["naming"]["suites"] if args.suite == "all" else [args.suite]
     results_dir = args.results
@@ -260,22 +289,20 @@ def main(argv: list[str] | None = None) -> int:
     if cov["unknown_trace_names"]:
         problems.append(f"trace names missing from the paragraph inventory: {cov['unknown_trace_names']}")
 
-    coverage_ok = cov["percent"] >= args.coverage_min
+    coverage_ok, coverage_lines = coverage_verdict(cov, args.coverage_min, filtered)
     for p in problems:
         print(f"CONVENTION/INVENTORY ERROR: {p}")
     summary = {
         "tests": len(outcomes), "passed": len(passed), "failed": len(failed),
         "skipped": len(skipped), "flaky": len(flaky),
         "coverage_percent": cov["percent"], "coverage_units": f"{cov['covered_units']}/{cov['total_units']}",
-        "coverage_min": args.coverage_min, "wall_seconds": round(wall, 2),
+        "coverage_min": args.coverage_min, "coverage_enforced": not filtered,
+        "wall_seconds": round(wall, 2),
     }
     (results_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(f"\nTESTS: {len(outcomes)} run, {len(passed)} passed, {len(failed)} failed, "
           f"{len(skipped)} skipped, {len(flaky)} flaky in {wall:.1f}s (seed {seed})")
-    print(f"COVERAGE: {cov['covered_units']}/{cov['total_units']} program entries+paragraphs = "
-          f"{cov['percent']:.1f}% (minimum {args.coverage_min:.1f}%) "
-          f"{'OK' if coverage_ok else 'BELOW MINIMUM'}; "
-          f"{cov['programs_exercised']}/{len(cov['programs'])} programs exercised")
+    print("\n".join(coverage_lines))
     print(f"JUnit XML: {results_dir / 'junit.xml'}")
     ok = not failed and not problems and coverage_ok and outcomes and not (flaky and args.fail_on_flaky)
     return 0 if ok else 1
