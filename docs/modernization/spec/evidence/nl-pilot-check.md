@@ -49,7 +49,7 @@ Counting the 5 errors found in section text outside the numbered items as well, 
 
 ### 2.1 Sample day (`app/data/ASCII`, business date 2022-07-06)
 
-Reference: `python3 tools/carddemo.py run POSTTRAN` (GnuCOBOL 3.2, `-std=ibm -fsign=EBCDIC`).
+Reference: `python3 tools/carddemo.py run POSTTRAN` (GnuCOBOL 3.2, `-std=ibm -fsign=EBCDIC`). The reimplementation, the stress generator and the comparison are in `checks/posttran_reimpl/`; after `make build`, `run_check.py` repeats 2.1 and `run_check.py --stress` repeats 2.2.
 
 | Check | Runner | Reimplementation | Result |
 | :-- | --: | --: | :-- |

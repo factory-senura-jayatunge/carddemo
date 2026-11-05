@@ -1,6 +1,6 @@
 # CardDemo entity catalog
 
-Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It starts with the entities that the pilot programs `COBIL00C` and `CBTRN02C` touch; the rest are merged from the area proposals in `areas/` (customer, card, user security, disclosure group, export, authorisation segments, DB2 tables) as programs are decomposed.
+Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It starts with the entities that the pilot programs `COBIL00C` and `CBTRN02C` touch, plus ENT-CUSTOMER and ENT-CARD, which most areas share. The rest are merged from the area proposals in `areas/` (user security, disclosure group, export, statements, authorisation segments, DB2 tables) as programs are decomposed.
 
 Conventions:
 
@@ -16,6 +16,7 @@ erDiagram
     CUSTOMER ||--o{ CARD_XREF : "XREF-CUST-ID"
     ACCOUNT ||--o{ CARD_XREF : "XREF-ACCT-ID (AIX, non-unique)"
     CARD ||--|| CARD_XREF : "XREF-CARD-NUM"
+    ACCOUNT ||--o{ CARD : "CARD-ACCT-ID (AIX, non-unique)"
     ACCOUNT ||--o{ TCAT_BAL : "TRANCAT-ACCT-ID"
     TRAN_TYPE ||--o{ TRAN_CATEGORY : "TRAN-TYPE-CD"
     TRAN_CATEGORY ||--o{ TCAT_BAL : "type + category"
@@ -25,7 +26,7 @@ erDiagram
     DAILY_TRAN ||--o| DAILY_REJECT : "rejected"
 ```
 
-`CUSTOMER` and `CARD` are shown for context; their layouts (`CVCUS01Y`, `CVACT02Y`) are not used by the two pilot programs and will be added later.
+`CUSTOMER` is ENT-CUSTOMER and `CARD` is ENT-CARD. Neither pilot program uses them.
 
 ## ENT-ACCOUNT · Credit card account
 
@@ -75,6 +76,62 @@ Used by (copybook, `docs/inventory.md:301`): CBACT01C, CBACT04C, CBEXPORT, CBIMP
 
 Sample: 50 records, one card per account.
 
+## ENT-CUSTOMER · Customer
+
+- **Copybooks:** `app/cpy/CVCUS01Y.cpy:4-23` and `app/cpy/CUSTREC.cpy:4-23` (`CUSTOMER-RECORD`, 500 bytes). The two layouts are identical except for the name of the date-of-birth field: `CUST-DOB-YYYY-MM-DD` in CVCUS01Y, `CUST-DOB-YYYYMMDD` in CUSTREC. Both are `X(10)` at position 309, and the sample data holds `YYYY-MM-DD` with dashes, so the CUSTREC name describes the content wrongly. Specs use the name from the copybook their program copies. CUSTREC is also indented with tab characters, which does not change the layout.
+- **Dataset:** `AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS`, KSDS, `KEYS(9 0)`, `RECORDSIZE(500 500)` (`app/jcl/CUSTFILE.jcl:46-59`). No alternate index.
+- **CICS file:** `CUSTDAT`, `RECOVERY(NONE)` (`app/csd/CARDDEMO.CSD:50-62`). **Batch DD:** `CUSTFILE` (`app/jcl/READCUST.jcl:24`, `app/jcl/CBEXPORT.jcl:49`; also CBTRN01C and CBSTM03A).
+- **Primary key:** `CUST-ID`.
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `CUST-ID` | 1 | 9 | `9(09)` | digits(9) | Customer number |
+| `CUST-FIRST-NAME` | 10 | 25 | `X(25)` | text(25) | First name |
+| `CUST-MIDDLE-NAME` | 35 | 25 | `X(25)` | text(25) | Middle name |
+| `CUST-LAST-NAME` | 60 | 25 | `X(25)` | text(25) | Last name |
+| `CUST-ADDR-LINE-1` | 85 | 50 | `X(50)` | text(50) | Address line 1 |
+| `CUST-ADDR-LINE-2` | 135 | 50 | `X(50)` | text(50) | Address line 2 |
+| `CUST-ADDR-LINE-3` | 185 | 50 | `X(50)` | text(50) | Address line 3 (holds the city in the sample data) |
+| `CUST-ADDR-STATE-CD` | 235 | 2 | `X(02)` | text(2) | State code |
+| `CUST-ADDR-COUNTRY-CD` | 237 | 3 | `X(03)` | text(3) | Country code |
+| `CUST-ADDR-ZIP` | 240 | 10 | `X(10)` | text(10) | ZIP code |
+| `CUST-PHONE-NUM-1` | 250 | 15 | `X(15)` | text(15) | Phone 1, `(nnn)nnn-nnnn` in the sample data |
+| `CUST-PHONE-NUM-2` | 265 | 15 | `X(15)` | text(15) | Phone 2 |
+| `CUST-SSN` | 280 | 9 | `9(09)` | digits(9) | Social security number; sensitive |
+| `CUST-GOVT-ISSUED-ID` | 289 | 20 | `X(20)` | text(20) | Government ID; sensitive |
+| `CUST-DOB-YYYY-MM-DD` (CUSTREC: `CUST-DOB-YYYYMMDD`) | 309 | 10 | `X(10)` | date-text | Date of birth; sensitive |
+| `CUST-EFT-ACCOUNT-ID` | 319 | 10 | `X(10)` | text(10) | Bank account for electronic payments; sensitive |
+| `CUST-PRI-CARD-HOLDER-IND` | 329 | 1 | `X(01)` | text(1) | `Y` primary card holder |
+| `CUST-FICO-CREDIT-SCORE` | 330 | 3 | `9(03)` | digits(3) | FICO score |
+| FILLER | 333 | 168 | `X(168)` | text | Unused |
+
+Sample (`app/data/ASCII/custdata.txt`): 50 records, IDs `000000001`-`000000050` in key order, all with country `USA`, primary holder `Y`, all fields filled. ZIP is 5 characters in 20 records and 10 in 30. FICO scores range from 001 to 793. Every customer appears in exactly one ENT-CARD-XREF record.
+
+Used by: CVCUS01Y (`docs/inventory.md:305`): CBCUS01C, CBEXPORT, CBIMPORT, CBTRN01C, COACTUPC, COACTVWC, COCRDSLC, COCRDUPC, COPAUA0C, COPAUS0C. CUSTREC (`docs/inventory.md:300`): CBSTM03A.
+
+## ENT-CARD · Credit card
+
+- **Copybook:** `app/cpy/CVACT02Y.cpy:4-11` (`CARD-RECORD`, 150 bytes)
+- **Dataset:** `AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS`, KSDS, `KEYS(16 0)`, `RECORDSIZE(150 150)` (`app/jcl/CARDFILE.jcl:50-63`)
+- **Alternate index:** `AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX`, `KEYS(11 16)` = `CARD-ACCT-ID`, **NONUNIQUEKEY**, `UPGRADE` (`app/jcl/CARDFILE.jcl:83-92`), path `...AIX.PATH` (`app/jcl/CARDFILE.jcl:100-102`)
+- **CICS files:** `CARDDAT` (by card, `app/csd/CARDDEMO.CSD:25-36`), `CARDAIX` (path, by account, `app/csd/CARDDEMO.CSD:13-24`), both `RECOVERY(NONE)`. **Batch DD:** `CARDFILE` (`app/jcl/READCARD.jcl:25`, `app/jcl/CBEXPORT.jcl:57`; also CBTRN01C).
+- **Primary key:** `CARD-NUM`. **Alternate key:** `CARD-ACCT-ID` (several cards per account allowed).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `CARD-NUM` | 1 | 16 | `X(16)` | text(16) | Card number (PAN); sensitive |
+| `CARD-ACCT-ID` | 17 | 11 | `9(11)` | digits(11) | Account the card belongs to, ENT-ACCOUNT |
+| `CARD-CVV-CD` | 28 | 3 | `9(03)` | digits(3) | Card verification value; sensitive |
+| `CARD-EMBOSSED-NAME` | 31 | 50 | `X(50)` | text(50) | Name printed on the card |
+| `CARD-EXPIRAION-DATE` | 81 | 10 | `X(10)` | date-text | Expiration date (the source's spelling) |
+| `CARD-ACTIVE-STATUS` | 91 | 1 | `X(01)` | text(1) | `Y` active |
+| FILLER | 92 | 59 | `X(59)` | text | Unused |
+
+Sample (`app/data/ASCII/carddata.txt`): 50 records in card-number order, one card per account, all active (`Y`), expiring between 2023-01-06 and 2025-12-28. Each card is in ENT-CARD-XREF with the same account number.
+
+`CARD-ACCT-ID` duplicates `XREF-ACCT-ID` in ENT-CARD-XREF, and nothing keeps the two in step. Which one each program uses is stated in its spec.
+
+Used by (`docs/inventory.md:302`): CBACT02C, CBEXPORT, CBIMPORT, CBTRN01C, COACTVWC, COCRDLIC, COCRDSLC, COCRDUPC, COPAUS0C, COTRTLIC.
 ## ENT-TRANSACTION · Posted transaction (transaction master)
 
 - **Copybook:** `app/cpy/CVTRA05Y.cpy:4-18` (`TRAN-RECORD`, 350 bytes)
@@ -199,6 +256,8 @@ Bill payment extension `CDEMO-CB00-INFO` (`app/cbl/COBIL00C.cbl:64-72`), positio
 | Entity | Candidate table | Primary key | Notes |
 | :-- | :-- | :-- | :-- |
 | ENT-ACCOUNT | `account` | `acct_id` CHAR(11) or BIGINT | amounts `DECIMAL(12,2)`; dates parse as `DATE` |
+| ENT-CUSTOMER | `customer` | `cust_id` CHAR(9) or INT | DOB parses as `DATE`; SSN, government ID, DOB and EFT account need column protection |
+| ENT-CARD | `card` | `card_num` | index on `acct_id` (non-unique); FK to account; CVV should not be stored in clear |
 | ENT-CARD-XREF | `card_account` | `card_num` | index on `acct_id` (non-unique); FK to account and customer |
 | ENT-TRANSACTION | `transaction` | `tran_id` CHAR(16) | `DECIMAL(11,2)`; two timestamp layouts to normalise to `DATETIME2` (COBIL00C Q-BILL-006) |
 | ENT-TCAT-BAL | `account_category_balance` | (`acct_id`, `type_cd`, `cat_cd`) | `DECIMAL(11,2)` |
