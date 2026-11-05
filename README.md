@@ -416,6 +416,7 @@ The command exits non-zero only on findings that are not in `cobol-lint-baseline
 
 For questions, issues, or improvement requests, please raise an issue in the repository with detailed information about your concern. The maintainers will respond according to availability.
 
+- AI coding agents: [AGENTS.md](./AGENTS.md) covers setup, commands, the repository map, conventions and the definition of done
 - Reference: [Generated inventory](./docs/inventory.md) of programs, transactions, mapsets, JCL jobs and copybooks
 - Operations: [Runbooks](./docs/runbooks/README.md) for batch restart, CICS files, daily rejects and the authorization purge
 - Security: [Secrets and credentials](./docs/security/secrets.md) and [Data handling (PII and cardholder data)](./docs/security/data-handling.md)
