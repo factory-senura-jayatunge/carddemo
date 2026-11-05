@@ -42,7 +42,7 @@ jobs: ## List runnable batch jobs and their DD mappings
 list: ## List which COBOL sources are built or excluded, and why
 	@$(CARDDEMO) list
 
-test: ## Run all tests with the paragraph-coverage minimum: make test TEST_ARGS="-k posttran"
+test: ## Run all tests with the coverage minimum; filter (minimum not enforced): make test TEST_ARGS="-k posttran"
 	@$(PYTHON) tests/run_tests.py $(TEST_ARGS)
 
 coverage: ## Run all tests and write the paragraph coverage report (build/test-results/coverage.json)

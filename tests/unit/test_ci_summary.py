@@ -23,10 +23,10 @@ class CiSummaryTest(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp(prefix="ci-summary-"))
         self.addCleanup(shutil.rmtree, self.dir)
 
-    def write(self, failed=0, flaky=False):
+    def write(self, failed=0, flaky=False, coverage=87.0, **extra):
         (self.dir / "summary.json").write_text(json.dumps({
             "tests": 3, "passed": 3 - failed, "failed": failed, "skipped": 0, "flaky": int(flaky),
-            "coverage_percent": 87.0, "coverage_units": "187/215", "coverage_min": 85.0}))
+            "coverage_percent": coverage, "coverage_units": "187/215", "coverage_min": 85.0, **extra}))
         (self.dir / "coverage.json").write_text(json.dumps({"programs": {
             "CBTRN02C": {"covered": 27, "units": 27, "percent": 100.0},
             "CBSTM03A": {"covered": 0, "units": 26, "percent": 0.0}}}))
@@ -54,6 +54,13 @@ class CiSummaryTest(unittest.TestCase):
         self.assertTrue(text.startswith("## Tests: FAILED\n"))
         self.assertIn("| `t.slow` | failed | 3 |", text)
         self.assertIn("| `t.retry` | flaky | 2 |", text)
+
+    def test_low_coverage_fails_only_when_enforced(self):
+        for extra, verdict in (({}, "FAILED"), ({"coverage_enforced": True}, "FAILED"),
+                               ({"coverage_enforced": False}, "passed")):
+            with self.subTest(extra=extra):
+                self.write(coverage=11.6, **extra)
+                self.assertTrue(cs.render(self.dir).startswith(f"## Tests: {verdict}\n"))
 
     def test_missing_results_exit_1(self):
         buf = io.StringIO()

@@ -20,7 +20,8 @@ program_timeout_seconds = 120  # per COBOL program run (CARDDEMO_TEST_TIMEOUT ov
 
 [coverage]
 # Paragraph coverage (program entry + paragraphs reached under -ftrace) over
-# every CardDemo program in tools/batch-programs.toml. The run fails below this.
-# Measured 87.0% (187/215); the gap is mostly CBSTM03A (26 entries), which
+# every CardDemo program in tools/batch-programs.toml. A full run fails below
+# this; a run filtered with -k or --suite reports coverage without enforcing it.
+# Measured 87.9% (189/215); the gap is mostly CBSTM03A (26 entries), which
 # reads z/OS control blocks and is not run.
 min_percent = 85
