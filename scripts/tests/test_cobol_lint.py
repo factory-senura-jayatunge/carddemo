@@ -377,6 +377,15 @@ class RuleTests(unittest.TestCase):
         hits = [l for l in self.repo.findings() if "[sensitive-display]" in l]
         self.assertEqual([h.split(":")[1] for h in hits], expected, hits)
 
+    def test_tabbed_copybook_is_analysed_with_tab_width(self):
+        self.repo.write("app/cpy/CUTAB01Y.cpy", "\n".join([
+            card("01  CUSTOMER-RECORD."), "\t\t     05  CUST-SSN        PIC 9(09)."]) + "\n")
+        proc = [card("0000-MAIN."), card("    DISPLAY CUST-SSN"), card("    GOBACK.")]
+        self.repo.write("app/cbl/CBTAB02C.cbl", program("CBTAB02C", proc, ws=[card("COPY CUTAB01Y.")]))
+        hits = self.rules_hit()
+        self.assertIn("tab-character", hits)
+        self.assertIn("sensitive-display", hits)
+
     # -- JCL
     def test_jcl_rules(self):
         jcl = "\n".join([

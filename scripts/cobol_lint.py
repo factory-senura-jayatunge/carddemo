@@ -188,7 +188,7 @@ def module_of(rel: str) -> str:
 
 
 class Source:
-    def __init__(self, rel: str, kind: str):
+    def __init__(self, rel: str, kind: str, tab_width: int = 8):
         self.rel = rel
         self.kind = kind  # program | copybook | jcl
         self.path = ROOT / rel
@@ -200,6 +200,9 @@ class Source:
             parts.pop()
         self.crlf_lines = [i for i, line in enumerate(parts, 1) if line.endswith("\r")]
         self.lines = [line[:-1] if line.endswith("\r") else line for line in parts]
+        # Structural analysis sees tabs expanded the way the compiler does (-ftab-width);
+        # the physical-layout rules keep working on the raw lines.
+        self.code_lines = [line.expandtabs(tab_width) if "\t" in line else line for line in self.lines]
         self.member = Path(rel).stem.upper()
         self.module = module_of(rel)
         self._cob = None
@@ -245,7 +248,7 @@ class CobolModel:
         def emit(text, kind, ln, col, first):
             self.toks.append(Tok(text, kind, ln, col, first))
 
-        for ln, line in enumerate(self.src.lines, 1):
+        for ln, line in enumerate(self.src.code_lines, 1):
             ind = line[6] if len(line) > 6 else " "
             if ind in "*/":
                 self.comments.append((ln, line[7:72]))
@@ -725,7 +728,7 @@ class Linter:
                         continue
                     if any(fnmatch.fnmatch(rel, ex) for ex in excludes):
                         continue
-                    self.sources[rel] = Source(rel, kind)
+                    self.sources[rel] = Source(rel, kind, self.cfg.get("tab_width", 8))
 
     def is_generated(self, rel: str) -> bool:
         return any(fnmatch.fnmatch(rel, g) for g in self.cfg["paths"].get("generated", []))
@@ -1201,7 +1204,7 @@ class Linter:
             else:
                 first_line = 1
             seq = []
-            for ln, line in enumerate(src.lines, 1):
+            for ln, line in enumerate(src.code_lines, 1):
                 if ln < first_line:
                     continue
                 ind = line[6] if len(line) > 6 else " "
