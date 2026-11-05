@@ -21,7 +21,8 @@
   "syntax": {
     "cobc": "cobc",
     "std": "ibm",
-    "flags": [],
+    "flags": ["-fsign=EBCDIC"],
+    "flags_reason": "Same dialect flags as the local build (tools/batch-programs.toml cobc_flags): -fsign=EBCDIC keeps mainframe zoned-decimal overpunch signs, so the syntax check compiles exactly what the build compiles.",
     "per_program_flags": {},
     "skip_exec_kinds": ["CICS", "SQL", "DLI"],
     "reason": "GnuCOBOL has no CICS, DB2 or IMS precompiler, so programs containing EXEC CICS/SQL/DLI are listed as skipped instead of compiled. -std=ibm matches the Enterprise COBOL dialect; copybook paths are the program's own module plus the base app."

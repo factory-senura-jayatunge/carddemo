@@ -48,7 +48,7 @@ git config core.hooksPath .githooks
 
 ## cobc syntax check
 
-For each program in `app/cbl`, `app/app-*/cbl`, `tools/shims` and `tools/drivers`, the check runs `cobc -fsyntax-only -std=ibm -ftab-width=4 -I <own module copybooks> -I <base copybooks>`. GnuCOBOL has no CICS, DB2 or IMS precompiler, so programs that contain `EXEC CICS`, `EXEC SQL` or `EXEC DLI` are listed as skipped, with the reason. They are never counted as passed. GnuCOBOL errors are reported as `cobc-syntax` and warnings as `cobc-warning`. A copybook problem is reported once, against the copybook. The tab width is 4 because `app/cpy/CUSTREC.cpy` uses 4-column tabs, so CBSTM03A only compiles with `-ftab-width=4`.
+For each program in `app/cbl`, `app/app-*/cbl`, `tools/shims` and `tools/drivers`, the check runs `cobc -fsyntax-only -std=ibm -ftab-width=4 -fsign=EBCDIC -I <own module copybooks> -I <base copybooks>`. GnuCOBOL has no CICS, DB2 or IMS precompiler, so programs that contain `EXEC CICS`, `EXEC SQL` or `EXEC DLI` are listed as skipped, with the reason. They are never counted as passed. GnuCOBOL errors are reported as `cobc-syntax` and warnings as `cobc-warning`. A copybook problem is reported once, against the copybook. The tab width is 4 because `app/cpy/CUSTREC.cpy` uses 4-column tabs, so CBSTM03A only compiles with `-ftab-width=4`. `-fsign=EBCDIC` matches the `cobc_flags` of the local build in `tools/batch-programs.toml`.
 
 ## Rules
 
