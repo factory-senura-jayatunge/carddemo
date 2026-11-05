@@ -169,7 +169,7 @@ None beyond `TRANREPT.md` NUM-JTRPT-001, which applies unchanged: card number as
 ## 13. Known defects and oddities
 
 #### DEF-JTRPTP-001 · The PROC statement is labelled REPROC
-- The member starts with `//REPROC PROC` (`:1`) and calls `EXEC PROC=REPROC` (`:21`). A cataloged procedure is found by its member name (`TRANREPT`), so the label has no effect on z/OS, but it misleads readers and breaks tools that index procedures by the `PROC` label; copied in-stream, it would define a second `REPROC`.
+- The member starts with `//REPROC PROC` (`:1`) and calls `EXEC PROC=REPROC` (`:21`). A cataloged procedure is found by its member name (`TRANREPT`), so the label has no effect on z/OS, but it misleads readers and breaks tools that index procedures by the `PROC` label. The procedure named `REPROC` thus contains a step that executes a procedure named `REPROC` (the cataloged `app/proc/REPROC.prc`, see `REPROC.md`). Copied into a job as an in-stream procedure, the label would make the in-stream definition the one that `EXEC PROC=REPROC` finds first, so the procedure would call itself and the job would fail with a JCL error. CORPT00C's job calls the member as a cataloged procedure by its member name (`EXEC PROC=TRANREPT`, FLOW-JTRPTP-001), so the online report path works and the defect is latent. The program-spec side (reports, area c) raises the same point.
 - **Source:** `:1, 21`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
 
