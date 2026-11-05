@@ -110,7 +110,7 @@ The program overrides the attributes of `TRTYPCD`, `TRTYDSC`, `INFOMSG` and the 
 | `CARDDEMO.TRANSACTION_TYPE` | ENT-DB2-TRAN-TYPE | UPDATE SET `TR_DESCRIPTION` | `TR_TYPE` | 1544-1548 |
 | `CARDDEMO.TRANSACTION_TYPE` | ENT-DB2-TRAN-TYPE | INSERT (`TR_TYPE`, `TR_DESCRIPTION`) | - | 1597-1602 |
 | `CARDDEMO.TRANSACTION_TYPE` | ENT-DB2-TRAN-TYPE | DELETE | `TR_TYPE` | 1627-1630 |
-| `CARDDEMO.TRANSACTION_TYPE_CATEGORY` | ENT-DB2-TRAN-TYPE-CAT | none (the DCLGEN is included at `:288` but never used); the foreign key `ON DELETE RESTRICT` makes Db2 refuse a delete of a type with categories | - | `app/app-transaction-type-db2/ctl/DB2CREAT.ctl:99-104` |
+| `CARDDEMO.TRANSACTION_TYPE_CATEGORY` | ENT-DB2-TRAN-TYPE-CAT | none (the DCLGEN is included at `:288` but never used); the foreign key `ON DELETE RESTRICT` makes Db2 refuse a delete of a type with categories | - | `app/app-transaction-type-db2/ctl/DB2CREAT.ctl:96-99` |
 
 Static SQL; the DCLGEN host structure for the type table is `DCLTRANSACTION-TYPE` with `DCL-TR-TYPE` X(2) and the VARCHAR `DCL-TR-DESCRIPTION` (length `S9(4) COMP` + text X(50)) (`app/app-transaction-type-db2/dcl/DCLTRTYP.dcl:35-46`).
 
@@ -138,7 +138,7 @@ ENT-COMMAREA fields used:
 | `CDEMO-ACCT-ID` | no | yes | cleared to zero on first entry (`:471-473`) |
 | `CDEMO-LAST-MAP`, `CDEMO-LAST-MAPSET` | no | yes | `CTRTUPA`, `COTRTUP ` on PF3 |
 
-On first entry the whole ENT-COMMAREA is initialised (DEF-TTUP-009).
+ENT-COMMAREA is initialised only on a direct start (`EIBCALEN` = 0); on entry from the menu or the list it is kept (DEF-TTUP-009).
 
 ### 4.4 Abend screen
 
@@ -167,7 +167,9 @@ stateDiagram-v2
     Search --> Search: Enter, bad code (VAL-TTUP-001..003)
     Search --> Shown: Enter, type found (S)
     Search --> NotFound: Enter, type not found (X)
-    NotFound --> Search: Enter same code / F12
+    NotFound --> Shown: Enter same code, new lookup finds it (S)
+    NotFound --> NotFound: Enter same code, still not found
+    NotFound --> Search: F12
     NotFound --> NewRec: F5 (R)
     NotFound --> Edited: Enter, different code (DEF-TTUP-003)
     NewRec --> Edited: Enter, description has errors (E)
@@ -178,7 +180,8 @@ stateDiagram-v2
     Edited --> Validated: Enter, description OK
     Validated --> Done: F5, update or insert (C, or L/F on lock error)
     Validated --> BackedOut: F12 (B)
-    BackedOut --> Edited: Enter (E)
+    BackedOut --> Validated: Enter, valid change (N)
+    BackedOut --> Edited: Enter, no change or invalid change (E)
     Shown --> ConfirmDelete: F4 (9)
     ConfirmDelete --> Deleted: F4, delete OK (7)
     ConfirmDelete --> DelFailed: F4, delete error (6)
@@ -189,6 +192,7 @@ stateDiagram-v2
     Deleted --> Search: any key
     DelFailed --> Search: any key
     Stuck --> [*]: Enter or F5, abend 9999
+    ConfirmDelete --> [*]: F5, abend 9999
 ```
 
 Each arrow is one CICS task: receive the screen, act, send the screen, end with "next transaction CTTU". PF3 leaves the program from every state (FLOW-TTUP-003).
@@ -233,12 +237,12 @@ Each arrow is one CICS task: receive the screen, act, send the screen, end with 
 
 #### BR-TTUP-004 · Delete of a transaction type
 - **When:** the user presses F4 on a shown type (state S), then F4 again (state 9).
-- **Then:** `DELETE FROM CARDDEMO.TRANSACTION_TYPE WHERE TR_TYPE = <code read from Db2>`; on success the deletion is committed and the screen shows `Delete successful.`. The table `TRANSACTION_TYPE_CATEGORY` has a foreign key to the type with `ON DELETE RESTRICT` (`app/app-transaction-type-db2/ctl/DB2CREAT.ctl:99-104`), so Db2 refuses the delete (SQLCODE -532) while the type has categories. Every type in the seed data has categories (`app/app-transaction-type-db2/ctl/DB2LTCAT.ctl:17-35`), so none of the seeded types can be deleted.
+- **Then:** `DELETE FROM CARDDEMO.TRANSACTION_TYPE WHERE TR_TYPE = <code read from Db2>`; on success the deletion is committed and the screen shows `Delete successful.`. The table `TRANSACTION_TYPE_CATEGORY` has a foreign key to the type with `ON DELETE RESTRICT` (`app/app-transaction-type-db2/ctl/DB2CREAT.ctl:96-99`), so Db2 refuses the delete (SQLCODE -532) while the type has categories. Every type in the seed data has categories (`app/app-transaction-type-db2/ctl/DB2LTCAT.ctl:20-37`), so none of the seeded types can be deleted.
 - **Source:** `:482-489, 1624-1663`
 - **Fidelity:** must-preserve · **Confidence:** platform-inferred (SQLCODE -532 for a RESTRICT violation)
 
 #### BR-TTUP-005 · What counts as a change
-- **When:** Enter is pressed with a type shown (states S, E, B, N, R).
+- **When:** Enter (or PF5 in states 8 and 9) in any state other than "not fetched", or X with the same code, once the type code has passed its edits (states S, E, B, N, R, X with a changed code, 8, 9).
 - **Then:** "no change" when the upper-cased type codes are equal and the upper-cased trimmed descriptions are equal and of equal trimmed length. Changing only the case of letters, or only leading or trailing spaces, is "no change" (VAL-TTUP-007, DEF-TTUP-007).
 - **Source:** `:783-812`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
@@ -254,9 +258,9 @@ Each arrow is one CICS task: receive the screen, act, send the screen, end with 
 ### 8.1 Keys, states and navigation
 
 #### FLOW-TTUP-001 · First entry
-- **When:** there is no commarea (`EIBCALEN` = 0), or `CDEMO-FROM-PROGRAM` is `COADM01C` or `COTRTLIC` and the context is not "re-enter".
-- **Then:** the whole ENT-COMMAREA and the program extension are initialised (DEF-TTUP-009), the context is set to "enter" and the state to "not fetched". The main dispatch then clears the extension, the work fields and `CDEMO-ACCT-ID`, sends the empty search screen (`Enter transaction type to be maintained`, type code editable, cursor on it), and sets the context to "re-enter".
-- **Otherwise:** ENT-COMMAREA is restored from the first 160 bytes of the received commarea and the extension from the next 105 bytes.
+- **When:** `EIBCALEN` = 0 (direct start of `CTTU`): ENT-COMMAREA and the program extension are initialised, the context is set to "enter" and the state to "not fetched". The source also tests `CDEMO-FROM-PROGRAM` = `COADM01C`/`COTRTLIC` with context not "re-enter" here, but it tests the working-storage copy before it is loaded from the received commarea, so in practice only `EIBCALEN` = 0 takes this branch (DEF-TTUP-009).
+- **Otherwise:** ENT-COMMAREA is restored from the first 160 bytes of the received commarea and the extension from the next 105 bytes (on entry from COADM01C or COTRTLIC these bytes lie past the 160-byte commarea).
+- **Then:** the main dispatch recognises first entry (context "enter" and from-program `COADM01C` or `COTRTLIC`, or context "enter" and state "not fetched"). It clears only the extension, the work fields and `CDEMO-ACCT-ID`, sends the empty search screen (`Enter transaction type to be maintained`, type code editable, cursor on it), and sets the context to "re-enter". User ID, user type, from-program and from-transaction are kept.
 - **Source:** `:366-381, 465-478`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -267,7 +271,7 @@ Each arrow is one CICS task: receive the screen, act, send the screen, end with 
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### FLOW-TTUP-003 · PF3, exit
-- **Then:** target transaction = `CDEMO-FROM-TRANID`, or `CA00` when blank; target program = `CDEMO-FROM-PROGRAM`, or `COADM01C` when blank (always blank in practice, DEF-TTUP-009); set from-transaction `CTTU`, from-program `COTRTUPC`, user type `A` (DEF-TTUP-010), context "enter", last mapset `COTRTUP `, last map `CTRTUPA`; SYNCPOINT (SE-TTUP-005); XCTL to the target with the 160-byte ENT-COMMAREA. PF3 is valid in every state.
+- **Then:** target transaction = `CDEMO-FROM-TRANID`, or `CA00` when blank; target program = `CDEMO-FROM-PROGRAM`, or `COADM01C` when blank: the caller (`COADM01C`/`CA00` from the menu, `COTRTLIC`/`CTLI` from the list; `COADM01C`/`CA00` only after a direct start, DEF-TTUP-009); set from-transaction `CTTU`, from-program `COTRTUPC`, user type `A` (DEF-TTUP-010), context "enter", last mapset `COTRTUP `, last map `CTRTUPA`; SYNCPOINT (SE-TTUP-005); XCTL to the target with the 160-byte ENT-COMMAREA. PF3 is valid in every state.
 - **Source:** `:429-460`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -277,10 +281,11 @@ Each arrow is one CICS task: receive the screen, act, send the screen, end with 
 | Value | Name in the source | Meaning |
 | :-- | :-- | :-- |
 | low-values or space | `TTUP-DETAILS-NOT-FETCHED` | search screen, no type shown |
-| `K` | `TTUP-INVALID-SEARCH-KEYS` | type code failed its edit |
+| `K` | `TTUP-INVALID-SEARCH-KEYS` | set when the type code fails its edit but overwritten at once by "not fetched" (`:729-730`), so never stored |
 | `X` | `TTUP-DETAILS-NOT-FOUND` | type code not in the table, add offered |
 | `S` | `TTUP-SHOW-DETAILS` | type shown, description editable |
 | `R` | `TTUP-CREATE-NEW-RECORD` | adding a new type, description editable |
+| `V` | `TTUP-REVIEW-NEW-RECORD` | declared, never set |
 | `E` | `TTUP-CHANGES-NOT-OK` | description changed but has errors (or after B) |
 | `N` | `TTUP-CHANGES-OK-NOT-CONFIRMED` | description valid, waiting for F5 |
 | `C` | `TTUP-CHANGES-OKAYED-AND-DONE` | save done (or failed, DEF-TTUP-001) |
@@ -302,15 +307,15 @@ After FLOW-TTUP-002 the key is dispatched in this order (first match wins):
 | 6 | PF5 in state N | save (FLOW-TTUP-008) |
 | 7 | PF12 in state N, 9 or S | cancel (FLOW-TTUP-006) |
 | 8 | key not valid in the state (VAL-TTUP-008) | redisplay with `Invalid key pressed` (FLOW-TTUP-009) |
-| 9 | anything else (Enter; PF5 in states 8, 7, 6) | process the input (FLOW-TTUP-005) |
+| 9 | anything else (Enter; PF5 in states 9 and 8, which both abend, ERR-TTUP-006; PF5 in 7 or 6 was reset to "not fetched" first) | process the input (FLOW-TTUP-005) |
 
 PF13-PF24 are treated as PF1-PF12 (`app/cpy/CSSTRPFY.cpy:54-77`).
 - **Source:** `:296-327, 386-387, 423-556`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### FLOW-TTUP-005 · Enter: process the input
-- **Then:** receive the map; copy the screen into the "new" fields (`*` or spaces become low-values, otherwise trimmed); in state X with Enter and the same code as before, the copy is skipped and the state set back to "not fetched" so that the code is looked up again. Then edit (section 8.2) and decide: state "not fetched" with a valid code: look up (SE-TTUP-001), state S if found, X if not; state S: N if a valid change, otherwise unchanged; state E or N: unchanged; state B: E; state K: unchanged; any other state: abend (ERR-TTUP-006). Finally send the screen (FLOW-TTUP-011).
-- **Source:** `:548-555, 625-636, 652-777, 978-1082`
+- **Then:** receive the map; copy the screen into the "new" fields (`*` or spaces become low-values, otherwise trimmed); in state X with Enter and the same code as before, the copy is skipped and the state set back to "not fetched" so that the code is looked up again. Then edit (section 8.2). The edits already set the state: any detected change sets E, then N when the description is valid (`:753, 775`); a type code error sets "not fetched". Then decide: state "not fetched" with a valid code: look up (SE-TTUP-001), state S if found, X if not; state S (no change): unchanged; state E or N: unchanged; state B (reached only with no change, since a change already replaced B by E or N): E; any other state (in practice 9 after PF5, and 8): abend (ERR-TTUP-006). So from S an invalid change gives E, and from B a valid change gives N. Finally send the screen (FLOW-TTUP-011).
+- **Source:** `:548-555, 625-636, 652-777, 978-1082, 1041-1042`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### FLOW-TTUP-006 · PF12, cancel
@@ -350,13 +355,13 @@ PF13-PF24 are treated as PF1-PF12 (`app/cpy/CSSTRPFY.cpy:54-77`).
 
 #### VAL-TTUP-002 · Type code numeric
 - **When:** `FUNCTION TEST-NUMVAL` of the 2-character code is not 0 (for example `A1`, `1A`).
-- **Then:** message `Tran Type code must be numeric.`, state K ("invalid search keys"), field red, cursor on the type code.
-- **Source:** `:728-732, 934-949, 1331-1334`
+- **Then:** message `Tran Type code must be numeric.`; the state ends "not fetched" (K is set and overwritten at once, `:729-730`), so the screen is built by 3201 and the entered code is cleared: the code field is shown empty in red with the cursor on it, information message `Enter transaction type to be maintained`.
+- **Source:** `:728-732, 934-949, 1146-1147, 1176-1179, 1331-1334`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### VAL-TTUP-003 · Type code not zero
 - **When:** `NUMVAL` of the code is 0 (`00`, `0`, `-0`).
-- **Then:** message `Tran Type code must not be zero.`, state K, field red. `.5` has a value of 0.5, passes this edit and is stored as `00` (DEF-TTUP-008).
+- **Then:** message `Tran Type code must not be zero.`; state "not fetched" as in VAL-TTUP-002, so the code field is shown empty in red. `.5` has a value of 0.5, passes this edit and is stored as `00` (DEF-TTUP-008).
 - **Source:** `:728-732, 954-969`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -403,7 +408,7 @@ A key outside this table sets `Invalid key pressed` and redisplays the screen wi
 ### 8.3 Screen build
 
 #### FLOW-TTUP-011 · Screen build
-- **Then:** on every send the program clears the output map, fills the titles, `CTTU`, `COTRTUPC`, date and time (NUM-TTUP-005), then (a) the field values per state: blank in state "not fetched", the values read from Db2 in states S, 9, 6, 7, B (and any other state not listed), the values entered in states E, N, L, F, X, K, R, C; on first entry nothing (`:1140-1205`); (b) the information message (`:1210-1265`, section 8.4) centred (NUM-TTUP-004) and the error message; (c) field attributes: all fields protected, then the type code editable in states "not fetched", K, X (and B with no type read), the description editable in states S, E, R, B; all protected in N, C, 9/8/7/6 (`:1269-1298`); colours: type code red when its edit failed or the delete failed, red with `*` when blank on re-entry (`:1331-1340`); the description red (and `*` when blank) when its edit failed, only if the type code edits passed (`:1342-1361`); information message bright when present (`:1386-1392`, DEF-TTUP-012); (d) key labels (FLOW-TTUP-012). The screen is sent with cursor positioning, erase and keyboard unlock; the response is not checked (ERR-TTUP-007).
+- **Then:** on every send the program clears the output map, fills the titles, `CTTU`, `COTRTUPC`, date and time (NUM-TTUP-005), then (a) the field values per state: blank in state "not fetched", the values read from Db2 in states S, 9, 6, 7, B (and any other state not listed), the values entered in states E, N, L, F, X, R, C; on first entry nothing (`:1140-1205`); (b) the information message (`:1210-1265`, section 8.4) centred (NUM-TTUP-004) and the error message; (c) field attributes: all fields protected, then the type code editable in states "not fetched", X (and B with no type read) and in L and F (the WHEN OTHER branch), the description editable in states S, E, R, B; all protected in N, C, 9/8/7/6 (`:1269-1298`); colours: type code red when its edit failed, the lookup failed (`:1491, 1497`) or the delete failed, red with `*` when blank on re-entry (`:1331-1340`); the description red (and `*` when blank) when its edit failed, only if the type code edits passed (`:1342-1361`); information message bright when present (`:1386-1392`, DEF-TTUP-012); (d) key labels (FLOW-TTUP-012). The screen is sent with cursor positioning, erase and keyboard unlock; the response is not checked (ERR-TTUP-007).
 - **Source:** `:1089-1104, 1110-1134, 1140-1205, 1210-1265, 1269-1384, 1428-1441`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -491,8 +496,8 @@ In execution order. Each successful change is committed at once; the CICS task e
 | 0 | found: state S |
 | +100 | `No record found for this key in database`, state X |
 | < 0 | `Error accessing: TRANSACTION_TYPE table. SQLCODE:...`, state X (DEF-TTUP-011) |
-| > 0, not 100 (warning) | no message, "found" not set, state X (DEF-TTUP-016) |
-- **Source:** `:1484-1509, 993-997`
+| > 0, not 100 (warning) | no message, "found" not set, state X (DEF-TTUP-016); the returned values are still stored as the "old" fields (`:1456-1462`) |
+- **Source:** `:1484-1509, 993-997, 1456-1462`
 - **Confidence:** platform-inferred
 
 #### ERR-TTUP-002 · Update SQLCODE
@@ -530,8 +535,8 @@ After any save the next key resets to the search screen (FLOW-TTUP-002).
 - **Confidence:** platform-inferred
 
 #### ERR-TTUP-006 · Unexpected state
-- **What:** when 2000-DECIDE-ACTION finds no matching state (in practice state 8 after DEF-TTUP-002, or a corrupted commarea), it sets code `0001`, message `UNEXPECTED DATA SCENARIO` and performs the abend routine, which overwrites the code with `9999`. The terminal shows the abend data and the task ends abnormally (ABCODE 9999); nothing is written.
-- **Source:** `:1073-1080, 1675-1698`
+- **What:** when 2000-DECIDE-ACTION finds no matching state (in practice state 8 after DEF-TTUP-002, PF5 pressed in state 9 on the delete confirmation screen, which is a valid key there although `F5=Save` is not shown, or a corrupted commarea), it sets code `0001`, message `UNEXPECTED DATA SCENARIO` and performs the abend routine, which overwrites the code with `9999`. The terminal shows the abend data and the task ends abnormally (ABCODE 9999); nothing is written.
+- **Source:** `:588-593, 1073-1080, 1675-1698`
 - **Confidence:** reviewed
 
 #### ERR-TTUP-007 · Unchecked responses
@@ -563,7 +568,7 @@ sequenceDiagram
 ```
 
 - **Inbound:** `COADM01C` (option 6) and `COTRTLIC` (PF2), both by XCTL with context 0; transaction `CTTU` for re-entry.
-- **Outbound:** PF3 transfers (XCTL) to `CDEMO-FROM-PROGRAM`, or to `COADM01C` when it is blank. Because the commarea is initialised on entry (DEF-TTUP-009), `CDEMO-FROM-PROGRAM` is always blank by then, so PF3 always goes to `COADM01C` with `CDEMO-TO-TRANID` `CA00`.
+- **Outbound:** PF3 transfers (XCTL) to `CDEMO-FROM-PROGRAM`, or to `COADM01C` when it is blank: back to `COADM01C` (`CA00`) when entered from the menu, back to `COTRTLIC` (`CTLI`) when entered from the list, and to `COADM01C` after a direct start.
 - **Shared data:** `CARDDEMO.TRANSACTION_TYPE` is also read, updated and deleted by `COTRTLIC`, maintained in batch by `COBTUPDT` (job MNTTRDB2) and extracted to the VSAM reference file by job TRANEXTR, which feeds the transaction report (TRANREPT). A description saved here reaches the reports only after the next TRANEXTR run and reload of the VSAM file.
 - **No lock across interactions:** two users editing the same type both succeed; the last save wins (SE-TTUP-002).
 
@@ -571,11 +576,11 @@ sequenceDiagram
 
 | Boundary | Contract |
 | :-- | :-- |
-| Entry | From the admin menu and the type list, with ENT-COMMAREA; the program ignores everything in it except the from-program and context, and initialises it (DEF-TTUP-009). |
+| Entry | From the admin menu and the type list, with ENT-COMMAREA; the program uses the from-program, from-transaction and context, and passes the rest through unchanged (DEF-TTUP-009). |
 | Data | Owns `CARDDEMO.TRANSACTION_TYPE`: read one row by code, update the description, insert, delete. Descriptions are stored padded to 50 (BR-TTUP-003). |
 | Referential integrity | Delete must keep refusing types that have categories (`ON DELETE RESTRICT`), or the business decides on a cascade (Q-TTUP-005). |
 | Downstream | Changes reach batch reporting only through TRANEXTR (Db2 to sequential extract) and the VSAM reload; a replacement must keep that extract format or replace the VSAM consumers. |
-| Exit | PF3 returns to the admin menu with `CDEMO-USER-TYPE` = `A`. |
+| Exit | PF3 returns to the caller (admin menu or type list) with `CDEMO-USER-TYPE` = `A`. |
 
 ## 12. Numeric, date and format details
 
@@ -614,7 +619,7 @@ None of these are changed in this branch.
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (logic); platform-inferred (SQLCODE -532)
 
 #### DEF-TTUP-003 · Changing the code after "not found" skips the lookup
-- In state X the type code stays editable. If the user types a different code and presses Enter, the program does not look it up: the code passes the edits, the comparison with the blank "old" values finds a change, and the screen moves to state E/N as if editing an existing type. F5 then updates that code's description if it exists (overwriting a description the user never saw) or inserts it if it does not.
+- In state X the type code stays editable. If the user types a different code and presses Enter, the program does not look it up: the code passes the edits, the comparison with the blank "old" values finds a change, and because the description is protected and empty in state X, the screen moves to state E (`Transaction Desc must be supplied.`); after a description is entered it moves to N, as if editing an existing type. F5 then updates that code's description if it exists (overwriting a description the user never saw) or inserts it if it does not.
 - **Source:** `:654-661, 698-737, 743-776`
 - **Status:** open · **Fidelity:** defect-decide (Q-TTUP-001) · **Confidence:** reviewed
 
@@ -634,7 +639,7 @@ None of these are changed in this branch.
 - **Status:** open · **Confidence:** reviewed
 
 #### DEF-TTUP-007 · Case-only changes cannot be saved
-- Because the comparison ignores case (BR-TTUP-005), a correction such as `PURCHASE` to `Purchase` is rejected with `No change detected with respect to values fetched.`. The seed data loaded by CREADB21 is all upper case (`app/app-transaction-type-db2/ctl/DB2LTTYP.ctl:16-22`), while the VSAM sample data is mixed case.
+- Because the comparison ignores case (BR-TTUP-005), a correction such as `PURCHASE` to `Purchase` is rejected with `No change detected with respect to values fetched.`. The seed data loaded by CREADB21 is all upper case (`app/app-transaction-type-db2/ctl/DB2LTTYP.ctl:17-23`), while the VSAM sample data is mixed case.
 - **Source:** `:786-797`
 - **Status:** open · **Fidelity:** defect-decide (Q-TTUP-004) · **Confidence:** reviewed
 
@@ -643,13 +648,13 @@ None of these are changed in this branch.
 - **Source:** `:934-969, 834-842`
 - **Status:** open · **Confidence:** runtime-verified (GnuCOBOL); platform-inferred (Enterprise COBOL)
 
-#### DEF-TTUP-009 · Commarea wiped on entry; PF3 never returns to the list
-- On entry from `COADM01C` or `COTRTLIC` (context 0) the program initialises the whole ENT-COMMAREA: user ID, user type, from-program, customer, account and card fields are cleared. PF3 therefore always goes to `COADM01C` (even when the user came from the list), and the admin menu receives a commarea without the signed-on user ID.
-- **Source:** `:366-374, 438-443`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+#### DEF-TTUP-009 · First-entry test reads the commarea before restoring it
+- The test at `:366-370` checks `CDEMO-FROM-PROGRAM` and the context in the working-storage copy of ENT-COMMAREA before it is loaded from the received commarea (`:376`), so it acts only when `EIBCALEN` = 0. On entry from the menu or the list the program therefore restores the commarea and also copies bytes 161-265 from beyond the end of the 160-byte commarea; the result is discarded by the first-entry dispatch (`:471`), but the read goes past the area the caller passed. ENT-COMMAREA (user ID, user type, from-program) passes through unchanged, and PF3 returns to the caller.
+- **Source:** `:366-381, 465-473`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed; the working-storage content tested is platform-inferred (no VALUE clause)
 
 #### DEF-TTUP-010 · [security] No authorisation; PF3 grants admin user type
-- The program never checks `CDEMO-USER-TYPE` or the user ID; anyone who can start `CTTU` (including directly from a blank terminal, FLOW-TTUP-001) can add, change and delete transaction types. PF3 sets `CDEMO-USER-TYPE` to `A` before transferring to the admin menu, so a user who reached this screen arrives in the admin menu as an administrator. The CSD has `RESSEC(NO) CMDSEC(NO)` for `CTTU` (`app/app-transaction-type-db2/csd/CRDDEMOD.csd:42`).
+- The program never checks `CDEMO-USER-TYPE` or the user ID; anyone who can start `CTTU` (including directly from a blank terminal, FLOW-TTUP-001) can add, change and delete transaction types. PF3 sets `CDEMO-USER-TYPE` to `A` before transferring to the caller, so the admin menu or the type list receives user type `A` (replacing the `U` that COTRTLIC set on PF2). The CSD has `RESSEC(NO) CMDSEC(NO)` for `CTTU` (`app/app-transaction-type-db2/csd/CRDDEMOD.csd:42`).
 - **Source:** `:448`
 - **Status:** open · **Fidelity:** defect-decide (Q-TTUP-006) · **Confidence:** reviewed
 
@@ -669,8 +674,8 @@ None of these are changed in this branch.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-TTUP-014 · After cancelling an update, delete and cancel are no longer offered
-- F12 in state N gives state B (`Update was cancelled`) with the read values. The next Enter moves to state E whether or not anything changed. In state E only Enter and PF3 are valid: the user can no longer delete (F4) or cancel (F12), and must leave with PF3 or make a valid change. The same holds for any edit error in state E.
-- **Source:** `:1003-1005, 1041-1042, 577-608`
+- F12 in state N gives state B (`Update was cancelled`) with the read values. The next Enter with no change gives state E with `No change detected with respect to values fetched.` (an invalid change also gives E; a valid change gives N). In state E only Enter and PF3 are valid: the user can no longer delete (F4) or cancel (F12) until a valid change reaches N, or must leave with PF3. The same holds for any edit error in state E.
+- **Source:** `:1003-1005, 1041-1042, 577-608, 753, 775`
 - **Status:** open · **Confidence:** reviewed
 
 #### DEF-TTUP-015 · Information message centred in 40 of 45 columns
@@ -682,6 +687,11 @@ None of these are changed in this branch.
 - A positive SQLCODE other than 100 on the lookup gives state X without a message; on the update it gives state C without SYNCPOINT (the change is committed at task end).
 - **Source:** `:1486-1509, 1555-1589`
 - **Status:** open · **Confidence:** platform-inferred
+
+#### DEF-TTUP-017 · [security] Direct start leads to the admin menu as administrator without sign-on
+- With no commarea (`CTTU` typed on any terminal) the program initialises ENT-COMMAREA, so the user ID and the from-program are blank (`:366-374`). PF3 then sets the user type to `A` and, because the from-program and from-transaction are blank, transfers (XCTL) to `COADM01C`/`CA00` with context 0 (`:429-460`). `COADM01C` sends the user to sign-on only when it gets no commarea (`app/cbl/COADM01C.cbl:86-95`), so it shows the admin menu, whose options include user list, add, update and delete (`app/cpy/COADM02Y.cpy:28-46`). Someone who never signed on can therefore reach user administration and create an administrator. PF3 also overwrites `CDEMO-USER-TYPE` with `A` on every exit (DEF-TTUP-010). Linked to area A (sign-on and menus): DEF-ADMN-001 and PINV-a-signon-admin-01; area F invariant PINV-f-06.
+- **Source:** `:366-374, 429-460`, `app/cbl/COADM01C.cbl:86-95`
+- **Status:** open · **Fidelity:** defect-decide (Q-TTUP-006) · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -703,7 +713,7 @@ A reimplementation must reproduce the Db2 changes, the information and error mes
 | --: | :-- | :-- | :-- |
 | S1 | from admin menu | - | blank screen, `Enter transaction type to be maintained`, type code editable, cursor on it |
 | S2 | search | Enter, code blank | `Tran Type code must be supplied.`, `*` in red in the code field |
-| S3 | search | Enter, `A1` | `Tran Type code must be numeric.`, code red |
+| S3 | search | Enter, `A1` | `Tran Type code must be numeric.`, code field empty and red |
 | S4 | search | Enter, `00` | `Tran Type code must not be zero.` |
 | S5 | search, type 01 exists | Enter, `1` | code `01`, description from Db2, `Enter transaction type to be maintained`, description editable, `F4=Delete` and `F12=Cancel` shown |
 | S6 | S5 | Enter, description unchanged or case-only change | `No change detected with respect to values fetched.` |
@@ -716,8 +726,9 @@ A reimplementation must reproduce the Db2 changes, the information and error mes
 | S13 | S5 | F4 | `Delete this record ? Press F4 to confirm`, Enter label hidden |
 | S14 | S13, type has categories (all seeded types) | F4 | `Please delete associated child records first:SQLCODE : -532:...`; then Enter abends with code 9999 (DEF-TTUP-002) |
 | S15 | S13, type without categories | F4 | row deleted, committed, `Delete successful.` |
-| S16 | any | PF3 | SYNCPOINT, XCTL to `COADM01C` |
+| S16 | any | PF3 | SYNCPOINT, XCTL to the caller: `COTRTLIC` when entered from the list, `COADM01C` from the menu or after a direct start |
 | S17 | S5 | PF7 | `Invalid key pressed`, screen redisplayed |
+| S18 | S13 | F5 | abend `UNEXPECTED DATA SCENARIO`, code 9999; nothing deleted (ERR-TTUP-006) |
 
 These scenarios cannot run locally (no CICS, no Db2); they become acceptance tests for the target. The type code normalisation (NUM-TTUP-001) was checked with GnuCOBOL; see `docs/modernization/spec/evidence/f-trantype-vsam-mq-review.md`.
 
