@@ -329,11 +329,11 @@ flowchart LR
 
 #### DEF-AUPG-005 · Frequencies compared as text
 - See NUM-AUPG-002: `P-CHKP-FREQ` and `P-CHKP-DIS-FREQ` are `X(05)` compared with numeric counters, so `00001` means every 1,000 summaries and the defaults mean almost never. A long run therefore holds its locks and uncommitted deletes for up to 1,000 summaries (or the whole run with the defaults).
-- **Source:** `:101, 103, 160, 360` · **Status:** open · **Confidence:** runtime-verified on GnuCOBOL; platform-inferred on z/OS
+- **Source:** `:101, 103, 160, 360` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-007) · **Confidence:** runtime-verified on GnuCOBOL; platform-inferred on z/OS
 
 #### DEF-AUPG-006 · "ABENDING" is a normal end with return code 16
 - ERR-AUPG-006 does not abend; IMS commits all deletes up to the failure, including the in-flight ones after the last checkpoint. The message says `ABENDING`. A rerun is safe because each run re-reads and re-tests what is left (`authorization-purge.md:89-94`).
-- **Source:** `:377-383` · **Status:** open · **Confidence:** platform-inferred
+- **Source:** `:377-383` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-008) · **Confidence:** platform-inferred
 
 #### DEF-AUPG-007 · Database position after a checkpoint
 - The program continues with an unqualified `GN PAUTSUM0` after `CHKP`. IMS documentation states that a basic checkpoint in a BMP loses database position for full-function databases; if so, the next `GN` starts again from the first summary, so kept summaries are read (and counted) again, and a database with more than about 1,000 kept summaries could loop. Not reachable with the 22 sample summaries. Needs confirmation by the mainframe team.
@@ -341,7 +341,7 @@ flowchart LR
 
 #### DEF-AUPG-008 · [security] Debug output and account numbers
 - The shipped debug flag `Y` prints the account number before every delete and in every checkpoint and error line. Account numbers are customer data (`docs/security/data-handling.md`). No card numbers are printed.
-- **Source:** `:306-308, 331-333, 362-363` · **Status:** open
+- **Source:** `:306-308, 331-333, 362-363` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-009)
 
 #### DEF-AUPG-009 · Purge ignores match status and fraud flags
 - Only the age decides. A detail matched with a posted transaction (`M`), a declined one (`D`) and one flagged as fraud (`F`, with a row in ENT-AUTH-FRAUD) are purged the same way. The status value `E` ("pending expired", ENT-AUTH-DETAIL) exists but is never set; expired details are deleted instead.
@@ -361,6 +361,9 @@ flowchart LR
 | Q-AUPG-004 | Is the summary `DLET` accepted after intervening `GNP` and `DLET` calls on the same PCB, or does IMS require the summary to be retrieved again first? | mainframe team |
 | Q-AUPG-005 | Should matched, declined or fraud-flagged authorizations be purged by age like the others, or marked expired (`E`) (DEF-AUPG-009)? | business |
 | Q-AUPG-006 | Should the age be a true day count (DEF-AUPG-004)? | business |
+| Q-AUPG-007 | Should the checkpoint and display frequencies be compared as numbers, so `00001` means every summary and the defaults mean every 5 and every 10 (DEF-AUPG-005)? | operations |
+| Q-AUPG-008 | Should an IMS error end the step with an abend and a backout to the last checkpoint instead of return code 16 with everything committed (DEF-AUPG-006)? | operations |
+| Q-AUPG-009 | Should the debug output (on in the shipped card) stop printing account numbers, or be off in production (DEF-AUPG-008)? | security, operations |
 
 ## 15. Equivalence contract
 
