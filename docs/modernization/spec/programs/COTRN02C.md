@@ -35,7 +35,7 @@ spec_status: draft
 
 ## 1. Summary
 
-The transaction add screen lets a user type a new transaction and write it to the transaction master file (`TRANSACT`). The user identifies the card either by account ID or by card number; the program looks the other one up in the card cross-reference. All twelve data fields are required and checked for format; the two dates are checked as calendar dates by `CSUTLDTC`. The user then confirms with `Y`, and the program writes the record with the next free transaction ID (highest existing ID + 1) and shows that ID. PF5 fills the data fields from the transaction with the highest ID in the file. The program writes only the transaction record: no account balance, category balance, credit limit or card status is read or changed.
+The transaction add screen lets a user type a new transaction and write it to the transaction master file (`TRANSACT`). The user identifies the card either by account ID or by card number; the program looks the other one up in the card cross-reference. All eleven data fields are required; type, category, amount, both dates and merchant ID are also checked for format, and the two dates are checked as calendar dates by `CSUTLDTC`. The user then confirms with `Y`, and the program writes the record with the next free transaction ID (highest existing ID + 1) and shows that ID. PF5 fills the data fields from the transaction with the highest ID in the file. The program writes only the transaction record: no account balance, category balance, credit limit or card status is read or changed.
 
 ## 2. Rules at a glance
 
@@ -74,7 +74,7 @@ The transaction add screen lets a user type a new transaction and write it to th
 
 ### 4.1 Screen COTRN2A (mapset COTRN02), 24 x 80
 
-Source: `app/bms/COTRN02.bms:19-304`; symbolic map `app/cpy-bms/COTRN02.CPY:17-272` (output map `COTRN2AO` redefines input map `COTRN2AI` at `:145`, so values received are sent back unless the program changes them). Every input field is unprotected, green, underlined and `FSET`, so it is sent back on every key, changed or not. No field has the `NUM` attribute or a `JUSTIFY` option.
+Source: `app/bms/COTRN02.bms:19-304`; symbolic map `app/cpy-bms/COTRN02.CPY:17-272` (output map `COTRN2AO` redefines input map `COTRN2AI` at `:145`, so values received are sent back unless the program changes them). Every input field is unprotected, green, underlined and `FSET`, so it is sent back on every key, changed or not. No field has the `NUM` attribute or a `JUSTIFY` option. The mapset has `CTRL=(ALARM,FREEKB)` (`app/bms/COTRN02.bms:19`), so the terminal alarm sounds on every send, including the success message.
 
 | Row,Col | Field | Len | Direction | Attributes | Content |
 | :-- | :-- | --: | :-- | :-- | :-- |
@@ -218,7 +218,7 @@ The first failing check sends its message and ends the task (FLOW-TRNA-011), so 
 
 #### BR-TRNA-004 · Record built from the screen
 - **When:** the new ID is known.
-- **Then:** the 350-byte record is initialised (text fields to spaces, numeric fields to zeros, FILLER to spaces) and filled:
+- **Then:** the 350-byte record is initialised (text fields to spaces, numeric fields to zeros) and filled. `INITIALIZE` does not touch the 20-byte FILLER (bytes 331-350), so it keeps the FILLER bytes of the highest-ID record just read into the same area by BR-TRNA-003; these are spaces for every record written by the batch and online programs in practice. When the read-previous reported end of file, the FILLER holds whatever was in working storage (runtime-verified with GnuCOBOL: FILLER set to `Z` survives `INITIALIZE`).
 
 | Record field | Value |
 | :-- | :-- |
@@ -237,7 +237,7 @@ The first failing check sends its message and ends the task (FLOW-TRNA-011), so 
 | `TRAN-PROC-TS` | processing date field (10), padded with spaces to 26 |
 
   Then the record is written (SE-TRNA-002).
-- **Source:** `:450-466`; layout `app/cpy/CVTRA05Y.cpy:4-18`
+- **Source:** `:450-466, 677`; layout `app/cpy/CVTRA05Y.cpy:4-18`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### BR-TRNA-005 · Success
@@ -253,13 +253,13 @@ The first failing check sends its message and ends the task (FLOW-TRNA-011), so 
   2. Read the transaction with the highest ID in the whole file, as in BR-TRNA-003. It need not belong to the account or card on the screen (DEF-TRNA-009).
   3. Copy its type, category, source, amount (edited `+99999999.99`), description (first 60), original and processing date (first 10 characters), merchant ID, name (first 30), city (first 25) and ZIP into the data fields. The card number and ID are not copied.
   4. Run the whole Enter logic (section 6). With the confirm field blank this ends in `Confirm to add this transaction...`; if the user had typed `Y` in it before pressing PF5, the copy is added at once.
-- If the read fails, its message is sent and the task ends before step 3 (ERR-TRNA-001).
+- If the read fails, its message is sent and the task ends before step 3 (ERR-TRNA-001). If the read-previous reports end of file (empty `TRANSACT`), no error is raised and step 3 copies a record area that was never read (DEF-TRNA-015).
 - **Source:** `:146-147, 471-495`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### BR-TRNA-007 · Only the transaction record is written
 - **When:** a transaction is added.
-- **Then:** the program does not read the account (`ACCTDAT` is named but unused), and does not check or change the account balance, credit limit, cycle totals, account or card status, card expiry, or the category balance (ENT-TCAT-BAL); it does not check that the type and category exist in ENT-TRAN-TYPE and ENT-TRAN-CATEGORY. The transaction is visible at once in the list and view screens and in the next transaction report that covers its processing date. It is not posted to any balance (DEF-TRNA-001, DEF-TRNA-002).
+- **Then:** the program does not read the account (`ACCTDAT` is named but unused), and does not check or change the account balance, credit limit, cycle totals, account or card status or card expiry (ENT-CARD), or the category balance (ENT-TCAT-BAL); it does not check that the type and category exist in ENT-TRAN-TYPE and ENT-TRAN-CATEGORY. The transaction is visible at once in the list and view screens and in the next transaction report that covers its processing date. It is not posted to any balance (DEF-TRNA-001, DEF-TRNA-002).
 - **Source:** whole program; `:40, 89` (unused account file and layout), `:442-466`
 - **Fidelity:** must-preserve (as-is scope); defect-decide (Q-TRNA-001) · **Confidence:** reviewed
 
@@ -314,7 +314,7 @@ Every message is shown in `ERRMSG` (row 23) in red, with the cursor on the field
 | Merchant City | `Merchant City can NOT be empty...` |
 | Merchant Zip | `Merchant Zip can NOT be empty...` |
 
-- **Then:** that message, cursor on that field. Partly blank fields are not "empty" here; they fail the format checks that follow.
+- **Then:** that message, cursor on that field. A partly blank value passes this check; it is rejected later only for the fields with a format check (type, category, amount, dates, merchant ID). Source, description, merchant name, city and ZIP are stored as received.
 - **Source:** `:251-320`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -474,7 +474,7 @@ Each error sets the error flag, writes `RESP:..REAS:..` to the CICS log for "Oth
 - **Confidence:** reviewed; browse cleanup at task end platform-inferred
 
 #### ERR-TRNA-002 · Screen receive not checked
-- **What:** the RECEIVE MAP response is stored but never tested; MAPFAIL (PA keys, Clear) is ignored.
+- **What:** the RECEIVE MAP response is stored but never tested; MAPFAIL (PA keys, Clear) is ignored. Clear and the PA keys then get `Invalid key pressed. Please see below...` (VAL-TRNA-013), and the map sent back holds whatever was left in the map area, because the receive filled nothing.
 - **Source:** `:539-547`
 - **Confidence:** reviewed
 
@@ -507,7 +507,7 @@ sequenceDiagram
 - **Inbound:** `COMEN01C` (option 8).
 - **Outbound:** `COMEN01C` (PF3), `COSGN00C` (no commarea), by XCTL; `CSUTLDTC` by CALL.
 - **Shared data:** `TRANSACT` is also browsed by the list (`COTRN00C`), read by the view (`COTRN01C`), written by bill payment (`COBIL00C`, same "highest + 1" ID method, COBIL00C DEF-BILL-003) and rebuilt by the batch posting POSTTRAN (`CBTRN02C`), which needs it empty and takes IDs from the daily file. The cross-reference is shared with bill payment and the account and card screens.
-- **Downstream effect:** a transaction added here is reported by TRANREPT when its processing date (positions 305-314 of the record) falls in the requested range, because the report selects on that field (`app/proc/TRANREPT.prc:38-42`). It never reaches the account balance or ENT-TCAT-BAL (BR-TRNA-007).
+- **Downstream effect:** a transaction added here is reported by TRANREPT when its processing date (positions 305-314 of the record) falls in the requested range, because the report selects on that field (`app/proc/TRANREPT.prc:38-46`). It never reaches the account balance or ENT-TCAT-BAL (BR-TRNA-007).
 - **Shared commarea contract:** positions 161-218 as in the list (proposed correction to ENT-COMMAREA in `areas/c-transactions-entities.md`).
 
 ### Module extraction notes (selective conversion of the add)
@@ -522,7 +522,7 @@ sequenceDiagram
 ## 12. Numeric, date and format details
 
 #### NUM-TRNA-001 · Amount parse and re-edit
-- After VAL-TRNA-008, the amount text is converted with `FUNCTION NUMVAL-C` into `S9(9)V99`, edited back with `+99999999.99` and put into the amount field (`-00000012.50` stays, `+00000012.50` stays). On add, the field is converted again with `NUMVAL-C` into `TRAN-AMT` (decimal(11,2)). The screen form allows 8 integer digits, so the stored amount is between -99,999,999.99 and +99,999,999.99; the record could hold 9. Two decimals are always given, so there is no rounding. A negative amount is stored as negative (a credit); nothing gives the sign a business meaning here. PF5 shows the copied amount with the same edit; a stored amount of 100,000,000.00 or more would lose its highest digit there.
+- After VAL-TRNA-008, the amount text is converted with `FUNCTION NUMVAL-C` into `S9(9)V99`, edited back with `+99999999.99` and put into the amount field (`-00000012.50` stays, `+00000012.50` stays, `-00000000.00` is shown again as `+00000000.00` and stored as zero; runtime-verified with GnuCOBOL). On add, the field is converted again with `NUMVAL-C` into `TRAN-AMT` (decimal(11,2)). The screen form allows 8 integer digits, so the stored amount is between -99,999,999.99 and +99,999,999.99; the record could hold 9. Two decimals are always given, so there is no rounding. A negative amount is stored as negative (a credit); nothing gives the sign a business meaning here. PF5 shows the copied amount with the same edit; a stored amount of 100,000,000.00 or more would lose its highest digit there.
 - **Source:** `:58-59, 383-386, 456-458, 481, 485`
 - **Confidence:** reviewed
 
@@ -571,7 +571,7 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (Q-TRNA-004)
 
 #### DEF-TRNA-005 · Typed card number ignored when an account is given
-- With both fields typed, the card number is replaced by the first card of the account without a message; a mismatch is not reported.
+- With both fields typed, the card number is replaced by the account's card from the cross-reference without a message; a mismatch is not reported. An account with several cards fails with DUPKEY before any replacement (DEF-TRNA-004).
 - **Source:** `:196-209`
 - **Status:** open · **Fidelity:** defect-decide
 
@@ -601,8 +601,8 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** incidental
 
 #### DEF-TRNA-011 · Unreachable and unused code
-- The data-field blanking when the error flag is on (`:237-249`) cannot run with the flag on (FLOW-TRNA-011). `ACCTDAT`, `CVACT01Y`, `WS-USR-MODIFIED`, `WS-TRAN-AMT`, `WS-TRAN-DATE` and the paging fields of the commarea extension are unused.
-- **Source:** `:40, 49-54, 89, 237-249`
+- The data-field blanking when the error flag is on (`:237-249`) cannot run with the flag on (FLOW-TRNA-011); for the same reason the test `IF NOT ERR-FLG-ON` in the copy function (`:480`) is always true. `ACCTDAT`, `CVACT01Y`, `WS-USR-MODIFIED`, `WS-TRAN-AMT`, `WS-TRAN-DATE` and the paging fields of the commarea extension are unused.
+- **Source:** `:40, 49-54, 89, 237-249, 480`
 - **Status:** open · **Fidelity:** incidental
 
 #### DEF-TRNA-012 · [security] Any signed-on user can add transactions
@@ -619,6 +619,11 @@ sequenceDiagram
 - Answering `N` gives the same `Confirm to add this transaction...` prompt as a blank field; the data stays on the screen. Only PF4 or PF3 abandons the add.
 - **Source:** `:173-181`
 - **Status:** open · **Fidelity:** defect-decide
+
+#### DEF-TRNA-015 · PF5 on an empty file copies unread data
+- When `TRANSACT` is empty, the read-previous reports end of file, the ID is set to zero and the error flag stays off, so the copy (`:480-492`) moves fields from a `TRAN-RECORD` that was never read. Working storage has no `VALUE` clauses for it and the transaction is defined `STORAGECLEAR(NO)` (`app/csd/CARDDEMO.CSD:441`), so the copied values are unpredictable.
+- **Source:** `:475-492, 685-690`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred (Q-TRNA-004)
 
 ## 14. Open questions
 
@@ -643,12 +648,12 @@ A reimplementation must reproduce, for each scenario, the message text and colou
 | S5 | any | Enter, account `99999999999` (missing) | `Account ID NOT found...` |
 | S6 | any | Enter, account `00000000050`, card blank, data blank | card field shows `0500024453765740`; `Type CD can NOT be empty...` |
 | S7 | any | Enter, account blank, card `0683586198171516`, data blank | account field shows `00000000027`; `Type CD can NOT be empty...` |
-| S8 | key valid | type `1` | `Type CD must be Numeric...` |
+| S8 | key valid, all other data fields filled | type `1` | `Type CD must be Numeric...` |
 | S9 | key valid, type `01`, category `0001`, other fields filled | amount `12.50` | `Amount should be in format -99999999.99` |
 | S10 | as S9 | amount `+00000012.50`, orig `2022-02-30` | `Orig Date - Not a valid date...` |
 | S11 | as S9 | amount `-00000012.50`, orig `2022-07-06`, proc `2022/07/06` | `Proc Date should be in format YYYY-MM-DD` |
-| S12 | as S9 | orig `1500-01-01`, proc `2022-07-06`, merchant ID `123` | `Merchant ID must be Numeric...` (the 1500 date passed) |
-| S13 | all valid, confirm blank | Enter | `Confirm to add this transaction...`, cursor on confirm, amount shown `-00000012.50` |
+| S12 | as S9 | amount `-00000012.50`, orig `1500-01-01`, proc `2022-07-06`, merchant ID `123` | `Merchant ID must be Numeric...` (the 1500 date passed) |
+| S13 | all valid, amount `-00000012.50`, confirm blank | Enter | `Confirm to add this transaction...`, cursor on confirm, amount shown `-00000012.50` |
 | S14 | all valid | confirm `X` | `Invalid value. Valid values are (Y/N)...` |
 | S15 | all valid, highest ID `0000000000000300` | confirm `Y` | record ID `0000000000000301` written with fields of BR-TRNA-004; screen cleared; green `Transaction added successfully.  Your Tran ID is 0000000000000301.` |
 | S16 | account `00000000050`, highest-ID record of another card | PF5 | data fields filled from that record; `Confirm to add this transaction...` |
@@ -670,7 +675,7 @@ Account and card values in S6-S7 are from the sample cross-reference (`app/data/
 | `VALIDATE-INPUT-KEY-FIELDS` | 193-230 | BR-TRNA-001, VAL-TRNA-001..003, NUM-TRNA-003, DEF-TRNA-005, DEF-TRNA-006 |
 | `VALIDATE-INPUT-DATA-FIELDS` | 235-437 | VAL-TRNA-006..011, NUM-TRNA-001, FLOW-TRNA-011, DEF-TRNA-002, DEF-TRNA-007, DEF-TRNA-008, DEF-TRNA-011 |
 | `ADD-TRANSACTION` | 442-466 | BR-TRNA-003, BR-TRNA-004, BR-TRNA-007, NUM-TRNA-002, NUM-TRNA-004, DEF-TRNA-001, DEF-TRNA-003 |
-| `COPY-LAST-TRAN-DATA` | 471-495 | BR-TRNA-006, DEF-TRNA-009 |
+| `COPY-LAST-TRAN-DATA` | 471-495 | BR-TRNA-006, DEF-TRNA-009, DEF-TRNA-011, DEF-TRNA-015 |
 | `RETURN-TO-PREV-SCREEN` | 500-511 | FLOW-TRNA-009 |
 | `SEND-TRNADD-SCREEN` | 516-534 | FLOW-TRNA-008, FLOW-TRNA-010, §8.2 |
 | `RECEIVE-TRNADD-SCREEN` | 539-547 | ERR-TRNA-002 |
