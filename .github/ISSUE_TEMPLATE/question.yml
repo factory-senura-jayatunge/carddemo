@@ -1,0 +1,51 @@
+name: Question
+description: Ask how to install, run or use CardDemo.
+title: "[Question]: "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the README Installation and Running Batch Jobs sections and the module READMEs
+        under `app/app-*` first. Do not include passwords or real customer data.
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - Base application (CICS online, VSAM, batch)
+        - "Optional: Transaction Type Management with Db2 (app-transaction-type-db2)"
+        - "Optional: Pending Authorizations with IMS, Db2 and MQ (app-authorization-ims-db2-mq)"
+        - "Optional: Account Extractions with MQ and VSAM (app-vsam-mq)"
+        - Data export/import (CBEXPORT, CBIMPORT)
+        - Sample data
+        - General / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - IBM z/OS mainframe (CICS, VSAM, JES)
+        - AWS Mainframe Modernization (managed runtime)
+        - Rocket / Micro Focus Enterprise Server or Developer
+        - Other rehosting or refactoring runtime
+        - Mainframe emulator (for example zD&T or Hercules)
+        - GnuCOBOL on a local machine
+        - Not set up yet
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and what have you tried so far?
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Related program, JCL or transaction (if any)
+    validations:
+      required: false
