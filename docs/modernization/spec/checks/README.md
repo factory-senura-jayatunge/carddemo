@@ -9,7 +9,7 @@ python3 docs/modernization/spec/checks/posttran_reimpl/run_check.py            #
 python3 docs/modernization/spec/checks/posttran_reimpl/run_check.py --stress   # edge-case data
 ```
 
-Both exit 0 when every comparison passes. They work in a temporary directory unless `--keep DIR` is given.
+Both exit 0 when every comparison passes. They work in a temporary directory unless `--keep DIR` is given. `make -C modernization verify-spec` (`tools/verify_spec.py`) runs `check_spec.py`, builds the programs, and runs every `checks/*_reimpl/run_check.py` with and without `--stress`, so each new check must support both and exit nonzero on any mismatch.
 
 `harness.py` holds the shared parts: `run_reference` runs a job from `tools/carddemo.py` on a chosen data directory and writes its sequential outputs (`<DDNAME>.txt`), unloaded KSDS files (`<DATASET>.after.txt`), `sysout.txt` and `rc.txt`; `Report` prints PASS/FAIL lines. A new check copies the `posttran_reimpl` layout:
 
