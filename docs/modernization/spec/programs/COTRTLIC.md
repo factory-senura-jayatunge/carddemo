@@ -78,7 +78,7 @@ An administrator picks option 5 **Transaction Type List/Update (Db2)** on the ad
 
 ### 4.1 Screen CTRTLIA (mapset COTRTLI), 24 x 80
 
-Source: `app/app-transaction-type-db2/bms/COTRTLI.bms:20-338`; symbolic map `app/app-transaction-type-db2/cpy-bms/COTRTLI.cpy:17-140`. The program addresses the 7 list rows through its own redefinition of the symbolic map (`:434-478`): 238 bytes of header fields, then 7 groups of selection (1), type (2) and description (50).
+Source: `app/app-transaction-type-db2/bms/COTRTLI.bms:20-338`; symbolic map `app/app-transaction-type-db2/cpy-bms/COTRTLI.cpy:17-500` (input 17-258, output 259-500). The program addresses the 7 list rows through its own redefinition of the symbolic map (`:434-478`): 238 bytes of header fields, then 7 groups of selection (1), type (2) and description (50).
 
 | Row,Col | Field | Len | Direction | Attributes (map default; program changes in FLOW-TTLS-016/017) | Content |
 | :-- | :-- | --: | :-- | :-- | :-- |
@@ -138,8 +138,8 @@ Table definitions: `TR_TYPE CHAR(2) NOT NULL` primary key, `TR_DESCRIPTION VARCH
 | `WS-CA-LAST-TR-CODE`, `WS-CA-FIRST-TR-CODE` | X(2) each | paging keys |
 | `WS-CA-SCREEN-NUM` | 9(1) | page counter, 1 = first page (NUM-TTLS-001) |
 | `WS-CA-LAST-PAGE-DISPLAYED` | 9(1) | 0 = last page already shown, 9 = not shown |
-| `WS-CA-NEXT-PAGE-IND` | X(1) | `Y` = another page exists, low-values = none |
-| `WS-CA-DELETE-FLAG`, `WS-CA-UPDATE-FLAG` | X(1) each | `Y` = a delete / update confirmation is pending; low-values = none or succeeded |
+| `WS-CA-NEXT-PAGE-IND` | X(1) | `Y` = another page exists; low-values or space (after initialisation) = none |
+| `WS-CA-DELETE-FLAG`, `WS-CA-UPDATE-FLAG` | X(1) each | `Y` = a delete / update confirmation is pending; low-values or space (after initialisation) = none or succeeded |
 
 | Commarea field | Read | Written | Use |
 | :-- | :-- | :-- | :-- |
@@ -292,15 +292,15 @@ Each arrow is one CICS task: (receive the screen and edit it), act, send the scr
 
 #### VAL-TTLS-001 · Type code filter must be 2 digits
 - **When:** the type filter is not blank, not low-values, not `00`, and not numeric (for example `1`, `1 `, ` 1`, `A1`).
-- **Then:** input error; message `TYPE CODE FILTER,IF SUPPLIED MUST BE A 2 DIGIT NUMBER`; the type filter field is shown red with the cursor in it; all row action fields are protected; the list is not re-read (the rows of the previous screen stay displayed).
-- **Source:** `:1111-1118, 713-717, 1340-1341, 1477-1480`
+- **Then:** input error; message `TYPE CODE FILTER,IF SUPPLIED MUST BE A 2 DIGIT NUMBER`; the type filter field is shown red with the cursor in it; all row action fields are protected; the list is not re-read (the rows of the previous screen stay displayed). Because the new filter text differs from the saved one, the paging keys are reset (`:1134`) and nothing sets the page number back, so the page number shows `0` and the next valid Enter lists from the lowest code.
+- **Source:** `:1111-1118, 1127-1137, 713-717, 1340-1341, 1477-1480`
 - **Fidelity:** must-preserve
 - **Confidence:** reviewed
 
 #### VAL-TTLS-002 · Filters must select something
 - **When:** at least one filter is valid and `SELECT COUNT(1)` with the filters returns 0.
-- **Then:** input error; message `No Records found for these filter conditions`; each valid filter is marked invalid and shown red with the cursor; row action fields protected; the list is not re-read.
-- **Source:** `:1239-1268, 1801-1833`
+- **Then:** input error; message `No Records found for these filter conditions`; each valid filter is marked invalid and shown red with the cursor; row action fields protected; the list is not re-read. When a filter changed in this interaction, the paging keys were reset (`:1134, 1172`), so the page number shows `0`.
+- **Source:** `:1134, 1172, 1239-1268, 1801-1833`
 - **Fidelity:** must-preserve
 - **Confidence:** reviewed
 
@@ -401,7 +401,7 @@ Each arrow is one CICS task: (receive the screen and edit it), act, send the scr
 
 #### FLOW-TTLS-006 · PF2, add a type
 - **When:** PF2 and `CDEMO-FROM-PROGRAM` = `COTRTLIC` (always true on re-entry and on a direct start).
-- **Then:** from-tranid `CTLI`, from-program `COTRTLIC`, user type `U`, context 0, last map `CTRTLIA`/`COTRTLI`, to-program `COTRTUPC`; XCTL to `COTRTUPC` with the 160-byte commarea. No `SYNCPOINT`. `COTRTUPC` starts fresh when called from `COTRTLIC` (`app/app-transaction-type-db2/cbl/COTRTUPC.cbl:366-374`).
+- **Then:** from-tranid `CTLI`, from-program `COTRTLIC`, user type `U`, context 0, last map `CTRTLIA`/`COTRTLI`, to-program `COTRTUPC`; XCTL to `COTRTUPC` with the 160-byte commarea. No `SYNCPOINT`. `COTRTUPC` shows its empty search screen when called from `COTRTLIC` with context 0, keeps the commarea, and its PF3 returns here (`app/app-transaction-type-db2/cbl/COTRTUPC.cbl:429-478`).
 - **Source:** `:630-652`
 - **Fidelity:** must-preserve (user type: DEF-TTLS-012)
 - **Confidence:** reviewed
@@ -602,8 +602,8 @@ Order within one interaction: (count query, if a filter is given) -> connectivit
 ## 10. Error handling
 
 #### ERR-TTLS-001 · Db2 message format
-- **What:** for a Db2 error the program stores an action text and calls `DSNTIAC` (with the EIB, the commarea, the SQLCA, a 10 x 72 output area and line length 72). The message is `TRIM(action) + ' SQLCODE:' + SQLCODE edited ----9 + ' ' + the 720-character DSNTIAC output`, built into the 800-character long message and then cut to the 75-character message field, so `ERRMSG` shows only the start of the first DSNTIAC line (for example after `Please delete associated child records first: SQLCODE: -532 ` only 15 characters of DSNTIAC text fit). If `DSNTIAC` returns a non-zero return code, the DSNTIAC text is replaced by `DSNTIAC CD` followed by the 2-digit code (the source moves `DSNTIAC CD: ` into a 10-character field, so the colon and space are lost). `SQLERRM` is not used (commented out).
-- **Source:** `app/app-transaction-type-db2/cpy/CSDB2RPY.cpy:53-85`; `app/app-transaction-type-db2/cpy/CSDB2RWY.cpy:21-46`
+- **What:** for a Db2 error the program stores an action text and calls `DSNTIAC` (with the EIB, the commarea, the SQLCA, a 10 x 72 output area and line length 72). The output area's length prefix is 0 at call time: its `VALUE +720` (`app/app-transaction-type-db2/cpy/CSDB2RWY.cpy:34`) is wiped by the `INITIALIZE WS-MISC-STORAGE` at `:500-502`, and only the line length is reset before the call. DSNTIAC is therefore expected to return a non-zero code, so the text after the SQLCODE is normally `DSNTIAC CDnn` rather than formatted Db2 text (platform-inferred, Q-TTLS-005). The message is `TRIM(action) + ' SQLCODE:' + SQLCODE edited ----9 + ' ' + the 720-character DSNTIAC output`, built into the 800-character long message and then cut to the 75-character message field, so `ERRMSG` shows only the start of the first DSNTIAC line (for example after `Please delete associated child records first: SQLCODE: -532 ` only 15 characters of DSNTIAC text fit). If `DSNTIAC` returns a non-zero return code, the DSNTIAC text is replaced by `DSNTIAC CD` followed by the 2-digit code (the source moves `DSNTIAC CD: ` into a 10-character field, so the colon and space are lost). `SQLERRM` is not used (commented out).
+- **Source:** `:304, 500-502`; `app/app-transaction-type-db2/cpy/CSDB2RPY.cpy:53-85`; `app/app-transaction-type-db2/cpy/CSDB2RWY.cpy:21-46`
 - **Fidelity:** incidental (the target produces its own error texts), but the leading action texts are user-facing
 - **Confidence:** platform-inferred (DSNTIAC output layout)
 
@@ -620,7 +620,7 @@ Order within one interaction: (count query, if a filter is given) -> connectivit
 | open backward | continue | - | (other) | - | `C-TR-TYPE-BACKWARD Open ...`; the fetches still run |
 | fetch backward | row | **treated as error**: `Error on fetch Cursor C-TR-TYPE-BACKWARD SQLCODE:  100 ...`, rows above stay empty (DEF-TTLS-006) | (other) | - | same text |
 | close backward | continue | - | (other) | - | `C-TR-TYPE-BACKWARD close ...` |
-| update | commit, success | `Record not found. Deleted by others ? ...`, request pending | `Deadlock. Someone else updating ? ...`, input error, request pending | (< 0) | < 0: `Update failed with ...`, request pending; positive warnings other than +100 fall through with no action |
+| update | commit, success | `Record not found. Deleted by others ? ...`, request pending | `Deadlock. Someone else updating ? ...`, input error, request pending | (< 0) | < 0: `Update failed with ...`, request pending; positive warnings other than +100: no SYNCPOINT, no message, request still pending, but the UPDATE has run, is committed when the task ends with RETURN TRANSID, and the re-read page shows it |
 | delete | commit, success | (other) | (other) | `Please delete associated child records first: ...`, request pending | `Delete failed with message: ...`, request stays as before (pending) |
 
 All texts except the priming one are written only when no message is set yet. Every error text is displayed in `ERRMSG`; processing then continues with the remaining steps of FLOW-TTLS-008 and the screen is sent.
@@ -734,17 +734,17 @@ None of these is changed in this branch.
 - **Status:** open · **Fidelity:** defect-decide (Q-TTLS-002) · **Confidence:** reviewed
 
 #### DEF-TTLS-003 · Confirmation can be skipped by switching D and U
-- The PF10 guard compares only the row number (FLOW-TTLS-007), and the pending flags are not cleared when a request is abandoned (only a successful action, a fresh entry or a successful delete reset them). After `D` + Enter on a row (delete prompt), changing that row's `D` to `U`, typing a new description and pressing PF10 updates the row without the update prompt; after `U` + Enter (update prompt), changing `U` to `D` and pressing PF10 deletes the row without the delete prompt.
-- **Source:** `:580-581, 666-678, 810-868, 1042-1047, 1397, 1410`
+- The PF10 guard compares only the row number (FLOW-TTLS-007), and the pending flags are not cleared when a request is abandoned (only a successful action, a fresh entry or a successful delete reset them). After `D` + Enter on a row (delete prompt), changing that row's `D` to `U`, typing a new description and pressing PF10 updates the row without the update prompt; after `U` + Enter (update prompt), changing `U` to `D` and pressing PF10 deletes the row without the delete prompt. The pending flag also survives paging: after `D` (or `U`) + Enter on row N, PF7 or PF8 clears the action codes (`:773, 787`) but not the flag, so on the new page `D` on the same row number N + PF10 deletes a type that was never prompted for. After `D`/`U` + Enter together with a filter change, the page is re-read from the lowest code (`:797-802`), so row N may hold a different type, which is highlighted and flagged without a prompt; the next PF10 acts on it.
+- **Source:** `:580-581, 666-678, 773, 787, 797-802, 810-868, 1042-1047, 1134, 1172, 1397, 1410`
 - **Status:** open · **Fidelity:** defect-decide (Q-TTLS-007) · **Confidence:** reviewed
 
 #### DEF-TTLS-004 · "No change detected" does not stop the save
-- VAL-TTLS-007 only warns; the request proceeds and PF10 rewrites the stored value (now with 50 characters, DEF-TTLS-001) and reports `HIGHLIGHTED row was updated`. A case-only change (`payment` for `PAYMENT`) is shown as "no change" and replaced on screen by the stored text, so it cannot be saved through Enter + PF10; it is saved only if the user retypes it and presses PF10 directly.
+- VAL-TTLS-007 only warns; the request proceeds and PF10 rewrites the stored value (now with 50 characters, DEF-TTLS-001) and reports `HIGHLIGHTED row was updated`. A case-only change (`payment` for `PAYMENT`) is shown as "no change" and replaced on screen by the stored text, so it cannot be saved through Enter + PF10; it is saved only if the user retypes it and presses PF10 directly. In the PF10 interaction the description edit runs again, so the success screen shows `No change detected with respect to database values.` in the error line together with `HIGHLIGHTED row was updated` in the information line (`:1072`).
 - **Source:** `:1060-1076, 1420-1421, 854-862`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-TTLS-005 · Page counter wraps after page 9
-- NUM-TTLS-001: the tenth page is shown as page 1 and PF7 there answers `No previous pages to display`; the user cannot page back past it. With 2-character codes there can be up to 100 types (15 pages).
+- NUM-TTLS-001: the tenth page is shown as page 1 and PF7 there answers `No previous pages to display`; the user cannot page back past it. With 2-digit numeric codes (`00`-`99`) there can be up to 100 types (15 pages).
 - **Source:** `:403, 770, 1646-1647, 721-734`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
@@ -779,8 +779,8 @@ None of these is changed in this branch.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-TTLS-012 · PF2 marks the user as a regular user
-- PF2 sets `CDEMO-USER-TYPE` to `U` before transferring to `COTRTUPC` (the source comment says "CALL MENU PROGRAM"). `COTRTUPC` clears the commarea on entry from this program, so the value has no visible effect there.
-- **Source:** `:634, 644-646`
+- PF2 sets `CDEMO-USER-TYPE` to `U` before transferring to `COTRTUPC` (the source comment says "CALL MENU PROGRAM"). `COTRTUPC` never reads the user type and its PF3 sets it to `A` before returning here, so the value has no visible effect.
+- **Source:** `:634, 644-646`, `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:448`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-TTLS-013 · Commarea extension read past the received length
@@ -802,6 +802,11 @@ None of these is changed in this branch.
 - The description filter is case-sensitive while the no-change check ignores case; `%` and `_` typed in the filter act as wildcards and are not validated (the description filter has no character check, unlike the update description).
 - **Source:** `:1155-1163, 1064-1067`
 - **Status:** open · **Fidelity:** defect-decide (Q-TTLS-006) · **Confidence:** platform-inferred
+
+#### DEF-TTLS-017 · [security] Direct start leads to the admin menu as administrator without sign-on
+- With no commarea (`CTLI` typed on any terminal) the program initialises ENT-COMMAREA, so the user ID is blank, and sets the user type to `A` itself (`:515-525`). PF3 then always sets the user type to `A` again and transfers (XCTL) to `COADM01C` with that commarea and context 0 (`:591-623`; the from-program is `COTRTLIC`, so the target falls back to the admin menu). `COADM01C` sends the user to sign-on only when it gets no commarea (`app/cbl/COADM01C.cbl:86-95`), so it shows the admin menu, whose options include user list, add, update and delete (`app/cpy/COADM02Y.cpy:28-46`). Someone who never signed on can therefore reach user administration and create an administrator. PF3 also overwrites `CDEMO-USER-TYPE` on every exit, whatever the caller had set. Linked to area A (sign-on and menus): DEF-ADMN-001 and PINV-a-signon-admin-01; area F invariant PINV-f-06.
+- **Source:** `:515-525, 591-623`, `app/cbl/COADM01C.cbl:86-95`
+- **Status:** open · **Fidelity:** defect-decide (Q-TTLS-003) · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -828,7 +833,7 @@ Sample data: types `01` PURCHASE, `02` PAYMENT, `03` CREDIT, `04` AUTHORIZATION,
 | S3 | S2 | PF8 | same rows, `No more pages to display`, no information message |
 | S4 | S1 | PF7 | same rows, `No previous pages to display` |
 | S5 | S1 | type filter `05`, Enter | one row `05` REFUND |
-| S6 | S1 | type filter `5`, Enter | `TYPE CODE FILTER,IF SUPPLIED MUST BE A 2 DIGIT NUMBER`, filter red, action fields protected, old rows still shown |
+| S6 | S1 | type filter `5`, Enter | `TYPE CODE FILTER,IF SUPPLIED MUST BE A 2 DIGIT NUMBER`, filter red, action fields protected, old rows still shown, page `0` |
 | S7 | S1 | description filter `PAY`, Enter | one row `02` PAYMENT |
 | S8 | S1 | description filter `pay`, Enter | `No Records found for these filter conditions` |
 | S9 | S1 | `D` on rows 1 and 2, Enter | `Please select only 1 action`, both action fields red |

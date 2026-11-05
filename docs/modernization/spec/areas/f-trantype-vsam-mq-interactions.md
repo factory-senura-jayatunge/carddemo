@@ -9,8 +9,8 @@ Edges, CRUD rows and invariant proposals from the transaction type (Db2) module 
 | COADM01C | COTRTLIC | XCTL | ENT-COMMAREA (160 bytes), from-program `COADM01C`, context 0; admin option 5 | `app/cbl/COADM01C.cbl:142-149`, `app/cpy/COADM02Y.cpy:46-49` | FLOW-TTLS-002 |
 | COADM01C | COTRTUPC | XCTL | ENT-COMMAREA, context 0; admin option 6 | `app/cbl/COADM01C.cbl:142-149`, `app/cpy/COADM02Y.cpy:50-53` | FLOW-TTUP-001 |
 | COTRTLIC | COTRTUPC | XCTL | ENT-COMMAREA (160 bytes), from-program `COTRTLIC`, user type set to `U`, context 0; PF2 | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:630-652` | FLOW-TTLS-006, DEF-TTLS-012 |
-| COTRTLIC | COADM01C | XCTL | ENT-COMMAREA after SYNCPOINT; PF3 (target from-program, in practice always `COADM01C`) | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:616-623` | FLOW-TTLS-005, SE-TTLS-007 |
-| COTRTUPC | COADM01C | XCTL | ENT-COMMAREA after SYNCPOINT; PF3 (from-program is always blank, so `COADM01C`) | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:453-460` | FLOW-TTUP-003, SE-TTUP-005, DEF-TTUP-009 |
+| COTRTLIC | COADM01C | XCTL | ENT-COMMAREA after SYNCPOINT, user type set to `A`; PF3 (target from-program, in practice always `COADM01C`); after a direct start without sign-on this opens the admin menu | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:591-623` | FLOW-TTLS-005, SE-TTLS-007, DEF-TTLS-017 |
+| COTRTUPC | COADM01C or COTRTLIC | XCTL | ENT-COMMAREA after SYNCPOINT, user type set to `A`; PF3 to the caller (`COTRTLIC` from the list, `COADM01C` from the menu or after a direct start without sign-on) | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:429-460` | FLOW-TTUP-003, SE-TTUP-005, DEF-TTUP-017 |
 | COTRTLIC | COTRTLIC (`CTLI`) | RETURN TRANSID | 2000-byte area: ENT-COMMAREA + 427-byte list state | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:910-914` | FLOW-TTLS-013 |
 | COTRTUPC | COTRTUPC (`CTTU`) | RETURN TRANSID | ENT-COMMAREA + program state (screen state, old and new type) | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:567-571` | FLOW-TTUP-010 |
 | COTRTLIC | DSNTIAC | CALL | EIB, commarea, SQLCA, 10 x 72 message area | `app/app-transaction-type-db2/cpy/CSDB2RPY.cpy:55-62` (included at `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:2055`) | DEF-TTLS-010 |
@@ -65,6 +65,7 @@ No program of these modules accesses CARDDEMO.TRANSACTION_TYPE_CATEGORY at run t
 | PINV-f-02 | Every online type change is committed at once (SYNCPOINT after each successful statement); a batch run is one unit of work (except that a -911 rolls back the changes made so far and processing continues in a new one). | COTRTLIC, COTRTUPC, COBTUPDT | SE-TTLS-005, SE-TTUP-002, SE-TTBU-004 |
 | PINV-f-03 | The Db2 tables and the VSAM files ENT-TRAN-TYPE / ENT-TRAN-CATEGORY hold the same codes only after TRANEXTR and then the base TRANTYPE and TRANCATG jobs have run; nothing enforces it. Today it does **not** hold for the descriptions (seed text differs). | TRANEXTR, TRANTYPE, TRANCATG, all readers of the VSAM files | DEF-JTREX-001, DEF-JCRDB-005 |
 | PINV-f-04 | Online-written type codes are two digits from `01` to `99`; batch-written codes may be any two characters, so the invariant holds only if MNTTRDB2 input is clean. | COTRTUPC, COTRTLIC, COBTUPDT | BR-TTUP-001, DEF-TTBU-003 |
+| PINV-f-06 | The transaction type programs must not open the admin menu for a user who has not signed on. Today it does **not** hold: a direct start of `CTLI` or `CTTU` followed by PF3 reaches `COADM01C` with user type `A` (area A: DEF-ADMN-001, PINV-a-signon-admin-01). | COTRTLIC, COTRTUPC, COADM01C | DEF-TTLS-017, DEF-TTUP-017 |
 | PINV-f-05 | Each MQ request produces at most one reply, on a fixed reply queue, with the request's MsgId and CorrelId; a request whose processing fails produces an error record and no reply. | COACCT01, CODATE01 | BR-MQAC-005, DEF-MQAC-007 |
 
 ## Mermaid
@@ -76,6 +77,7 @@ flowchart LR
     LIC -- PF2 XCTL --> UPC
     LIC -- PF3 --> ADM
     UPC -- PF3 --> ADM
+    UPC -- PF3 if called from list --> LIC
     LIC --> TT[(TRANSACTION_TYPE)]
     UPC --> TT
     CM[Control-M weekly] --> MNT[MNTTRDB2 / COBTUPDT] --> TT
