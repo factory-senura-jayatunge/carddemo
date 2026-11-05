@@ -1,0 +1,40 @@
+name: agents-md
+
+# AGENTS.md and the project skills name make targets, scripts, options and
+# paths; this fails when a change to any of them leaves the docs behind.
+on:
+  push:
+    branches: [main]
+    paths:
+      - AGENTS.md
+      - Makefile
+      - .factory/skills/**
+      - scripts/**
+      - tools/**
+      - tests/**
+      - docs/**
+      - .github/workflows/agents-md.yml
+  pull_request:
+    paths:
+      - AGENTS.md
+      - Makefile
+      - .factory/skills/**
+      - scripts/**
+      - tools/**
+      - tests/**
+      - docs/**
+      - .github/workflows/agents-md.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Needs only Python 3.11+, make and git from the runner image: the
+      # checker runs `make -n` and `--help`, never a build.
+      - name: Check the commands and paths in AGENTS.md and the skills
+        run: python3 scripts/check_agents_md.py
