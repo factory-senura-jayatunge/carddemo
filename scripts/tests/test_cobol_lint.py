@@ -403,6 +403,8 @@ class RuleTests(unittest.TestCase):
         names = [h for h in hits if "[jcl-name-field]" in h]
         self.assertEqual([h.split(":")[1] for h in fmt], ["6"], hits)
         self.assertEqual([h.split(":")[1] for h in names], ["7"], hits)
+        self.repo.write("app/jcl/TOOLONGJCL.jcl", "//CBJOB02 JOB (ACCT),'TEST'\n")
+        self.assertIn("app/jcl/TOOLONGJCL.jcl:1: error [jcl-name-field]", self.repo.run("lint", "--no-baseline").stdout)
 
     # -- cobc
     @unittest.skipUnless(HAVE_COBC, "cobc not installed")

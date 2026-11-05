@@ -831,6 +831,9 @@ class Linter:
     def jcl(self, src: Source) -> None:
         instream = self.jcl_instream_lines(src)
         name_re = re.compile(self.opt("jcl-name-field", "pattern", r"[A-Z@#$][A-Z0-9@#$]{0,7}"))
+        if not name_re.fullmatch(src.member):
+            self.add(src, 1, "jcl-name-field", f"member name {src.member!r} is not 1-8 alphanumeric/national characters",
+                     fingerprint="file")
         for ln, line in enumerate(src.lines, 1):
             if ln in instream or line.startswith("//*") or line.startswith("/*"):
                 continue
