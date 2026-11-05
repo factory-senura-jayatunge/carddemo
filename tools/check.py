@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from typing import TextIO
 
 NOT_PRESENT = "NOT PRESENT:"
 # Lines from tests/run_tests.py that the summary repeats.
@@ -77,14 +78,15 @@ def summary(steps: list[Step]) -> tuple[str, int]:
     return "\n".join(out), 1
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str], out: TextIO | None = None, err: TextIO | None = None) -> int:
+    out, err = out or sys.stdout, err or sys.stderr
     if not argv:
-        print("usage: check.py TARGET...", file=sys.stderr)
+        print("usage: check.py TARGET...", file=err)
         return 2
     make = os.environ.get("MAKE", "make")
     steps = [run_step(make, t) for t in argv]
     text, rc = summary(steps)
-    print(text)
+    print(text, file=out)
     return rc
 
 
