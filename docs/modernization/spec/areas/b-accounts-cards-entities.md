@@ -1,5 +1,7 @@
 # Area b-accounts-cards: entity proposals
 
+Merged in d439e47 into `../entities.md`.
+
 Proposals from area `b-accounts-cards` (programs COACTVWC, COACTUPC, COCRDLIC, COCRDSLC, COCRDUPC) for [../entities.md](../entities.md), at source commit b5e0139. The entities these programs use (ENT-ACCOUNT, ENT-CARD, ENT-CARD-XREF, ENT-CUSTOMER, ENT-COMMAREA) are already in `entities.md`, so this file proposes no new entity. It lists corrections and extra facts (current text "(not stated)" when the fact adds to `entities.md` without contradicting it), the per-program commarea extensions, and the relationships the five programs follow. Open questions stay in the program specs.
 
 ## Corrections and extra facts

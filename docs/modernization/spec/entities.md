@@ -1,6 +1,6 @@
 # CardDemo entity catalog
 
-Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It holds the entities of the pilot programs `COBIL00C` and `CBTRN02C`, ENT-CUSTOMER and ENT-CARD, and the proposals merged from areas a (sign-on and administration), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Each `areas/<area>-entities.md` file records the commit that merged it. The entities of the other areas are added as they merge.
+Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It holds the entities of the pilot programs `COBIL00C` and `CBTRN02C`, ENT-CUSTOMER and ENT-CARD, and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Each `areas/<area>-entities.md` file records the commit that merged it. The entities of the other areas are added as they merge.
 
 Conventions:
 
@@ -17,7 +17,7 @@ Conventions:
 erDiagram
     CUSTOMER ||--o{ CARD_XREF : "XREF-CUST-ID"
     ACCOUNT ||--o{ CARD_XREF : "XREF-ACCT-ID (AIX, non-unique)"
-    CARD ||--|| CARD_XREF : "XREF-CARD-NUM"
+    CARD ||--o| CARD_XREF : "XREF-CARD-NUM (not enforced)"
     ACCOUNT ||--o{ CARD : "CARD-ACCT-ID (AIX, non-unique)"
     ACCOUNT ||--o{ TCAT_BAL : "TRANCAT-ACCT-ID"
     TRAN_TYPE ||--o{ TRAN_CATEGORY : "TRAN-TYPE-CD"
@@ -30,6 +30,8 @@ erDiagram
     ACCOUNT }o--o{ DISC_GROUP : "ACCT-GROUP-ID, fallback DEFAULT"
     TRAN_CATEGORY ||--o{ DISC_GROUP : "type + category"
     USER_SECURITY ||--o{ COMMAREA : "SEC-USR-ID = CDEMO-USER-ID"
+    COMMAREA }o--o| ACCOUNT : "CDEMO-ACCT-ID"
+    COMMAREA }o--o| CUSTOMER : "CDEMO-CUST-ID"
     DB2_TRAN_TYPE ||--o{ DB2_TRAN_TYPE_CAT : "FK, ON DELETE RESTRICT"
     DB2_TRAN_TYPE ||--o| TRAN_TYPE : "copied by TRANEXTR"
     DB2_TRAN_TYPE_CAT ||--o| TRAN_CATEGORY : "copied by TRANEXTR"
@@ -61,6 +63,15 @@ Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_C
 | ENT-MQ-ACCT-REPLY | ENT-ACCOUNT | fields copied from the account read | copy of one record | `app/app-vsam-mq/cbl/COACCT01.cbl:408-425` |
 | ENT-STMT-TRAN | ENT-TRANSACTION | `TRNX-CARD-NUM` + `TRNX-ID` = `TRAN-CARD-NUM` + `TRAN-ID` (copy rebuilt by CREASTMT) | one to one after each rebuild | `app/jcl/CREASTMT.JCL:44-62` |
 | ENT-EXPORT-RECORD | ENT-CUSTOMER, ENT-ACCOUNT, ENT-CARD-XREF, ENT-TRANSACTION, ENT-CARD | one export record per source record, type byte `C`, `A`, `X`, `T`, `D` | one to one | `app/cpy/CVEXPORT.cpy:9-100`; CBEXPORT SE-EXPT-001 |
+| ENT-CARD | ENT-ACCOUNT | `CARD-ACCT-ID` = `ACCT-ID` | many cards to one account (alternate index `CARDAIX`, non-unique); no online account or card program follows it at run time (the card list compares the field while browsing) | `app/cpy/CVACT02Y.cpy:6`, `app/jcl/CARDFILE.jcl:83-92` |
+| ENT-CARD | ENT-CARD-XREF | `CARD-NUM` = `XREF-CARD-NUM` | one to zero or one; not enforced (both are 16-byte primary keys; the sample holds the same 50 numbers in both) | `app/cpy/CVACT02Y.cpy:5`, `app/cpy/CVACT03Y.cpy:5` |
+| ENT-CARD | ENT-CARD-XREF | `CARD-ACCT-ID` should equal `XREF-ACCT-ID` of the same card | redundant copy of the card-to-account link; card update can break it (DEF-CRDU-001, INV-030) | `app/cbl/COCRDUPC.cbl:1463`, `app/cpy/CVACT03Y.cpy:4-8` |
+| ENT-ACCOUNT | ENT-CARD-XREF | `ACCT-ID` = `XREF-ACCT-ID` (path `CXACAIX`) | one to zero or more; account view and account update work only for accounts with exactly one cross-reference record (DEF-ACVW-003, DEF-ACVW-004, DEF-ACUP-012, INV-031) | `app/cbl/COACTVWC.cbl:727-768`, `app/cbl/COACTUPC.cbl:3654-3696`, `app/jcl/XREFFILE.jcl:72-75` |
+| ENT-CARD-XREF | ENT-CUSTOMER | `XREF-CUST-ID` = `CUST-ID` | many to one; account view and account update read the customer of the cross-reference record found | `app/cbl/COACTVWC.cbl:739`, `app/cbl/COACTVWC.cbl:826-834`, `app/cbl/COACTUPC.cbl:3753-3761` |
+| ENT-COMMAREA | ENT-ACCOUNT | `CDEMO-ACCT-ID` = `ACCT-ID` | session to zero or one current account | `app/cbl/COACTUPC.cbl:3805` |
+| ENT-COMMAREA | ENT-CUSTOMER | `CDEMO-CUST-ID` = `CUST-ID` (account update also uses it as the key of the customer lock, SE-ACUP-005) | session to zero or one current customer | `app/cbl/COACTUPC.cbl:3806` |
+| ENT-CUSTOMER | US state code list in `CSLKPCDY` (not an entity) | `CUST-ADDR-STATE-CD` | many to one; enforced only by account update (VAL-ACUP-024) | `app/cpy/CSLKPCDY.cpy:1013-1069` |
+| ENT-CUSTOMER | State and ZIP prefix list in `CSLKPCDY` (not an entity) | `CUST-ADDR-STATE-CD` + first 2 characters of `CUST-ADDR-ZIP` | many to one; enforced only by account update (VAL-ACUP-034); the two lists disagree (INV-041) | `app/cpy/CSLKPCDY.cpy:1073-1313` |
 
 ## ENT-ACCOUNT · Credit card account
 
@@ -72,7 +83,7 @@ Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_C
 | Field | Pos | Len | PIC | Type | Meaning |
 | :-- | --: | --: | :-- | :-- | :-- |
 | `ACCT-ID` | 1 | 11 | `9(11)` | digits(11) | Account number |
-| `ACCT-ACTIVE-STATUS` | 12 | 1 | `X(01)` | text(1) | `Y` active (all sample accounts are `Y`); not checked by the pilot programs |
+| `ACCT-ACTIVE-STATUS` | 12 | 1 | `X(01)` | text(1) | `Y` active, `N` inactive (all sample accounts are `Y`); not checked by the pilot programs. Account view shows it as stored; account update accepts only upper-case `Y` or `N` (VAL-ACUP-003, VAL-ACUP-004) |
 | `ACCT-CURR-BAL` | 13 | 12 | `S9(10)V99` | decimal(12,2) | Current balance owed; positive = the cardholder owes money |
 | `ACCT-CREDIT-LIMIT` | 25 | 12 | `S9(10)V99` | decimal(12,2) | Credit limit |
 | `ACCT-CASH-CREDIT-LIMIT` | 37 | 12 | `S9(10)V99` | decimal(12,2) | Cash advance limit (not used by the pilot programs) |
@@ -81,13 +92,19 @@ Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_C
 | `ACCT-REISSUE-DATE` | 69 | 10 | `X(10)` | date-text | Reissue date |
 | `ACCT-CURR-CYC-CREDIT` | 79 | 12 | `S9(10)V99` | decimal(12,2) | Sum of non-negative amounts posted this cycle; reset to zero by INTCALC for every account that has a category balance |
 | `ACCT-CURR-CYC-DEBIT` | 91 | 12 | `S9(10)V99` | decimal(12,2) | Sum of negative amounts posted this cycle (stored negative); reset to zero by INTCALC like the cycle credit (`app/cbl/CBACT04C.cbl:351-356`) |
-| `ACCT-ADDR-ZIP` | 103 | 10 | `X(10)` | text(10) | Billing ZIP code |
-| `ACCT-GROUP-ID` | 113 | 10 | `X(10)` | text(10) | Disclosure (interest) group, the key into ENT-DISC-GROUP; blank in the sample, so INTCALC uses `DEFAULT` (`app/cbl/CBACT04C.cbl:210, 437-440`) |
+| `ACCT-ADDR-ZIP` | 103 | 10 | `X(10)` | text(10) | Billing ZIP code. Never shown online; every online account update overwrites it with the group ID (layout note below, DEF-ACUP-002) |
+| `ACCT-GROUP-ID` | 113 | 10 | `X(10)` | text(10) | Disclosure (interest) group, the key into ENT-DISC-GROUP; blank in the sample, so INTCALC uses `DEFAULT` (`app/cbl/CBACT04C.cbl:210, 437-440`). Shown as `Account Group` by account view and account update, which read it here; account update rewrites it at position 103, so after an online save these bytes hold FILLER content the program does not set (DEF-ACUP-002, DEF-ACUP-020). Not validated by account update (BR-ACUP-108) |
 | FILLER | 123 | 178 | `X(178)` | text | Unused |
 
 Sample: account `00000000001`, balance 194.00, limit 2,020.00, cash limit 1,020.00, opened 2014-11-20, expires 2025-05-20, cycle credit and debit 0.00.
 
-Data observation: in all 50 sample accounts `ACCT-ADDR-ZIP` holds `A000000000` (the format of a disclosure group ID) and `ACCT-GROUP-ID` is blank (Q-ENT-001).
+Online account view and update (COACTVWC, COACTUPC):
+
+- **Writers' layout.** Account update does not rewrite the account through `CVACT01Y`: it rewrites from its own 300-byte layout `ACCT-UPDATE-RECORD`, which has no `ACCT-ADDR-ZIP`. Its `ACCT-UPDATE-GROUP-ID` is at positions 103-112 (the ZIP position of `CVACT01Y`) and its FILLER `X(188)` at 113-300, so a save overwrites the ZIP with the group ID and the `CVACT01Y` group ID position with FILLER content that the program does not set (`INITIALIZE` skips FILLER). Positions 1-102 match `CVACT01Y` (SE-ACUP-006, NUM-ACUP-010, DEF-ACUP-002, DEF-ACUP-020, Q-ACUP-001, Q-ACUP-010, INV-039; `app/cbl/COACTUPC.cbl:418-433, 3956, 4002, 4066-4068`, `app/cpy/CVACT01Y.cpy:4-17`).
+- **Amounts.** Account view edits the five amount fields with `+ZZZ,ZZZ,ZZZ.99` (9 integer digits), so a tenth integer digit is not shown (DEF-ACVW-005, `app/cpy-bms/COACTVW.CPY:302, 314, 326, 332, 344`). Account update accepts any value `NUMVAL-C` can read, including negative values; more than 2 decimals are truncated and more than 10 integer digits lose their high-order digits. No relation between balance and limits is enforced, and the balance and cycle totals can be typed directly (VAL-ACUP-011, VAL-ACUP-012, DEF-ACUP-113, DEF-ACUP-114; `app/cbl/COACTUPC.cbl:1072-1140, 2180-2219`).
+- **Dates.** When changed online, `ACCT-OPEN-DATE`, `ACCT-EXPIRAION-DATE` and `ACCT-REISSUE-DATE` must each be a real calendar date with year 1900-2099 (VAL-ACUP-005 to VAL-ACUP-009); no order between them is enforced. Account update rebuilds them as `YYYY-MM-DD` (INV-045; `app/cpy/CSUTLDPY.cpy:25-279`, `app/cbl/COACTUPC.cbl:1478-1507`).
+
+Data observation: in all 50 sample accounts `ACCT-ADDR-ZIP` holds `A000000000` (the format of a disclosure group ID) and `ACCT-GROUP-ID` is blank (Q-ENT-001). The records match the account update layout `ACCT-UPDATE-RECORD` (group ID `A000000000` at position 103, spaces from 113), not `CVACT01Y`. Every reader that uses `CVACT01Y` (account view, INTCALC) sees a blank group ID, and account update's change detection counts every sample account as changed, because the blank group ID it read differs from what the screen returns (DEF-ACUP-122; `app/data/ASCII/acctdata.txt:1`).
 
 Used by (copybook, `docs/inventory.md:301`): CBACT01C, CBACT04C, CBEXPORT, CBIMPORT, CBSTM03A, CBTRN01C, CBTRN02C, COACCT01, COACTUPC, COACTVWC, COBIL00C, COPAUA0C, COPAUS0C, COTRN02C. READACCT (CBACT01C) copies every field to the ENT-ACCT-EXTRACT files.
 
@@ -109,7 +126,9 @@ Used by (copybook, `docs/inventory.md:301`): CBACT01C, CBACT04C, CBEXPORT, CBIMP
 
 *Sample data note:* `app/data/ASCII/cardxref.txt` has 36-byte lines (no FILLER); the loader pads them to 50 bytes. Only bytes 1-36 are used by any program. `app/data/ASCII/tcatbal.txt` mixes line endings (49 CRLF lines, 1 LF line); a target data loader must strip both.
 
-Sample: 50 records, one card per account.
+Sample: 50 records, one card per account. `XREF-CUST-ID` equals `XREF-ACCT-ID` numerically in every record (customer n owns account n; `app/data/ASCII/cardxref.txt:1-50`).
+
+Online reads by account: account view reads `CXACAIX` with a keyed READ by account and takes that record's card and customer. For an account with several cards the READ through the non-unique path returns DUPKEY, which account view treats as an error (DEF-ACVW-003); an account with no card gives "not found" (DEF-ACVW-004). Account update reads it the same way and fails the same way, so such accounts cannot be updated online (SE-ACUP-001, DEF-ACUP-012, INV-031; DUPKEY behaviour platform-inferred, the sample has one card per account; `app/cbl/COACTVWC.cbl:727-768`, `app/cbl/COACTUPC.cbl:3654-3696`).
 
 ## ENT-CUSTOMER · Customer
 
@@ -126,13 +145,13 @@ Sample: 50 records, one card per account.
 | `CUST-LAST-NAME` | 60 | 25 | `X(25)` | text(25) | Last name |
 | `CUST-ADDR-LINE-1` | 85 | 50 | `X(50)` | text(50) | Address line 1 |
 | `CUST-ADDR-LINE-2` | 135 | 50 | `X(50)` | text(50) | Address line 2 |
-| `CUST-ADDR-LINE-3` | 185 | 50 | `X(50)` | text(50) | Address line 3 (holds the city in the sample data) |
-| `CUST-ADDR-STATE-CD` | 235 | 2 | `X(02)` | text(2) | State code |
+| `CUST-ADDR-LINE-3` | 185 | 50 | `X(50)` | text(50) | Address line 3 (holds the city in the sample data); labelled `City` online |
+| `CUST-ADDR-STATE-CD` | 235 | 2 | `X(02)` | text(2) | State code; online, one of 56 codes in `CSLKPCDY` |
 | `CUST-ADDR-COUNTRY-CD` | 237 | 3 | `X(03)` | text(3) | Country code |
-| `CUST-ADDR-ZIP` | 240 | 10 | `X(10)` | text(10) | ZIP code |
+| `CUST-ADDR-ZIP` | 240 | 10 | `X(10)` | text(10) | ZIP code, 5 characters or ZIP+4 with a dash; online only the first 5 are shown and saved (DEF-ACUP-003, INV-044) |
 | `CUST-PHONE-NUM-1` | 250 | 15 | `X(15)` | text(15) | Phone 1, `(nnn)nnn-nnnn` in the sample data |
-| `CUST-PHONE-NUM-2` | 265 | 15 | `X(15)` | text(15) | Phone 2 |
-| `CUST-SSN` | 280 | 9 | `9(09)` | digits(9) | Social security number; sensitive |
+| `CUST-PHONE-NUM-2` | 265 | 15 | `X(15)` | text(15) | Phone 2, same format and online rules as phone 1 |
+| `CUST-SSN` | 280 | 9 | `9(09)` | digits(9) | Social security number; sensitive. Account view shows it in full as `nnn-nn-nnnn` (DEF-ACVW-010) |
 | `CUST-GOVT-ISSUED-ID` | 289 | 20 | `X(20)` | text(20) | Government ID; sensitive |
 | `CUST-DOB-YYYY-MM-DD` (CUSTREC: `CUST-DOB-YYYYMMDD`) | 309 | 10 | `X(10)` | date-text | Date of birth; sensitive |
 | `CUST-EFT-ACCOUNT-ID` | 319 | 10 | `X(10)` | text(10) | Bank account for electronic payments; sensitive |
@@ -141,6 +160,13 @@ Sample: 50 records, one card per account.
 | FILLER | 333 | 168 | `X(168)` | text | Unused |
 
 Sample (`app/data/ASCII/custdata.txt`): 50 records, IDs `000000001`-`000000050` in key order, all with country `USA`, primary holder `Y`, all fields filled. ZIP is 5 characters in 20 records and 10 in 30. FICO scores range from 001 to 793. Every customer appears in exactly one ENT-CARD-XREF record.
+
+Online account view and update (COACTVWC, COACTUPC):
+
+- **Display.** Account view shows the first 5 of the 10 ZIP characters, so ZIP+4 values such as `19852-6716` (customer 3) are cut, and the first 13 of the 15 characters of each phone number (`app/cpy-bms/COACTVW.CPY:410, 428, 440`, `app/data/ASCII/custdata.txt:3`).
+- **Edits.** Account update rules: first and last name required, letters and spaces only; middle name optional, same characters (VAL-ACUP-019 to VAL-ACUP-021); address line 1 required (VAL-ACUP-022); city (line 3) required, letters and spaces only (VAL-ACUP-026); state one of 56 upper-case US state and territory codes (VAL-ACUP-023, VAL-ACUP-024); ZIP 5 digits, not zero, whose first two digits are allowed for the state (VAL-ACUP-025, VAL-ACUP-034); country required, letters only, no list (VAL-ACUP-027); phones optional when all parts are empty, otherwise area code (positions 2-4) in the general-purpose list and prefix (6-8) and line number (10-13) numeric and not zero (VAL-ACUP-028 to VAL-ACUP-031); SSN in parts 3-2-4, each numeric and not zero, part 1 not 666 and not 900-999 (VAL-ACUP-013 to VAL-ACUP-016); date of birth a real date, year 1900-2099, before today (VAL-ACUP-010); EFT account 10 digits, not zero (VAL-ACUP-032); primary card holder `Y` or `N` (VAL-ACUP-033); FICO score 300-850 (VAL-ACUP-017, VAL-ACUP-018). Customer ID, address line 2 and government ID are not validated (BR-ACUP-108). (`app/cbl/COACTUPC.cbl:1533-1662, 2225-2557`, `app/cpy/CSLKPCDY.cpy:1013-1069`.)
+- **Writers' layout.** Account update rewrites the customer from its own 500-byte layout `CUST-UPDATE-RECORD` (field positions as `CVCUS01Y`), built from scratch from the screen values, including the protected customer ID and the unedited government ID and address line 2 (SE-ACUP-007, DEF-ACUP-013). Its FILLER content is not set by the program (DEF-ACUP-020). It writes each phone as `(aaa)bbb-cccc` followed by 2 spaces, only 5 ZIP characters (DEF-ACUP-003) and the date of birth as `YYYY-MM-DD` (`app/cbl/COACTUPC.cbl:434-456, 4007-4059`).
+- **Sample against the edits.** None of the 50 sample customers passes every account update edit (state and ZIP prefix mismatch 44, phone 1 area code 26, phone 2 area code 25, FICO below 300 for 21, state code 5 (`FM`, `MH`, `PW`, `AP`), SSN 4 (one starting `666`, three starting `9`), last name `O'Connell` 1), so no sample account can be saved online (DEF-ACUP-112, INV-038; `app/data/ASCII/custdata.txt:1-50`, `app/cpy/CSLKPCDY.cpy:1073-1313`).
 
 Used by: CVCUS01Y (`docs/inventory.md:305`): CBCUS01C, CBEXPORT, CBIMPORT, CBTRN01C, COACTUPC, COACTVWC, COCRDSLC, COCRDUPC, COPAUA0C, COPAUS0C. CUSTREC (`docs/inventory.md:300`): CBSTM03A.
 
@@ -151,22 +177,29 @@ Exposure: READCUST prints `CUST-SSN`, `CUST-GOVT-ISSUED-ID` and `CUST-DOB-YYYY-M
 - **Copybook:** `app/cpy/CVACT02Y.cpy:4-11` (`CARD-RECORD`, 150 bytes)
 - **Dataset:** `AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS`, KSDS, `KEYS(16 0)`, `RECORDSIZE(150 150)` (`app/jcl/CARDFILE.jcl:50-63`)
 - **Alternate index:** `AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX`, `KEYS(11 16)` = `CARD-ACCT-ID`, **NONUNIQUEKEY**, `UPGRADE` (`app/jcl/CARDFILE.jcl:83-92`), path `...AIX.PATH` (`app/jcl/CARDFILE.jcl:100-102`)
-- **CICS files:** `CARDDAT` (by card, `app/csd/CARDDEMO.CSD:25-36`), `CARDAIX` (path, by account, `app/csd/CARDDEMO.CSD:13-24`), both `RECOVERY(NONE)`. **Batch DD:** `CARDFILE` (`app/jcl/READCARD.jcl:25`, `app/jcl/CBEXPORT.jcl:57`; also CBTRN01C).
+- **CICS files:** `CARDDAT` (by card, `app/csd/CARDDEMO.CSD:25-36`), `CARDAIX` (path, by account, `app/csd/CARDDEMO.CSD:13-24`), both `RECOVERY(NONE)`, `UPDATEMODEL(LOCKING)` and `READINTEG(UNCOMMITTED)`. No online program reads `CARDAIX` at run time: card view reads by account only in a paragraph that is never performed (SE-CRDV-002, `app/cbl/COCRDSLC.cbl:779-791`). **Batch DD:** `CARDFILE` (`app/jcl/READCARD.jcl:25`, `app/jcl/CBEXPORT.jcl:57`; also CBTRN01C).
 - **Primary key:** `CARD-NUM`. **Alternate key:** `CARD-ACCT-ID` (several cards per account allowed).
 
 | Field | Pos | Len | PIC | Type | Meaning |
 | :-- | --: | --: | :-- | :-- | :-- |
 | `CARD-NUM` | 1 | 16 | `X(16)` | text(16) | Card number (PAN); sensitive |
-| `CARD-ACCT-ID` | 17 | 11 | `9(11)` | digits(11) | Account the card belongs to, ENT-ACCOUNT |
-| `CARD-CVV-CD` | 28 | 3 | `9(03)` | digits(3) | Card verification value; sensitive |
-| `CARD-EMBOSSED-NAME` | 31 | 50 | `X(50)` | text(50) | Name printed on the card |
-| `CARD-EXPIRAION-DATE` | 81 | 10 | `X(10)` | date-text | Expiration date (the source's spelling) |
-| `CARD-ACTIVE-STATUS` | 91 | 1 | `X(01)` | text(1) | `Y` active |
-| FILLER | 92 | 59 | `X(59)` | text | Unused |
+| `CARD-ACCT-ID` | 17 | 11 | `9(11)` | digits(11) | Account the card belongs to, ENT-ACCOUNT; card update can change it (below) |
+| `CARD-CVV-CD` | 28 | 3 | `9(03)` | digits(3) | Card verification value; sensitive. Never shown online; card update writes `000` on every save (DEF-CRDU-002) |
+| `CARD-EMBOSSED-NAME` | 31 | 50 | `X(50)` | text(50) | Name printed on the card; card update upper-cases it (a-z only) after every read and saves what is on the screen (BR-CRDU-008, DEF-CRDU-008) |
+| `CARD-EXPIRAION-DATE` | 81 | 10 | `X(10)` | date-text | Expiration date (the source's spelling), read by position. Card view shows month and year only; card update changes year and month, keeps the day it read and writes `YYYY-MM-DD` (DEF-CRDU-009) |
+| `CARD-ACTIVE-STATUS` | 91 | 1 | `X(01)` | text(1) | `Y` active, `N` inactive; card update accepts only `Y` or `N`, card view and the card list show the stored value |
+| FILLER | 92 | 59 | `X(59)` | text | Unused; spaces in the sample. Card update does not keep it on rewrite (below) |
 
 Sample (`app/data/ASCII/carddata.txt`): 50 records in card-number order, one card per account, all active (`Y`), expiring between 2023-01-06 and 2025-12-28. Each card is in ENT-CARD-XREF with the same account number.
 
-`CARD-ACCT-ID` duplicates `XREF-ACCT-ID` in ENT-CARD-XREF, and nothing keeps the two in step. Which one each program uses is stated in its spec.
+`CARD-ACCT-ID` duplicates `XREF-ACCT-ID` in ENT-CARD-XREF, and nothing keeps the two in step (INV-030). Which one each program uses is stated in its spec: account view uses `XREF-ACCT-ID` (through `CXACAIX`), the card list uses `CARD-ACCT-ID`, and card update is the only online program that writes either; it changes `CARD-ACCT-ID` only (`app/cbl/COACTVWC.cbl:727-735`, `app/cbl/COCRDLIC.cbl:1386`).
+
+Online card list, view and update (COCRDLIC, COCRDSLC, COCRDUPC):
+
+- The card list shows `CARD-ACCT-ID` and filters on it by exact comparison while browsing (BR-CRDL-003). Card view reads it but neither shows it nor checks it against the account typed (BR-CRDV-001, DEF-CRDV-001). Card update writes it from the account number on its screen, which on the menu path is any 11-digit account the user typed, so a save can move the card to another account, existing or not, without changing ENT-CARD-XREF (BR-CRDU-007, DEF-CRDU-001; `app/cbl/COCRDLIC.cbl:1385-1394`, `app/cbl/COCRDSLC.cbl:740-750`, `app/cbl/COCRDUPC.cbl:1463`).
+- Card update overwrites `CARD-CVV-CD` from a work field that is never filled, through a `9(03)` redefinition, so it writes `000` (DEF-CRDU-002; `app/cbl/COCRDUPC.cbl:107-108, 306, 1464-1465`).
+- `INITIALIZE` skips FILLER, so card update's rewrite stores in the record FILLER the 59 bytes at commarea positions 431-489, the FILLER of the card image in its extension (DEF-CRDU-003, INV-036; `app/cbl/COCRDUPC.cbl:314-321, 1461`).
+- Card update reads the expiry by position (year 1-4, month 6-7, day 9-10) and writes year, `-`, month, `-`, day (`app/cbl/COCRDUPC.cbl:1361-1366, 1467-1474`); card view shows month and year (`app/cbl/COCRDSLC.cbl:477-482`).
 
 Used by (`docs/inventory.md:302`): CBACT02C, CBEXPORT, CBIMPORT, CBTRN01C, COACTVWC, COCRDLIC, COCRDSLC, COCRDUPC, COPAUS0C, COTRTLIC.
 
@@ -328,15 +361,17 @@ Data observation: no sample account has a group in `ACCT-GROUP-ID` (Q-ENT-001), 
 | `CDEMO-FROM-PROGRAM` | 5 | 8 | text | Program that transferred here (PF3 target) |
 | `CDEMO-TO-TRANID` | 13 | 4 | text | Target transaction |
 | `CDEMO-TO-PROGRAM` | 17 | 8 | text | Target program for XCTL |
-| `CDEMO-USER-ID` | 25 | 8 | text | Signed-on user, upper-cased by sign-on; the only identity in the online application (no CICS sign-on, `app/cbl/COSGN00C.cbl:132-133, 226`) |
-| `CDEMO-USER-TYPE` | 33 | 1 | text | `A` admin, `U` regular user. Set by sign-on from `SEC-USR-TYPE`; also forced to `U` by the account and card programs and to `A` by the Db2 transaction type programs when they start without a commarea (DEF-SGN-012, INV-006). Any value other than `A` is routed as a regular user |
-| `CDEMO-PGM-CONTEXT` | 34 | 1 | digits(1) | 0 first entry, 1 re-entry |
+| `CDEMO-USER-ID` | 25 | 8 | text | Signed-on user, upper-cased by sign-on; the only identity in the online application (no CICS sign-on, `app/cbl/COSGN00C.cbl:132-133, 226`). Blank when the card list starts without a commarea, and cleared with the whole base commarea when the card list is re-entered with PF3 from card view or card update (DEF-CRDL-005, `app/cbl/COCRDLIC.cbl:315-325, 458-469`) |
+| `CDEMO-USER-TYPE` | 33 | 1 | text | `A` admin, `U` regular user. Set by sign-on from `SEC-USR-TYPE`. The five account and card programs overwrite it with `U` on every transfer of control, whatever the signed-on user's type, and the card list also when it starts without a commarea; none of them tests it (DEF-CRDV-004, DEF-ACVW-011, DEF-ACUP-009, DEF-CRDL-004, DEF-CRDU-007). The Db2 transaction type programs force `A` when they start without a commarea (DEF-SGN-012, INV-006). Any value other than `A` is routed as a regular user (`app/cbl/COCRDLIC.cbl:320, 388, 466, 522, 550`, `app/cbl/COCRDSLC.cbl:326`, `app/cbl/COACTVWC.cbl:344`, `app/cbl/COACTUPC.cbl:947`, `app/cbl/COCRDUPC.cbl:464`) |
+| `CDEMO-PGM-CONTEXT` | 34 | 1 | digits(1) | 0 first entry, 1 re-entry. Card view ends the conversation with the plain text `UNEXPECTED DATA SCENARIO` for any other value (FLOW-CRDV-014); the card list never sets 1 and recognises its own re-entry by `CDEMO-FROM-PROGRAM` = `COCRDLIC` (INV-028, `app/cbl/COCRDSLC.cbl:373-380`, `app/cbl/COCRDLIC.cbl:336-343, 604-608`) |
 | `CDEMO-CUST-ID` | 35 | 9 | digits | Selected customer |
 | `CDEMO-CUST-FNAME`, `-MNAME`, `-LNAME` | 44, 69, 94 | 25 each | text | Customer name |
 | `CDEMO-ACCT-ID` | 119 | 11 | digits | Selected account |
 | `CDEMO-ACCT-STATUS` | 130 | 1 | text | Its status |
-| `CDEMO-CARD-NUM` | 131 | 16 | digits | Selected card |
-| `CDEMO-LAST-MAP`, `-LAST-MAPSET` | 147, 154 | 7 each | text | Last screen shown |
+| `CDEMO-CARD-NUM` | 131 | 16 | digits | Selected card (full card number, sensitive) |
+| `CDEMO-LAST-MAP`, `-LAST-MAPSET` | 147, 154 | 7 each | text | Last screen shown: the map and mapset of the program that last transferred control, set just before XCTL (the card list sets `CCRDLIA`/`COCRDLI`, card view `CCRDSLA`/`COCRDSL` on PF3). Card view treats `COCRDLI` together with from-program `COCRDLIC` as "called from the card list" and protects its search fields (BR-CRDV-003); card update tests only `CDEMO-FROM-PROGRAM` (`app/cbl/COCRDLIC.cbl:524-525`, `app/cbl/COCRDSLC.cbl:328-329, 505-512`, `app/cbl/COCRDUPC.cbl:482-485`) |
+
+Selected account, customer and card (`CDEMO-ACCT-ID`, `CDEMO-CUST-ID`, `CDEMO-CARD-NUM`) in the account and card programs (INV-033): account view sets the account from the number typed (0 when invalid) and customer and card from the cross-reference record found; after a failed lookup the customer and card keep the previous values (BR-ACVW-005, DEF-ACVW-018). The card list sets account and card from its filter fields on each re-entry (0 when blank or invalid) and from the selected row before it transfers to card view or card update. Card view and card update read them only when entered from the card list; card view looks the card up by `CDEMO-CARD-NUM` only. Card update zeroes account and card when it returns to the list. Account update sets account, customer, the three customer names, account status and card (the card of the cross-reference record found by account) after every successful fetch, and clears `CDEMO-ACCT-ID` when the user continues after a save attempt (FLOW-ACUP-007). (`app/cbl/COACTUPC.cbl:979-983, 3805-3811`, `app/cbl/COACTVWC.cbl:660, 675, 678, 739-740`, `app/cbl/COCRDLIC.cbl:531-534, 1024-1027`, `app/cbl/COCRDSLC.cbl:339-343`, `app/cbl/COCRDUPC.cbl:482-491`.)
 
 Extensions by program:
 
@@ -347,9 +382,16 @@ Extensions by program:
 | `COUSR00C`, `COUSR02C`, `COUSR03C` | `CDEMO-CU00-INFO`, `CDEMO-CU02-INFO`, `CDEMO-CU03-INFO` | 161-194 | ENT-COMMAREA-USER-ADMIN-EXT |
 | `COTRTLIC` | list state in a 2000-byte area (`app/app-transaction-type-db2/cbl/COTRTLIC.cbl:420`) | after 160 | Described in the COTRTLIC spec |
 | `COTRTUPC` | screen state, old and new type | after 160 | Described in the COTRTUPC spec |
+| `COACTVWC` | `WS-THIS-PROGCOMMAREA` (`app/cbl/COACTVWC.cbl:213-218`) | 161-172 | `CA-FROM-PROGRAM` (161, 8), `CA-FROM-TRANID` (169, 4); never set or tested |
+| `COACTUPC` | `WS-THIS-PROGCOMMAREA` (`app/cbl/COACTUPC.cbl:652-669`) | 161-1033 | 873 bytes: the change state `ACUP-CHANGE-ACTION`, then `ACUP-OLD-DETAILS` (account and customer values as fetched, compared at save time) and `ACUP-NEW-DETAILS` (values received from the screen). Holds SSN, date of birth, government ID and EFT account in clear (FLOW-ACUP-002, DEF-ACUP-016) |
+| `COCRDSLC` | own extension (`app/cbl/COCRDSLC.cbl:200-205`) | 161-172 | `CA-FROM-PROGRAM` (161, 8), `CA-FROM-TRANID` (169, 4); never set or tested |
+| `COCRDLIC` | own extension (`app/cbl/COCRDLIC.cbl:229-262`) | 161-414 | Last card key of the page (card 161-176, account 177-187), first card key (card 188-203, account 204-214), page number 215 (one digit, wraps after 9, DEF-CRDL-010), "end of list reported" flag 216 (0 reported, 9 not), next-page indicator 217 (`Y` or low-values), unused flag 218, and the 7 displayed rows of 28 bytes (account 11, card 16, status 1) at 219-414 |
+| `COCRDUPC` | `WS-THIS-PROGCOMMAREA` (`app/cbl/COCRDUPC.cbl:274-321`) | 161-489 | `CCUP-CHANGE-ACTION` (161, 1; space or low-values not fetched, `S` details shown, `E` changes not valid, `N` valid not confirmed, `C` done, `L` lock error, `F` failed), `CCUP-OLD-ACCTID` (162, 11), `CCUP-OLD-CARDID` (173, 16), `CCUP-OLD-CVV-CD` (189, 3, sensitive), `CCUP-OLD-CRDNAME` (192, 50), `CCUP-OLD-EXPYEAR` (242, 4), `-EXPMON` (246, 2), `-EXPDAY` (248, 2), `CCUP-OLD-CRDSTCD` (250, 1), `CCUP-NEW-DETAILS` (251-339, same layout with prefix `CCUP-NEW-`), `CARD-UPDATE-RECORD` (340-489, layout of ENT-CARD; its FILLER at 431-489 is what the rewrite stores in the card FILLER). Card number and CVV travel through the terminal in this area (DEF-CRDU-019) |
 | `COSGN00C`, `COMEN01C`, `COADM01C`, `COUSR01C`, `CORPT00C` | none | - | 160 bytes |
 
 Hand-overs through an extension (INV-008): the transaction list writes the selected transaction ID at 203-218 and the view reads it there under its own name (`app/cbl/COTRN00C.cbl:186-195`, `app/cbl/COTRN01C.cbl:99-109`); the user list writes the selected user at 187-194 for update and delete. The menus pass only 160 bytes, so a program started from a menu finds its extension filled with spaces. Transaction add would, on first entry, move a non-blank 203-218 into its card number field (`app/cbl/COTRN02C.cbl:124-129`); with only the menu calling it, this never happens.
+
+The account and card programs hand over nothing through an extension (INV-026): COACTVWC, COACTUPC, COCRDLIC, COCRDSLC and COCRDUPC each return a 2000-byte area to themselves on RETURN TRANSID (base, own extension, spaces to 2000) and pass only the 160-byte base on XCTL. Each also reads its extension positions when entered with only 160 bytes (DEF-ACVW-015, DEF-ACUP-008, DEF-CRDL-012, DEF-CRDV-006, DEF-CRDU-004; `app/cbl/COACTVWC.cbl:397-406`, `app/cbl/COACTUPC.cbl:1007-1020`, `app/cbl/COCRDLIC.cbl:604-619`, `app/cbl/COCRDSLC.cbl:394-406`, `app/cbl/COCRDUPC.cbl:546-558`).
 
 ## ENT-COMMAREA-USER-ADMIN-EXT · User administration commarea extension
 
@@ -922,9 +964,9 @@ Other bodies: not found (`COACCT01.cbl:429-434`) is `INVALID REQUEST PARAMETERS 
 
 | Entity | Candidate table | Primary key | Notes |
 | :-- | :-- | :-- | :-- |
-| ENT-ACCOUNT | `account` | `acct_id` CHAR(11) or BIGINT | amounts `DECIMAL(12,2)`; dates parse as `DATE` |
+| ENT-ACCOUNT | `account` | `acct_id` CHAR(11) or BIGINT | amounts `DECIMAL(12,2)`; dates parse as `DATE`; one layout for ZIP and group ID (Q-ENT-001, INV-039); a version column for the online concurrency check (INV-042) |
 | ENT-CUSTOMER | `customer` | `cust_id` CHAR(9) or INT | DOB parses as `DATE`; SSN, government ID, DOB and EFT account need column protection |
-| ENT-CARD | `card` | `card_num` | index on `acct_id` (non-unique); FK to account; CVV should not be stored in clear |
+| ENT-CARD | `card` | `card_num` | index on `acct_id` (non-unique); FK to account; CVV should not be stored in clear; one owner of the card-to-account link instead of the copy in ENT-CARD-XREF (INV-030) |
 | ENT-CARD-XREF | `card_account` | `card_num` | index on `acct_id` (non-unique); FK to account and customer |
 | ENT-TRANSACTION | `transaction` | `tran_id` CHAR(16) | `DECIMAL(11,2)`; four timestamp layouts, one of them a typed date, to normalise to `DATETIME2` (COBIL00C Q-BILL-006) |
 | ENT-TCAT-BAL | `account_category_balance` | (`acct_id`, `type_cd`, `cat_cd`) | `DECIMAL(11,2)` |
@@ -941,5 +983,5 @@ Other bodies: not found (`COACCT01.cbl:429-434`) is `INVALID REQUEST PARAMETERS 
 
 | ID | Question |
 | :-- | :-- |
-| Q-ENT-001 | In the sample accounts the ZIP field holds `A000000000` and the group ID is blank. Is the sample data shifted, or is this intended? It matters for interest (INTCALC looks up the disclosure group by `ACCT-GROUP-ID`). |
+| Q-ENT-001 | In the sample accounts the ZIP field holds `A000000000` and the group ID is blank. Is the sample data shifted, or is this intended? It matters for interest (INTCALC looks up the disclosure group by `ACCT-GROUP-ID`). The sample matches the layout that account update writes (`ACCT-UPDATE-RECORD`, group ID at 103), which suggests the data was produced with that layout (COACTUPC DEF-ACUP-002, Q-ACUP-001, INV-039). |
 | Q-ENT-002 | Should the target keep the 16-character text transaction ID, or move to a numeric surrogate key with the old ID as an attribute? |

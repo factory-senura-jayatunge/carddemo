@@ -1,5 +1,7 @@
 # Area b-accounts-cards: interaction proposals
 
+Merged in d439e47 into `../interactions.md` (diagram and edges) and `../components.md` (component rows, CRUD rows; PINV-b-accounts-cards-01 and -22 into INV-006, -02..-21 as INV-026..INV-045, see the "Proposed as" column).
+
 Proposals from area `b-accounts-cards` (programs COACTVWC, COACTUPC, COCRDLIC, COCRDSLC, COCRDUPC) for [../interactions.md](../interactions.md) and [../components.md](../components.md), at source commit b5e0139. The menu side of each menu edge (COMEN01C) belongs to area `a-signon-admin`; it is stated here from the menu table only.
 
 ## Edges
