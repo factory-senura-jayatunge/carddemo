@@ -73,7 +73,7 @@ Content: 1 `User List (Security)` `COUSR00C`, 2 `User Add (Security)` `COUSR01C`
 
 | Entity | Field or statement | Current text | Proposed text | Evidence (file:line) |
 | :-- | :-- | :-- | :-- | :-- |
-| ENT-COMMAREA | `CDEMO-USER-TYPE` meaning | `A` admin, `U` regular user | `A` admin, `U` regular user; set only by sign-on from `SEC-USR-TYPE`; any value other than `A` is routed as a regular user | `app/cbl/COSGN00C.cbl:227-240` |
+| ENT-COMMAREA | `CDEMO-USER-TYPE` meaning | `A` admin, `U` regular user | `A` admin, `U` regular user; set by sign-on from `SEC-USR-TYPE`, and also forced to `U` by the account and card programs and to `A` by the Db2 transaction-type programs (DEF-SGN-012); any value other than `A` is routed as a regular user | `app/cbl/COSGN00C.cbl:227-240`; `app/cbl/COCRDLIC.cbl:320`; `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:520` |
 | ENT-COMMAREA | `CDEMO-USER-ID` meaning | Signed-on user | Signed-on user, upper-cased by sign-on; the only identity in the online application (no CICS sign-on) | `app/cbl/COSGN00C.cbl:132-133, 226` |
 | ENT-COMMAREA | extension sentence | programs may append their own extension | programs may append their own extension; a shorter commarea copied into a longer one leaves the extension filled with spaces, and the menus truncate longer ones to 160 bytes. User administration extension: ENT-COMMAREA-USER-ADMIN-EXT | `app/cbl/COUSR00C.cbl:114`; `app/cbl/COADM01C.cbl:90` |
 | ENT-COMMAREA | (new) initialisation | - | Sign-on sets only the from-fields, user ID, user type and context; the other fields are passed uninitialised (COSGN00C DEF-SGN-007) | `app/cbl/COSGN00C.cbl:224-228` |

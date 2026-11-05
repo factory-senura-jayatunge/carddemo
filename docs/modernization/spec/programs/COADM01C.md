@@ -29,7 +29,7 @@ spec_status: draft
 
 ## 1. Summary
 
-COADM01C is the menu an administrator (user type `A`) reaches after sign-on. It lists the 6 functions of the admin menu table `COADM02Y`: user list, add, update and delete on the user security file, and the two transaction-type functions of the optional Db2 module. It reads the option number the user types and transfers control (XCTL) to the option's program with the commarea. If that program is not installed, CICS raises PGMIDERR and the program shows the green message `This option is not installed ...` instead. PF3 returns to the sign-on screen. The program reads no file and never checks that the user really is an administrator: it relies on sign-on having routed only type `A` users here.
+COADM01C is the menu an administrator (user type `A`) reaches after sign-on. It lists the 6 functions of the admin menu table `COADM02Y`: user list, add, update and delete on the user security file, and the two transaction-type functions of the optional Db2 module. It reads the option number the user types and transfers control (XCTL) to the option's program with the commarea. If that program is not installed, CICS raises PGMIDERR and the program shows the green message `This option is not installed ...` instead. PF3 returns to the sign-on screen. The program reads no file and never checks that the user really is an administrator. Sign-on routes only type `A` users here, but with the Db2 module installed the transaction-type programs can bring anyone here without a sign-on (DEF-ADMN-001).
 
 ## 2. Rules at a glance
 
@@ -81,7 +81,7 @@ None. `USRSEC` is named in working storage (`:39`) and the user record layout is
 
 ### 4.3 Commarea
 
-ENT-COMMAREA, 160 bytes, no extension. A longer commarea from a returning function (the user programs pass 194 bytes, ENT-COMMAREA-USER-ADMIN-EXT) is truncated to its first 160 bytes (`:90`), so the user-list paging state is lost on return here. The program uses:
+ENT-COMMAREA, 160 bytes, no extension. A longer commarea from a returning function (`COUSR00C`, `COUSR02C` and `COUSR03C` pass 194 bytes, ENT-COMMAREA-USER-ADMIN-EXT; `COUSR01C`, `COTRTLIC` and `COTRTUPC` pass 160) is truncated to its first 160 bytes (`:90`), so the user-list paging state is lost on return here. The program uses:
 
 | Field | Read | Written | Use |
 | :-- | :-- | :-- | :-- |
@@ -277,7 +277,7 @@ flowchart LR
 | :-- | :-- |
 | Entry | XCTL from sign-on (type `A`) or a returning function, 160-byte commarea (longer ones truncated). |
 | Exit | XCTL to the option's program with `CDEMO-FROM-TRANID` = `CA00`, `CDEMO-FROM-PROGRAM` = `COADM01C`, `CDEMO-PGM-CONTEXT` = 0, every other field unchanged. The user functions use `COADM01C` as their fixed return target. |
-| Authorisation | None in the program. A rewrite that exposes the admin functions as services must add an administrator check, because today the only check is the sign-on routing (DEF-ADMN-001, Q-ADMN-001). |
+| Authorisation | None in the program. A rewrite that exposes the admin functions as services must add an administrator check, because today there is no check at all: sign-on routing is bypassed by the Db2 transaction-type programs (DEF-ADMN-001, Q-ADMN-001). |
 | Menu table | 6 options from `COADM02Y`, compiled in. |
 
 ## 12. Numeric, date and format details
@@ -296,8 +296,8 @@ flowchart LR
 None of these were changed in this branch (`COADM01C.cbl` and `COADM02Y.cpy` are not touched after the original import; `CHANGELOG.md` "Fixed" lists only batch and JCL fixes).
 
 #### DEF-ADMN-001 · [security] The admin menu does not check that the user is an administrator
-- The program never tests `CDEMO-USER-TYPE`; any commarea with `CDEMO-PGM-CONTEXT` set reaches the menu and every admin function. Today only sign-on decides who gets here (type `A`, BR-SGN-004), and the identity exists only in the commarea (DEF-SGN-006). The user functions do not check either (DEF-USRL-008).
-- **Source:** `:86-107, 140-148`
+- The program never tests `CDEMO-USER-TYPE`; any commarea with `CDEMO-PGM-CONTEXT` set reaches the menu and every admin function. Sign-on sends only type `A` users here (BR-SGN-004), but it is not the only way in. With the Db2 module installed, `COTRTLIC` (`CTLI`) and `COTRTUPC` treat "no commarea" as a first run, initialise the commarea with a blank user ID and type `A`, and transfer here on PF3. Typing `CTLI` on a blank terminal and pressing PF3 therefore opens the admin menu, and with it user add, update and delete, without a password; an outsider can create an administrator (DEF-USRA-005). The identity exists only in the commarea (DEF-SGN-006, DEF-SGN-012). The user functions do not check either (DEF-USRL-008).
+- **Source:** `:86-107, 140-148`; `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:515-525, 591-623`; `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:366-374, 438-449`
 - **Status:** open · **Fidelity:** defect-decide (Q-ADMN-001) · **Confidence:** reviewed
 
 #### DEF-ADMN-002 · "Not installed" message is green and does not name the option

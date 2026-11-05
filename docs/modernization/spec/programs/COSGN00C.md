@@ -24,7 +24,7 @@ data_stores:
   - {name: USRSEC, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [read]}
 calls: []
 transfers_to: [COADM01C, COMEN01C]
-invoked_by: [COMEN01C, COADM01C, COUSR00C, COUSR01C, COUSR02C, COUSR03C, COBIL00C]
+invoked_by: [COMEN01C, COADM01C, COUSR00C, COUSR01C, COUSR02C, COUSR03C, COBIL00C, CORPT00C, COTRN00C, COTRN01C, COTRN02C, COPAUS0C]
 spec_status: draft
 ---
 
@@ -54,14 +54,14 @@ COSGN00C is the entry point of the CardDemo online application (transaction `CC0
 - **Actor:** anyone at a CICS terminal. No prior identification is needed (the transaction has `RESSEC(NO)` and `CMDSEC(NO)`, `app/csd/CARDDEMO.CSD:385`).
 - **Normal trigger:** the user types `CC00` on a blank terminal (`app/csd/CARDDEMO.CSD:378-387`, program `COSGN00C`, `app/csd/CARDDEMO.CSD:249-256`). The program starts with no commarea and shows the sign-on screen (FLOW-SGN-001).
 - **Re-entry trigger:** every interaction ends with "return, next transaction `CC00`", so the next key pressed on the sign-on screen starts COSGN00C again, now with a 160-byte commarea (FLOW-SGN-005).
-- **Return to sign-on from other programs:** the menus' PF3 (`COMEN01C`, `COADM01C`) transfer here without a commarea, so the user gets a fresh sign-on screen (`app/cbl/COMEN01C.cbl:196-203`, `app/cbl/COADM01C.cbl:163-170`). Most other online programs transfer here, with their commarea, when they are started without one (for example `app/cbl/COUSR00C.cbl:110-112`, `app/cbl/COBIL00C.cbl:107-109`); see FLOW-SGN-008.
+- **Return to sign-on from other programs:** the menus' PF3 (`COMEN01C`, `COADM01C`) transfer here without a commarea, so the user gets a fresh sign-on screen (`app/cbl/COMEN01C.cbl:196-203`, `app/cbl/COADM01C.cbl:163-170`). Many other online programs transfer here, with their commarea, when they are started without one (for example `app/cbl/COUSR00C.cbl:110-112`, `app/cbl/COBIL00C.cbl:107-109`); see FLOW-SGN-008. Not all of them: the account and card programs (`COACTVWC`, `COACTUPC`, `COCRDLIC`, `COCRDSLC`, `COCRDUPC`) and the Db2 module's `COTRTLIC` and `COTRTUPC` run without a sign-on and build their own commarea (DEF-SGN-012).
 - **Precondition:** the CICS file `USRSEC` must be open. The batch cycle closes it (`app/jcl/CLOSEFIL.jcl:30`), so nobody can sign on during the batch window (ERR-SGN-001).
 
 ## 4. Interfaces
 
 ### 4.1 Screen COSGN0A (mapset COSGN00), 24 x 80
 
-Source: `app/bms/COSGN00.bms:26-205`; symbolic map `app/cpy-bms/COSGN00.CPY:17-152`. The mapset has `CTRL=(ALARM,FREEKB)` and `EXTATT=YES` (`app/bms/COSGN00.bms:19-25`). All named fields except the constants have `FSET`, so they are always sent back to the program.
+Source: `app/bms/COSGN00.bms:26-205`; symbolic map `app/cpy-bms/COSGN00.CPY:17-152`. The mapset has `CTRL=(ALARM,FREEKB)` and `EXTATT=YES` (`app/bms/COSGN00.bms:19-25`). The input fields have `FSET`, so they are always sent back to the program (the unnamed `AppID:` label also has `FSET`, `app/bms/COSGN00.bms:75`; the stray field of DEF-SGN-009 has none).
 
 | Row,Col | Field | Len | Direction | Attributes | Content |
 | :-- | :-- | --: | :-- | :-- | :-- |
@@ -196,7 +196,7 @@ Each arrow is one CICS task.
 
 #### BR-SGN-005 · Session state after sign-on
 - **When:** the password matched, before the transfer.
-- **Then:** `CDEMO-FROM-TRANID` = `CC00`, `CDEMO-FROM-PROGRAM` = `COSGN00C`, `CDEMO-USER-ID` = upper-cased user ID, `CDEMO-USER-TYPE` = stored user type, `CDEMO-PGM-CONTEXT` = 0. These five fields are the whole "session" of CardDemo; every later program trusts them without checking them again (DEF-SGN-006).
+- **Then:** `CDEMO-FROM-TRANID` = `CC00`, `CDEMO-FROM-PROGRAM` = `COSGN00C`, `CDEMO-USER-ID` = upper-cased user ID, `CDEMO-USER-TYPE` = stored user type, `CDEMO-PGM-CONTEXT` = 0. These five fields are the whole "session" of CardDemo; every later program trusts them without checking them again (DEF-SGN-006). Some later programs also overwrite them: the account and card functions set the type to `U` and the Db2 transaction-type functions set it to `A` before returning to a menu (DEF-SGN-012).
 - **Source:** `:224-228`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -358,14 +358,14 @@ sequenceDiagram
 - **Inbound:** transaction `CC00`; PF3 of `COMEN01C` and `COADM01C` (XCTL without commarea); the "no commarea" fallback of most online programs (XCTL with commarea, FLOW-SGN-008).
 - **Outbound:** `COADM01C` (ADMN) or `COMEN01C` (MENU) by XCTL with the 160-byte commarea. Their specs describe what they do with it (FLOW-ADMN-002, FLOW-MENU-002).
 - **Shared data:** `USRSEC` is maintained online by `COUSR01C` (add), `COUSR02C` (update) and `COUSR03C` (delete), and browsed by `COUSR00C`. Those programs store user IDs and passwords as typed, without upper-casing them, which COSGN00C requires (DEF-SGN-011, DEF-USRA-001, DEF-USRU-004).
-- **Shared invariants (proposed, PINV-a-signon-admin-01..03 in `areas/a-signon-admin-interactions.md`):** the session identity is only `CDEMO-USER-ID` and `CDEMO-USER-TYPE` in the commarea, set only here; a user can sign on only if the stored ID and password are upper case (or contain no letters); `USRSEC` is unavailable during the batch window.
+- **Shared invariants (proposed, PINV-a-signon-admin-01..03 in `areas/a-signon-admin-interactions.md`):** the session identity is only `CDEMO-USER-ID` and `CDEMO-USER-TYPE` in the commarea, meant to be set only here (today other programs also set them, DEF-SGN-012); a user can sign on only if the stored ID and password are upper case (or contain no letters); `USRSEC` is unavailable during the batch window.
 
 ### Module extraction notes (selective conversion of sign-on)
 
 | Boundary | Contract |
 | :-- | :-- |
 | Entry | Transaction `CC00` from a blank terminal; PF3 from the menus (no commarea). |
-| Credential store | `USRSEC` (ENT-USER-SECURITY): key = 8-character user ID, 8-character plain-text password, 1-character type. Shared with the user administration programs; a new authentication service must either keep this store or migrate it together with `COUSR01C`-`COUSR03C`. |
+| Credential store | `USRSEC` (ENT-USER-SECURITY): key = 8-character user ID, 8-character plain-text password, 1-character type. Shared with the user administration programs; a new authentication service must either keep this store or migrate it together with `COUSR01C`-`COUSR03C`. `USRSEC` has one VSAM string (`STRINGS(1)`, `app/csd/CARDDEMO.CSD:91`), so concurrent sign-ons, list browses and update reads queue for it: a throughput limit, not a functional rule. |
 | Output to the legacy programs | XCTL to `COADM01C` or `COMEN01C` with a 160-byte commarea holding at least `CDEMO-FROM-TRANID`, `CDEMO-FROM-PROGRAM`, `CDEMO-USER-ID`, `CDEMO-USER-TYPE`, `CDEMO-PGM-CONTEXT` = 0 (BR-SGN-005). Nothing else downstream identifies the user. |
 | Batch window | Must be unavailable (or must not depend on `USRSEC` being open) while the batch cycle runs. |
 
@@ -411,7 +411,7 @@ None of these were changed in this branch (`COSGN00C.cbl` is not touched by any 
 - **Status:** open · **Fidelity:** defect-decide (Q-SGN-005) · **Confidence:** reviewed
 
 #### DEF-SGN-006 · [security] Identity lives only in the commarea; no CICS security
-- The program does not issue EXEC CICS SIGNON and the CardDemo transactions are defined with `RESSEC(NO) CMDSEC(NO)`, so the CICS task keeps running under the terminal's default user. Authorisation in the rest of the application rests on `CDEMO-USER-TYPE` in the commarea, and the admin programs do not check even that (DEF-ADMN-001, DEF-USRL-008).
+- The program does not issue EXEC CICS SIGNON and the CardDemo transactions are defined with `RESSEC(NO) CMDSEC(NO)`, so the CICS task keeps running under the terminal's default user. Authorisation in the rest of the application rests on `CDEMO-USER-TYPE` in the commarea, and the admin programs do not check even that (DEF-ADMN-001, DEF-USRL-008). Because some programs build a commarea of their own when started without one, both menus can be reached without signing on at all (DEF-SGN-012).
 - **Source:** `:224-240`; `app/csd/CARDDEMO.CSD:385`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (CSD), platform-inferred (CICS user)
 
@@ -421,7 +421,7 @@ None of these were changed in this branch (`COSGN00C.cbl` is not touched by any 
 - **Status:** open · **Confidence:** platform-inferred
 
 #### DEF-SGN-008 · Password field starts with underscores
-- The password field's initial value is `________` (eight underscores, `app/bms/COSGN00.bms:175-180`) and it has `FSET`. A user who types a password shorter than 8 characters without erasing the rest of the field sends, for example, `PASS____`, which does not match `PASS    `. The demo password `PASSWORD` fills the field and is not affected.
+- The password field's initial value is `________` (eight underscores, `app/bms/COSGN00.bms:175-180`) and it has `FSET`. A user who types a password shorter than 8 characters without erasing the rest of the field sends, for example, `PASS____`, which does not match `PASS    `. The demo password `PASSWORD` fills the field and is not affected. A password field the user never touched comes back as `________`, not blank, so VAL-SGN-002 (`Please enter Password ...`) fires only when the user erased the field; otherwise the file is read and the result is `Wrong Password. Try again ...` or `User not found. Try again ...`, which lets anyone probe which user IDs exist without typing a password (DEF-SGN-003).
 - **Source:** `app/bms/COSGN00.bms:175-180`; `:123, 223`
 - **Status:** open · **Confidence:** platform-inferred (3270 overtype behaviour)
 
@@ -439,6 +439,16 @@ None of these were changed in this branch (`COSGN00C.cbl` is not touched by any 
 - The user ID and password are upper-cased before the read and the compare (BR-SGN-001), but the user add and update programs store both exactly as typed (DEF-USRA-001, DEF-USRU-004). A user added as `jsmith` cannot be found; a password stored as `Secret12` can never match. Unless the terminals translate input to upper case (CICS `UCTRAN`), an administrator can create users who can never sign on.
 - **Source:** `:132-136, 215, 223`; `app/cbl/COUSR01C.cbl:154-158`
 - **Status:** open · **Fidelity:** defect-decide (Q-SGN-002) · **Confidence:** reviewed; terminal translation platform-inferred (Q-SGN-006)
+
+#### DEF-SGN-012 · [security] Both menus can be reached without signing on
+- Sign-on is not the only place that creates the session commarea. The account and card programs (`COACTVWC`, `COACTUPC`, `COCRDLIC`, `COCRDSLC`, `COCRDUPC`) treat "no commarea" as a normal first run: they initialise the commarea (user ID blank) and set the type to `U`, and their PF3 transfers to `COMEN01C` with context 0. With the Db2 module installed, `COTRTLIC` and `COTRTUPC` do the same with type `A` and transfer to `COADM01C`. So `CCLI` + PF3 on a blank terminal opens the main menu, and `CTLI` + PF3 opens the admin menu (and user add, update and delete) without a password. The transactions have no resource or command security (`RESSEC(NO) CMDSEC(NO)`). The same programs also overwrite `CDEMO-USER-TYPE` on every PF3, so the type is not stable across a session (BR-SGN-005). See DEF-MENU-003, DEF-ADMN-001.
+- **Source:** `app/cbl/COCRDLIC.cbl:315-325, 384-404`; `app/cbl/COACTVWC.cbl:338-352`; `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:515-525, 591-623`; `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:366-374, 438-449`; `app/csd/CARDDEMO.CSD:357-364`
+- **Status:** open · **Fidelity:** defect-decide (Q-ADMN-001) · **Confidence:** reviewed (code paths); starting a transaction by typing its ID on a blank screen is standard CICS behaviour, platform-inferred
+
+#### DEF-SGN-013 · Attempted user ID left in the commarea
+- After a failed sign-on the commarea returned to CICS still carries the upper-cased user ID that was tried (`:134`). The next interaction does not use it, so there is no visible effect; a rewrite should not treat it as an identity.
+- **Source:** `:132-136, 98-102`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -459,7 +469,7 @@ A reimplementation must reproduce, for each scenario: which menu is reached and 
 | --: | :-- | :-- | :-- |
 | S1 | blank terminal | `CC00` | sign-on screen, cursor on user ID |
 | S2 | sign-on screen | Enter, both blank | `Please enter User ID ...`, cursor on user ID |
-| S3 | sign-on screen | Enter, `ADMIN001`, password blank | `Please enter Password ...`, cursor on password |
+| S3 | sign-on screen | Enter, `ADMIN001`, password field erased | `Please enter Password ...`, cursor on password (with the underscores left in place: `Wrong Password. Try again ...`, DEF-SGN-008) |
 | S4 | sign-on screen | Enter, `ADMIN001` / `PASSWORD` | admin menu `COADM01C`; commarea user `ADMIN001`, type `A`, context 0, from `CC00`/`COSGN00C` |
 | S5 | sign-on screen | Enter, `user0001` / `password` | main menu `COMEN01C`; commarea user `USER0001`, type `U` |
 | S6 | sign-on screen | Enter, `NOUSER01` / `PASSWORD` | `User not found. Try again ...`, cursor on user ID |
@@ -477,7 +487,7 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | :-- | :-- | :-- |
 | (data division) | 33-67 | §4.3, §5, DEF-SGN-007 |
 | `MAIN-PARA` | 73-102 | FLOW-SGN-001..006, VAL-SGN-005, DEF-SGN-010 |
-| `PROCESS-ENTER-KEY` | 108-140 | VAL-SGN-001, VAL-SGN-002, BR-SGN-001, ERR-SGN-002, FLOW-SGN-008 |
+| `PROCESS-ENTER-KEY` | 108-140 | VAL-SGN-001, VAL-SGN-002, BR-SGN-001, ERR-SGN-002, FLOW-SGN-008, DEF-SGN-013 |
 | `SEND-SIGNON-SCREEN` | 145-157 | FLOW-SGN-007, DEF-SGN-004 |
 | `SEND-PLAIN-TEXT` | 162-172 | FLOW-SGN-003 |
 | `POPULATE-HEADER-INFO` | 177-204 | FLOW-SGN-007, NUM-SGN-001 |

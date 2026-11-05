@@ -38,7 +38,7 @@ COMEN01C is the menu a regular user (type `U`) reaches after sign-on. It lists t
 | BR-MENU-001 | The menu shows every option of the main menu table, numbered `01`-`11`, in table order. |
 | BR-MENU-002 | A valid option transfers to the option's program with the commarea, as a first entry. |
 | BR-MENU-003 | An option marked admin-only (`A`) is refused to a regular user; no shipped option is marked so. |
-| BR-MENU-004 | Option 11 (Pending Authorization View) is offered only if its program is installed in CICS. |
+| BR-MENU-004 | Option 11 (Pending Authorization View) is always listed but can be selected only if its program is installed in CICS. |
 | BR-MENU-005 | An option whose program name starts with `DUMMY` shows "coming soon"; no shipped option does. |
 | VAL-MENU-001 | The option must be a number from 1 to the option count (11). |
 | VAL-MENU-002 | Only Enter and PF3 are valid keys. |
@@ -47,7 +47,7 @@ COMEN01C is the menu a regular user (type `U`) reaches after sign-on. It lists t
 
 - **Actor:** a signed-on user. The program does not read `USRSEC`; it trusts `CDEMO-USER-TYPE` in the commarea (DEF-MENU-003).
 - **Normal trigger:** sign-on `COSGN00C` transfers here (XCTL) for every user type other than `A`, with `CDEMO-PGM-CONTEXT` = 0 (`app/cbl/COSGN00C.cbl:235-239`; BR-SGN-004).
-- **Return trigger:** the functions return here when the user presses PF3 on them, by XCTL with their commarea and context 0 (for example `app/cbl/COBIL00C.cbl:128-135`).
+- **Return trigger:** the functions return here when the user presses PF3 on them, by XCTL with their commarea and context 0 (for example `app/cbl/COBIL00C.cbl:128-135, 273-284`).
 - **Re-entry trigger:** each interaction ends with "return, next transaction `CM00`" (`app/csd/CARDDEMO.CSD:399-408`), so the next key on the menu starts COMEN01C again (FLOW-MENU-006).
 - **Direct start:** typing `CM00` on a blank terminal starts the program with no commarea; it sends the user to sign-on (FLOW-MENU-001).
 
@@ -177,6 +177,7 @@ stateDiagram-v2
 - **When:** the chosen option's program is `COPAUS0C` (Pending Authorization View, part of the optional authorisation module).
 - **Then:** the program asks CICS whether the program is defined (EXEC CICS INQUIRE PROGRAM, NOHANDLE). If the response is NORMAL: transfer as in BR-MENU-002. Otherwise: message `This option Pending Authorization View is not installed...` in red (the option name up to the first double space), menu sent.
 - **Source:** `:147-168`
+- **Caveat:** INQUIRE PROGRAM returns NORMAL when the program definition is installed, not when its load module can be loaded. A definition without a load module passes the check and the XCTL then abends (PGMIDERR, AEI0); with program autoinstall a loadable program that has no definition yet is reported as not installed. INQUIRE is a system programming command (translator option SP; subject to command security if `CMDSEC` is ever enabled). A rewrite needs an explicit "module available" contract.
 - **Fidelity:** must-preserve · **Confidence:** reviewed (logic), runtime-verified (message text, GnuCOBOL), platform-inferred (INQUIRE response when the module is absent)
 
 #### BR-MENU-005 · Placeholder options
@@ -297,7 +298,7 @@ flowchart LR
 ## 12. Numeric, date and format details
 
 #### NUM-MENU-001 · Option normalisation
-- The 2-character option field arrives right-justified and zero-filled by BMS (`JUSTIFY=(RIGHT,ZERO)`), so `5` normally arrives as `05`. The program then (1) finds the last non-space character, (2) moves the characters up to it into `WS-OPTION-X` right-justified, (3) replaces spaces with `0`, (4) moves the result to the 2-digit `WS-OPTION`, and echoes `WS-OPTION` into the option field. Results on GnuCOBOL 3.2 with the project flags: `05`, ` 5` and `5 ` all give 5; `00` and low-values give 0 (rejected). For non-digit characters the result depends on the compiler: GnuCOBOL turns `AB` into 0 (rejected) and `1A` into 1 (accepted as option 1); the z/OS result was not tested (Q-MENU-002). The field's numeric attribute normally stops letters being typed.
+- The 2-character option field arrives right-justified and zero-filled by BMS (`JUSTIFY=(RIGHT,ZERO)`), so `5` normally arrives as `05`. The program then (1) finds the last non-space character, (2) moves the characters up to it into `WS-OPTION-X` right-justified, (3) replaces spaces with `0`, (4) moves the result to the 2-digit `WS-OPTION`, and echoes `WS-OPTION` into the option field. Results on GnuCOBOL 3.2 with the project flags: `05`, ` 5` and `5 ` all give 5; `00` and low-values give 0 (rejected). For non-digit characters the result depends on the compiler: GnuCOBOL turns `AB` and `A1` into 0 (rejected) and `1A` into 1 (accepted as option 1), and also accepts `-1` and `1-` as option 1; the z/OS result was not tested (Q-MENU-002), where `-1` probably fails the NUMERIC test and is rejected. The field's numeric attribute normally stops letters being typed, but it still allows `-` and `.`.
 - **Source:** `:117-125`; `app/bms/COMEN01.bms:145-149`
 - **Confidence:** runtime-verified (GnuCOBOL), platform-inferred (BMS justification, z/OS)
 
@@ -310,7 +311,7 @@ flowchart LR
 None of these were changed in this branch (`COMEN01C.cbl` and `COMEN02Y.cpy` are not touched after the original import; `CHANGELOG.md` "Fixed" lists only batch and JCL fixes).
 
 #### DEF-MENU-001 · Admin check runs after an invalid option
-- After VAL-MENU-001 has sent its message, the admin-only test still evaluates the table entry for the invalid option: for 0 or 12-99 it reads outside the 11 defined entries (the table is declared with 12 occurrences over 11 entries, and no subscript checking is compiled in). If the byte read happens to be `A` and the user is type `U`, a second screen with `No access - Admin Only option... ` follows; normally nothing visible happens.
+- After VAL-MENU-001 has sent its message, the admin-only test still evaluates the table entry for the invalid option: for 0 or 12-99 it reads outside the 11 defined entries (the table is declared with 12 occurrences over 11 entries, and no subscript checking is compiled in). If the byte read happens to be `A` and the user is type `U`, a second screen with `No access - Admin Only option... ` follows; normally nothing visible happens. For option 0 the byte read is the last byte of `CDEMO-MENU-OPT-COUNT` (`1`), so it can never be `A`; for 12-99 it depends on the storage after the table.
 - **Source:** `:127-143`; `app/cpy/COMEN02Y.cpy:93-98`
 - **Status:** open · **Confidence:** platform-inferred (storage layout)
 
@@ -320,8 +321,8 @@ None of these were changed in this branch (`COMEN01C.cbl` and `COMEN02Y.cpy` are
 - **Status:** open · **Fidelity:** defect-decide (Q-MENU-001) · **Confidence:** reviewed
 
 #### DEF-MENU-003 · [security] No check that the user is signed on
-- The menu accepts any commarea: it does not check that `CDEMO-USER-ID` is filled in or that the user type is valid. It is reachable only by XCTL from CardDemo programs (a direct `CM00` without commarea goes to sign-on), so in practice the protection is the sign-on routing (DEF-SGN-006).
-- **Source:** `:82-91`
+- The menu accepts any commarea: it does not check that `CDEMO-USER-ID` is filled in or that the user type is valid. A direct `CM00` without commarea goes to sign-on, but that does not protect it: the account and card programs (`COACTVWC`, `COACTUPC`, `COCRDLIC`, `COCRDSLC`, `COCRDUPC`) treat "no commarea" as a normal first run, initialise the commarea with a blank user ID and type `U`, and transfer here on PF3 with context 0. Typing `CCLI` on a blank terminal and pressing PF3 therefore shows the main menu without a sign-on, and every main-menu function is open (DEF-SGN-012).
+- **Source:** `:82-91`; `app/cbl/COCRDLIC.cbl:315-325, 384-404`; `app/cbl/COACTVWC.cbl:338-352`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-MENU-004 · "Coming soon" message is malformed
@@ -336,7 +337,7 @@ None of these were changed in this branch (`COMEN01C.cbl` and `COMEN02Y.cpy` are
 
 #### DEF-MENU-006 · Option 11 message colour differs from the admin menu
 - The "not installed" message is red here and green on the admin menu (BR-ADMN-003), and the wording differs (`... is not installed...` with the option name here, `This option is not installed ...` there).
-- **Source:** `:161-167`; `app/cbl/COADM01C.cbl:150-156`
+- **Source:** `:161-167`; `app/cbl/COADM01C.cbl:270-277`
 - **Status:** open (cosmetic) · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions
@@ -344,7 +345,7 @@ None of these were changed in this branch (`COMEN01C.cbl` and `COMEN02Y.cpy` are
 | ID | Question | For |
 | :-- | :-- | :-- |
 | Q-MENU-001 | Should any main-menu function be restricted (for example transaction add, once marked "Admin Only"), and should regular users be limited to their own accounts and cards? The menu offers everything to everyone today. | business, security |
-| Q-MENU-002 | On z/OS: what does a non-digit option such as `1A` normalise to (NUM-MENU-001)? Rejected, or accepted as some option? | mainframe team |
+| Q-MENU-002 | On z/OS: what does a non-digit option such as `1A`, `-1` or `1.` normalise to (NUM-MENU-001)? Rejected, or accepted as some option? | mainframe team |
 | Q-MENU-003 | Keep "PF3 = back to sign-on without a goodbye", or make PF3 a proper sign-off? | business |
 
 ## 15. Equivalence contract
