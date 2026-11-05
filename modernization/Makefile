@@ -52,12 +52,12 @@ COMPOSE = docker compose --project-directory '$(HERE)' -f '$(HERE)/docker-compos
 # Not implemented yet. Each target fails with the phase that delivers it;
 # replace the stub with the real recipe (and drop it from STUBS) when that
 # work lands.
-STUBS := db-reset load smoke billpay verify-spec verify-ledger test-backend \
+STUBS := db-reset load smoke billpay verify-ledger test-backend \
 	test-billpay verify-batch verify-data verify-harness verify-cycle \
 	test-airflow web-build test-e2e trace
 
 .PHONY: help setup toolchain up down status logs infra-up infra-down infra-wipe \
-	require-env $(STUBS)
+	require-env verify-spec $(STUBS)
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -112,8 +112,8 @@ smoke: ## Quick health check of the running application stack [not implemented y
 smoke: PHASE = Phase 3, the Bill Pay pilot (end-to-end smoke check)
 billpay: ## Run the Bill Pay slice end to end [not implemented yet]
 billpay: PHASE = Phase 3, the Bill Pay pilot
-verify-spec: ## Check the natural-language spec and its paragraph coverage [not implemented yet]
-verify-spec: PHASE = Phase 1, the natural-language spec (coverage checker)
+verify-spec: ## Check the NL spec (format, paragraph coverage) and run its GnuCOBOL equivalence checks
+	$(PYTHON) '$(HERE)/../docs/modernization/spec/tools/verify_spec.py'
 verify-ledger: ## Check the ledger evidence and its links [not implemented yet]
 verify-ledger: PHASE = Phase 4, validation (ledger evidence checks)
 test-backend: ## Spring Boot service tests (heavy: Testcontainers) [not implemented yet]

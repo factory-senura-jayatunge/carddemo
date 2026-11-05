@@ -71,6 +71,6 @@ Use the layout of `../entities.md`:
 
 ## Merge process
 
-1. The area merges `origin/modernization`, then commits its specs and proposals on its own branch. Before it reports: `python3 docs/modernization/spec/tools/check_spec.py --program <NAME>` passes for each of its specs; an independent reviewer subagent has checked the items against the source and its verdicts and error rate are in `evidence/<area>-review.md`; areas `d1` and `d2` also record their spec-only reimplementations against the GnuCOBOL runner in `evidence/` (see `../format.md`, "Evidence and verification").
+1. The area merges `origin/modernization`, then commits its specs and proposals on its own branch. Before it reports: `python3 docs/modernization/spec/tools/check_spec.py --program <NAME>` passes for each of its specs; an independent reviewer subagent has checked the items against the source and its verdicts and error rate are in `evidence/<area>-review.md`; areas `d1` and `d2` also commit their spec-only reimplementations as runnable checks under `checks/<job>_reimpl/` (layout in `../checks/README.md`, example `../checks/posttran_reimpl/`) and record the results in `evidence/` (see `../format.md`, "Evidence and verification").
 2. The spec lead merges the proposals into the system artifacts, resolves overlaps between areas, and records each merge at the top of the proposal file (`Merged in <commit>`), so the file stays as the area's record.
 3. Cross-area consistency reviews compare each area's interface statements with the other side's spec and file the differences as corrections.

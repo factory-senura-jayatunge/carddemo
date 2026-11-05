@@ -27,6 +27,7 @@ All paths are under `docs/modernization/spec/`.
 | Interaction view | `interactions.md` | Who calls whom: online navigation, batch cycle, cross-module flows, Mermaid diagrams. | spec lead |
 | Area proposals | `areas/<area>-entities.md`, `areas/<area>-interactions.md` | Additions an area proposes for the three system artifacts; the spec lead merges them. | area agent |
 | Evidence | `evidence/*.md` | Self-checks: reviewer sampling, spec-only reimplementations, runner comparisons. | whoever ran the check |
+| Equivalence checks | `checks/<job>_reimpl/` | Runnable spec-only reimplementation, data generator and comparison with the runner (`checks/README.md`). | area agent |
 | Checker | `tools/check_spec.py` | Front matter, IDs, references, source citations and paragraph coverage. | spec lead |
 
 Only the spec lead edits `entities.md`, `components.md` and `interactions.md`, so parallel areas never conflict on them.

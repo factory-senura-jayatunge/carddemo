@@ -16,6 +16,7 @@ The spec describes the **as-is** behaviour at a given commit, defects included. 
 | [interactions.md](interactions.md) | Interaction view: online navigation, batch cycle, cross-module flows. |
 | [areas/](areas/) | Proposals from the area teams for the three system artifacts above. |
 | [evidence/](evidence/) | Results of independent reviews and spec-only reimplementations. |
+| [checks/](checks/) | Runnable spec-only reimplementations and their comparison with the GnuCOBOL runner. |
 | `tools/check_spec.py` | Checker for front matter, IDs, references, source citations and paragraph coverage. |
 
 ## How to read a program spec
