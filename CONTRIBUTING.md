@@ -40,6 +40,18 @@ GitHub provides additional document on [forking a repository](https://help.githu
 [creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
 
 
+## Naming conventions
+
+These conventions come from the existing code. `scripts/cobol_lint.py` checks them (see [docs/linting.md](docs/linting.md#naming)).
+
+* **Member names.** Every program, copybook, mapset and JCL member name is 1-8 characters from `A-Z 0-9 @ # $` and starts with a letter or national character. The file name without its extension is the member name, and `PROGRAM-ID` must match it.
+* **Program prefixes.** Online CICS programs start with `CO` (for example `COSGN00C`, `COACTUPC`, `COPAUS0C`). Batch programs start with `CB` (for example `CBACT01C`, `CBTRN02C`). Common callable utilities start with `CS` (`CSUTLDTC`). Programs usually end in `C`. A program that uses `EXEC CICS` must start with `CO`.
+* **Copybook prefixes.** `CV` = file and record layouts (`CVACT01Y`, `CVTRA05Y`). `CS` = shared services, messages and utilities (`CSMSG01Y`, `CSUTLDWY`). `CO` = online commarea, menus and screen titles (`COCOM01Y`, `COMEN02Y`). `CU` = the legacy customer layout (`CUSTREC`). `CC`/`CI` = authorization request and reply layouts and IMS segments (`CCPAURQY`, `CIPAUDTY`). `DCL` = DCLGEN table declarations. IMS PCB masks end in `PCB`. Most data copybooks end in `Y`.
+* **BMS maps.** A symbolic-map copybook in `cpy-bms` has the same name as its mapset source in the sibling `bms/` directory (`bms/COSGN00.bms` produces `cpy-bms/COSGN00.CPY`).
+* **Paragraphs.** Most programs number their paragraphs `NNNN-DESCRIPTIVE-NAME` (`1000-PROCESS-RECORDS`), with a matching `NNNN-...-EXIT` paragraph when `PERFORM ... THRU` is used. Some older online programs use descriptive names only (`PROCESS-ENTER-KEY`). Within one program, use one style. Paragraph names use hyphens, never underscores, and are at most 30 characters.
+* **Module boundaries.** The base application (`app/cbl`, `app/cpy`, `app/cpy-bms`, ...) must not copy copybooks from, or CALL programs in, the optional `app/app-*` modules. Each module may use the base application but not another module. Batch programs must not copy CICS (`DFHAID`, `DFHBMSCA`, `DFHEIBLK`) or BMS copybooks.
+* **JCL.** Job, step and DD names are 1-8 characters.
+
 ## Finding contributions to work on
 Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any 'help wanted' issues is a great place to start.
 

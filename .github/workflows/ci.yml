@@ -1,0 +1,82 @@
+# Lint, docs check, build and tests for every push to main and every pull
+# request. COBOL work runs in the dev container image (.devcontainer/Dockerfile),
+# so CI uses the same GnuCOBOL 3.2 as local development.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the dev container image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          tags: carddemo-dev:ci
+          load: true
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+      - name: make lint (COBOL/JCL lint, cobc syntax check, linter tests)
+        run: tools/ci-run.sh make lint
+
+  docs-check:
+    name: docs-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: make docs-check (docs/inventory.md is current)
+        run: make docs-check
+      - name: make agents-md-check (AGENTS.md and skills name existing commands and paths)
+        run: make agents-md-check
+
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the dev container image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          tags: carddemo-dev:ci
+          load: true
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+      - name: make check-toolchain
+        run: tools/ci-run.sh make check-toolchain
+      - name: make build
+        run: tools/ci-run.sh make build
+      - name: make test (unit + integration, coverage minimum)
+        run: tools/ci-run.sh make test
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        run: python3 tools/ci_summary.py >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload test results (JUnit XML, coverage, timings)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: build/test-results/
+          if-no-files-found: error
+          retention-days: 14

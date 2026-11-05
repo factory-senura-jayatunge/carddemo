@@ -1,0 +1,112 @@
+name: Bug report
+description: Something in CardDemo does not compile, abends, or gives wrong results.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Search the existing open and closed issues first; compile errors,
+        line endings and data loading come up often.
+        **Do not report security vulnerabilities here.** Use the
+        [AWS vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/).
+        Do not paste real card numbers, SSNs or passwords. The bundled sample data is synthetic,
+        but your own data may not be.
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      description: Which part of CardDemo is affected?
+      options:
+        - Base application (CICS online, VSAM, batch)
+        - "Optional: Transaction Type Management with Db2 (app-transaction-type-db2)"
+        - "Optional: Pending Authorizations with IMS, Db2 and MQ (app-authorization-ims-db2-mq)"
+        - "Optional: Account Extractions with MQ and VSAM (app-vsam-mq)"
+        - Data export/import (CBEXPORT, CBIMPORT)
+        - Scheduler definitions (CA7, Control-M)
+        - Sample data (app/data ASCII or EBCDIC)
+        - Scripts, build or CI tooling
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Program, copybook, map, JCL or transaction
+      description: Member names involved, for example CBTRN02C, CVACT01Y, COSGN00, POSTTRAN, CC00.
+      placeholder: "CBACT04C / INTCALC"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - IBM z/OS mainframe (CICS, VSAM, JES)
+        - AWS Mainframe Modernization (managed runtime)
+        - Rocket / Micro Focus Enterprise Server or Developer
+        - Other rehosting or refactoring runtime
+        - Mainframe emulator (for example zD&T or Hercules)
+        - GnuCOBOL on a local machine
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Compiler and runtime versions
+      description: For example Enterprise COBOL 6.3, CICS TS 5.6, Db2 13, IMS 15, GnuCOBOL 3.2.
+    validations:
+      required: false
+  - type: input
+    id: revision
+    attributes:
+      label: CardDemo revision
+      description: Commit hash or release you are using (`git rev-parse --short HEAD`).
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Jobs submitted in order, transactions and PF keys used, input values.
+      placeholder: |
+        1. Run CLOSEFIL, ACCTFILE, ...
+        2. Submit POSTTRAN
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the abend code (for example ASRA, ABM0, U0999), file status, SQLCODE, IMS status or compiler message ID (for example IGYPA3050-S).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Job output or compiler listing
+      description: Relevant SYSOUT, SYSPRINT or CICS messages. Mask any real customer data.
+      render: text
+    validations:
+      required: false
+  - type: dropdown
+    id: transfer
+    attributes:
+      label: How were sources and data transferred?
+      description: Line endings and code page cause many compile and load problems.
+      options:
+        - Not applicable
+        - Text transfer (ASCII to EBCDIC conversion)
+        - Binary transfer
+        - Git checkout used directly (LF line endings)
+        - Not sure
+    validations:
+      required: false

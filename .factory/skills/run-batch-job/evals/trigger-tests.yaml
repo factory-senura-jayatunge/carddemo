@@ -1,0 +1,13 @@
+should_trigger:
+  - 'Run POSTTRAN locally and tell me how many transactions were rejected'
+  - 'Reproduce the INTCALC job on the sample data'
+  - 'What does CBEXPORT write to its output file?'
+  - 'Show me the daily rejects from the posting job'
+  - 'Run CBACT01C and check its return code'
+
+should_not_trigger:
+  - 'Add a regression test for CBTRN02C'
+  - 'Fix the tab-character lint finding in CBACT02C'
+  - 'Change the COSGN00C sign-on screen layout'
+  - 'Explain the DB2 transaction type module'
+  - 'Upload the JCL to the mainframe'

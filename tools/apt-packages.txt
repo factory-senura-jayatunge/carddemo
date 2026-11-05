@@ -1,0 +1,9 @@
+# Debian 13 (trixie) packages for building and testing CardDemo locally.
+# Installed by .devcontainer/Dockerfile, which CI also uses. gnucobol3 is
+# pinned because the build requires GnuCOBOL 3.2 (tools/batch-programs.toml
+# [toolchain]); Debian builds it with Berkeley DB for INDEXED files.
+gnucobol3=3.2-3
+python3
+make
+git
+ca-certificates

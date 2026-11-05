@@ -1,0 +1,14 @@
+# Default owners for everything in the repository.
+# Chosen from git history: snjarao (Sanjay Rao) authored the most commits and
+# merged most pull requests; arunkse (Arunkumar Selvam) authored the optional
+# modules and data export/import; kshiabhi (Abhijit K) merged community PRs.
+* @snjarao @arunkse @kshiabhi
+
+# Optional modules added and maintained by arunkse
+/app/app-authorization-ims-db2-mq/ @arunkse @snjarao
+/app/app-transaction-type-db2/     @arunkse @snjarao
+/app/app-vsam-mq/                  @arunkse @snjarao
+/app/scheduler/                    @arunkse @snjarao
+
+# Repository automation and policy
+/.github/                          @snjarao @arunkse

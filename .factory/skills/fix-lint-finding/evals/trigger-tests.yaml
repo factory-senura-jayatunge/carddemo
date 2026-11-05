@@ -1,0 +1,13 @@
+should_trigger:
+  - 'make lint fails with a tab-character finding'
+  - 'The pre-commit hook rejected my COBOL change'
+  - 'Fix the sensitive-display error in CBACT01C'
+  - 'Prune the stale entries from cobol-lint-baseline.json'
+  - 'scripts/lint.sh reports a cobc-syntax error'
+
+should_not_trigger:
+  - 'Run POSTTRAN and count the rejects'
+  - 'Add a test that covers CBIMPORT'
+  - 'Explain the CardDemo naming conventions'
+  - 'Update the CHANGELOG for the release'
+  - 'Set up the dev container'

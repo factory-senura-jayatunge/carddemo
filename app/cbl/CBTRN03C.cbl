@@ -197,8 +197,9 @@
                 ELSE                                                            
                  DISPLAY 'TRAN-AMT ' TRAN-AMT                                   
                  DISPLAY 'WS-PAGE-TOTAL'  WS-PAGE-TOTAL                         
-                 ADD TRAN-AMT TO WS-PAGE-TOTAL                                  
-                                 WS-ACCOUNT-TOTAL                               
+                 IF WS-FIRST-TIME = 'N'
+                   PERFORM 1120-WRITE-ACCOUNT-TOTALS
+                 END-IF
                  PERFORM 1110-WRITE-PAGE-TOTALS                                 
                  PERFORM 1110-WRITE-GRAND-TOTALS                                
                 END-IF                                                          

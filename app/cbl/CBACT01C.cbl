@@ -224,6 +224,7 @@
                                                WS-REISSUE-DATE.
            MOVE   '2'                     TO   CODATECN-TYPE.
            MOVE   '2'                     TO   CODATECN-OUTTYPE.
+           MOVE   SPACES                  TO   CODATECN-0UT-DATE.
 
       *---------------------------------------------------------------*
       *CALL ASSEMBLER PROGRAM FOR DATE FORMATTING                     *
@@ -235,6 +236,8 @@
            MOVE   ACCT-CURR-CYC-CREDIT    TO   OUT-ACCT-CURR-CYC-CREDIT.
            IF  ACCT-CURR-CYC-DEBIT EQUAL TO ZERO
                MOVE 2525.00         TO   OUT-ACCT-CURR-CYC-DEBIT
+           ELSE
+               MOVE ACCT-CURR-CYC-DEBIT TO OUT-ACCT-CURR-CYC-DEBIT
            END-IF.
            MOVE   ACCT-GROUP-ID           TO   OUT-ACCT-GROUP-ID.
            EXIT.

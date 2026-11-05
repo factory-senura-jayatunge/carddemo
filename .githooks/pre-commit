@@ -1,0 +1,17 @@
+#!/bin/sh
+# Pre-commit hook: lints the staged COBOL, copybook and JCL files, runs the cobc
+# syntax check on staged programs (and on programs that copy a staged copybook),
+# and rejects staged files larger than the large-file limit. Only findings that
+# are not in cobol-lint-baseline.json block the commit.
+#
+# Enable it once per clone:   git config core.hooksPath .githooks
+# Bypass in an emergency:      git commit --no-verify
+#
+# The hook lints the working-tree copy of each staged file, so stage the whole
+# file (or stash unstaged edits) for the result to match what is committed.
+root=$(git rev-parse --show-toplevel) || exit 2
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "pre-commit: python3 not found; cannot run scripts/cobol_lint.py" >&2
+    exit 1
+fi
+exec python3 "$root/scripts/cobol_lint.py" check --staged --allow-missing-cobc --quiet-clean

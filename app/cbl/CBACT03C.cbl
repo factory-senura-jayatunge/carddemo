@@ -93,7 +93,7 @@
            READ XREFFILE-FILE INTO CARD-XREF-RECORD.                            
            IF  XREFFILE-STATUS = '00'                                           
                MOVE 0 TO APPL-RESULT                                            
-               DISPLAY CARD-XREF-RECORD                                         
+      *        DISPLAY CARD-XREF-RECORD                                         
            ELSE                                                                 
                IF  XREFFILE-STATUS = '10'                                       
                    MOVE 16 TO APPL-RESULT                                       

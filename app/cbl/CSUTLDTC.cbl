@@ -119,7 +119,7 @@
                   OUTPUT-LILLIAN,                                               
                   FEEDBACK-CODE                                                 
                                                                                 
-           MOVE WS-DATE-TO-TEST            TO WS-DATE                           
+           MOVE VSTRING-TEXT OF WS-DATE-TO-TEST TO WS-DATE
            MOVE SEVERITY OF FEEDBACK-CODE  TO WS-SEVERITY-N                     
            MOVE MSG-NO OF FEEDBACK-CODE    TO WS-MSG-NO-N                       
                                                                  

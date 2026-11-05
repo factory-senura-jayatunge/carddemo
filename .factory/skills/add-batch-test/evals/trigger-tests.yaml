@@ -1,0 +1,13 @@
+should_trigger:
+  - 'Add a test for the CBIMPORT unknown record path'
+  - 'Coverage dropped below 85 percent, add tests'
+  - 'Write a regression test for the POSTTRAN overlimit bug'
+  - 'Which paragraphs of CBTRN03C are not covered by tests?'
+  - 'I changed CBACT04C interest calculation, cover it with a test'
+
+should_not_trigger:
+  - 'Run TRANREPT and show me the report'
+  - 'make lint fails with sensitive-display'
+  - 'Add a test for the COACTUPC CICS screen'
+  - 'Regenerate docs/inventory.md'
+  - 'Bump the GnuCOBOL version in the dev container'

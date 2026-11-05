@@ -12,6 +12,7 @@ CardDemo is a comprehensive mainframe application that simulates a credit card m
 - [Optional Features](#optional-features)
 - [Installation](#installation)
 - [Running Batch Jobs](#running-batch-jobs)
+- [Local Build, Run and Test](#local-build-run-and-test)
 - [Application Details](#application-details)
   - [User Functions](#user-functions)
   - [Admin Functions](#admin-functions)
@@ -202,6 +203,7 @@ CardDemo includes several optional modules that extend the base functionality:
 - **Online Functions**: Start the CardDemo application using the CC00 transaction
   - Admin access: Use userid ADMIN001 with password PASSWORD
   - User access: Use userid USER0001 with password PASSWORD
+  - These are demo-only seed records in the user security file, not real secrets. Reset them before anyone else can reach the region. See [Secrets and credentials](./docs/security/secrets.md).
 - **Batch Functions**: See the "Running Batch Jobs" section below
 
 ## Running Batch Jobs
@@ -232,6 +234,55 @@ Execute the following JCLs in sequence to run the full batch process:
 | WAITSTEP | Defines a step to wait job for given time           |                 |
 | CBPAUP0J | Purge expired authorizations                        | IMS-DB2-MQ: Pending Authorizations |
 
+## Local Build, Run and Test
+
+The batch programs that need no CICS, Db2, IMS or MQ can be compiled and run on a workstation with GnuCOBOL. This is for development and testing only. The mainframe JCL and compile procedures above stay the way to deploy.
+
+### Requirements
+
+- GnuCOBOL 3.2 (`cobc`) built with Berkeley DB for INDEXED (KSDS) files
+- Python 3.11 or newer (standard library only)
+- GNU make
+
+`make check-toolchain` checks all three. If you don't want to install them, open the repository in the dev container (`.devcontainer/`): it pins the Debian 13 image and `gnucobol3=3.2-3` from `tools/apt-packages.txt`, and CI uses the same image. To change defaults such as the business date or the test timeout, copy `.env.example` to `.env`.
+
+### Build and run
+
+```sh
+make build                       # compile into build/release
+make list                        # which sources are built or excluded, and why
+make jobs                        # runnable jobs and their DD mappings
+make run-batch PROGRAM=POSTTRAN  # run one job (or program) on fresh sample data
+```
+
+`make build` compiles 14 batch programs (`-std=ibm -fsign=EBCDIC`), the LE/assembler shims they call (`tools/shims`), the PARM driver (`tools/drivers`) and the KSDS load/unload utilities. The CICS screens and the optional Db2/IMS/MQ modules are excluded, because they need a CICS region or a precompiler. `make list` prints every excluded file with the reason.
+
+`make run-batch` loads the ASCII sample data from `app/data/ASCII` into a scratch directory (`build/run/<JOB>`) and runs the job with the DD names from its JCL. It prints SYSOUT, RETURN-CODE and a record count for each output. Jobs that read another job's output run that job first: TRANREPT and CBEXPORT run after POSTTRAN, and CBIMPORT runs after CBEXPORT. The business date is 2022-07-06 by default (`CARDDEMO_BUSINESS_DATE`). For example, POSTTRAN processes 300 daily transactions and posts 262; the other 38 go to DALYREJS with reason 102 (over limit), and the job ends with RETURN-CODE 4.
+
+CBSTM03A (CREASTMT) compiles but is not run, because it reads z/OS control blocks. Its file-access subroutine CBSTM03B is tested directly.
+
+### Test
+
+```sh
+make test              # unit + integration tests, paragraph coverage minimum
+make test-unit         # runner, manifest and subroutine tests, no batch jobs
+make test-integration
+make test TEST_ARGS="-k posttran"
+```
+
+The suite (`tests/`) builds a `-ftrace` variant in `build/trace` and runs the jobs on the sample data plus targeted cases (each rejection rule, abends on missing input, the export/import round trip). It compares the results with expected values that `tests/oracle.py` computes independently from the copybook layouts. Tests run in parallel in random order; the seed is printed, and `CARDDEMO_TEST_SEED` repeats a run. A failing test is retried and reported as flaky if it then passes. A full run fails if paragraph coverage drops below the minimum in `tests/test-config.toml`. A run filtered with `-k` or `--suite` (including `make test-unit` and `make test-integration`) still reports coverage but does not enforce the minimum. Results go to `build/test-results/` (`junit.xml`, `coverage.json`, `timings.json`, `summary.json`).
+
+### All checks
+
+```sh
+make check   # lint, docs-check, agents-md-check, build and test, with a summary
+```
+
+`make check` runs every step even after one fails. It prints a summary with the test counts and coverage, and exits non-zero if any step failed or could not run. `make lint` (`scripts/lint.sh` and the linter's own tests) and `make docs-check` (`scripts/gen_inventory.py --check`) report "not present" when their tool is missing. `make agents-md-check` (`scripts/check_agents_md.py`) fails when AGENTS.md or a skill names a command, option or path that no longer exists, or when a make target with a help comment is missing from AGENTS.md. CI (`.github/workflows/ci.yml`) runs the same steps in the jobs `lint`, `docs-check` (which also runs agents-md-check) and `build-and-test`.
+
+### Releases
+
+Pushing a tag such as `v1.0.0` runs `.github/workflows/release.yml`: `make check`, then `make package VERSION=v1.0.0` (a `dist/` archive of `build/release` with `SHA256SUMS`), then a GitHub release whose notes come from `tools/changelog.py`. `make changelog` regenerates `CHANGELOG.md` from the commit history.
 ## Application Details
 
 CardDemo is a comprehensive credit card management application built primarily using COBOL. It provides functionality for managing accounts, credit cards, transactions, and bill payments.
@@ -263,6 +314,8 @@ Admin users can perform the following functions:
 - Transaction type management (with DB2 optional module)
 
 ### Application Inventory
+
+For a complete, generated cross-reference of programs, transactions, mapsets, JCL jobs and copybooks, see [docs/inventory.md](./docs/inventory.md).
 
 #### Online Components
 
@@ -350,9 +403,24 @@ Admin users can perform the following functions:
 | **Base Application** | Customer<br>Account<br>Card<br>Transaction<br>Bill Payment<br>Statement/Report | COBOL<br>CICS<br>JCL (Batch)<br>VSAM (KSDS with AIX) |
 | **Optional Features** | Authorization<br>Fraud<br>Transaction Type (Extension) | DB2<br>MQ<br>IMS DB<br>JCL Utilities<br>Complex data formats<br>Various dataset types<br>Advanced copybook structures |
 
+## Linting
+
+COBOL, copybook and JCL sources are checked by `scripts/cobol_lint.py`, a standard-library Python 3.10+ linter configured by `cobol-lint.json`. Run all checks, both the lint rules and a GnuCOBOL `cobc -fsyntax-only` check for the programs without EXEC CICS/SQL/DLI, with:
+
+```sh
+scripts/lint.sh
+```
+
+The command exits non-zero only on findings that are not in `cobol-lint-baseline.json`, the list of findings that existed when the linter was introduced. `python3 scripts/cobol_lint.py report` shows the counts per rule. To lint staged files before every commit, enable the hook with `git config core.hooksPath .githooks`. [docs/linting.md](docs/linting.md) describes every rule and threshold, the baseline, the hook and the `fix` formatter.
 ## Support
 
 For questions, issues, or improvement requests, please raise an issue in the repository with detailed information about your concern. The maintainers will respond according to availability.
+
+- AI coding agents: [AGENTS.md](./AGENTS.md) covers setup, commands, the repository map, conventions and the definition of done
+- Reference: [Generated inventory](./docs/inventory.md) of programs, transactions, mapsets, JCL jobs and copybooks
+- Operations: [Runbooks](./docs/runbooks/README.md) for batch restart, CICS files, daily rejects and the authorization purge
+- Security: [Secrets and credentials](./docs/security/secrets.md) and [Data handling (PII and cardholder data)](./docs/security/data-handling.md)
+- Report security vulnerabilities through the [AWS vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/), not in a public issue
 
 ## Roadmap
 
