@@ -64,13 +64,41 @@ Know these limits before you put CardDemo anywhere other than a private test reg
 
 | Location | What it contains | Action |
 | :------- | :--------------- | :----- |
-| `app/jcl/FTPJCL.JCL` | In-stream FTP `SYSIN` with a server address, an FTP user ID and a password for the original demo site | Treat as a sample. Replace the values for your site and move the user ID and password out of the JCL, for example into a z/OS FTP `NETRC` data set protected by RACF, before you submit it. Never commit your own values. |
+| `app/jcl/FTPJCL.JCL` | The placeholder FTP host `MY.FTP.SERVER.COM` on the first `SYSIN` line and a `NETRC` DD (`&SYSUID..NETRC`). No user ID or password. | Replace the host with your server. Keep the login in your `NETRC` data set; see [FTP credentials for FTPJCL](#ftp-credentials-for-ftpjcl). Never commit your own host or login. |
 | `scripts/run_full_batch.sh`, `scripts/run_posting.sh`, `scripts/run_interest_calc.sh`, `scripts/remote_compile.sh`, `scripts/remote_refresh.sh`, `scripts/remote_submit.sh`, `scripts/upld_module.sh` | `tnftp localhost 2121` through an SSH tunnel to the mainframe. No credentials in the scripts. | `tnftp` reads the login from the operator's `~/.netrc`. Keep that file outside the repository with mode `0600`. `.netrc` is listed in `.gitignore`. |
 | `samples/m2/mf/CardDemo_runtime.zip` (`app_config.json`) | Two `secret-manager-arn` references that include an AWS account ID | Not secrets, but they identify the original account. Point them at secrets in your own account when you deploy the sample. |
 
 A scan of the tracked sources, JCL, scripts and both runtime archives found no access keys,
-tokens or private keys. The only credential values are the demo passwords and the FTP
-sample above.
+tokens or private keys. The only credential values in the current tree are the demo
+sign-on passwords. Earlier revisions of `FTPJCL.JCL` in git history carried an in-stream
+server address, FTP user ID and password for the original demo site. If those values were
+ever valid for a server you run, rotate them.
+
+## FTP credentials for FTPJCL
+
+`FTPJCL` runs the z/OS FTP client in batch (`PGM=FTP`). The client takes the host from the
+first `SYSIN` line and the user ID and password from the data set on the `NETRC` DD, so
+the JCL holds no login. Set this up once for each user ID that submits the job (your TSO
+user ID or the scheduler's ID):
+
+1. Allocate `userid.NETRC` as a sequential data set, `RECFM=FB`, `LRECL=80`, one track.
+   A PDS member also works if you change the `NETRC` DD to name it.
+2. Add one line for the server. The keywords must be lower case, and the data set must
+   not contain comments:
+
+   ```text
+   machine MY.FTP.SERVER.COM login userid password pw
+   ```
+
+   Use your real host, user ID and password. The `machine` value must match the host on
+   the first `SYSIN` line of the job exactly.
+3. Protect the data set so only its owner can read it, for example with
+   `ADDSD 'userid.NETRC' UACC(NONE)`.
+4. Change `MY.FTP.SERVER.COM` in `FTPJCL.JCL` to the same host, submit the job, and check
+   that the job log shows a successful login before the `PUT`.
+
+To pass the host as a parameter instead, uncomment the `PARM` line in the job, add a comma
+after `REGION=2048K` on the `EXEC` statement and delete the host line from `SYSIN`.
 
 ## Local environment files
 
