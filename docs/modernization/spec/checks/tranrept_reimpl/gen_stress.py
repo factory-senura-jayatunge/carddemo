@@ -11,6 +11,10 @@ tranfile.txt (the sorted TRANFILE) and dateparm.txt:
   case-lastout   the last record is out of range (no totals at all)
   case-empty     empty TRANFILE
   case-reversed  start date after end date
+  case-blankdates  empty TRANFILE with blank DATEPARM dates (the blank work
+                 record is in range, so the end-of-file totals are written)
+  case-blankcard the first record has a blank card number (no card break, no
+                 cross-reference read before the first detail)
   case-badcat    a category missing from TRANCATG (abend after some lines)
   case-badcard   a card missing from CARDXREF (abend)
 """
@@ -92,6 +96,8 @@ def main() -> None:
     write_case(out, "case-lastout", allin[:-1] + [with_ts(allin[-1], "2021-12-31")], parm)
     write_case(out, "case-empty", [], parm)
     write_case(out, "case-reversed", allin[:20], "2022-06-30 2022-03-01")
+    write_case(out, "case-blankdates", [], " " * 21 + "*")
+    write_case(out, "case-blankcard", [allin[0][:262] + " " * 16 + allin[0][278:]] + allin[:12], parm)
     bad = list(allin[:60])
     bad[45] = bad[45][:16] + "01" + "0099" + bad[45][22:]
     write_case(out, "case-badcat", bad, parm)

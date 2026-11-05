@@ -79,7 +79,7 @@ Column numbers are 1-based. Every line is 133 characters; the parts not listed a
 | :-- | :-- |
 | Name header | 1-38 `DALYREPT`; 39-79 `Daily Transaction Report`; 80-91 `Date Range: `; 92-101 start date; 102-105 ` to `; 106-115 end date |
 | Blank | 133 spaces |
-| Column header | 1-17 `Transaction ID`; 18-29 `Account ID`; 30-48 `Transaction Type`; 49-83 `Tran Category`; 84-97 `Tran Source`; 98 space; 99-114 `        Amount` (8 spaces + `Amount`) |
+| Column header | 1-17 `Transaction ID`; 18-29 `Account ID`; 30-48 `Transaction Type`; 49-83 `Tran Category`; 84-97 `Tran Source`; 98 space; 99-114 `        Amount` (8 spaces + `Amount` in a 16-character field, so `Amount` is in columns 107-112 and columns 113-114 are spaces) |
 | Rule | 133 hyphens `-` |
 | Detail | 1-16 `TRAN-ID`; 17 space; 18-28 account ID (11 digits); 29 space; 30-31 type code; 32 `-`; 33-47 type description (first 15 characters); 48 space; 49-52 category code (4 digits); 53 `-`; 54-82 category description (first 29 characters); 83 space; 84-93 `TRAN-SOURCE`; 94-97 spaces; 98-112 amount, edit pattern `-ZZZ,ZZZ,ZZZ.ZZ` (NUM-TRPT-002); 113-114 spaces |
 | Account total | 1-13 `Account Total`; 14-97 84 dots `.`; 98-112 amount, edit pattern `+ZZZ,ZZZ,ZZZ.ZZ` |
@@ -162,7 +162,7 @@ flowchart TD
 #### FLOW-TRPT-001 · Main loop and the range exit
 - **When:** each pass of the loop.
 - **Then:** the range test sits in the same sentence as the loop, and its "outside" branch is `NEXT SENTENCE`, which continues after the end of the whole loop. So an out-of-range record (or, at end of file, a last record that is out of range) ends the loop without displaying the record, without the end-of-file lines and without any total. The files are then closed normally and the return code is 0.
-- The test is applied to the work record **after** each read, including the read that hits end of file (the work record still holds the last transaction). An empty TRANFILE leaves the work record at its initial content (spaces locally), which is below any start date, so an empty input gives an empty report with no totals.
+- The test is applied to the work record **after** each read, including the read that hits end of file (the work record still holds the last transaction). An empty TRANFILE leaves the work record at its initial content. `TRAN-RECORD` (`CVTRA05Y`) has no `VALUE` clause, and locally it starts as binary zeros (X'00'), which compare below any start date, even a blank one; so an empty input gives an empty report with no totals and no end-of-file lines. On z/OS the initial content of storage without a `VALUE` is not defined by the language.
 - **Source:** `:170-207`
 - **Fidelity:** must-preserve (defect-decide, DEF-TRPT-001) · **Confidence:** runtime-verified (a record out of range in the middle of the file ends the report after the lines before it; a range that excludes the first record gives a 0-line report; an empty input gives a 0-line report)
 
@@ -189,7 +189,7 @@ flowchart TD
 - **Fidelity:** must-preserve · **Confidence:** runtime-verified
 
 #### BR-TRPT-004 · Card break ("Account Total")
-- **When:** a transaction in range has a `TRAN-CARD-NUM` different from the previous transaction's (the first transaction always differs, since the saved card starts as spaces).
+- **When:** a transaction in range has a `TRAN-CARD-NUM` different from the previous transaction's (the first transaction differs unless its card number is blank, since the saved card starts as spaces; a blank first card number skips the account total and the cross-reference lookup, so the detail line's account column comes from a cross-reference record that was never read: locally 11 binary-zero bytes X'00', runtime-verified).
 - **Then:** if a detail has already been printed, write the account total block: `Account Total` with the account total, then a rule; set the account total to 0; the line counter goes up by 2. Then remember the card and look it up (BR-TRPT-007). This happens before the page check of BR-TRPT-005 for the new card's first detail.
 - The total is per **card**, labelled "Account Total": an account with two cards gets two totals, and the account number on the detail lines is the card's account (DEF-TRPT-004).
 - **Source:** `:181-188, 307-317`
