@@ -1499,6 +1499,7 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("--staged", action="store_true", help="lint the files staged in git (pre-commit mode)")
         sp.add_argument("--allow-missing-cobc", action="store_true", help="warn instead of failing when cobc is absent")
         sp.add_argument("--quiet", action="store_true", help="print only the summary")
+        sp.add_argument("--quiet-clean", action="store_true", help="print nothing when there are no new findings")
     sp = sub.add_parser("fix")
     sp.add_argument("paths", nargs="+", help="files to normalise in place")
     sp.add_argument("--check", action="store_true", help="report what would change; exit 1 if anything would")
@@ -1597,6 +1598,10 @@ def main(argv: list[str] | None = None) -> int:
     use_baseline = not args.no_baseline
     stale = apply_baseline(findings, load_baseline(cfg)) if use_baseline else 0
     findings.sort(key=lambda f: (f.path, f.line, f.rule))
+    if args.quiet_clean and not any(not f.baselined for f in findings) and not (problem and not args.allow_missing_cobc):
+        if problem:
+            print(f"warning: {problem}", file=sys.stderr)
+        return 0
     if not args.quiet:
         for f in findings:
             if not f.baselined:
