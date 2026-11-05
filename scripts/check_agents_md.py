@@ -37,7 +37,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-AGENTS_MD = ROOT / "AGENTS.md"
 SKILLS_GLOB = ".factory/skills/*/SKILL.md"
 SHELL_FENCES = {"", "sh", "bash", "shell", "console"}
 INTERPRETERS = {"python3": "python", "python": "python", "sh": "sh", "bash": "sh"}
@@ -143,8 +142,10 @@ def looks_like_path(token: str, dotfiles: bool = False) -> bool:
 
 
 class Checker:
-    def __init__(self) -> None:
-        self.makefile = (ROOT / "Makefile").read_text()
+    def __init__(self, root: Path = ROOT) -> None:
+        self.root = root.resolve()
+        self.agents_md = self.root / "AGENTS.md"
+        self.makefile = (self.root / "Makefile").read_text()
         self.targets = make_targets(self.makefile)
         self.errors: list[str] = []
         self.counts = {"commands": 0, "paths": 0, "links": 0}
@@ -161,8 +162,8 @@ class Checker:
 
     # -- documents -------------------------------------------------------
     def check_doc(self, doc: Path) -> None:
-        rel = doc.relative_to(ROOT).as_posix() if doc.is_relative_to(ROOT) else str(doc)
-        is_agents = doc == AGENTS_MD
+        rel = doc.relative_to(self.root).as_posix() if doc.is_relative_to(self.root) else str(doc)
+        is_agents = doc == self.agents_md
         for lineno, kind, text in scan(doc.read_text()):
             where = f"{rel}:{lineno}"
             if kind == "link":
@@ -218,7 +219,7 @@ class Checker:
         if problems:
             return problems
         env = {k: v for k, v in os.environ.items() if k not in ("MAKEFLAGS", "MAKELEVEL", "MFLAGS")}
-        proc = subprocess.run(["make", "-n", *args], cwd=ROOT, env=env,
+        proc = subprocess.run(["make", "-n", *args], cwd=self.root, env=env,
                               capture_output=True, text=True, timeout=60)
         cmd = "make -n " + shlex.join(args)
         if proc.returncode != 0:
@@ -257,13 +258,13 @@ class Checker:
     def help_text(self, path: Path, sub: list[str]) -> tuple[int, str]:
         key = (path, *sub)
         if key not in self._help:
-            proc = subprocess.run([sys.executable, str(path), *sub, "--help"], cwd=ROOT,
+            proc = subprocess.run([sys.executable, str(path), *sub, "--help"], cwd=self.root,
                                   capture_output=True, text=True, timeout=60)
             self._help[key] = (proc.returncode, proc.stdout + proc.stderr)
         return self._help[key]
 
     def arg_problems(self, path: Path, sub: list[str], args: list[str]) -> list[str]:
-        rel = path.relative_to(ROOT).as_posix()
+        rel = path.relative_to(self.root).as_posix()
         shown = " ".join([rel, *sub, "--help"])
         rc, text = self.help_text(path, sub)
         if rc != 0:
@@ -302,43 +303,43 @@ class Checker:
     def tree(self) -> list[str]:
         if self._tree is None:
             entries = []
-            for dirpath, dirnames, filenames in os.walk(ROOT):
+            for dirpath, dirnames, filenames in os.walk(self.root):
                 dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-                base = Path(dirpath).relative_to(ROOT).as_posix()
+                base = Path(dirpath).relative_to(self.root).as_posix()
                 for name in dirnames + filenames:
                     entries.append(name if base == "." else f"{base}/{name}")
             self._tree = entries
         return self._tree
 
     def resolve(self, name: str) -> Path | None:
-        if (ROOT / name).is_file():
-            return ROOT / name
+        if (self.root / name).is_file():
+            return self.root / name
         if "/" not in name:
-            hits = [e for e in self.tree() if e.endswith("/" + name) and (ROOT / e).is_file()]
+            hits = [e for e in self.tree() if e.endswith("/" + name) and (self.root / e).is_file()]
             if len(hits) == 1:
-                return ROOT / hits[0]
+                return self.root / hits[0]
         return None
 
     def exists(self, rel: str) -> bool:
         pattern = re.sub(r"<[^>]*>", "*", rel).rstrip("/")
         want_dir = rel.endswith("/")
         top = pattern.split("/", 1)[0]
-        if "*" in top or not (ROOT / top).exists():
+        if "*" in top or not (self.root / top).exists():
             # A bare name or a path relative to a directory named in the text
             # (e.g. `unit/cobol/` under tests/): it must exist somewhere.
             hits = [e for e in self.tree()
                     if fnmatch.fnmatchcase(e, pattern) or fnmatch.fnmatchcase(e, "*/" + pattern)]
+        elif "*" in pattern:
+            hits = [p.relative_to(self.root).as_posix() for p in self.root.glob(pattern)]
         else:
-            hits = [p.relative_to(ROOT).as_posix() for p in ROOT.glob(pattern)] if "*" in pattern \
-                else ([pattern] if (ROOT / pattern).exists() else [])
-        return any((ROOT / h).is_dir() for h in hits) if want_dir else bool(hits)
+            hits = [pattern] if (self.root / pattern).exists() else []
+        return any((self.root / h).is_dir() for h in hits) if want_dir else bool(hits)
 
-    @staticmethod
-    def git_ignored(rel: str) -> bool:
+    def git_ignored(self, rel: str) -> bool:
         concrete = re.sub(r"<[^>]*>", "x", rel)
         try:
             proc = subprocess.run(["git", "check-ignore", "-q", "--no-index", "--", concrete],
-                                  cwd=ROOT, capture_output=True, timeout=30)
+                                  cwd=self.root, capture_output=True, timeout=30)
         except OSError:
             return False
         return proc.returncode == 0
@@ -371,17 +372,19 @@ def main(argv: list[str] | None = None) -> int:
         description="Check that the commands and paths in AGENTS.md and the project skills exist.")
     parser.add_argument("files", nargs="*", type=Path,
                         help=f"Markdown files to check (default: AGENTS.md and {SKILLS_GLOB})")
+    parser.add_argument("--root", type=Path, default=ROOT,
+                        help="repository root (default: this script's repository)")
     args = parser.parse_args(argv)
 
     docs = [f if f.is_absolute() else Path.cwd() / f for f in args.files] or \
-        [AGENTS_MD, *sorted(ROOT.glob(SKILLS_GLOB))]
-    checker = Checker()
+        [args.root / "AGENTS.md", *sorted(args.root.glob(SKILLS_GLOB))]
+    checker = Checker(args.root)
     for doc in docs:
         if not doc.is_file():
             print(f"check_agents_md: {doc} does not exist", file=sys.stderr)
             return 2
         checker.check_doc(doc.resolve())
-    if AGENTS_MD in {d.resolve() for d in docs}:
+    if checker.agents_md in {d.resolve() for d in docs}:
         checker.check_targets_documented()
 
     for error in checker.errors:
