@@ -36,7 +36,8 @@ git config core.hooksPath .githooks
 | `make lint` | `scripts/lint.sh` (lint rules plus the cobc syntax check), then the linter's own tests. |
 | `make docs-check` | Fails when `docs/inventory.md` is stale. |
 | `make agents-md-check` | Checks the commands and paths in AGENTS.md and the skills. |
-| `make check` | lint, docs-check, agents-md-check, build and test, with a summary. This is the single gate. |
+| `make spec-check` | Checks the natural-language specs in `docs/modernization/spec/`: front matter and source hashes, item IDs, references, source citations and paragraph coverage. |
+| `make check` | lint, docs-check, agents-md-check, spec-check, build and test, with a summary. This is the single gate. |
 | `make package VERSION=v1.0.0` | Archives `build/release` into `dist/` with `SHA256SUMS`. |
 | `make changelog` | Regenerates `CHANGELOG.md` from the git history. |
 | `make clean` | Removes `build/` and `dist/`. |
@@ -53,6 +54,8 @@ python3 -m unittest discover -s scripts/tests
 python3 scripts/gen_inventory.py             # regenerate docs/inventory.md
 python3 scripts/gen_inventory.py --check     # what make docs-check runs
 python3 scripts/check_agents_md.py           # check the commands and paths in this file
+python3 docs/modernization/spec/tools/check_spec.py --program CBTRN02C   # one NL spec
+python3 docs/modernization/spec/tools/check_spec.py --inventory          # every in-scope source and its spec
 ```
 
 `scripts/lint.sh` and `scripts/cobol_lint.py check` exit 0 when there are no new findings, 1 when there are new findings, and 2 for a configuration error or a missing cobc.
@@ -87,6 +90,7 @@ A change is done when `make check` ends with `make check: OK`. It runs every ste
 | `tests/` | Test runner (`run_tests.py`), helpers (`support.py`), the independent model of expected results (`oracle.py`), paragraph coverage (`paracov.py`), `unit/` (including COBOL drivers in `unit/cobol/`) and `integration/`. |
 | `scripts/` | `cobol_lint.py` and `lint.sh` with their tests in `scripts/tests/`, `gen_inventory.py`, `check_agents_md.py`. The older `remote_*.sh`, `run_*.sh` and `upld_module.sh` drive a real mainframe through an FTP tunnel and do not run locally; `local_compile.sh`, `git-addSrcVersionInfo.sh`, `pad.awk` and `markers/` are legacy helpers that the local build does not use. |
 | `docs/` | [Inventory](docs/inventory.md), [linting](docs/linting.md), [runbooks](docs/runbooks/README.md), [security](docs/security/secrets.md). |
+| `docs/modernization/spec/` | The [natural-language specification](docs/modernization/spec/README.md) of every program and job for the modernization: [format](docs/modernization/spec/format.md), program and job specs, entity catalog, component map, interaction view, area proposals, evidence and the checker `docs/modernization/spec/tools/check_spec.py`. A spec whose source changed fails `make spec-check` until it is re-checked and its `sha256` updated. |
 | `.github/workflows/` | `ci.yml` (jobs lint, docs-check, build-and-test), `release.yml` (`v*` tags), `label-sync.yml`, `agents-md.yml`. |
 | `.factory/skills/` | Step-by-step procedures for common tasks (listed below). |
 | `modernization/` | The modernized stack, in progress: local infrastructure (Docker Compose) and its own make targets. See [modernization/README.md](modernization/README.md). |

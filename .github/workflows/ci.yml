@@ -46,6 +46,8 @@ jobs:
         run: make docs-check
       - name: make agents-md-check (AGENTS.md and skills name existing commands and paths)
         run: make agents-md-check
+      - name: make spec-check (NL specs, front matter, IDs, citations, paragraph coverage)
+        run: make spec-check
 
   build-and-test:
     name: build-and-test
