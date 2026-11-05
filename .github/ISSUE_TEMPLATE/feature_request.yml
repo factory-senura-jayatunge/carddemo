@@ -1,0 +1,62 @@
+name: Feature request
+description: Suggest a new scenario, module or improvement for CardDemo.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CardDemo exists to exercise mainframe analysis, migration and modernization tooling.
+        Requests that add realistic COBOL, CICS, VSAM, Db2, IMS, MQ or JCL patterns fit best.
+        See the Roadmap section in the README before proposing something new.
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - Base application (CICS online, VSAM, batch)
+        - "Optional: Transaction Type Management with Db2 (app-transaction-type-db2)"
+        - "Optional: Pending Authorizations with IMS, Db2 and MQ (app-authorization-ims-db2-mq)"
+        - "Optional: Account Extractions with MQ and VSAM (app-vsam-mq)"
+        - Data export/import (CBEXPORT, CBIMPORT)
+        - Scheduler definitions (CA7, Control-M)
+        - Sample data
+        - Scripts, build or CI tooling
+        - Documentation
+        - New optional module
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or scenario
+      description: What modernization or testing scenario is missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Programs, copybooks, maps, JCL, CSD definitions or data that would be added or changed.
+    validations:
+      required: true
+  - type: input
+    id: affected
+    attributes:
+      label: Affected programs, copybooks or jobs
+      placeholder: "COACTUPC, CVACT01Y, ACCTFILE"
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request for this.
+          required: false
