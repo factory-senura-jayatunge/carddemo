@@ -642,8 +642,8 @@ None of these were changed in this branch: `COCRDSLC.cbl`, its BMS and symbolic 
 - **Confidence:** reviewed
 
 #### DEF-CRDV-002 · [security] No sign-on or ownership check
-- The program accepts a start without a commarea (typing `CCDL`) and shows the search screen instead of sending the user to sign-on. It never looks at `CDEMO-USER-ID` or `CDEMO-USER-TYPE`, and it does not restrict the card to the user's own accounts. Any terminal user who knows a card number sees the cardholder name, status and expiry.
-- **Source:** `:268-272, 349-356`
+- The program accepts a start without a commarea (typing `CCDL`) and shows the search screen instead of sending the user to sign-on. It never looks at `CDEMO-USER-ID` or `CDEMO-USER-TYPE`, and it does not restrict the card to the user's own accounts. Any terminal user who knows a card number sees the cardholder name, status and expiry. PF3 then transfers to the main menu `COMEN01C`, because the fresh commarea names no calling program (`:309-334`); that commarea has a blank user ID and user type `U` (DEF-CRDV-004), and the menu accepts it, so the main menu is reached without a sign-on. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
+- **Source:** `:268-272, 349-356`, `:305-334`; `app/cbl/COMEN01C.cbl:82-91`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDV-002)
 - **Confidence:** reviewed
@@ -656,7 +656,7 @@ None of these were changed in this branch: `COCRDSLC.cbl`, its BMS and symbolic 
 - **Confidence:** reviewed; working-storage initial content platform-inferred
 
 #### DEF-CRDV-004 · PF3 forces the user type to "regular user"
-- PF3 sets `CDEMO-USER-TYPE` to `U` whatever it was. An administrator who reached this screen would continue as a regular user. (The card list does the same before it calls this program.)
+- PF3 sets `CDEMO-USER-TYPE` to `U` whatever it was. An administrator who reached this screen would continue as a regular user. (The card list does the same before it calls this program.) The same overwrite is recorded from the session side in DEF-SGN-012 and PINV-a-signon-admin-01.
 - **Source:** `:326`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDV-003)
