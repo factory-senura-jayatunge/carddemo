@@ -64,9 +64,9 @@ The program reads the first 17 bytes of one SYSIN record into `PRM-INFO` (`:98-1
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | 1-2 | `P-EXPIRY-DAYS` | `9(02)` | `00` | expiry days (BR-AUPG-002) | 5 when the two characters are not numeric |
 | 3 | separator | `X` | `,` | ignored | |
-| 4-8 | `P-CHKP-FREQ` | `X(05)` | `00001` | checkpoint frequency (BR-AUPG-005) | `5    ` when spaces, `00000` or low-values |
+| 4-8 | `P-CHKP-FREQ` | `X(05)` | `00001` | checkpoint frequency (BR-AUPG-005) | `5    ` when spaces, `0    ` or low-values (`00000` is kept) |
 | 9 | separator | `X` | `,` | ignored | |
-| 10-14 | `P-CHKP-DIS-FREQ` | `X(05)` | `00001` | display a checkpoint line every this many checkpoints | `10   ` when spaces, `00000` or low-values |
+| 10-14 | `P-CHKP-DIS-FREQ` | `X(05)` | `00001` | display a checkpoint line every this many checkpoints | `10   ` when spaces, `0    ` or low-values (`00000` is kept) |
 | 15 | separator | `X` | `,` | ignored | |
 | 16 | `P-DEBUG-FLAG` | `X(01)` | `Y` | `Y` prints a debug line per read and delete | any value other than `Y` becomes `N` |
 | 17 | filler | `X` | space | ignored | |
@@ -209,7 +209,7 @@ The program validates only its parameter record.
 
 #### FLOW-AUPG-001 · Parameter record and defaults
 - **When:** at start.
-- **Then:** read one record from SYSIN. `P-EXPIRY-DAYS` is used when it is numeric (00-99), else 5. `P-CHKP-FREQ` becomes `5` when it is spaces, `00000` or low-values; `P-CHKP-DIS-FREQ` becomes `10` in the same cases (both left-aligned text, NUM-AUPG-002). `P-DEBUG-FLAG` other than `Y` becomes `N`. No value is rejected: non-numeric frequencies are kept and compared as text.
+- **Then:** read one record from SYSIN. `P-EXPIRY-DAYS` is used when it is numeric (00-99), else 5. `P-CHKP-FREQ` becomes `5` when it is spaces, `0    ` (a single `0` followed by spaces) or low-values; `P-CHKP-DIS-FREQ` becomes `10` in the same cases (both left-aligned text, NUM-AUPG-002). The test compares the `X(05)` field with the numeric literal `0`, which is compared as the text `0` padded with spaces, so `00000` is not defaulted: the counter is always greater than `00000` as text, so a checkpoint is taken after every summary, and a display frequency of `00000` prints `CHKP SUCCESS` after every checkpoint (runtime-verified on GnuCOBOL, `docs/modernization/spec/evidence/e-review.md`). `P-DEBUG-FLAG` other than `Y` becomes `N`. No value is rejected: non-numeric frequencies are kept and compared as text.
 - **Source:** `:189, 196-209`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -289,7 +289,7 @@ flowchart LR
 
 #### NUM-AUPG-001 · Dates
 - Today: `ACCEPT CURRENT-YYDDD FROM DAY`, `9(05)`, `YYDDD` with a 2-digit year (`:187`). Detail date: `PA-AUTH-DATE-9C` `S9(05) COMP-3` holding `99999 - YYDDD` (written by COPAUA0C NUM-AUTH-005); recovered into `WS-AUTH-DATE 9(05)` (`:280`).
-- The age is stored in `WS-DAY-DIFF S9(4) COMP`; every age reachable within a century (-1,000 to +1,000 around a year end) fits. Run on 2025-01-01 (25001) for a detail of 2024-12-31 (24366): age 25001 - 24366 = 635; of 2024-12-30: 636.
+- The age is stored in `WS-DAY-DIFF S9(4) COMP`. Differences from -9999 to +9999 fit. Larger ones (a detail 10 or more years old, or a century change) are cut to 4 digits under the z/OS option TRUNC(STD) (10050 becomes 50, -99364 becomes -9364) or wrap at the halfword under TRUNC(BIN) (-99364 becomes +31708); both behaviours runtime-verified on GnuCOBOL (`-fbinary-truncate` and default `-std=ibm`), the z/OS option in use is platform-inferred. Run on 2025-01-01 (25001) for a detail of 2024-12-31 (24366): age 25001 - 24366 = 635; of 2024-12-30: 636.
 - **Source:** `:44-47, 187, 280-282`
 
 #### NUM-AUPG-002 · Frequencies are compared as text
@@ -324,8 +324,8 @@ flowchart LR
 - **Source:** `:286-293` (no `REPL` anywhere in the program) · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-002) · **Confidence:** reviewed (confirms `authorization-purge.md:54-55`)
 
 #### DEF-AUPG-004 · Year-end age error
-- BR-AUPG-001 subtracts `YYDDD` numbers. On 1 January a detail from late December is about 636 "days" old and is purged whatever the expiry days (up to 99). Ages are correct within a calendar year. At a century change (`99xxx` to `00xxx`) the age becomes negative and nothing is purged.
-- **Source:** `:187, 280-284` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-006) · **Confidence:** reviewed (confirms `authorization-purge.md:57-59`)
+- BR-AUPG-001 subtracts `YYDDD` numbers. On 1 January a detail from late December is about 636 "days" old and is purged whatever the expiry days (up to 99). Ages are correct within a calendar year. On any day of a new year every detail of the previous year is at least 635 "days" old. At a century change (`99xxx` to `00xxx`) the age of a detail from the previous century is about -99,000: under TRUNC(STD) it becomes a negative 4-digit value and those details are never purged; under TRUNC(BIN) it wraps to a large positive value and they are purged (NUM-AUPG-001). Details of the new century are aged normally.
+- **Source:** `:47, 187, 280-284` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-006) · **Confidence:** reviewed (confirms `authorization-purge.md:57-59`); century change platform-inferred
 
 #### DEF-AUPG-005 · Frequencies compared as text
 - See NUM-AUPG-002: `P-CHKP-FREQ` and `P-CHKP-DIS-FREQ` are `X(05)` compared with numeric counters, so `00001` means every 1,000 summaries and the defaults mean almost never. A long run therefore holds its locks and uncommitted deletes for up to 1,000 summaries (or the whole run with the defaults).
@@ -340,16 +340,16 @@ flowchart LR
 - **Source:** `:160-165, 352-356` · **Status:** open · **Confidence:** platform-inferred (Q-AUPG-003)
 
 #### DEF-AUPG-008 · [security] Debug output and account numbers
-- The shipped debug flag `Y` prints the account number before every delete and in every checkpoint and error line. Account numbers are customer data (`docs/security/data-handling.md`). No card numbers are printed.
-- **Source:** `:306-308, 331-333, 362-363` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-009)
+- The shipped debug flag `Y` prints the account number before every delete. Independently of the flag, every checkpoint line (`CHKP SUCCESS`, `CHKP FAILED`) and every error line prints it too, so turning debug off does not remove all account numbers. Account numbers are customer data (`docs/security/data-handling.md`). No card numbers are printed.
+- **Source:** `:268, 306-308, 319, 331-333, 344, 362-363, 366-368` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-009)
 
 #### DEF-AUPG-009 · Purge ignores match status and fraud flags
 - Only the age decides. A detail matched with a posted transaction (`M`), a declined one (`D`) and one flagged as fraud (`F`, with a row in ENT-AUTH-FRAUD) are purged the same way. The status value `E` ("pending expired", ENT-AUTH-DETAIL) exists but is never set; expired details are deleted instead.
 - **Source:** `:280-296` · **Status:** open · **Fidelity:** defect-decide (Q-AUPG-005)
 
 #### DEF-AUPG-010 · Dead error flag and unused fields
-- `WS-ERR-FLG` is tested in the main loop but never set, so the loop ends only at end of database or by ERR-AUPG-006. `CURRENT-DATE`, `WS-TOT-REC-WRITTEN`, `IDX`, `IMS-RETURN-CODE` and its conditions, `PSB-NAME`, the PCB masks and the checkpoint counter `WK-CHKPT-ID-CTR` are declared but have no effect.
-- **Source:** `:59-61, 75-95, 142` · **Status:** open (incidental)
+- `WS-ERR-FLG` is tested in the main loop but never set, so the loop ends only at end of database or by ERR-AUPG-006. `CURRENT-DATE`, `IDX`, `WS-TOT-REC-WRITTEN`, `WS-INFILE-STATUS`, `WS-CUSTID-STATUS` and its `END-OF-FILE` condition, `IMS-RETURN-CODE` and its conditions, `WS-IMS-PSB-SCHD-FLG`, `PSB-NAME`, the PCB masks and the checkpoint counter `WK-CHKPT-ID-CTR` are declared but have no effect.
+- **Source:** `:43, 48, 53, 59-61, 71-95, 128-129, 142` · **Status:** open (incidental)
 
 ## 14. Open questions
 
@@ -361,7 +361,7 @@ flowchart LR
 | Q-AUPG-004 | Is the summary `DLET` accepted after intervening `GNP` and `DLET` calls on the same PCB, or does IMS require the summary to be retrieved again first? | mainframe team |
 | Q-AUPG-005 | Should matched, declined or fraud-flagged authorizations be purged by age like the others, or marked expired (`E`) (DEF-AUPG-009)? | business |
 | Q-AUPG-006 | Should the age be a true day count (DEF-AUPG-004)? | business |
-| Q-AUPG-007 | Should the checkpoint and display frequencies be compared as numbers, so `00001` means every summary and the defaults mean every 5 and every 10 (DEF-AUPG-005)? | operations |
+| Q-AUPG-007 | Should the checkpoint and display frequencies be compared as numbers? With the checkpoint test `>` (`:160`) and the counter reset to 0, `00001` would then mean every 2 summaries and the default every 6, unless the test becomes `>=`; the display test is already `>=` (`:360`), so its default would mean every 10 (DEF-AUPG-005). | operations |
 | Q-AUPG-008 | Should an IMS error end the step with an abend and a backout to the last checkpoint instead of return code 16 with everything committed (DEF-AUPG-006)? | operations |
 | Q-AUPG-009 | Should the debug output (on in the shipped card) stop printing account numbers, or be off in production (DEF-AUPG-008)? | security, operations |
 

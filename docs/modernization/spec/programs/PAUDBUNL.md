@@ -121,7 +121,8 @@ flowchart TD
 #### BR-PDUL-003 · Detail records with parent key
 - **When:** after a written summary.
 - **Then:** `GNP PAUTDTL1` until `GE`; for each detail write `OUTFIL2` = the summary's `PA-ACCT-ID` (packed, 6 bytes, set before the details are read) + the 200-byte detail image (SE-PDUL-002). Details come in key order, newest first (COPAUA0C NUM-AUTH-005). At `GE` print `CHILD SEG FLAG GE : Y`.
-- **Source:** `:228-230, 253-284`
+- **Note:** `ROOT-SEG-KEY` is in the FD record area and is set only once per summary; the 2nd and later details of a summary rely on the record area keeping its content after `WRITE` (DEF-PDUL-005, platform-inferred).
+- **Source:** `:45-48, 228-230, 253-284`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 ## 8. Validations and messages
@@ -179,14 +180,14 @@ flowchart LR
 ## 12. Numeric, date and format details
 
 #### NUM-PDUL-001 · Parent key in the detail record
-- `ROOT-SEG-KEY` is `S9(11) COMP-3` (6 bytes), the same format as `PA-ACCT-ID` and the database key `ACCNTID` (`DBPAUTP0.dbd:30`), so PAUDBLOD can use it unchanged in a qualified SSA. It is initialized to zero and then set from `PA-ACCT-ID` for each written summary.
-- **Source:** `:47, 228-230`
+- `ROOT-SEG-KEY` is `S9(11) COMP-3` (6 bytes), the same format as `PA-ACCT-ID` and the database key `ACCNTID` (`DBPAUTP0.dbd:30`), so PAUDBLOD can use it unchanged in a qualified SSA. It is initialized to zero and then set from `PA-ACCT-ID` for each summary read, before the `IS NUMERIC` test (`:232`), so also for skipped summaries. It lives in the FD record area (DEF-PDUL-005).
+- **Source:** `:45-48, 228-232`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 ## 13. Known defects and oddities
 
 #### DEF-PDUL-001 · Write status not checked
-- Neither `WRITE` is followed by a status test; a full or failing output file is noticed only at close (ERR-PDUL-003), with return code 0.
+- Neither `WRITE` is followed by a status test. A write failure is not detected by the program; it is reported only if the `CLOSE` also fails (ERR-PDUL-003), and the step ends with return code 0. On z/OS an out-of-space condition can instead end in status `34` or an `Sx37` abend (platform-inferred).
 - **Source:** `:233, 271` · **Status:** open · **Fidelity:** defect-decide (Q-PDUL-001) · **Confidence:** reviewed
 
 #### DEF-PDUL-002 · Skipped summaries are not reported
@@ -196,6 +197,10 @@ flowchart LR
 #### DEF-PDUL-003 · Errors leave catalogued partial files
 - ERR-PDUL-004 and ERR-PDUL-003 end the step normally, so the new data sets are catalogued even when incomplete; only the return code (16, or 0 for close errors) tells the operator.
 - **Source:** `:296, 303, 308-314`, `UNLDPADB.JCL:49, 54` · **Status:** open · **Fidelity:** defect-decide (Q-PDUL-001) · **Confidence:** reviewed (dispositions: platform-inferred)
+
+#### DEF-PDUL-005 · Parent key depends on the record area after WRITE
+- `ROOT-SEG-KEY` is part of the FD record `OPFIL2-REC` (`:45-48`). It is set once per summary (`:228-230`); each detail then moves only `CHILD-SEG-REC` (`:270`) before `WRITE OPFIL2-REC` (`:271`). Under the COBOL rules a record released by `WRITE` is no longer available in the record area (there is no `SAME RECORD AREA` and no working-storage copy). With blocked QSAM output (`RECFM=FB`, `BLKSIZE=0`, `UNLDPADB.JCL:53-56`) the record area can move to the next buffer slot, so the 2nd and later details of a summary can carry an undefined parent key, which PAUDBLOD then skips (non-numeric key) or does not find. GnuCOBOL keeps the record area, so a local run does not show this.
+- **Source:** `:45-48, 228-230, 270-271` · **Status:** open · **Fidelity:** defect-decide (Q-PDUL-003) · **Confidence:** platform-inferred
 
 #### DEF-PDUL-004 · Counters never printed; dead fields
 - The read counters are incremented (detail reads added to the summary counters, `:268-269`) but never displayed. `PRM-INFO` (its `ACCEPT` is commented out), `CURRENT-YYDDD`, the checkpoint ID and the other work fields are unused; the abend text and `WS-PGMNAME` say `IMSUNLOD`.
@@ -207,6 +212,7 @@ flowchart LR
 | :-- | :-- | :-- |
 | Q-PDUL-001 | Should write and close errors and IMS errors make the step fail (abend, so that `DISP=(NEW,CATLG,DELETE)` deletes the partial files) (DEF-PDUL-001, DEF-PDUL-003)? | operations |
 | Q-PDUL-002 | Should summaries with an invalid account ID be reported or unloaded (DEF-PDUL-002)? | operations |
+| Q-PDUL-003 | Does the production unload write the correct account key on every detail record, that is, does the compiled program keep the record area after `WRITE` (DEF-PDUL-005)? | mainframe team |
 
 ## 15. Equivalence contract
 
@@ -230,7 +236,7 @@ Not runnable locally (IMS). Scenario check on the sample data (22 roots, 202 det
 | `1000-EXIT` | 203-204 | FLOW-PDUL-001 |
 | `2000-FIND-NEXT-AUTH-SUMMARY` | 207-247 | BR-PDUL-001, BR-PDUL-002, ERR-PDUL-002 |
 | `2000-EXIT` | 248-249 | BR-PDUL-001 |
-| `3000-FIND-NEXT-AUTH-DTL` | 253-284 | BR-PDUL-003, SE-PDUL-002, ERR-PDUL-002 |
+| `3000-FIND-NEXT-AUTH-DTL` | 253-284 | BR-PDUL-003, SE-PDUL-002, ERR-PDUL-002, DEF-PDUL-005 |
 | `3000-EXIT` | 285-286 | BR-PDUL-003 |
 | `4000-FILE-CLOSE` | 289-304 | FLOW-PDUL-001, ERR-PDUL-003 |
 | `4000-EXIT` | 305-306 | FLOW-PDUL-001 |

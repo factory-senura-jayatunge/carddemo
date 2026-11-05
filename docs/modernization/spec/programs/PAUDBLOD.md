@@ -153,7 +153,7 @@ The only check of the input is the numeric test of the parent key (BR-PDLD-003).
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### ERR-PDLD-002 · Read error
-- Status other than `00` or `10`: `ERROR READING ROOT SEG INFILE` (or `ERROR READING CHILD SEG INFILE`); the record is skipped and the next one is read. A read error that repeats on every `READ` never reaches end of file, so the loop does not end (DEF-PDLD-003).
+- Status other than `00` or `10`: `ERROR READING ROOT SEG INFILE` (or `ERROR READING CHILD SEG INFILE`); the record is skipped and the next one is read. After a permanent read error every further `READ` fails, end of file is never reached and the loop does not end (DEF-PDLD-003).
 - **Source:** `:231-237, 283-289`
 - **Fidelity:** must-preserve (skip); defect-decide (loop) · **Confidence:** reviewed (repeating status: platform-inferred)
 
@@ -201,8 +201,8 @@ flowchart LR
 - An `END-IF` is missing after the success branch of the `GU`: the test meant to report a failed `GU` (`ROOT GU CALL FAIL:`) is nested inside the success branch, where it tests the status of the detail insert instead. So a failed `GU` is never reported and the detail is lost without a message, and `ROOT GU CALL FAIL:` cannot be printed (an insert failure already ended the run in ERR-PDLD-003).
 - **Source:** `:305-314` · **Status:** open · **Fidelity:** defect-decide (Q-PDLD-002) · **Confidence:** reviewed
 
-#### DEF-PDLD-003 · A repeating read error loops forever
-- ERR-PDLD-002 only prints a message; if the file keeps returning the same error status, the loop never ends and prints the message without end.
+#### DEF-PDLD-003 · A permanent read error loops forever
+- ERR-PDLD-002 only prints a message. After an unsuccessful `READ` that is not end of file (status `3x` or `9x`), every further sequential `READ` fails (status `46`, no valid next record, on IBM and GnuCOBOL), so end of file is never reached, the loop never ends and the message is printed without end.
 - **Source:** `:226-237, 272-289` · **Status:** open · **Confidence:** platform-inferred
 
 #### DEF-PDLD-004 · No checkpoints; partial loads are committed
@@ -210,7 +210,7 @@ flowchart LR
 - **Source:** `:90-92, 360-366` · **Status:** open · **Fidelity:** defect-decide (Q-PDLD-003) · **Confidence:** reviewed (commit behaviour: platform-inferred)
 
 #### DEF-PDLD-005 · Console volume and dead code
-- Two asterisk lines and a status line are printed for every record (about 4 lines per detail). The counters, `PRM-INFO`, `CURRENT-YYDDD`, `ROOT-UNQUAL-SSA` for reads and `WS-PGMNAME` `IMSUNLOD` are unused; commented-out lines that add 2 to the detail key parts are left in the code (`:307-308`).
+- Two asterisk lines and a status line are printed for every record (about 4 lines per detail). The counters, `PRM-INFO`, `CURRENT-YYDDD`, `WS-PGMNAME` `IMSUNLOD` are unused; commented-out lines that add 2 to the detail key parts are left in the code (`:307-308`).
 - **Source:** `:53-92, 129-139, 248-252, 300-308` · **Status:** open (incidental)
 
 ## 14. Open questions

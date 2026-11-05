@@ -27,7 +27,7 @@ spec_status: draft
 
 ## 1. Summary
 
-UNLDPADB deletes the previous unload files and then runs PAUDBUNL in a DL/I batch region. The program writes every summary of `DBPAUTP0` as a 100-byte record to `AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO` and every detail, prefixed with its account key, as a 206-byte record to `AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO` (rules in the PAUDBUNL spec). These files are the input of LOADPADB. This spec covers the JCL: the delete step that fails when the files do not exist (DEF-JULPA-001), the new cataloged output files and their small space, and the batch region with DBRC off. It is run on demand.
+UNLDPADB deletes the previous unload files and then runs PAUDBUNL in a DL/I batch region. The program writes every summary of `DBPAUTP0` as a 100-byte record to `AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO` and every detail, prefixed with its account key (PAUDBUNL DEF-PDUL-005), as a 206-byte record to `AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO` (rules in the PAUDBUNL spec). These files are the input of LOADPADB. This spec covers the JCL: the delete step that fails when the files do not exist (DEF-JULPA-001), the new cataloged output files and their small space, and the batch region with DBRC off. It is run on demand.
 
 ## 2. Rules at a glance
 

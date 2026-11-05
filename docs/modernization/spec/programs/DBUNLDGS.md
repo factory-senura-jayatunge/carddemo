@@ -186,7 +186,7 @@ flowchart LR
 ## 13. Known defects and oddities
 
 #### DEF-DBUL-001 · Detail records have no parent key
-- The program fills `ROOT-SEG-KEY` and `CHILD-SEG-REC` of a 206-byte `OPFIL2-REC` (`:54-56, 237-239, 280`) but inserts the bare 200-byte segment, so the detail file cannot be related to its summary except by counting records in both files in order. The record layout differs from PAUDBUNL's detail file (ENT-AUTH-CHILD-FILE) and PAUDBLOD cannot load it.
+- The program fills `ROOT-SEG-KEY` and `CHILD-SEG-REC` of a 206-byte `OPFIL2-REC` (`:54-56, 237-239, 280`) but inserts the bare 200-byte segment, so the detail file cannot be related to its summary reliably: neither file says how many details belong to a summary, and the only clue, the summary's approved and declined counts, is not kept in step with the details (CBPAUP0C DEF-AUPG-003). The record layout differs from PAUDBUNL's detail file (ENT-AUTH-CHILD-FILE) and PAUDBLOD cannot load it.
 - **Source:** `:236-239, 280-282, 321-323` · **Status:** open · **Fidelity:** defect-decide (Q-DBUL-001) · **Confidence:** reviewed
 
 #### DEF-DBUL-002 · Skipped summaries are not reported
@@ -194,8 +194,8 @@ flowchart LR
 - **Source:** `:241-247` · **Status:** open · **Fidelity:** defect-decide (Q-DBUL-002) · **Confidence:** reviewed
 
 #### DEF-DBUL-003 · "ABENDING" is a normal end with return code 16
-- ERR-DBUL-004 does not abend, so the output data sets are kept with partial content; a restart must start from empty files.
-- **Source:** `:357-363` · **Status:** open · **Confidence:** reviewed
+- ERR-DBUL-004 does not abend, so the output data sets are kept with partial content. The GSAM PCBs are in load mode (`PROCOPT=LS`, `DLIGSAMP.PSB:21-22`) and the DDs are `DISP=(OLD,KEEP,KEEP)` (`UNLDGSAM.JCL:36-40`), so a rerun overwrites them from the beginning; the program has no checkpoint restart. Only the return code 16 shows that the content is incomplete.
+- **Source:** `:357-363` · **Status:** open · **Confidence:** platform-inferred
 
 #### DEF-DBUL-004 · Wrong text for detail GSAM errors
 - The detail insert error prints `GSAM PARENT FAIL :`, the same text as for the root file.
