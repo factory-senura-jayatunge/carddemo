@@ -39,7 +39,7 @@ spec_status: draft
 | ERR-JCTLM-001 | A job that ends not OK sets no condition; its successors wait, and no automatic action is defined. |
 | NUM-JCTLM-001 | Order date conditions, `TIMETO 23:00`, `MAXWAIT 7`, `MAXRERUN 5`, smart-folder interval 5 minutes. |
 | DEF-JCTLM-001 | No POSTTRAN; the daily backup empties the transaction master every day. |
-| DEF-JCTLM-002 | MNTTRDB2 and the monthly folder have no scheduling days. |
+| DEF-JCTLM-002 | MNTTRDB2 and the monthly folder have no scheduling days; MNTTRDB2 has no in-condition. |
 | DEF-JCTLM-003 | Two folders share one name, and the parent folder attributes point the wrong way. |
 | DEF-JCTLM-004 | Two smart folders consume and delete the same condition. |
 | DEF-JCTLM-005 | The weekly Db2 refresh never reloads the VSAM type and category files; DISCGRP waits for an unrelated Db2 job. |
@@ -113,7 +113,7 @@ flowchart TD
 - **Fidelity:** defect-decide (DEF-JCTLM-001) · **Confidence:** reviewed (definition); platform-inferred (ordering)
 
 #### FLOW-JCTLM-002 · Db2 transaction type maintenance
-- **When:** MNTTRDB2 is ordered. Its job has month flags but no `DAYS` attribute (`:27`), so it is not ordered automatically (DEF-JCTLM-002); an operator must order it.
+- **When:** MNTTRDB2 is ordered. Its job has month flags but no `DAYS` attribute (`:27`), so it is not ordered automatically (DEF-JCTLM-002); an operator must order it. It has no `INCOND` (`:27-31`), so once ordered it is submitted at once, with no CLOSEFIL or other job before it.
 - **Then:** MNTTRDB2 runs program `COBTUPDT` under the TSO terminal monitor against Db2, with input `INPFILE` (`app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:21-30`), and on success sets `WEEKLY-TransactionTypesDBRefresh-MNTTRDB2` (`:28`). It deletes no condition.
 - **Source:** `:26-31`, `app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:21-30`
 - **Fidelity:** incidental · **Confidence:** reviewed
@@ -186,8 +186,8 @@ None.
 - **Status:** open · **Fidelity:** defect-decide (Q-JCTLM-001, Q-JCTLM-004) · **Confidence:** reviewed
 
 #### DEF-JCTLM-002 · Jobs without scheduling days
-- MNTTRDB2 (`:27`) and the five jobs of `MONTHLY-InterestCalculation` (`:65, 69, 75, 81, 87`) have month flags but no `DAYS`, `WEEKDAYS`, `DAYSCAL` or rule-based calendar other than `"*"`. Control-M does not order such jobs at New Day, so the monthly interest calculation and the weekly Db2 maintenance run only when ordered by hand; the two Saturday smart folders then wait for an MNTTRDB2 condition that never appears.
-- **Source:** `:27, 65, 69, 75, 81, 87`
+- MNTTRDB2 (`:27`) and the five jobs of `MONTHLY-InterestCalculation` (`:65, 69, 75, 81, 87`) have month flags but no `DAYS`, `WEEKDAYS`, `DAYSCAL` or rule-based calendar other than `"*"`. Control-M does not order such jobs at New Day, so the monthly interest calculation and the weekly Db2 maintenance run only when ordered by hand; the two Saturday smart folders then wait for an MNTTRDB2 condition that never appears. MNTTRDB2 also has no `INCOND` (`:27-31`). The first CLOSEFIL of the daily and monthly folders has none either (`:4-7, 65-68`), but the daily one is ordered every day; MNTTRDB2, the head of the weekly chain, is tied neither to a day nor to the end of another job.
+- **Source:** `:27-31, 65, 69, 75, 81, 87`
 - **Status:** open · **Fidelity:** defect-decide (Q-JCTLM-002) · **Confidence:** reviewed (attributes); platform-inferred (ordering)
 
 #### DEF-JCTLM-003 · Duplicate folder name and inverted parent folders
