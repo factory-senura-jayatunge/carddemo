@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import TextIO
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -46,13 +47,15 @@ def render(results: Path, slowest: int = 10) -> str:
     return "\n".join(out) + "\n"
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str], out: TextIO | None = None) -> int:
+    out = out or sys.stdout
     results = Path(argv[0]) if argv else ROOT / "build" / "test-results"
     missing = [n for n in ("summary.json", "coverage.json", "timings.json") if not (results / n).exists()]
     if missing:
-        print(f"## Tests: no results\n\n{results} has no {', '.join(missing)}; the test step did not finish.")
+        print(f"## Tests: no results\n\n{results} has no {', '.join(missing)}; the test step did not finish.",
+              file=out)
         return 1
-    print(render(results), end="")
+    print(render(results), end="", file=out)
     return 0
 
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import sys
 import unittest
 from pathlib import Path
@@ -48,13 +49,13 @@ class CheckSummaryTest(unittest.TestCase):
         original = check.run_step
         check.run_step = fake
         try:
-            rc = check.main(["lint", "build", "test"])
+            rc = check.main(["lint", "build", "test"], out=io.StringIO())
         finally:
             check.run_step = original
         self.assertEqual((ran, rc), (["lint", "build", "test"], 1))
 
     def test_no_targets_is_a_usage_error(self):
-        self.assertEqual(check.main([]), 2)
+        self.assertEqual(check.main([], err=io.StringIO()), 2)
 
 
 if __name__ == "__main__":

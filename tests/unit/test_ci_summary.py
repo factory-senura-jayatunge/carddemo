@@ -1,7 +1,6 @@
 """tools/ci_summary.py: the CI job summary built from build/test-results."""
 from __future__ import annotations
 
-import contextlib
 import importlib.util
 import io
 import json
@@ -63,9 +62,10 @@ class CiSummaryTest(unittest.TestCase):
                 self.assertTrue(cs.render(self.dir).startswith(f"## Tests: {verdict}\n"))
 
     def test_missing_results_exit_1(self):
+        # A stream argument, not redirect_stdout: run_tests.py runs tests in
+        # threads, and swapping sys.stdout would capture other tests' output.
         buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            rc = cs.main([str(self.dir)])
+        rc = cs.main([str(self.dir)], out=buf)
         self.assertEqual(rc, 1)
         self.assertIn("no results", buf.getvalue())
 
