@@ -70,9 +70,16 @@
                COMPUTE WS-YYYYMMDD = WS-YYYY * 10000 + WS-MM * 100
                                    + WS-DD
       *        INTEGER-OF-DATE counts from 1601-01-01 = 1, which is
-      *        Lilian day 6654.
-               COMPUTE LS-LILIAN =
-                   FUNCTION INTEGER-OF-DATE(WS-YYYYMMDD) + 6653
+      *        Lilian day 6654. It rejects earlier years, so dates in
+      *        1582-1600 are shifted 400 years (146097 days) forward.
+               IF WS-YYYY < 1601
+                   COMPUTE LS-LILIAN =
+                       FUNCTION INTEGER-OF-DATE(WS-YYYYMMDD + 4000000)
+                       + 6653 - 146097
+               ELSE
+                   COMPUTE LS-LILIAN =
+                       FUNCTION INTEGER-OF-DATE(WS-YYYYMMDD) + 6653
+               END-IF
            ELSE
                MOVE 3 TO WS-TOKEN-SEV
                MOVE WS-MSG TO WS-TOKEN-MSG

@@ -67,6 +67,10 @@ name = "CBSTM03A"
 source = "app/cbl/CBSTM03A.CBL"
 type = "executable"
 description = "Account statements (plain text and HTML)"
+# CBSTM03A deliberately walks z/OS control blocks (PSA at address 0 -> TCB ->
+# TIOT) to list the step's DD names. That memory does not exist outside z/OS,
+# so the program compiles here but is not run; CBSTM03B is tested directly.
+not_runnable = "it reads z/OS control blocks (PSA/TCB/TIOT) starting at address 0"
 
 [[program]]
 name = "CBSTM03B"
@@ -241,6 +245,8 @@ lrecl = 350
 organization = "indexed"
 key = { offset = 0, length = 16 }
 
+# CREASTMT.JCL's sorted copy of TRANSACT (card number + transaction id key),
+# read by CBSTM03B as TRNXFILE.
 [dataset.TRXFL]
 lrecl = 350
 organization = "indexed"

@@ -228,7 +228,7 @@ def build_units(variant: str, module_ext: str, manifest: dict | None = None) -> 
     base = list(manifest["toolchain"]["cobc_flags"])
     for d in manifest["toolchain"]["copybook_dirs"]:
         base += ["-I", str(ROOT / d)]
-    program_flags = base + (["-ftraceall"] if variant == "trace" else [])
+    program_flags = base + (["-ftrace"] if variant == "trace" else [])
     units: list[Unit] = []
     for shim in manifest.get("shim", []):
         units.append(Unit(shim["name"], ROOT / shim["source"], "module",
@@ -406,12 +406,14 @@ class StepResult:
 class WorkDir:
     """A scratch directory holding the datasets for one or more chained jobs."""
 
-    def __init__(self, path: Path, variant: str = "release", trace_file: Path | None = None):
+    def __init__(self, path: Path, variant: str = "release", trace_file: Path | None = None,
+                 timeout: float | None = None):
         self.path = path
         self.variant = variant
         self.layout = layout(variant)
         self.datasets = datasets()
         self.trace_file = trace_file
+        self.timeout = timeout          # seconds per program run; None = no limit
 
     @classmethod
     def fresh(cls, path: Path, **kwargs) -> "WorkDir":
@@ -447,7 +449,7 @@ class WorkDir:
         env = self.base_env()
         env["DD_LSFILE"] = str(ls_path)
         env["DD_KSFILE"] = str(self.dataset_path(name))
-        proc = subprocess.run([str(exe), mode], cwd=self.path, env=env,
+        proc = subprocess.run([str(exe), mode], cwd=self.path, env=env, timeout=self.timeout,
                               capture_output=True, text=True, check=False)
         if proc.returncode != 0:
             raise CardDemoError(f"{mode} {name} failed (rc={proc.returncode}):\n{proc.stdout}{proc.stderr}")
@@ -476,7 +478,24 @@ class WorkDir:
                if not k.upper().startswith("DD_") and not k.startswith("COB_TRACE")
                and k != "COB_SET_TRACE"}
         env["COB_LIBRARY_PATH"] = str(self.layout.lib)
+        if not env.get("COB_CURRENT_DATE"):
+            current = business_date_setting()
+            if current:
+                env["COB_CURRENT_DATE"] = current
         return env
+
+    def add_trace_env(self, env: dict[str, str]) -> None:
+        """Send -ftrace output to a new file per program run.
+
+        libcob truncates COB_TRACE_FILE when a program starts, so runs that
+        shared one file would keep only the last program's trace.
+        """
+        if self.trace_file is None:
+            return
+        self._trace_runs = getattr(self, "_trace_runs", 0) + 1
+        path = self.trace_file.with_name(f"{self.trace_file.stem}-{self._trace_runs}{self.trace_file.suffix}")
+        env["COB_SET_TRACE"] = "Y"
+        env["COB_TRACE_FILE"] = str(path)
 
     def resolve_dd(self, job: Job) -> dict[str, tuple[Path, DD]]:
         paths = {}
@@ -510,9 +529,7 @@ class WorkDir:
         env = self.base_env()
         for ddname, (path, _) in dds.items():
             env[f"DD_{ddname}"] = str(path)
-        if self.trace_file is not None:
-            env["COB_SET_TRACE"] = "Y"
-            env["COB_TRACE_FILE"] = str(self.trace_file)
+        self.add_trace_env(env)
         if program["type"] == "module":
             cmd = [str(self.layout.bin / "PARMRUN"), job.program, job.parm or ""]
         else:
@@ -520,12 +537,9 @@ class WorkDir:
         if not Path(cmd[0]).exists():
             raise CardDemoError(f"{cmd[0]} is not built; run `make build`")
         start = time.monotonic()
-        proc = subprocess.run(cmd, cwd=self.path, env=env, input=job.sysin or "",
+        proc = subprocess.run(cmd, cwd=self.path, env=env, input=job.sysin or "", timeout=self.timeout,
                               capture_output=True, text=True, check=False)
         seconds = time.monotonic() - start
-        if self.trace_file is not None:
-            with open(self.trace_file, "a") as fh:
-                fh.write("")  # ensure the file exists even if nothing was traced
         outputs = {}
         for ddname, (path, dd) in dds.items():
             if dd.new and dd.new != "KSDS" and path.exists():
@@ -541,22 +555,55 @@ class WorkDir:
         for prior in job.after:
             res = self.run_chain(JOBS[prior])
             results += res
-            if res[-1].rc > JOBS[prior].max_rc:
+            if not step_ok(res[-1], JOBS[prior]):
                 return results
         results.append(self.run_job(job))
         return results
 
 
-def count_vb(path: Path) -> int:
-    """Count records in a GnuCOBOL variable-length sequential file (4-byte RDW-style header)."""
-    data, count, pos = path.read_bytes(), 0, 0
+DEFAULT_BUSINESS_DATE = "2022-07-06"
+
+
+def business_date_setting(value: str | None = None) -> str | None:
+    """COB_CURRENT_DATE value for CARDDEMO_BUSINESS_DATE ('now' = system clock).
+
+    The programs stamp records with FUNCTION CURRENT-DATE, and TRANREPT
+    selects transactions processed between 2022-01-01 and 2022-07-06, so a
+    fixed business date keeps local runs reproducible and inside that window.
+    """
+    if value is None:
+        value = os.environ.get("CARDDEMO_BUSINESS_DATE", DEFAULT_BUSINESS_DATE)
+    value = value.strip()
+    if value.lower() == "now":
+        return None
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2}))?", value)
+    if not m:
+        raise CardDemoError(f"CARDDEMO_BUSINESS_DATE must be YYYY-MM-DD[ HH:MM:SS] or 'now', got {value!r}")
+    y, mo, d, hh, mi, ss = m.groups()
+    return f"{y}/{mo}/{d} {hh or '12'}:{mi or '00'}:{ss or '00'}"
+
+
+def read_vb(path: Path) -> list[bytes]:
+    """Records of a GnuCOBOL variable-length sequential file.
+
+    With the default COB_VARSEQ_FORMAT each record is preceded by a 4-byte
+    header whose first two bytes hold the record length (big-endian), like a
+    z/OS RDW but without counting the header itself.
+    """
+    data, records, pos = path.read_bytes(), [], 0
     while pos + 4 <= len(data):
         length = int.from_bytes(data[pos:pos + 2], "big")
+        if pos + 4 + length > len(data):
+            break
+        records.append(data[pos + 4:pos + 4 + length])
         pos += 4 + length
-        count += 1
     if pos != len(data):
         raise CardDemoError(f"{path}: malformed variable-length file")
-    return count
+    return records
+
+
+def count_vb(path: Path) -> int:
+    return len(read_vb(path))
 
 
 def program_entry(name: str) -> dict:
@@ -577,15 +624,6 @@ def pre_tranrept(work: WorkDir) -> None:
     selected = [r for r in records if REPORT_START.encode() <= r[304:314] <= REPORT_END.encode()]
     selected.sort(key=lambda r: r[262:278])
     write_fixed(work.path / "TRANSACT.DALY.ps", selected, 350)
-
-
-def pre_creastmt(work: WorkDir) -> None:
-    """STEP010 SORT FIELDS=(263,16,CH,A,1,16,CH,A), OUTREC=(1:263,16,17:1,262,279:279,50);
-    STEP020 REPRO into the TRXFL KSDS (key = card number + transaction id)."""
-    records = work.unload_ksds("TRANSACT")
-    records.sort(key=lambda r: (r[262:278], r[0:16]))
-    rebuilt = [(r[262:278] + r[0:262] + r[278:328]).ljust(350, b" ") for r in records]
-    work.load_ksds("TRXFL", rebuilt)
 
 
 DATEPARM = f"{REPORT_START} {REPORT_END}"
@@ -631,14 +669,6 @@ JOBS: dict[str, Job] = {j.name: j for j in [
         "DATEPARM": DD(inline=DATEPARM, lrecl=80),
         "TRANREPT": DD(new="FB", lrecl=133),
     }, note="runs POSTTRAN first to create TRANSACT"),
-    Job("CREASTMT", "CBSTM03A", jcl="app/jcl/CREASTMT.JCL", after=("POSTTRAN",), pre=pre_creastmt, dd={
-        "TRNXFILE": DD(dataset="TRXFL"),
-        "XREFFILE": DD(dataset="CARDXREF"),
-        "ACCTFILE": DD(dataset="ACCTDATA"),
-        "CUSTFILE": DD(dataset="CUSTDATA"),
-        "STMTFILE": DD(new="FB", lrecl=80),
-        "HTMLFILE": DD(new="FB", lrecl=100),
-    }, note="runs POSTTRAN first to create TRANSACT"),
     Job("CBEXPORT", "CBEXPORT", jcl="app/jcl/CBEXPORT.jcl", after=("POSTTRAN",), dd={
         "CUSTFILE": DD(dataset="CUSTDATA"),
         "ACCTFILE": DD(dataset="ACCTDATA"),
@@ -655,7 +685,7 @@ JOBS: dict[str, Job] = {j.name: j for j in [
         "TRNXOUT": DD(new="FB", lrecl=350),
         "CARDOUT": DD(new="FB", lrecl=150),
         "ERROUT": DD(new="FB", lrecl=132),
-    }, note="runs CBEXPORT first; CARDOUT is not in CBIMPORT.jcl but the program opens it"),
+    }, note="runs CBEXPORT first"),
     Job("WAITSTEP", "COBSWAIT", jcl="app/jcl/WAITSTEP.jcl", sysin="00000050\n", dd={},
         note="SYSIN 00000050 (0.5 s); the JCL uses 00003600 (36 s)"),
 ]}
@@ -668,6 +698,9 @@ def find_job(name: str) -> Job:
     matches = [j for j in JOBS.values() if j.program == key]
     if len(matches) == 1:
         return matches[0]
+    for prog in load_manifest()["program"]:
+        if prog["name"] == key and prog.get("not_runnable"):
+            raise CardDemoError(f"{key} builds but cannot run locally: {prog['not_runnable']}")
     raise CardDemoError(f"no job for {name!r}; choose one of: "
                         + ", ".join(f"{j.name} ({j.program})" for j in JOBS.values()))
 
@@ -699,7 +732,7 @@ def cmd_run(args) -> int:
           + (f" (JCL {job.jcl})" if job.jcl else "") + (f" - {job.note}" if job.note else ""))
     print(f"== work directory {work.path}")
     results = work.run_chain(job)
-    worst = 0
+    failed = False
     for res in results:
         jdef = JOBS[res.job]
         print(f"\n---- {res.job} / {res.program} SYSOUT ----")
@@ -710,12 +743,20 @@ def cmd_run(args) -> int:
             print(f"  {ddname:<9} {count:>6} records  {path.name}")
         for line in SUMMARIES.get(res.job, lambda *_: [])(work, res):
             print(line)
-        if res.rc > jdef.max_rc:
-            worst = max(worst, res.rc)
+        if not step_ok(res, jdef):
+            failed = True
+            if res.rc < 0:
+                print(f"  {res.program} was killed by signal {-res.rc}")
     final = results[-1]
-    status = "OK" if worst == 0 and final.rc <= job.max_rc else "FAILED"
+    status = "FAILED" if failed or final.job != job.name else "OK"
     print(f"\nRESULT {status}: {final.program} RETURN-CODE={final.rc}")
-    return 0 if status == "OK" else (worst or final.rc or 1)
+    if status == "OK":
+        return 0
+    return final.rc if 0 < final.rc < 256 else 1
+
+
+def step_ok(res: StepResult, job: Job) -> bool:
+    return 0 <= res.rc <= job.max_rc
 
 
 def cmd_list(_args) -> int:
