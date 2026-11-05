@@ -1,0 +1,252 @@
+# Build and run manifest for the local GnuCOBOL toolchain.
+#
+# Every COBOL source under app/ must appear either as a [[program]] (built
+# locally) or in an [[exclude]] entry (with the reason it cannot build under
+# GnuCOBOL). tools/carddemo.py and tests/unit/test_manifest.py enforce this.
+
+[toolchain]
+cobc_version = "3.2"        # required GnuCOBOL major.minor; `make check-toolchain` enforces it
+python_min = "3.11"         # tomllib
+copybook_dirs = ["app/cpy"]
+# -std=ibm          IBM Enterprise COBOL dialect (binary truncation, reserved words)
+# -fsign=EBCDIC     the ASCII sample data keeps mainframe zoned-decimal overpunch
+#                   ('{' = +0, '}' = -0, 'A'..'I' / 'J'..'R'); GnuCOBOL's ASCII
+#                   default ('p'..'y') would misread every signed amount
+# -ftab-width=4     app/cpy/CUSTREC.cpy contains tab characters; at the default
+#                   width of 8 its PICTURE clauses run past column 72
+cobc_flags = ["-std=ibm", "-fsign=EBCDIC", "-ftab-width=4"]
+
+# ---------------------------------------------------------------------------
+# Programs built locally. type = "executable" (cobc -x) or "module" (cobc -m,
+# loaded through COB_LIBRARY_PATH by a dynamic CALL).
+# ---------------------------------------------------------------------------
+[[program]]
+name = "CBACT01C"
+source = "app/cbl/CBACT01C.cbl"
+type = "executable"
+description = "Read account master, write fixed, array and variable-length extracts"
+
+[[program]]
+name = "CBACT02C"
+source = "app/cbl/CBACT02C.cbl"
+type = "executable"
+description = "Read and print the card master"
+
+[[program]]
+name = "CBACT03C"
+source = "app/cbl/CBACT03C.cbl"
+type = "executable"
+description = "Read and print the card cross-reference"
+
+[[program]]
+name = "CBACT04C"
+source = "app/cbl/CBACT04C.cbl"
+type = "module"
+description = "Interest calculator; takes a JCL PARM, so it runs through the PARMRUN driver"
+
+[[program]]
+name = "CBCUS01C"
+source = "app/cbl/CBCUS01C.cbl"
+type = "executable"
+description = "Read and print the customer master"
+
+[[program]]
+name = "CBEXPORT"
+source = "app/cbl/CBEXPORT.cbl"
+type = "executable"
+description = "Export customers, accounts, xref, transactions and cards to one multi-record KSDS"
+
+[[program]]
+name = "CBIMPORT"
+source = "app/cbl/CBIMPORT.cbl"
+type = "executable"
+description = "Split the export KSDS back into normalized sequential files"
+
+[[program]]
+name = "CBSTM03A"
+source = "app/cbl/CBSTM03A.CBL"
+type = "executable"
+description = "Account statements (plain text and HTML)"
+
+[[program]]
+name = "CBSTM03B"
+source = "app/cbl/CBSTM03B.CBL"
+type = "module"
+description = "File-access subroutine CALLed by CBSTM03A"
+
+[[program]]
+name = "CBTRN01C"
+source = "app/cbl/CBTRN01C.cbl"
+type = "executable"
+description = "Validate daily transactions against the card/account files"
+
+[[program]]
+name = "CBTRN02C"
+source = "app/cbl/CBTRN02C.cbl"
+type = "executable"
+description = "Post daily transactions (POSTTRAN)"
+
+[[program]]
+name = "CBTRN03C"
+source = "app/cbl/CBTRN03C.cbl"
+type = "executable"
+description = "Transaction detail report (TRANREPT)"
+
+[[program]]
+name = "COBSWAIT"
+source = "app/cbl/COBSWAIT.cbl"
+type = "executable"
+description = "Wait step; SYSIN gives the delay in centiseconds"
+
+[[program]]
+name = "CSUTLDTC"
+source = "app/cbl/CSUTLDTC.cbl"
+type = "module"
+description = "Date validation subroutine (wraps LE CEEDAYS)"
+
+# ---------------------------------------------------------------------------
+# Local replacements for z/OS Language Environment and assembler routines the
+# batch programs CALL. They are not part of CardDemo and are only built here.
+# ---------------------------------------------------------------------------
+[[shim]]
+name = "CEE3ABD"
+source = "tools/shims/CEE3ABD.cbl"
+replaces = "LE callable service CEE3ABD (abnormal termination)"
+
+[[shim]]
+name = "CEEDAYS"
+source = "tools/shims/CEEDAYS.cbl"
+replaces = "LE callable service CEEDAYS (date to Lilian day number)"
+
+[[shim]]
+name = "COBDATFT"
+source = "tools/shims/COBDATFT.cbl"
+replaces = "app/asm/COBDATFT.asm (date format conversion)"
+
+[[shim]]
+name = "MVSWAIT"
+source = "tools/shims/MVSWAIT.cbl"
+replaces = "app/asm/MVSWAIT.asm (STIMER wait)"
+
+[[driver]]
+name = "PARMRUN"
+source = "tools/drivers/PARMRUN.cbl"
+purpose = "Pass a JCL PARM string (halfword length + text) to a program's PROCEDURE DIVISION USING"
+
+# ---------------------------------------------------------------------------
+# Sources that cannot build under GnuCOBOL. They need a CICS, Db2 or IMS
+# precompiler/translator and runtime (and MQ for the MQ programs).
+# ---------------------------------------------------------------------------
+[[exclude]]
+reason = "Online CICS program (EXEC CICS needs the CICS translator and a CICS region)"
+sources = [
+  "app/cbl/COACTUPC.cbl", "app/cbl/COACTVWC.cbl", "app/cbl/COADM01C.cbl",
+  "app/cbl/COBIL00C.cbl", "app/cbl/COCRDLIC.cbl", "app/cbl/COCRDSLC.cbl",
+  "app/cbl/COCRDUPC.cbl", "app/cbl/COMEN01C.cbl", "app/cbl/CORPT00C.cbl",
+  "app/cbl/COSGN00C.cbl", "app/cbl/COTRN00C.cbl", "app/cbl/COTRN01C.cbl",
+  "app/cbl/COTRN02C.cbl", "app/cbl/COUSR00C.cbl", "app/cbl/COUSR01C.cbl",
+  "app/cbl/COUSR02C.cbl", "app/cbl/COUSR03C.cbl",
+]
+
+[[exclude]]
+reason = "Optional IMS/Db2/MQ authorization module (EXEC CICS, EXEC SQL and DL/I calls need CICS, Db2 and IMS)"
+sources = [
+  "app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl",
+  "app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl",
+  "app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl",
+  "app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl",
+  "app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl",
+  "app/app-authorization-ims-db2-mq/cbl/DBUNLDGS.CBL",
+  "app/app-authorization-ims-db2-mq/cbl/PAUDBLOD.CBL",
+  "app/app-authorization-ims-db2-mq/cbl/PAUDBUNL.CBL",
+]
+
+[[exclude]]
+reason = "Optional Db2 transaction-type module (EXEC SQL needs the Db2 precompiler; online parts need CICS)"
+sources = [
+  "app/app-transaction-type-db2/cbl/COBTUPDT.cbl",
+  "app/app-transaction-type-db2/cbl/COTRTLIC.cbl",
+  "app/app-transaction-type-db2/cbl/COTRTUPC.cbl",
+]
+
+[[exclude]]
+reason = "Optional VSAM/MQ module (EXEC CICS plus IBM MQ API calls)"
+sources = [
+  "app/app-vsam-mq/cbl/COACCT01.cbl",
+  "app/app-vsam-mq/cbl/CODATE01.cbl",
+]
+
+# ---------------------------------------------------------------------------
+# Datasets. `source` is a file in CARDDEMO_DATA_DIR (default app/data/ASCII).
+# Offsets are 0-based, matching IDCAMS KEYS(length offset).
+# ---------------------------------------------------------------------------
+[dataset.ACCTDATA]
+source = "acctdata.txt"
+lrecl = 300
+organization = "indexed"
+key = { offset = 0, length = 11 }
+
+[dataset.CARDDATA]
+source = "carddata.txt"
+lrecl = 150
+organization = "indexed"
+key = { offset = 0, length = 16 }
+
+[dataset.CUSTDATA]
+source = "custdata.txt"
+lrecl = 500
+organization = "indexed"
+key = { offset = 0, length = 9 }
+
+[dataset.CARDXREF]
+source = "cardxref.txt"
+lrecl = 50
+organization = "indexed"
+key = { offset = 0, length = 16 }
+# AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX: KEYS(11,25) NONUNIQUEKEY
+alternate = [{ offset = 25, length = 11, duplicates = true }]
+
+[dataset.TCATBALF]
+source = "tcatbal.txt"
+lrecl = 50
+organization = "indexed"
+key = { offset = 0, length = 17 }
+
+[dataset.DISCGRP]
+source = "discgrp.txt"
+lrecl = 50
+organization = "indexed"
+key = { offset = 0, length = 16 }
+
+[dataset.TRANTYPE]
+source = "trantype.txt"
+lrecl = 60
+organization = "indexed"
+key = { offset = 0, length = 2 }
+
+[dataset.TRANCATG]
+source = "trancatg.txt"
+lrecl = 60
+organization = "indexed"
+key = { offset = 0, length = 6 }
+
+[dataset.DALYTRAN]
+source = "dailytran.txt"
+lrecl = 350
+organization = "sequential"
+
+# Created by jobs, not loaded from sample data.
+[dataset.TRANSACT]
+lrecl = 350
+organization = "indexed"
+key = { offset = 0, length = 16 }
+
+[dataset.TRXFL]
+lrecl = 350
+organization = "indexed"
+key = { offset = 0, length = 32 }
+
+[dataset.EXPORT]
+lrecl = 500
+organization = "indexed"
+key = { offset = 27, length = 4 }
