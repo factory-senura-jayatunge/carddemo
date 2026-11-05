@@ -118,7 +118,7 @@ One ENT-AUTH-ERROR-LOG record of 122 bytes per logged error (`CCPAUERY.cpy:19-40
 | ENT-AUTH-RESPONSE | - | yes | NUM-AUTH-003 |
 | ENT-AUTH-ERROR-LOG | - | yes | SE-AUTH-006 |
 
-Program-local data with behaviour: `WS-REQSTS-PROCESS-LIMIT` 500 (`:40`), `WS-MSG-PROCESSED` (`:42`), `WS-RESP-LENGTH PIC S9(4) VALUE 1`, the reply pointer (`:46`, DEF-AUTH-001), `WS-WAIT-INTERVAL` (`:60`), `WS-AVAILABLE-AMT S9(09)V99 COMP-3` (`:62`), `WS-TRANSACTION-AMT-AN X(13)` (`:63`), `WS-TRANSACTION-AMT`, `WS-APPROVED-AMT S9(10)V99` (`:64-65`), `WS-APPROVED-AMT-DIS PIC -zzzzzzzzz9.99` (`:66`), the flags of `WS-SWITCHES` (`:110-145`). Only `WS-MSG-LOOP-FLG`, `WS-MSG-AVAILABLE-FLG` and the two queue flags have initial values; the found/not-found flags, the decline flags and the record areas have none and are not reset between requests (DEF-AUTH-002, DEF-AUTH-003, DEF-AUTH-004). The decline reasons "card not active", "account closed", "card fraud" and "merchant fraud" (`:142-145`) are never set (DEF-AUTH-006).
+Program-local data with behaviour: `WS-REQSTS-PROCESS-LIMIT` 500 (`:40`), `WS-MSG-PROCESSED` (`:42`), `WS-RESP-LENGTH PIC S9(4) VALUE 1`, the reply pointer (`:46`, DEF-AUTH-001), `WS-WAIT-INTERVAL` (`:60`), `WS-AVAILABLE-AMT S9(09)V99 COMP-3` (`:62`), `WS-TRANSACTION-AMT-AN X(13)` (`:63`), `WS-TRANSACTION-AMT`, `WS-APPROVED-AMT S9(10)V99` (`:64-65`), `WS-APPROVED-AMT-DIS PIC -zzzzzzzzz9.99` (`:66`), the flags of `WS-SWITCHES` (`:110-145`). Only `WS-MSG-LOOP-FLG`, `WS-MSG-AVAILABLE-FLG` and the two queue flags have initial values; the others have none. Every request sets `APPROVE-AUTH`, `CARD-FOUND-XREF` and `FOUND-ACCT-IN-MSTR` (`:441-446`); `WS-PAUT-SMRY-SEG-FLG` (set only in 5500), `WS-CUST-MASTER-READ-FLG` (set only in 5300) and `WS-DECLINE-REASON-FLG` (never reset) carry over from earlier requests, as do the record areas (DEF-AUTH-002, DEF-AUTH-003, DEF-AUTH-004). The decline reasons "card not active", "account closed", "card fraud" and "merchant fraud" (`:142-145`) are never set (DEF-AUTH-006).
 
 ## 6. Processing flow
 
@@ -156,7 +156,7 @@ flowchart TD
 #### FLOW-AUTH-001 · Task start
 - **When:** the task starts.
 - **Then:** `RETRIEVE INTO(MQTM) NOHANDLE`; when it succeeds, the trigger's queue name becomes the request queue and the trigger data is kept (unused). The wait interval is set to 5000 ms. The queue is opened for shared input (`MQOO-INPUT-SHARED`) and the first request is read (SE-AUTH-001).
-- **Otherwise:** when `RETRIEVE` fails (the transaction was started without a trigger message), the queue name stays blank, `MQOPEN` fails and the task ends with error M001 (ERR-AUTH-002).
+- **Otherwise:** when `RETRIEVE` fails (the transaction was started without a trigger message), the queue name keeps its uninitialized content (no `VALUE`, `:43`), `MQOPEN` fails and the task ends with error M001 (ERR-AUTH-002).
 - **Source:** `:230-247, 255-284`
 - **Fidelity:** must-preserve (triggered start) · **Confidence:** platform-inferred
 
@@ -203,7 +203,7 @@ flowchart TD
 
 #### BR-AUTH-005 · Approve or decline
 - **When:** available credit was computed (BR-AUTH-004).
-- **Then:** if `WS-TRANSACTION-AMT > WS-AVAILABLE-AMT`: decline, reason flag "insufficient funds". Otherwise approve: an amount equal to the available credit is approved.
+- **Then:** if `WS-TRANSACTION-AMT > WS-AVAILABLE-AMT`: decline, reason flag "insufficient funds". Otherwise approve the full requested amount (BR-AUTH-006); the comparison is strict, so a requested amount equal to the available credit is approved.
 - **Also declined:** neither summary nor account found.
 - **Not checked:** card status, card expiry, account status, customer existence (except for the reason code), fraud, merchant, the processing code, duplicate requests (DEF-AUTH-006).
 - **Source:** `:665-683`
@@ -242,7 +242,7 @@ flowchart TD
   - no summary found (`GE`): `INITIALIZE PENDING-AUTH-SUMMARY REPLACING NUMERIC DATA BY ZERO`, then `PA-ACCT-ID = XREF-ACCT-ID`, `PA-CUST-ID = XREF-CUST-ID`. Text fields (`PA-AUTH-STATUS`, `PA-ACCOUNT-STATUS`) are not cleared by this form of `INITIALIZE` and keep whatever the work area held (DEF-AUTH-013);
   - always: `PA-CREDIT-LIMIT = ACCT-CREDIT-LIMIT`, `PA-CASH-LIMIT = ACCT-CASH-CREDIT-LIMIT` (ENT-ACCOUNT; from the work area even when the account was not found, DEF-AUTH-003);
   - approved: approved count + 1, approved amount + approved amount, `PA-CREDIT-BALANCE` + approved amount, `PA-CASH-BALANCE = 0`;
-  - declined: declined count + 1, declined amount + `PA-TRANSACTION-AMT`, which at this point still holds the previous request's amount (DEF-AUTH-004);
+  - declined: declined count + 1, declined amount + `PA-TRANSACTION-AMT`, which at this point still holds the amount of the last earlier request in the task whose card was found (DEF-AUTH-004);
   - write: `REPL` when the summary was found, `ISRT` when not (SE-AUTH-003).
 - **Source:** `:798-834`
 - **Fidelity:** must-preserve (counts and credit balance); defect-decide (DEF-AUTH-003, DEF-AUTH-004) · **Confidence:** reviewed
@@ -277,7 +277,7 @@ In execution order for one request. The MQ calls are outside the CICS unit of wo
 - **Confidence:** platform-inferred (command-level `REPL` after `GU` needs no hold form)
 
 #### SE-AUTH-004 · Detail insert
-- `ISRT` path call: `SEGMENT (PAUTSUM0) WHERE (ACCNTID = PA-ACCT-ID) SEGMENT (PAUTDTL1) FROM (PENDING-AUTH-DETAILS) SEGLENGTH (200)`.
+- `ISRT` of the child segment `PAUTDTL1` under the parent qualified by `SEGMENT (PAUTSUM0) WHERE (ACCNTID = PA-ACCT-ID)`, `FROM (PENDING-AUTH-DETAILS) SEGLENGTH (LENGTH OF PENDING-AUTH-DETAILS)` (= 200 bytes).
 - **Source:** `:911-920`
 - **Confidence:** platform-inferred
 
@@ -357,7 +357,7 @@ flowchart LR
 ```
 
 - **Upstream:** the requester and the MQ trigger (section 3). The base application's files are maintained by the base programs (accounts, customers, cross-reference).
-- **Downstream:** COPAUS0C and COPAUS1C show the summaries and details it writes; COPAUS1C and COPAUS2C mark details as fraud; CBPAUP0C deletes expired details and summaries (BR-AUPG-004). Nothing in the repository matches an authorization with a posted transaction (match status `M` is never set) or reduces `PA-CREDIT-BALANCE`.
+- **Downstream:** COPAUS0C and COPAUS1C show the summaries and details it writes; COPAUS1C and COPAUS2C mark details as fraud; CBPAUP0C deletes expired details and summaries (BR-AUPG-004). Nothing in the repository matches an authorization with a posted transaction (match status `M` is never set) or reduces `PA-CREDIT-BALANCE` (other than an approved negative amount, DEF-AUTH-007).
 - **Shared data:** `DBPAUTP0` is updated concurrently by COPAUS1C (fraud flag) and CBPAUP0C (deletes); IMS serializes the calls.
 - **No Db2.** Transaction `CP00` has no `DB2TRAN` entry.
 
@@ -368,8 +368,8 @@ flowchart LR
 - **Source:** `:62-65, 376-379, 814-821`, `CIPAUSMY.cpy:23-30`, `CIPAUDTY.cpy:34-35`
 
 #### NUM-AUTH-002 · Available credit arithmetic
-- `WS-AVAILABLE-AMT S9(09)V99 COMP-3` = limit - balance, exact; it can be negative (balance over limit), and then any positive amount is declined while a zero or negative amount is approved. The comparison is `WS-TRANSACTION-AMT > WS-AVAILABLE-AMT` with two decimals.
-- **Source:** `:665-679`
+- `WS-AVAILABLE-AMT S9(09)V99 COMP-3` (`:62`) = limit - balance. The operands are `S9(10)V99` in the account branch (ENT-ACCOUNT) and `S9(09)V99` in the summary branch (ENT-AUTH-SUMMARY); with no `ON SIZE ERROR`, a difference of 1,000,000,000.00 or more in absolute value loses its high-order digits. The result can be negative (balance over limit); then only amounts less than or equal to that negative value are approved, and every zero or positive amount is declined. The comparison is `WS-TRANSACTION-AMT > WS-AVAILABLE-AMT` with two decimals.
+- **Source:** `:62, 665-679`
 
 #### NUM-AUTH-003 · Reply format
 - `STRING ... DELIMITED BY SIZE INTO W02-PUT-BUFFER WITH POINTER WS-RESP-LENGTH` of: card number (16), `,`, transaction ID (15), `,`, authorization ID code (6), `,`, response code (2), `,`, reason (4), `,`, approved amount edited as `-zzzzzzzzz9.99` (14), `,`: 63 characters with a trailing comma. Text values keep trailing spaces. Amount examples: 50.00 → 9 spaces + `50.00`; declined 0 → 10 spaces + `0.00`; a negative approved amount has `-` in the first position.
@@ -403,11 +403,11 @@ flowchart LR
 - **Source:** `:535-547, 673-682, 801-811` · **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-AUTH-004 · Declined amount comes from the previous request
-- BR-AUTH-009 adds `PA-TRANSACTION-AMT` to the declined amount, but the detail area is filled for the current request only later, in 8500. The amount added is therefore the previous request's amount (or, for the first request of a task, whatever the uninitialized packed field holds; invalid packed data would raise a data exception and abend the task, platform-inferred). The detail itself stores the correct amount.
-- **Source:** `:819-821, 885` · **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+- BR-AUTH-009 adds `PA-TRANSACTION-AMT` to the declined amount, but the detail area is filled for the current request only later, in 8500, which runs only for requests whose card was found. The amount added is therefore the amount of the last earlier request in the task whose card was found, not necessarily the previous request (or, for the first request of a task, whatever the uninitialized packed field holds; invalid packed data would raise a data exception and abend the task, platform-inferred). The detail itself stores the correct amount.
+- **Source:** `:463-465, 819-821, 885` · **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-AUTH-005 · Available credit ignores the posted balance once a summary exists
-- With a summary, available credit = credit limit - `PA-CREDIT-BALANCE`, the running sum of approvals in IMS. Posted transactions and payments in ENT-ACCOUNT are ignored; without a summary the account's current balance is used. Nothing in the repository decreases `PA-CREDIT-BALANCE`: there is no matching with posted transactions, and the purge does not write its adjustments back (CBPAUP0C DEF-AUPG-003). So available credit only shrinks until the summary is deleted, and when the purge deletes it, the next request is checked against the account balance again.
+- With a summary, available credit = credit limit - `PA-CREDIT-BALANCE`, the running sum of approvals in IMS. Posted transactions and payments in ENT-ACCOUNT are ignored; without a summary the account's current balance is used. Nothing in the repository decreases `PA-CREDIT-BALANCE`, except an approved negative amount (DEF-AUTH-007): there is no matching with posted transactions, and the purge does not write its adjustments back (CBPAUP0C DEF-AUPG-003). So available credit only shrinks until the summary is deleted, and when the purge deletes it, the next request is checked against the account balance again.
 - **Source:** `:665-683, 817` · **Status:** open · **Fidelity:** defect-decide (Q-AUTH-003)
 
 #### DEF-AUTH-006 · Missing checks and unreachable reason codes
@@ -427,8 +427,8 @@ flowchart LR
 - **Source:** `:354-374` · **Status:** open · **Confidence:** reviewed
 
 #### DEF-AUTH-010 · Error log fields are stale
-- `ERROR-LOG-RECORD` is never initialized. M003, M004, I002 and I003 set the event key from `PA-CARD-NUM` of the detail area, which holds the previous request's card (or nothing for the first). M001, I001 and M005 do not set the event key at all, and I001 and the A/I errors do not set code 2, so values from an earlier error remain. M003 is tagged subsystem CICS although it is an MQ error.
-- **Source:** `:273-281, 311-315, 419-428, 777, 845, 966-974` · **Status:** open (incidental)
+- `ERROR-LOG-RECORD` is never initialized. M003, M004, I002 and I003 set the event key from `PA-CARD-NUM` of the detail area, which holds the card of the last earlier request whose detail was built (or uninitialized content for the first). M001, I001 and M005 do not set the event key at all; A001, A002 and A003 set neither code 1 nor code 2, and I001, I002 and I003 do not set code 2, so values from an earlier error remain. M003 is tagged subsystem CICS although it is an MQ error.
+- **Source:** `:273-281, 311-315, 419-428, 494-499, 541-546, 589-594, 638, 777, 845, 966-974` · **Status:** open (incidental)
 
 #### DEF-AUTH-011 · [security] Card numbers in logs and replies
 - The full card number is written in clear to the CSSL log (event key of A001, C001 and the stale keys of DEF-AUTH-010) and returned in every reply. Combined with DEF-AUTH-001 a reply discloses the card numbers of other requests. See `docs/security/data-handling.md`.
