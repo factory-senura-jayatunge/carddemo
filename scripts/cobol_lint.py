@@ -33,7 +33,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = ROOT / "cobol-lint.json"
 
 RULES = {
     # format (fixed-format physical layout)
@@ -49,6 +48,7 @@ RULES = {
     # structure
     "unresolved-copy": "COPY / EXEC SQL INCLUDE names a member that is not in the repository or the external list.",
     "unterminated-exec": "EXEC block without a matching END-EXEC.",
+    "duplicate-paragraph": "Paragraph or section name is defined more than once in a program.",
     "stop-run-in-cics": "STOP RUN in a CICS program; use EXEC CICS RETURN or GOBACK.",
     # naming
     "program-id-mismatch": "PROGRAM-ID differs from the source member name.",
@@ -104,7 +104,9 @@ FIGURATIVE = {
     "HIGH-VALUE", "HIGH-VALUES", "QUOTE", "QUOTES", "ALL", "NULL", "NULLS",
 }
 WORD_RE = re.compile(r"[A-Za-z0-9$#@_]+(?:-+[A-Za-z0-9$#@_]+)*")
-MARKER_RE = re.compile(r"\b(TODO|FIXME|XXX|HACK)\b")
+# XXX is also a PICTURE string ("PIC XXX") and a format mask, so it only counts as a
+# marker at the start of a comment or when followed by ':' or '('.
+MARKER_RE = re.compile(r"(?<![\w-])(TODO|FIXME|HACK)(?![\w-])|^\s*(XXX)(?![\w-])|(?<![\w-])(XXX)(?=\s*[:(])")
 
 
 class ConfigError(Exception):
@@ -444,6 +446,7 @@ class Scanner:
         self.names = para_names
         self.cfg = cfg
         self.info = ParaInfo()
+        self.ignore_unreachable = set(cfg["rules"].get("unreachable-code", {}).get("ignore_verbs", []))
 
     def w(self, k: int) -> str:
         if 0 <= k < len(self.items):
@@ -462,6 +465,10 @@ class Scanner:
                 info.inline_loops.append((e["k"], k, e["line"]))
 
         def pop_until(*kinds):
+            # A terminator with no matching open scope (END-STRING after a STRING that had
+            # no ON OVERFLOW phrase, for example) must not unwind the enclosing IFs.
+            if not any(e["kind"] in kinds for e in stack[1:]):
+                return
             while len(stack) > 1 and stack[-1]["kind"] not in kinds:
                 pop()
 
@@ -477,7 +484,7 @@ class Scanner:
         def stmt(line, verb):
             info.statements += 1
             top = stack[-1]
-            if top["term"] and not top["rep"]:
+            if top["term"] and not top["rep"] and verb not in self.ignore_unreachable:
                 info.unreachable.append((line, verb, top["tline"]))
                 top["rep"] = True
 
@@ -784,8 +791,7 @@ class Linter:
                     continue
             ident = line[72:80]
             if ident.strip():
-                straddles = line[71:72].strip() and ident[:1].strip()
-                if straddles or not re.fullmatch(r"[A-Za-z0-9@#$]{1,8} *", ident):
+                if not re.fullmatch(r"[A-Za-z0-9@#$]{1,8} *", ident):
                     self.add(src, ln, "text-past-column-72",
                              f"columns 73-80 hold {ident!r}; text there is ignored by the compiler")
 
@@ -861,11 +867,11 @@ class Linter:
 
     def marker(self, src: Source, ln: int, text: str) -> None:
         ref = re.compile(self.opt("tech-debt-marker", "reference_pattern", r"\((#\d+|[A-Z][A-Z0-9]+-\d+)\)"))
-        for mt in MARKER_RE.finditer(text.upper()):
-            self.metrics["markers"][mt.group(1)] += 1
+        for mt in MARKER_RE.finditer(text):
+            word = mt.group(1) or mt.group(2) or mt.group(3)
+            self.metrics["markers"][word] += 1
             if not ref.match(text[mt.end():]):
-                self.add(src, ln, "tech-debt-marker",
-                         f"{mt.group(1)} without an issue reference; write it as {mt.group(1)}(#123)")
+                self.add(src, ln, "tech-debt-marker", f"{word} without an issue reference; write it as {word}(#123)")
 
     # -- programs
     def para_infos(self, src: Source) -> list[tuple[Para, ParaInfo]]:
@@ -897,6 +903,16 @@ class Linter:
         if g_max and total > g_max:
             self.add(src, m.proc_start and m.toks[m.proc_start - 1].line, "program-complexity",
                      f"program cyclomatic complexity {total} (max {g_max})", fingerprint="file")
+        seen_names: dict[str, int] = {}
+        for p in m.paras:
+            if not p.name:
+                continue
+            key = (p.section if not p.is_section else None, p.name)
+            if key in seen_names:
+                self.add(src, p.line, "duplicate-paragraph",
+                         f"{p.name} is already defined at line {seen_names[key]}; PERFORM/GO TO {p.name} is ambiguous")
+            else:
+                seen_names[key] = p.line
         # STOP RUN in CICS
         if is_cics:
             for _, info in infos:
@@ -1098,13 +1114,10 @@ class Linter:
                 pid = src.cob.program_id
                 if pid and pid[0] != src.member:
                     self.add(src, pid[1], "program-id-mismatch", f"PROGRAM-ID {pid[0]} but the member is {src.member}")
-                cics = src.cob.has_exec("CICS")
-                if cics and not src.member.startswith(online):
-                    self.add(src, 1, "program-prefix", f"CICS program {src.member} should start with {online}", fingerprint="file")
-                if not cics and src.member.startswith(batch) is False:
-                    pass
-                if src.member.startswith(batch) and cics:
-                    self.add(src, 1, "program-prefix", f"{src.member} uses the batch prefix {batch} but contains EXEC CICS", fingerprint="file")
+                if src.cob.has_exec("CICS") and not src.member.startswith(online):
+                    hint = f" (the {batch} prefix is for batch programs)" if src.member.startswith(batch) else ""
+                    self.add(src, 1, "program-prefix",
+                             f"CICS program {src.member} should start with {online}{hint}", fingerprint="file")
                 paras = [p for p in src.cob.paras if p.name and not p.is_section]
                 for p in paras:
                     if "_" in p.name or len(p.name) > max_len:
@@ -1277,6 +1290,7 @@ def syntax_check(cfg: dict, linter: Linter, only: set[str] | None, allow_missing
         jobs.append((rel, cmd))
     line_re = re.compile(r"^(.*?):(\d+): (error|warning): (.*)$")
     findings: list[Finding] = []
+    seen: set[tuple[str, str, str, str]] = set()
 
     def run(job):
         rel, cmd = job
@@ -1287,7 +1301,6 @@ def syntax_check(cfg: dict, linter: Linter, only: set[str] | None, allow_missing
     with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as ex:
         for rel, rc, out in ex.map(run, jobs):
             errors = 0
-            seen = set()
             for raw in out.splitlines():
                 mt = line_re.match(raw)
                 if not mt:
@@ -1301,7 +1314,8 @@ def syntax_check(cfg: dict, linter: Linter, only: set[str] | None, allow_missing
                 errors += level == "error"
                 if not cfg["rules"].get(rule, {}).get("enabled", True):
                     continue
-                key = (frel, ln, msg)
+                # a copybook problem is reported once, not once per program that copies it
+                key = (frel, ln, level, msg)
                 if key in seen:
                     continue
                 seen.add(key)
@@ -1474,7 +1488,8 @@ def summarize(findings: list[Finding], baseline_used: bool) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cobol_lint.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--config", type=Path, default=CONFIG_PATH, help="config file (default: cobol-lint.json)")
+    ap.add_argument("--config", type=Path, default=None, help="config file (default: <root>/cobol-lint.json)")
+    ap.add_argument("--root", type=Path, default=None, help="repository root to lint (default: this script's repository)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("check", "lint", "syntax", "report"):
         sp = sub.add_parser(name)
@@ -1491,8 +1506,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("rules", help="list rules, severities and thresholds")
     args = ap.parse_args(argv)
 
+    global ROOT
+    if args.root is not None:
+        ROOT = args.root.resolve()
     try:
-        cfg = load_config(args.config)
+        cfg = load_config(args.config or ROOT / "cobol-lint.json")
     except ConfigError as e:
         print(f"cobol_lint: {e}", file=sys.stderr)
         return 2
