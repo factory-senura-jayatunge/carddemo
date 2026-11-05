@@ -263,7 +263,7 @@ Message catalog:
 
 | ID | Question | For |
 | :-- | :-- | :-- |
-| Q-DTFT-001 | Confirm on z/OS, with the production assembly and binder listing, the literal-pool layout and the actual result of a type 1 request with a dashed date and of an invalid request (bytes 14-38 of the message). Should the target reproduce the assembler (dashed type 1 accepted, message tail undefined) or the shim (dashed type 1 rejected, message padded with spaces)? | mainframe team, architecture |
+| Q-DTFT-001 | Confirm on z/OS, with the production assembly and binder listing, the literal-pool layout and the actual result of a type 1 request with a dashed date and of an invalid request (bytes 14-38 of the message). Should the target reproduce the assembler (dashed type 1 accepted, message tail undefined) or the shim (dashed type 1 rejected, message padded with spaces)? Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team, architecture |
 | Q-DTFT-002 | Is COBDATFT needed at all in the target? Its only caller removes two dashes from a date; a target can do this in place. | architecture |
 
 ## 15. Equivalence contract

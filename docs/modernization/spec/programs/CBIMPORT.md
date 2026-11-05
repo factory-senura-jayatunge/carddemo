@@ -656,7 +656,7 @@ flowchart LR
 | :-- | :-- | :-- |
 | Q-IMPT-001 | What should the import validate (checksums, record counts against the export, referential integrity, numeric validity)? Should `No validation errors detected` reflect the outcome? | business |
 | Q-IMPT-002 | Should unknown record types or failed error writes end the job with a non-zero return code (for example 4)? Today the run always ends with 0. | operations |
-| Q-IMPT-003 | On z/OS: does the export cluster's `KEYS(4 28)` make the OPEN fail (status 39) against the program's key at offset 27? What does `CEE3ABD` do when called with no arguments? Does opening a defined but never loaded export cluster fail? | mainframe team |
+| Q-IMPT-003 | On z/OS: does the export cluster's `KEYS(4 28)` make the OPEN fail (status 39) against the program's key at offset 27? What does `CEE3ABD` do when called with no arguments? Does opening a defined but never loaded export cluster fail? The modernized system does not depend on the answer (VSAM key offsets and z/OS control blocks do not carry over). Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
 | Q-IMPT-004 | Nothing loads the `*.IMPORT` datasets into VSAM. In the target, should the import write directly into the operational stores, and how should it handle records that already exist? | architecture |
 
 ## 15. Equivalence contract

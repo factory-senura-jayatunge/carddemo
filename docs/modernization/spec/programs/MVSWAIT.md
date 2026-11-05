@@ -185,8 +185,8 @@ None on data. The routine stores only into its own `BINLBL` and into the flag by
 
 | ID | Question | For |
 | :-- | :-- | :-- |
-| Q-MWAT-001 | Does any mainframe tooling (dump or trace analysis) rely on the X'FF' return flag that MVSWAIT sets in the caller's save area, or can it be dropped (DEF-MWAT-001)? | mainframe team |
-| Q-MWAT-002 | How is MVSWAIT bound in production (`RENT`, `AMODE`, `RMODE`, static or dynamic call from COBSWAIT)? | mainframe team |
+| Q-MWAT-001 | Does any mainframe tooling (dump or trace analysis) rely on the X'FF' return flag that MVSWAIT sets in the caller's save area, or can it be dropped (DEF-MWAT-001)? Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
+| Q-MWAT-002 | How is MVSWAIT bound in production (`RENT`, `AMODE`, `RMODE`, static or dynamic call from COBSWAIT)? Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
 
 ## 15. Equivalence contract
 

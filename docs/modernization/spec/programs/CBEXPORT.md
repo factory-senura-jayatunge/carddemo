@@ -520,7 +520,7 @@ flowchart LR
 | ID | Question | For |
 | :-- | :-- | :-- |
 | Q-EXPT-001 | Which program version produced the mainframe sample export (26-character timestamp `.000000`, sequence gap 451-459, 300 transactions)? Is that timestamp the intended format, so that the 4 undefined bytes and the dropped fraction (DEF-EXPT-003) should be fixed? | mainframe team |
-| Q-EXPT-002 | Confirm that the JCL as written fails the export open with status 39 (DEF-EXPT-002), and whether the fix is `KEYS(4 27)` in the JCL. CBIMPORT reads the same cluster. | mainframe team |
+| Q-EXPT-002 | Confirm that the JCL as written fails the export open with status 39 (DEF-EXPT-002), and whether the fix is `KEYS(4 27)` in the JCL. CBIMPORT reads the same cluster. The modernized system does not depend on the answer (VSAM key offsets and z/OS control blocks do not carry over). Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
 | Q-EXPT-003 | Should a migration export carry the SSN, government ID, date of birth, EFT account, full card number and CVV at all, and if so encrypted or tokenised? | business, security |
 | Q-EXPT-004 | What do branch `0001` and region `NORTH` mean for the target? Should the export be selected or grouped by branch or by customer? | business |
 | Q-EXPT-005 | Must the export run with the CICS files closed, to get a consistent snapshot? | operations |
