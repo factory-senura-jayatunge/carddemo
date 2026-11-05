@@ -40,9 +40,17 @@ class ReaderJobsTest(CardDemoTestCase):
         self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBCUS01C")], expected)
 
     def test_readacct_writes_the_three_extract_files(self):
-        _, (res,) = self.run_job("READACCT")
+        # Every sample account has a zero cycle debit; give some a non-zero one,
+        # next to zero ones, so both branches of the debit rule are exercised.
+        debits = {1: Decimal("123.45"), 2: Decimal("-67.89"), 5: Decimal("2525.01")}
+        raws = [r.encode("latin-1") for r in in_key_order("acctdata.txt", 11)]
+        raws = [oracle.set_fields(ACCOUNT, r, **{"ACCT-CURR-CYC-DEBIT": debits[i]}) if i in debits else r
+                for i, r in enumerate(raws)]
+        work = self.new_work()
+        work.load_ksds("ACCTDATA", raws)
+        _, (res,) = self.run_job("READACCT", work)
         self.assert_rc(res, 0)
-        accounts = [Record(ACCOUNT, r) for r in in_key_order("acctdata.txt", 11)]
+        accounts = [Record(ACCOUNT, r) for r in raws]
         out = carddemo.read_fixed(res.outputs["OUTFILE"][0], 107)
         arry = carddemo.read_fixed(res.outputs["ARRYFILE"][0], 110)
         vbrc = carddemo.read_vb(res.outputs["VBRCFILE"][0])
@@ -51,14 +59,16 @@ class ReaderJobsTest(CardDemoTestCase):
             with self.subTest(account=a.raw("ACCT-ID")):
                 o = out[i].decode("latin-1")
                 # OUT-ACCT-REC: id, status, balance, limits and dates copied; the reissue
-                # date converted by COBDATFT from YYYY-MM-DD to YYYYMMDD. The last two
-                # bytes of OUT-ACCT-REISSUE-DATE are never set by the conversion.
+                # date converted by COBDATFT from YYYY-MM-DD to YYYYMMDD, which leaves
+                # the last two bytes of the X(10) field blank.
                 self.assertEqual(o[:48], a.text[:48])
                 self.assertEqual(o[48:68], a.text[48:68])
-                self.assertEqual(o[68:76], a.raw("ACCT-REISSUE-DATE").replace("-", ""))
+                self.assertEqual(o[68:78], a.raw("ACCT-REISSUE-DATE").replace("-", "").ljust(10))
                 self.assertEqual(zoned(o[78:90], 2), a["ACCT-CURR-CYC-CREDIT"])
-                if a["ACCT-CURR-CYC-DEBIT"] == 0:
-                    self.assertEqual(oracle.unpack_comp3(out[i][90:97], 2), Decimal("2525.00"))
+                # The cycle debit is copied (COMP-3); a zero debit is replaced by 2525.00.
+                debit = a["ACCT-CURR-CYC-DEBIT"]
+                self.assertEqual(oracle.unpack_comp3(out[i][90:97], 2),
+                                 debit if debit != 0 else Decimal("2525.00"))
                 self.assertEqual(o[97:107], a.raw("ACCT-GROUP-ID").ljust(10))
 
                 r = arry[i]
