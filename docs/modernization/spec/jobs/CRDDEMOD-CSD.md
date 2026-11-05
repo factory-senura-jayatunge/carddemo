@@ -81,8 +81,8 @@ flowchart LR
 
 #### FLOW-JCSDD-003 · Db2 attachment
 - **When:** a CTLI or CTTU task issues its first SQL statement.
-- **Then:** the DB2TRAN for its transaction ID routes it to DB2ENTRY `CARDDEMO`, which uses plan `CARDDEMO` and signs on to Db2 with the CICS user ID of the task (`AUTHTYPE(USERID)`), so Db2 privileges are checked per user. `THREADLIMIT(1)` with `THREADWAIT(YES)`: one thread for both transactions; a second task waits until it is free. `PROTECTNUM(0)`: no thread is kept between tasks. `DROLLBACK(YES)`: when Db2 chooses the task as a deadlock victim, CICS rolls back its unit of work and returns SQLCODE -911.
-- The packages in plan `CARDDEMO` are bound in collection `CARDDEMO` (`samples/proc/BLDCIDB2.prc:144, 168-169`). A Db2 connection definition (DB2CONN) is not in this file (Q-JCSDD-001).
+- **Then:** the DB2TRAN for its transaction ID routes it to DB2ENTRY `CARDDEMO`, which uses plan `CARDDEMO` and signs on to Db2 with the CICS user ID of the task (`AUTHTYPE(USERID)`), so Db2 privileges are checked per user. `THREADLIMIT(1)` with `THREADWAIT(YES)`: one thread for both transactions; a second task waits until it is free. `PROTECTNUM(0)`: no protected threads, so a thread is not kept once no task is waiting for it. `DROLLBACK(YES)`: when Db2 chooses the task as a deadlock victim, CICS rolls back its unit of work and returns SQLCODE -911.
+- The packages in plan `CARDDEMO` are bound in collection `CARDDEMO` (`samples/proc/BLDCIDB2.prc:144, 168-169`; the plan name is set by `samples/jcl/CICDBCMP.jcl:42`, `SET PLAN=CARDDEMO`). A Db2 connection definition (DB2CONN) is not in this file (Q-JCSDD-001).
 - **Source:** `:45-60`
 - **Fidelity:** must-preserve (plan and authorisation) · **Confidence:** platform-inferred
 

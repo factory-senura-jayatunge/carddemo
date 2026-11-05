@@ -48,7 +48,7 @@ A one-time installation job for the transaction type module. It frees old Db2 pl
 
 - **Actor:** the installer (a Db2 administrator), once, when the module is installed (`app/app-transaction-type-db2/README.md` step 1). Not scheduled.
 - **Preconditions:** Db2 subsystem `DAZ1`; storage group `AWST1STG` (`:48-50`); the control members copied to `AWS.M2.CARDDEMO.CNTL` (`&LBNM..CNTL`, `:28-29`); DSNTIAD and DSNTEP4 bound (`:23-24`); the submitter can set `CURRENT SQLID` to `SYSADM` (`app/app-transaction-type-db2/ctl/DB2CREAT.ctl:15`).
-- **After it:** bind the module's programs (packages in collection `CARDDEMO` and plan `CARDDEMO`, as in `samples/proc/BLDCIDB2.prc:135-176`), define the CICS resources (CRDDEMOD-CSD job spec), run TRANEXTR.
+- **After it:** bind the module's programs (packages in collection `CARDDEMO` and plan `CARDDEMO`, as in `samples/proc/BLDCIDB2.prc:135-176` with the plan name from `samples/jcl/CICDBCMP.jcl:42`), define the CICS resources (CRDDEMOD-CSD job spec), run TRANEXTR.
 
 ## 4. Interfaces
 
@@ -155,8 +155,8 @@ In step order.
 
 #### ERR-JCRDB-002 · Step conditions
 - LDTTYPE and LDTCCAT have `COND=(0,NE)`: each is skipped when 0 is not equal to the return code of any earlier step, that is when any earlier step ended with a non-zero code. RUNTEP2 has no COND and always runs (unless the job abends).
-- Consequences: on a new installation FREEPLN ends with RC 8 (`:36-38`), so the categories are not loaded although the types are; on a rerun the type insert fails on duplicate keys (DSNTEP4 non-zero), so the categories are not loaded either. The categories are loaded only when FREEPLN and RUNTEP2 both end with 0.
-- **Source:** `:64-65, 77`
+- Consequences: FREEPLN also frees plan `COTRTLIC` and collection `COTRTLIC`, which no build creates (DEF-JCRDB-006), so it is expected to end with RC 8 on every run, not only on a new installation as the comment says (`:36-38`); then the categories are not loaded although the types are; on a rerun the type insert fails on duplicate keys (DSNTEP4 non-zero), so the categories are not loaded either. The categories are loaded only when FREEPLN and RUNTEP2 both end with 0, which in practice requires removing FREEPLN or the `COTRTLIC` lines. CRCRDDB and RUNTEP2 have no COND and run even when FREEPLN fails.
+- **Source:** `:64-65, 77`, `app/app-transaction-type-db2/ctl/DB2FREE.ctl:16-18`
 - **Confidence:** platform-inferred (z/OS COND semantics; the RC 8 is the job comment's statement)
 
 #### ERR-JCRDB-003 · Create errors do not stop the job
@@ -172,7 +172,7 @@ In step order.
 ## 11. Interactions
 
 - **Downstream:** COTRTLIC, COTRTUPC (CICS, plan `CARDDEMO`), COBTUPDT (MNTTRDB2) and TRANEXTR use the tables. The VSAM reference files ENT-TRAN-TYPE and ENT-TRAN-CATEGORY are separate and are not loaded from these tables by this job.
-- **Bind:** not in this job; `samples/proc/BLDCIDB2.prc:135-176` binds each program's package into collection `CARDDEMO` and plan `CARDDEMO` with `PKLIST(CARDDEMO.*)`.
+- **Bind:** not in this job; `samples/proc/BLDCIDB2.prc:135-176` (plan name `samples/jcl/CICDBCMP.jcl:42`) binds each program's package into collection `CARDDEMO` and plan `CARDDEMO` with `PKLIST(CARDDEMO.*)`.
 
 ## 12. Numeric, date and format details
 
@@ -187,7 +187,7 @@ In step order.
 - **Source:** `:2` · **Status:** open · **Fidelity:** incidental
 
 #### DEF-JCRDB-002 · Categories are skipped on a new installation
-- See ERR-JCRDB-002. The free step's expected RC 8 suppresses LDTCCAT; LDTTYPE (an empty IEFBR14 step under the "STEP 20" comment) shows that RUNTEP2 was probably meant to carry the condition, and RUNTEP2 has none.
+- See ERR-JCRDB-002. The free step's expected RC 8 (on every run, because of the `COTRTLIC` names) suppresses LDTCCAT; LDTTYPE (an empty IEFBR14 step under the "STEP 20" comment) shows that RUNTEP2 was probably meant to carry the condition, and RUNTEP2 has none.
 - **Source:** `:60-84` · **Status:** open · **Fidelity:** defect-decide
 
 #### DEF-JCRDB-003 · [security] Broad privileges
@@ -204,7 +204,7 @@ In step order.
 
 #### DEF-JCRDB-006 · The free step targets the wrong names
 - It frees plan `COTRTLIC`, which nothing uses (the CICS entry and MNTTRDB2 use `CARDDEMO`), and collection `COTRTLIC`, while the packages are in collection `CARDDEMO`. It also frees plan `CARDDEMO`, which this job does not re-create.
-- **Source:** `app/app-transaction-type-db2/ctl/DB2FREE.ctl:16-18`, `samples/proc/BLDCIDB2.prc:144, 168-169` · **Status:** open · **Confidence:** platform-inferred
+- **Source:** `app/app-transaction-type-db2/ctl/DB2FREE.ctl:16-18`, `samples/proc/BLDCIDB2.prc:144, 168-169` (plan name from `samples/jcl/CICDBCMP.jcl:42`, `SET PLAN=CARDDEMO`) · **Status:** open · **Confidence:** platform-inferred
 
 #### DEF-JCRDB-007 · Naming and hard-coding
 - The job name on the card is `CREADB2`, the member is `CREADB21` (`:1`). `JOBLIB` lists `OEM.DB2.DAZ1.SDSNLOAD` twice (`:32-33`). FREEPLN hard-codes `DAZ1` in `STEPLIB` instead of `&DB2S` (`:41`), and the control members hard-code `DSN SYSTEM(DAZ1)`. The step that runs DSNTEP4 is called `RUNTEP2` and its control member `DB2TEP41`.

@@ -113,13 +113,13 @@ flowchart TD
 - **When:** STEP40 runs.
 - **Then:** one 60-byte record per table row: `TR_TYPE` (2 bytes), then `TR_DESCRIPTION` cast to `CHAR(50)` (padded with spaces to 50), then `REPEAT('0',8)`, eight zero characters; the whole cast to `CHAR(60)`. Rows in `ORDER BY TR_TYPE` (EBCDIC byte order). This matches ENT-TRAN-TYPE (`TRAN-TYPE` X(2), `TRAN-TYPE-DESC` X(50), FILLER X(8), `app/cpy/CVTRA03Y.cpy:4-7`); the sample file has eight `0` characters in the FILLER too.
 - **Source:** `:65-91`
-- **Fidelity:** must-preserve · **Confidence:** reviewed
+- **Fidelity:** must-preserve · **Confidence:** reviewed; the 60-byte length is platform-inferred (if Db2 describes the expression as nullable, DSNTIAUL adds a 1-byte null indicator)
 
 #### BR-JTREX-002 · Category file layout
 - **When:** STEP50 runs.
 - **Then:** one 60-byte record per row: `TRC_TYPE_CODE` (2) + `TRC_TYPE_CATEGORY` (4) + `TRC_CAT_DATA` cast to `CHAR(50)` + `REPEAT('0',4)`, cast to `CHAR(60)`, in `ORDER BY TRC_TYPE_CODE, TRC_TYPE_CATEGORY`. This matches ENT-TRAN-CATEGORY (`app/cpy/CVTRA04Y.cpy:4-9`), whose `TRAN-CAT-CD` is `PIC 9(04)`; the Db2 column is `CHAR(4)` and nothing makes it numeric (the seed is all digits).
 - **Source:** `:95-122`
-- **Fidelity:** must-preserve · **Confidence:** reviewed
+- **Fidelity:** must-preserve · **Confidence:** reviewed; the 60-byte length is platform-inferred (DSNTIAUL null indicator, as BR-JTREX-001)
 
 ## 8. Validations
 
@@ -152,7 +152,7 @@ In step order.
 ## 10. Error handling
 
 #### ERR-JTREX-001 · Step conditions
-- STEP20, STEP30 and STEP40 have `COND=(0,NE)`: each is skipped when any earlier step ended with a non-zero code. STEP50 has `COND=(4,LT)`: it is skipped only when an earlier step ended above 4. So a warning (RC 4) from STEP40 still lets STEP50 run, while a warning in STEP10 or STEP20 stops the type unload.
+- STEP20, STEP30 and STEP40 have `COND=(0,NE)`: each is skipped when any earlier step ended with a non-zero code. STEP50 has `COND=(4,LT)`: it is skipped only when an earlier step ended above 4. So a warning (RC 4) from STEP40 still lets STEP50 run, while a warning in STEP10 or STEP20 stops the type unload. In that case STEP30 is bypassed but STEP50 still runs: it allocates `TRANCATG.PS` with `DISP=(NEW,CATLG,DELETE)` while the old file still exists, so it fails at allocation or catalog time (JCL error or NOT CATLG 2). An RC above 4 in STEP40 bypasses STEP50, leaving both files deleted.
 - **Source:** `:42, 53, 65, 95`
 - **Confidence:** platform-inferred
 

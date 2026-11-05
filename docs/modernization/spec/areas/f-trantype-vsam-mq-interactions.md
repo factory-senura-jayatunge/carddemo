@@ -13,9 +13,9 @@ Edges, CRUD rows and invariant proposals from the transaction type (Db2) module 
 | COTRTUPC | COADM01C | XCTL | ENT-COMMAREA after SYNCPOINT; PF3 (from-program is always blank, so `COADM01C`) | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:453-460` | FLOW-TTUP-003, SE-TTUP-005, DEF-TTUP-009 |
 | COTRTLIC | COTRTLIC (`CTLI`) | RETURN TRANSID | 2000-byte area: ENT-COMMAREA + 427-byte list state | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:910-914` | FLOW-TTLS-013 |
 | COTRTUPC | COTRTUPC (`CTTU`) | RETURN TRANSID | ENT-COMMAREA + program state (screen state, old and new type) | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:567-571` | FLOW-TTUP-010 |
-| COTRTLIC | DSNTIAC | CALL | EIB, commarea, SQLCA, 10 x 72 message area | COTRTLIC spec section 10 | DEF-TTLS-010 |
-| COTRTLIC | CARDDEMO.TRANSACTION_TYPE | DB2 | count, forward and backward cursors, UPDATE, DELETE | COTRTLIC spec section 9 | SE-TTLS-001 .. SE-TTLS-006 |
-| COTRTUPC | CARDDEMO.TRANSACTION_TYPE | DB2 | SELECT by code, UPDATE then INSERT, DELETE | COTRTUPC spec section 9 | SE-TTUP-001 .. SE-TTUP-004 |
+| COTRTLIC | DSNTIAC | CALL | EIB, commarea, SQLCA, 10 x 72 message area | `app/app-transaction-type-db2/cpy/CSDB2RPY.cpy:55-62` (included at `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:2055`) | DEF-TTLS-010 |
+| COTRTLIC | CARDDEMO.TRANSACTION_TYPE | DB2 | count, forward and backward cursors, UPDATE, DELETE | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:338-366, 1626-2034` | SE-TTLS-001 .. SE-TTLS-006 |
+| COTRTUPC | CARDDEMO.TRANSACTION_TYPE | DB2 | SELECT by code, UPDATE then INSERT, DELETE | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:1475-1637` | SE-TTUP-001 .. SE-TTUP-004 |
 | CARDDEMO.TRANSACTION_TYPE_CATEGORY | COTRTLIC, COTRTUPC, COBTUPDT | DB2 | foreign key `ON DELETE RESTRICT` refuses a type delete (-532) | `app/app-transaction-type-db2/ctl/DB2CREAT.ctl:96-99` | BR-TTLS-009, BR-TTUP-004, BR-TTBU-004 |
 | Control-M | MNTTRDB2 | scheduler | folder `WEEKLY-TransactionTypesDBRefresh` | `app/scheduler/CardDemo.controlm:26-31` | FLOW-JMNTT-001 |
 | MNTTRDB2 | COBTUPDT | JCL step | `IKJEFT01` / `DSN RUN PROGRAM(COBTUPDT) PLAN(CARDDEMO)`, DD `INPFILE` | `app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:21-30` | BR-JMNTT-001 |
@@ -62,7 +62,7 @@ No program of these modules accesses CARDDEMO.TRANSACTION_TYPE_CATEGORY at run t
 | ID | Invariant | Components | Evidence |
 | :-- | :-- | :-- | :-- |
 | PINV-f-01 | A transaction type that has categories cannot be deleted by any path (online list, online update, batch). | COTRTLIC, COTRTUPC, COBTUPDT, Db2 | `app/app-transaction-type-db2/ctl/DB2CREAT.ctl:96-99`; BR-TTLS-009, BR-TTUP-004, BR-TTBU-004 |
-| PINV-f-02 | Every online type change is committed at once (SYNCPOINT after each successful statement); a batch run is one unit of work. | COTRTLIC, COTRTUPC, COBTUPDT | SE-TTLS-005, SE-TTUP-002, SE-TTBU-004 |
+| PINV-f-02 | Every online type change is committed at once (SYNCPOINT after each successful statement); a batch run is one unit of work (except that a -911 rolls back the changes made so far and processing continues in a new one). | COTRTLIC, COTRTUPC, COBTUPDT | SE-TTLS-005, SE-TTUP-002, SE-TTBU-004 |
 | PINV-f-03 | The Db2 tables and the VSAM files ENT-TRAN-TYPE / ENT-TRAN-CATEGORY hold the same codes only after TRANEXTR and then the base TRANTYPE and TRANCATG jobs have run; nothing enforces it. Today it does **not** hold for the descriptions (seed text differs). | TRANEXTR, TRANTYPE, TRANCATG, all readers of the VSAM files | DEF-JTREX-001, DEF-JCRDB-005 |
 | PINV-f-04 | Online-written type codes are two digits from `01` to `99`; batch-written codes may be any two characters, so the invariant holds only if MNTTRDB2 input is clean. | COTRTUPC, COTRTLIC, COBTUPDT | BR-TTUP-001, DEF-TTBU-003 |
 | PINV-f-05 | Each MQ request produces at most one reply, on a fixed reply queue, with the request's MsgId and CorrelId; a request whose processing fails produces an error record and no reply. | COACCT01, CODATE01 | BR-MQAC-005, DEF-MQAC-007 |

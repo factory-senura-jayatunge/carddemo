@@ -50,7 +50,7 @@ Five definitions in group `CARDDEMO`: programs COACCT01 and CODATE01, the transa
 
 ## 5. Data used
 
-None directly. COACCT01 reads the account file `ACCTDAT` (ENT-ACCOUNT), which is defined in the base CSD (`app/csd/CARDDEMO.CSD:1-10`), not here.
+None directly. COACCT01 reads the account file `ACCTDAT` (ENT-ACCOUNT), which is defined in the base CSD (`app/csd/CARDDEMO.CSD:1-12`), not here.
 
 ## 6. Processing flow
 

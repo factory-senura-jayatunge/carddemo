@@ -42,7 +42,7 @@ Job MNTTRDB2 runs this program under the Db2 TSO attach to apply a file of chang
 | BR-TTBU-003 | Update replaces the description of the row with the record's code; no row is an error. |
 | BR-TTBU-004 | Delete removes the row with the record's code; no row is an error, and Db2 refuses a type that still has categories. |
 | BR-TTBU-005 | A failed record sets return code 4 and the run goes on; the return code is never set back to 0. |
-| BR-TTBU-006 | Records are applied in file order; every successful change stays applied whatever happens to later records. |
+| BR-TTBU-006 | Records are applied in file order; a failed record changes nothing, except that a -911 rolls back every change made so far; nothing is committed before the program ends normally. |
 | VAL-TTBU-001 | The action code must be `A`, `U`, `D` or `*`, upper case. |
 | VAL-TTBU-002 | The code and description are not checked by the program; only Db2 constraints apply. |
 
@@ -183,7 +183,7 @@ flowchart TD
 
 #### BR-TTBU-006 · File order and independent records
 - **When:** several records name the same code (for example `A01`, then `U01`, then `D01`).
-- **Then:** they are applied in file order and each sees the effect of the earlier ones. A failed record changes nothing; the records before and after it are applied normally. There is no COMMIT or ROLLBACK in the program (SE-TTBU-004).
+- **Then:** they are applied in file order and each sees the effect of the earlier ones. A record that fails with an ordinary statement error (for example -803, -532) changes nothing and the earlier changes stay pending; a -911 (deadlock or timeout) rolls back every change made so far in the run, and later records are applied in a new unit of work. There is no COMMIT or ROLLBACK in the program, and nothing is committed until it ends normally (SE-TTBU-004).
 - **Source:** `:91-99, 109-130`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -218,7 +218,7 @@ In file order, one statement per record. Each is part of the single unit of work
 - **Source:** `:201-204`
 
 #### SE-TTBU-004 · One unit of work, no explicit commit
-- The program issues no COMMIT or ROLLBACK. Under the TSO attach, Db2 commits all changes of the run when the program ends normally and backs them all out if the step abends or is cancelled. A failed SQL statement undoes only itself; the earlier changes stay pending in the same unit of work. The table space has `LOCKSIZE TABLE`, so the first change locks the whole table until the run ends (DEF-TTBU-006).
+- The program issues no COMMIT or ROLLBACK. Under the TSO attach, Db2 commits all changes of the run when the program ends normally and backs them all out if the step abends or is cancelled. A statement that fails with an ordinary error (-803, -532, ...) undoes only itself; the earlier changes stay pending in the same unit of work. A -911 rolls back the entire unit of work, so every earlier change of the run is lost while later records are still applied (and committed at the end). The table space has `LOCKSIZE TABLE`, so the first change locks the whole table until the run ends (DEF-TTBU-006).
 - **Source:** `:80-99`, `app/app-transaction-type-db2/ctl/DB2CREAT.ctl:24-31`
 - **Confidence:** platform-inferred
 
@@ -232,7 +232,7 @@ In file order, one statement per record. Each is part of the single unit of work
 
 #### ERR-TTBU-002 · Negative SQLCODE
 - **When:** the INSERT, UPDATE or DELETE returns a negative SQLCODE.
-- **Then:** the message buffer receives `Error accessing: TRANSACTION_TYPE table. SQLCODE:` followed by the SQLCODE edited as 5 characters (NUM-TTBU-002), for example `Error accessing: TRANSACTION_TYPE table. SQLCODE: -803` (54 characters); it is printed, return code 4, next record. The same text is used for the three statements, so the message does not say which action failed (the preceding `ADDING`/`UPDATING`/`DELETING RECORD` line does).
+- **Then:** the message buffer receives `Error accessing: TRANSACTION_TYPE table. SQLCODE:` followed by the SQLCODE edited as 5 characters (NUM-TTBU-002), for example `Error accessing: TRANSACTION_TYPE table. SQLCODE: -803` (54 characters); it is printed, return code 4, next record. The same text is used for the three statements, so the message does not say which action failed (the preceding `ADDING`/`UPDATING`/`DELETING RECORD` line does). A -911 is reported like any other failure, but Db2 has already backed out every earlier change of the run (SE-TTBU-004).
 - **Source:** `:154-162, 185-193, 216-224, 230-233`
 - **Confidence:** reviewed
 
@@ -275,9 +275,9 @@ flowchart LR
 - **Source:** `:39-46, 71-77`
 
 #### NUM-TTBU-002 · SQLCODE display
-- `WS-VAR-SQLCODE` is `PIC ----9`: 5 characters, right-aligned, a floating minus sign. `-803` prints ` -803`, `-532` ` -532`. A 5-digit SQLCODE loses its leading digit: `-10405` prints `-0405`.
+- `WS-VAR-SQLCODE` is `PIC ----9`: 5 characters, right-aligned, a floating minus sign. `-803` prints ` -803`, `-532` ` -532`. A 5-digit SQLCODE loses its leading digit: GnuCOBOL prints `-10405` as `-0405`, while the standard truncate-then-edit result, expected on z/OS, is ` -405` (platform-inferred).
 - **Source:** `:65, 149, 176, 205`
-- **Confidence:** runtime-verified (GnuCOBOL 3.2 `-std=ibm`, evidence file)
+- **Confidence:** runtime-verified for 4-digit codes (GnuCOBOL 3.2 `-std=ibm`, evidence file); the 5-digit z/OS result is platform-inferred
 
 #### NUM-TTBU-003 · Message buffer is never cleared
 - `WS-RETURN-MSG` is `PIC X(80)`, spaces at start. Each message is put into it with STRING, which writes only the characters of the new message and leaves the rest of the buffer as it was. The first message prints cleanly; a later, shorter message prints followed by the tail of the longest earlier one. After `Error accessing: TRANSACTION_TYPE table. SQLCODE: -803`, a not-found record prints `No records found.TRANSACTION_TYPE table. SQLCODE: -803` and an invalid action prints `ERROR: TYPE NOT VALIDSACTION_TYPE table. SQLCODE: -803`. The full 80 bytes are printed.
@@ -285,7 +285,7 @@ flowchart LR
 - **Confidence:** runtime-verified (GnuCOBOL 3.2 `-std=ibm`, evidence file)
 
 #### NUM-TTBU-004 · Stored description length
-- The description host variable is `PIC X(50)`, not the VARCHAR structure of the DCLGEN, so Db2 receives a 50-byte string and `TR_DESCRIPTION` is stored with its trailing spaces (length 50). The online programs also store 50 bytes (BR-TTUP-003), so the stored form is the same; only the content rules differ (VAL-TTBU-002).
+- The description host variable is `PIC X(50)`, not the VARCHAR structure of the DCLGEN, so Db2 receives a 50-byte string and `TR_DESCRIPTION` is stored with its trailing spaces (length 50). The online programs also store 50 bytes (BR-TTUP-003), but after removing leading spaces (`FUNCTION TRIM`); COBTUPDT keeps leading spaces. Seed rows from CREADB21 keep the literal length (for example `PURCHASE` is 8). The content rules also differ (VAL-TTBU-002).
 - **Source:** `:76, 146, 173`
 - **Confidence:** platform-inferred
 
@@ -296,7 +296,7 @@ flowchart LR
 ## 13. Known defects and oddities
 
 #### DEF-TTBU-001 · A failed open loops for ever
-- When the open fails (no dataset, wrong record length, not authorised), the program prints `OPEN FILE NOT OK` and reads anyway. A read on a file that is not open returns status 47, not end of file, so the end-of-file flag is never set. Each pass prints `PROCESSING   ` with the blank work record, then `ERROR: TYPE NOT VALID` and sets return code 4, without end. The job card has `TIME=1440` (no CPU limit, `app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:1-2`), so the step runs until an operator cancels it or the output limit stops it. The same happens for any read error that is not end of file.
+- When the open fails with a file status (DD missing, conflicting record length; a missing dataset under MNTTRDB2 is a JCL error before the step starts and an authorisation failure is normally an S913 abend, platform-inferred), the program prints `OPEN FILE NOT OK` and reads anyway. A read on a file that is not open returns status 47, not end of file, so the end-of-file flag is never set. Each pass prints `PROCESSING   ` with the blank work record, then `ERROR: TYPE NOT VALID` and sets return code 4, without end. The job card has `TIME=1440` (no CPU limit, `app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:1-2`), so the step runs until an operator cancels it or the output limit stops it. For a read error that is not end of file after at least one good record, the loop is the same but the work record keeps the last good record (READ INTO does not move on failure), so that record is printed and applied again on every pass.
 - **Source:** `:82-107` · **Status:** open · **Fidelity:** defect-decide (Q-TTBU-004)
 - **Confidence:** runtime-verified on GnuCOBOL 3.2 (open status 35, then read status 47 repeated with the end-of-file flag unset; evidence file); the z/OS statuses are platform-inferred.
 
