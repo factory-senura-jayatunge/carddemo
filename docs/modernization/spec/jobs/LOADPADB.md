@@ -146,7 +146,7 @@ None at job level. PAUDBLOD's messages are listed in its section 4.3.
 - **Source:** `:40-47` · **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
 
 #### DEF-JLDPA-002 · Merge, not restore
-- Nothing empties or reinitializes `DBPAUTP0` before the load. Loaded into a database that is not empty, the job adds the unloaded segments and keeps every existing one, including segments deleted or changed since the unload: a summary changed online after the unload keeps its new totals, and details purged since the unload come back. The result is a restore only when the database is empty.
+- Nothing empties or reinitializes `DBPAUTP0` before the load. Loaded into a database that is not empty, the job keeps every existing segment unchanged (a summary changed online after the unload keeps its new totals, because the insert of the unloaded copy returns `II`) and re-inserts the segments deleted since the unload (details purged since the unload come back). The result is a restore only when the database is empty.
 - **Source:** `:26-38` · **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-JLDPA-003 · README names another PSB for loading

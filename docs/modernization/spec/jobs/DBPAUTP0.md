@@ -35,10 +35,10 @@ DBPAUTP0 (named after the database it unloads) deletes the previous unload data 
 | FLOW-JDBPA-001 | Two steps, always both: delete the old unload, then unload the database. |
 | SE-JDBPA-001 | `STEPDEL` deletes `AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0` whether or not it exists. |
 | SE-JDBPA-002 | `UNLOAD` reads `DBPAUTP0` with the HD unload utility and catalogs a new unload data set. |
-| ERR-JDBPA-001 | A failed unload deletes the new data set; the previous one is already gone. |
+| ERR-JDBPA-001 | An abended unload deletes the new data set; a failure reported only by a return code catalogs it incomplete. The previous one is already gone. |
 | ERR-JDBPA-002 | The unload needs DBRC authorization for the database (RECON data sets). |
 | NUM-JDBPA-001 | Unload data set: `RECFM=VB`, `LRECL=27990`, space in 32,274-byte blocks. |
-| NUM-JDBPA-002 | Region, buffers and control statement. |
+| NUM-JDBPA-002 | Job limits, region, buffers and control statement. |
 | DEF-JDBPA-001 | The only copy of the previous unload is deleted before the new one is written. |
 | DEF-JDBPA-002 | Misleading comment and a stray `//*` past column 72. |
 | DEF-JDBPA-003 | Site-specific library names. |
@@ -127,7 +127,7 @@ None at job level. The utility writes its statistics (segment counts per segment
 
 #### ERR-JDBPA-001 · Unload failure
 - **When:** the utility abends or fails, for example on an I/O error, a missing database data set, a DBRC refusal (ERR-JDBPA-002) or a full output volume.
-- **Then:** `DFSURGU1` is deleted (`DISP=(,CATLG,DELETE)`), and the previous unload was already deleted by `STEPDEL` (DEF-JDBPA-001), so no unload exists. The database is unchanged. Rerun after fixing the cause.
+- **Then:** on an abend, `DFSURGU1` is deleted (abnormal disposition `DELETE` of `DISP=(,CATLG,DELETE)`), and the previous unload was already deleted by `STEPDEL` (DEF-JDBPA-001), so no unload exists. When the utility ends normally with a non-zero return code instead, the normal disposition `CATLG` applies and an incomplete or empty unload is cataloged under the usual name. The database is unchanged. Rerun after fixing the cause.
 - **Source:** `:25-26`
 - **Confidence:** platform-inferred
 
@@ -149,9 +149,9 @@ None at job level. The utility writes its statistics (segment counts per segment
 - **Source:** `:25-29`
 - **Confidence:** reviewed (JCL); platform-inferred (allocation)
 
-#### NUM-JDBPA-002 · Region, buffers and control statement
-- Step `REGION=4M` (`:15`). `DFSVSAMP` points to member `DFSVSMDB` with the VSAM buffer pools. The `DFSCTL` statement `SBPARM ACTIV=COND` lets IMS turn on sequential buffering for the database data sets when it sees a sequential access pattern, which an unload is.
-- **Source:** `:15, 33-35`
+#### NUM-JDBPA-002 · Job limits, region, buffers and control statement
+- The job card codes `REGION=0K,TIME=30` (`:2`): at most 30 minutes of CPU time, and a JOB-level `REGION` overrides the `REGION` of every step, so the step's `REGION=4M` (`:15`) has no effect and the step gets all available private storage. `DFSVSAMP` points to member `DFSVSMDB` with the VSAM buffer pools. The `DFSCTL` statement `SBPARM ACTIV=COND` lets IMS turn on sequential buffering for the database data sets when it sees a sequential access pattern, which an unload is.
+- **Source:** `:2, 15, 33-35`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
 ## 13. Known defects and oddities
@@ -161,7 +161,7 @@ None at job level. The utility writes its statistics (segment counts per segment
 - **Source:** `:7-10, 25-26` · **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-JDBPA-002 · Misleading comment and stray characters
-- The step comment says `DOWNLOAD DBD DBPAUTP0` (`:13`), but the step unloads the database, not the DBD. Line 45 has `//*` in columns 76-78, past column 72; the JCL reader ignores columns 73-80, so it has no effect (lint finding `text-past-column-72` in the baseline, `cobol-lint-baseline.json:99-102`). Several lines carry trailing spaces.
+- The step comment says `DOWNLOAD DBD DBPAUTP0` (`:13`), but the step unloads the database, not the DBD. Line 45 has `//*` in columns 76-78, past column 72; the JCL reader ignores columns 73-80, so it has no effect (lint finding `text-past-column-72` in the baseline, `cobol-lint-baseline.json:99-102`). Lines 1-44 (all but the last three) carry trailing spaces (`trailing-whitespace` in the baseline, `cobol-lint-baseline.json:103-106`).
 - **Source:** `:13, 45` · **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JDBPA-003 · Site-specific library names

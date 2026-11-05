@@ -157,7 +157,7 @@ None at job level. The program does not reject any parameter value (CBPAUP0C FLO
 - **Source:** `:37` · **Status:** open · **Fidelity:** defect-decide (CBPAUP0C Q-AUPG-001, Q-AUPG-009) · **Confidence:** reviewed
 
 #### DEF-JAUPG-002 · Placeholder load library
-- The second `STEPLIB` library is `XXXXXXXX.PROD.LOADLIB`, which does not exist as shipped, so the step cannot find CBPAUP0C until it is edited (`docs/runbooks/authorization-purge.md:18-19`). The other jobs of the module use `AWS.M2.CARDDEMO.LOADLIB` and `OEMA.IMS.IMSP.*` IMS libraries; this one uses `IMS.*`.
+- The second `STEPLIB` library is `XXXXXXXX.PROD.LOADLIB`, which does not exist as shipped, so the step cannot find CBPAUP0C until it is edited (`docs/runbooks/authorization-purge.md:18-19`). The other jobs of the module use `AWS.M2.CARDDEMO.LOADLIB` and IMS libraries under three prefixes (`OEMA.IMS.IMSP.SDFSRESL`, `OEM.IMS.IMSP.PSBLIB`/`DBDLIB`, `OEMPP.IMS.V15R01MB.PROCLIB`; for example `LOADPADB.JCL:28-34, 45`); this one uses `IMS.*`.
 - **Source:** `:26-34` · **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JAUPG-003 · Return code 16 may not stop the chain

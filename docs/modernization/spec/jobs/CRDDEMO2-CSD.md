@@ -23,7 +23,7 @@ spec_status: draft
 
 ## 1. Summary
 
-Eleven CICS resource definitions, all in group `CARDDEMO` (the group of the base application): the two mapsets of the pending-authorization screens, the four programs of the module, the three transactions `CP00` (authorization processor, started by MQ triggering), `CPVS` (summary screen) and `CPVD` (detail screen), and the Db2 attachment that connects `CPVD` to plan `AWS01PLN` through one DB2ENTRY and one DB2TRAN. No security is set on the transactions (DEF-JCSD2-001); the Db2 entry allows one thread (DEF-JCSD2-002) and its name differs from the one in the module README (DEF-JCSD2-003). The MQ and IMS connections the programs need are not in the file (Q-JCSD2-001).
+Eleven CICS resource definitions, all in group `CARDDEMO` (the group of the base application): the two mapsets of the pending-authorization screens, the four programs of the module, the three transactions `CP00` (authorization processor, started by MQ triggering), `CPVS` (summary screen) and `CPVD` (detail screen), and the Db2 attachment that connects `CPVD` to plan `AWS01PLN` through one DB2ENTRY and one DB2TRAN. Resource and command security are off on the transactions (DEF-JCSD2-001); the Db2 entry allows one thread (DEF-JCSD2-002) and its name differs from the one in the module README (DEF-JCSD2-003). The MQ and IMS connections the programs need are not in the file (Q-JCSD2-001).
 
 ## 2. Rules at a glance
 
@@ -97,7 +97,7 @@ flowchart LR
 
 #### FLOW-JCSD2-004 · Db2 attachment of CPVD
 - **When:** a `CPVD` task issues its first SQL statement (in COPAUS2C).
-- **Then:** DB2TRAN `CPVDTRAN` routes transaction `CPVD` to DB2ENTRY `AWS01PLN`, which uses plan `AWS01PLN` and signs on to Db2 with the CICS user ID of the task (`AUTHTYPE(USERID)`), so the user needs Db2 privileges on `CARDDEMO.AUTHFRDS`. `THREADLIMIT(1)` with `THREADWAIT(YES)`: one thread; a second task waits until it is free. `PROTECTNUM(0)`: no thread is kept for reuse. `DROLLBACK(YES)`: when Db2 chooses the task as a deadlock victim, CICS rolls back the task's unit of work (IMS and Db2 changes) and the SQL returns -911. `ACCOUNTREC(TXID)`: one Db2 accounting record per transaction ID. `PRIORITY(HIGH)`: the thread runs at a higher dispatching priority than the CICS main task. No DB2CONN is defined here.
+- **Then:** DB2TRAN `CPVDTRAN` routes transaction `CPVD` to DB2ENTRY `AWS01PLN`, which uses plan `AWS01PLN` and signs on to Db2 with the CICS user ID of the task (`AUTHTYPE(USERID)`); COPAUS2C uses only static SQL, so Db2 checks the table privileges on `CARDDEMO.AUTHFRDS` against the plan owner at bind time and each user needs `EXECUTE` authority on plan `AWS01PLN`. `THREADLIMIT(1)` with `THREADWAIT(YES)`: one thread; a second task waits until it is free. `PROTECTNUM(0)`: no thread is kept for reuse. `DROLLBACK(YES)`: when Db2 chooses the task as a deadlock victim, CICS rolls back the task's unit of work (IMS and Db2 changes) and the SQL returns -911. `ACCOUNTREC(TXID)`: one Db2 accounting record per transaction ID. `PRIORITY(HIGH)`: the thread runs at a higher dispatching priority than the CICS main task. No DB2CONN is defined here.
 - **Source:** `:69-79`
 - **Fidelity:** must-preserve (plan and authorization) · **Confidence:** platform-inferred
 
@@ -138,8 +138,8 @@ None at run time. Installing the definitions adds or replaces these eleven resou
 
 ## 13. Known defects and oddities
 
-#### DEF-JCSD2-001 · [security] No transaction security
-- `RESSEC(NO)` and `CMDSEC(NO)` on all three transactions, and the programs check no user type (COPAUS0C DEF-AUSM-007, COPAUS1C DEF-AUDT-006). Any signed-on user can view any account's authorizations and mark fraud; anyone who can start `CP00` can run the authorization processor.
+#### DEF-JCSD2-001 · [security] No resource or command security
+- `RESSEC(NO)` and `CMDSEC(NO)` on all three transactions turn off resource-level and command-level security, and the programs check no user type (COPAUS0C DEF-AUSM-007, COPAUS1C DEF-AUDT-006). Transaction-attach security is not a TRANSACTION attribute; it depends on the SIT (`SEC`, `XTRAN`) and the security manager profiles, outside this file. Unless attach security restricts them, any signed-on user can view any account's authorizations and mark fraud, and anyone who can start `CP00` can run the authorization processor.
 - **Source:** `:46, 56, 66` · **Status:** open (security) · **Fidelity:** defect-decide
 
 #### DEF-JCSD2-002 · One Db2 thread
@@ -151,8 +151,8 @@ None at run time. Installing the definitions adds or replaces these eleven resou
 - **Source:** `:69-77` · **Status:** open · **Fidelity:** incidental
 
 #### DEF-JCSD2-004 · README install steps are incomplete
-- The README defines program COPAUA0C twice, mapset `COPAU00` and transaction `CP00` only, and installs only the three transactions and the two Db2 resources (`app/app-authorization-ims-db2-mq/README.md:165-189`); mapset `COPAU01` and programs COPAUS0C, COPAUS1C, COPAUS2C are defined only in this file. Installing per the README works only with program autoinstall.
-- **Source:** `:1-38` · **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
+- The README defines program COPAUA0C twice, mapset `COPAU00` and transaction `CP00` only, and installs the three transactions and the two Db2 resources (`app/app-authorization-ims-db2-mq/README.md:165-189`); transactions `CPVS` and `CPVD`, mapset `COPAU01` and programs COPAUS0C, COPAUS1C, COPAUS2C are defined only in this file. The README's `CEDA INSTALL TRANS(CPVS)` and `TRANS(CPVD)` (`app/app-authorization-ims-db2-mq/README.md:185-186`) fail without this file's definitions, and the missing programs and mapset need either this file or program and mapset autoinstall.
+- **Source:** `:1-58` · **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCSD2-005 · Misleading descriptions
 - The DB2ENTRY description `DB2 RETRY FOR AWS01PLN PLAN` (`:70`) describes no retry; the DB2TRAN description `DB2TRAN FOR SDB2 TRANSACTION` (`:76`) names a transaction `SDB2` that does not exist.
