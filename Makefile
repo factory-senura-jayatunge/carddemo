@@ -1,5 +1,5 @@
 # Local build, run and test entry points for the CardDemo batch programs.
-# Requires GnuCOBOL 3.2 (cobc) and Python 3.11+. See README "Local build".
+# Requires GnuCOBOL 3.2 (cobc) and Python 3.11+. See README "Local Build, Run and Test".
 
 # Optional local overrides (copy .env.example to .env).
 -include .env
