@@ -102,11 +102,26 @@ class ReaderJobsTest(CardDemoTestCase):
         _, (res,) = self.run_job("TRANVALD", work)
         self.assert_rc(res, 0)
         lines = [l.rstrip() for l in program_lines(res.sysout, "CBTRN01C")]
+        # Per daily record, in file order: the record, its xref lookup (2000-LOOKUP-XREF)
+        # and, for a known card, its account read (3000-READ-ACCOUNT). Nothing after
+        # the last record.
+        xref_by_card = oracle.keyed(oracle.records_of(XREF, xref), "XREF-CARD-NUM")
+        accounts = {r.raw("ACCT-ID") for r in oracle.sample(ACCOUNT, "acctdata.txt")}
+        expected = []
         for rec in daily:
-            self.assertIn(rec.decode("latin-1").rstrip(), lines)
-        self.assertIn("CARD NUMBER 0000000000000000 COULD NOT BE VERIFIED. "
-                      "SKIPPING TRANSACTION ID-V000000000000002", lines)
-        self.assertIn("ACCOUNT 99999999999 NOT FOUND", lines)
-        good = Record(DALYTRAN, base).raw("DALYTRAN-CARD-NUM")
-        self.assertIn(f"CARD NUMBER: {good}", lines)
-        self.assertIn("SUCCESSFUL READ OF ACCOUNT FILE", lines)
+            t = Record(DALYTRAN, rec)
+            card = t.raw("DALYTRAN-CARD-NUM")
+            expected.append(rec.decode("latin-1").rstrip())
+            x = xref_by_card.get(card)
+            if x is None:
+                expected += ["INVALID CARD NUMBER FOR XREF",
+                             f"CARD NUMBER {card} COULD NOT BE VERIFIED. "
+                             f"SKIPPING TRANSACTION ID-{t.raw('DALYTRAN-ID')}"]
+                continue
+            expected += ["SUCCESSFUL READ OF XREF", f"CARD NUMBER: {card}",
+                         f"ACCOUNT ID : {x.raw('XREF-ACCT-ID')}", f"CUSTOMER ID: {x.raw('XREF-CUST-ID')}"]
+            if x.raw("XREF-ACCT-ID") in accounts:
+                expected.append("SUCCESSFUL READ OF ACCOUNT FILE")
+            else:
+                expected += ["INVALID ACCOUNT NUMBER FOUND", f"ACCOUNT {x.raw('XREF-ACCT-ID')} NOT FOUND"]
+        self.assertEqual(lines, expected)
