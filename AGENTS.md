@@ -56,6 +56,7 @@ python3 scripts/gen_inventory.py --check     # what make docs-check runs
 python3 scripts/check_agents_md.py           # check the commands and paths in this file
 python3 docs/modernization/spec/tools/check_spec.py --program CBTRN02C   # one NL spec
 python3 docs/modernization/spec/tools/check_spec.py --inventory          # every in-scope source and its spec
+python3 docs/modernization/spec/tools/verify_spec.py   # check_spec, build, every checks/*_reimpl on sample and stress data (make -C modernization verify-spec)
 ```
 
 `scripts/lint.sh` and `scripts/cobol_lint.py check` exit 0 when there are no new findings, 1 when there are new findings, and 2 for a configuration error or a missing cobc.

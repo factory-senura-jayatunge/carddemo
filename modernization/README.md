@@ -63,11 +63,11 @@ Other targets:
 
 ## Verification targets
 
-None of these is implemented yet; each one fails with the phase that delivers it. "Heavy" means it needs the running stack or Testcontainers, takes minutes, and should not run in parallel with other heavy targets on a laptop.
+Only `verify-spec` is implemented so far; each of the others fails with the phase that delivers it. "Heavy" means it needs the running stack or Testcontainers, takes minutes, and should not run in parallel with other heavy targets on a laptop.
 
 | Target | Checks | Heavy | Arrives with |
 |:--|:--|:--|:--|
-| `verify-spec` | Natural-language spec format and paragraph coverage | No | Phase 1, NL spec |
+| `verify-spec` | Natural-language spec format and paragraph coverage (`check_spec.py`), then every spec-only reimplementation in `docs/modernization/spec/checks/` against the GnuCOBOL build, on sample and stress data. Builds the batch programs first (needs GnuCOBOL 3.2, see the root `AGENTS.md`). | No | Done (Phase 1, NL spec) |
 | `verify-ledger` | Ledger evidence and links | No | Phase 4, validation |
 | `test-backend` | Spring Boot service tests | Yes (Testcontainers) | Phase 3 |
 | `test-billpay` | Bill Pay service, API and UI tests | Yes | Phase 3, Bill Pay pilot |
