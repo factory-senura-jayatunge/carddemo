@@ -99,7 +99,12 @@ def discover(config: dict, suites: list[str]) -> tuple[list[tuple[str, unittest.
 
 
 def run_once(case: unittest.TestCase) -> tuple[str, float, str]:
-    fresh = type(case)(case._testMethodName)
+    # A module that fails to import becomes a loader _FailedTest, which cannot be
+    # rebuilt from its method name; running it reports the import error.
+    if isinstance(case, unittest.loader._FailedTest):
+        fresh = case
+    else:
+        fresh = type(case)(case._testMethodName)
     result = unittest.TestResult()
     start = time.monotonic()
     fresh.run(result)
