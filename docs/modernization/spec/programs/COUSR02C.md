@@ -328,7 +328,7 @@ On save the error flag does not stop the comparison and rewrite that follow (DEF
 - **Inbound:** `COADM01C` option 3; `COUSR00C` with `U` (selected user ID in the commarea extension).
 - **Outbound:** PF3 to `CDEMO-FROM-PROGRAM` (`COUSR00C` or `COADM01C`); PF12 to `COADM01C`; `COSGN00C` without commarea.
 - **Shared data:** `USRSEC` (ENT-USER-SECURITY), with sign-on (reads, upper-cases ID and password: a password saved here with lower-case letters locks the user out, DEF-SGN-011), the list, add and delete.
-- **Shared invariants (proposed):** PINV-a-signon-admin-02 (upper-case credentials), PINV-a-signon-admin-04 (the hand-over of the selected user ID).
+- **Shared invariants:** INV-007 (upper-case credentials), INV-008 (the hand-over of the selected user ID).
 
 ### Module extraction notes
 

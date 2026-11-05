@@ -358,7 +358,7 @@ sequenceDiagram
 - **Inbound:** transaction `CC00`; PF3 of `COMEN01C` and `COADM01C` (XCTL without commarea); the "no commarea" fallback of most online programs (XCTL with commarea, FLOW-SGN-008).
 - **Outbound:** `COADM01C` (ADMN) or `COMEN01C` (MENU) by XCTL with the 160-byte commarea. Their specs describe what they do with it (FLOW-ADMN-002, FLOW-MENU-002).
 - **Shared data:** `USRSEC` is maintained online by `COUSR01C` (add), `COUSR02C` (update) and `COUSR03C` (delete), and browsed by `COUSR00C`. Those programs store user IDs and passwords as typed, without upper-casing them, which COSGN00C requires (DEF-SGN-011, DEF-USRA-001, DEF-USRU-004).
-- **Shared invariants (proposed, PINV-a-signon-admin-01..03 in `areas/a-signon-admin-interactions.md`):** the session identity is only `CDEMO-USER-ID` and `CDEMO-USER-TYPE` in the commarea, meant to be set only here (today other programs also set them, DEF-SGN-012); a user can sign on only if the stored ID and password are upper case (or contain no letters); `USRSEC` is unavailable during the batch window.
+- **Shared invariants (INV-006, INV-007, INV-002 in `components.md`):** the session identity is only `CDEMO-USER-ID` and `CDEMO-USER-TYPE` in the commarea, meant to be set only here (today other programs also set them, DEF-SGN-012); a user can sign on only if the stored ID and password are upper case (or contain no letters); `USRSEC` is unavailable during the batch window.
 
 ### Module extraction notes (selective conversion of sign-on)
 
