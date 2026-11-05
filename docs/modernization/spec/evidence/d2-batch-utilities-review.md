@@ -11,7 +11,7 @@ The area covers seven units: the statement job program CBSTM03A (`STMT`) and its
 
 The specs went through two independent checks:
 
-1. **Source review.** Three reviewer subagents that had not written the specs checked the items against the source at `b5e0139`, which covers the COBOL, assembler, copybooks, macros, JCL, shims and tools. Each reviewer checked every item of its specs, not a sample. Each also ran the GnuCOBOL build to test the runtime claims.
+1. **Source review.** Three reviewer subagents (a fourth later reviewed the interaction proposal, section 1.4) that had not written the specs checked the items against the source at `b5e0139`, which covers the COBOL, assembler, copybooks, macros, JCL, shims and tools. Each reviewer checked every item of its specs, not a sample. Each also ran the GnuCOBOL build to test the runtime claims.
 2. **Spec-only reimplementation.** For CBSTM03B, CBEXPORT and CBIMPORT, a separate subagent received only the program spec, `format.md`, `entities.md`, the area entity proposal and the sample input files. It saw no COBOL, JCL, tests, tools, check scripts or reference outputs. Each subagent wrote a standard-library Python version. Its outputs were then compared byte for byte with the GnuCOBOL runner, on the sample data and on stress data the subagent never saw.
 
 All runs below were made on commit `1bfa042` (branch `nl/D2`), with GnuCOBOL 3.2.0 and Python 3.14.
@@ -88,6 +88,36 @@ Every WRONG finding is fixed. All MINOR findings were also applied.
 - COBSWAIT's text-to-binary conversion and CBSTM03B's account-key conversion follow different rules. For example, `5A` gives 0 in COBSWAIT and 5 in CBSTM03B. Each spec describes its own rule.
 - The assembler-only claims (implicit lengths, literal pool, save area, `STIMER BINTVL` units) were checked by reasoning, not by runs.
 
+### 1.4 Interaction proposal
+
+A fourth reviewer, who had not seen the other reviews, checked `areas/d2-batch-utilities-interactions.md` against the JCL, the CA-7 and Control-M schedules, the CSD, the COBOL and assembler sources, `components.md`, `interactions.md` and the seven specs. It reviewed every edge row, CRUD row, invariant and diagram edge, then re-checked the revised document.
+
+| Pass | Claims | Reviewed | CORRECT | MINOR | WRONG | WRONG / reviewed | WRONG+MINOR / reviewed |
+| :-- | --: | --: | --: | --: | --: | --: | --: |
+| First review | 58 | 58 | 46 | 12 | 0 | 0.0% | 20.7% |
+| Re-check of the claims the revision added | 44 | 44 | 41 | 3 | 0 | 0.0% | 6.8% |
+
+The re-check confirmed that all 12 first-pass findings were fixed. All 15 MINOR findings across both passes are fixed:
+- **Spec item column:** six edge rows pointed at the wrong spec item. They now cite the section that describes the job step or schedule trigger (CBSTM03A §3, COBSWAIT §3).
+- **TXT2PDF1:** it reads only `STATEMNT.PS` and writes `STATEMNT.PS.PDF`.
+- **Line ranges:** the CBIMPORT job (`app/jcl/CBIMPORT.jcl:22-65`) and the Control-M entries.
+- **CRUD:** the COBDATFT row is removed, because a parameter block in the caller's storage is not a data store.
+- **PINV-d2-02:** each program declares its own FD key at offset 27.
+- **PINV-d2-03:** now cites `tests/integration/test_export_import.py:11-36`.
+- **Cards data-store row:** now includes the alternate index on account (`CARDAIX`, `KEYS(11 16)`, non-unique).
+- **Diagram:** it now draws the missing edges. A TRANSACT edge wrongly suggested that DELDEF01 uses TRANSACT; that is fixed.
+
+**Omissions the reviewer found, now added:**
+- component and data-store rows for `components.md`;
+- CREASTMT DELDEF01 and STEP030;
+- TXT2PDF1 as the consumer of the text statements;
+- the six other CA-7 jobs that trigger WAITSTEP;
+- the CLOSEFIL → READACCT → CBACT01C → COBDATFT path;
+- MVSWAIT's `STIMER` call through the `ASMWAIT` macro;
+- the COBSWAIT SYSIN input;
+- a note on the local stand-ins.
+
+**Conflict left to the lead:** CA-7 runs CREASTMT after CLOSEFIL (`app/scheduler/CardDemo.ca7:465-468`). `interactions.md` follows the runbook (`docs/runbooks/batch-cycle-restart.md:18-20`) and places it between COMBTRAN and TRANIDX. The proposal states both orders.
 ## 2. Spec-only reimplementations
 
 Each check lives in `docs/modernization/spec/checks/<program>_reimpl/`:
@@ -189,5 +219,8 @@ The specs of these four units are therefore `reviewed`, not `verified`.
   - write and read I/O errors in CBEXPORT and CBIMPORT;
   - counter overflow;
   - every assembler path on z/OS.
-- The interactions proposal (`areas/d2-batch-utilities-interactions.md`) was checked by `check_spec.py` and against the specs it summarises, but no independent reviewer reviewed it.
+- Three cross-area points went to the NL lead, who owns `format.md` and `entities.md`: the U0999 glossary wording, the second batch DD name of TRANSACT, and a project-wide rule for duplicate keys and short records in KSDS unloads (section 2.5). The CREASTMT schedule order also goes to the lead (section 1.4).
+- Two kinds of question can only be settled on a mainframe, and the modernized system does not depend on either answer. They stay open as Q-items that cite this file:
+  - the export cluster's key position (Q-EXPT-002, Q-IMPT-003);
+  - the z/OS control-block, literal-pool and save-area behaviour (Q-STMT-008, Q-DTFT-001, Q-MWAT-001, Q-MWAT-002).
 - Open business and platform questions are listed in each spec (Q-STMT-*, Q-STIO-*, Q-EXPT-*, Q-IMPT-*, Q-WAIT-*, Q-MWAT-*, Q-DTFT-*). The platform questions need someone with mainframe access.
