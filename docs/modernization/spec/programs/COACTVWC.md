@@ -746,7 +746,7 @@ None of these were changed in this branch: `COACTVWC.cbl`, `COACTVW.bms`, `COACT
 - **Confidence:** reviewed
 
 #### DEF-ACVW-009 · [security] Works without sign-on and leads into the main menu
-- Started with no commarea (typing `CAVW`), the program does not send the user to sign-on (`COSGN00C`) as most CardDemo screens do; it shows the account view and performs lookups. PF3 then transfers to the main menu `COMEN01C` with a commarea whose user ID is blank and whose user type is `U` (DEF-ACVW-011), and the menu accepts it, so an unauthenticated terminal reaches the regular-user functions. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
+- Started with no commarea (typing `CAVW`), the program does not send the user to sign-on (`COSGN00C`) as most CardDemo screens do; it shows the account view and performs lookups. PF3 then transfers to the main menu `COMEN01C` with a commarea whose user ID is blank; the start leaves the user type blank too (the INITIALIZE at `:285`), and PF3 itself sets it to `U` just before the transfer (`:344`, DEF-ACVW-011), and the menu accepts it, so an unauthenticated terminal reaches the regular-user functions. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
 - **Source:** `:282-286, 328-352, 353-360`; `app/cbl/COMEN01C.cbl:82-90`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-ACVW-001)

@@ -859,7 +859,7 @@ None of these were changed in this branch: `COCRDUPC.cbl`, `COCRDUP.bms`, `COCRD
 - **Confidence:** platform-inferred
 
 #### DEF-CRDU-006 · [security] No sign-on, authorisation or ownership check
-- The program never looks at `CDEMO-USER-ID` or `CDEMO-USER-TYPE` and starts a search when there is no commarea, so `CCUP` typed on a cleared terminal opens the card update without signing on. Any user can update any card. The record does not say who changed it. PF3 then transfers to the main menu `COMEN01C`, because the fresh commarea names no calling program (`:435-476`); that commarea has a blank user ID and user type `U` (DEF-CRDU-007), and the menu accepts it, so the main menu is reached without a sign-on. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
+- The program never looks at `CDEMO-USER-ID` or `CDEMO-USER-TYPE` and starts a search when there is no commarea, so `CCUP` typed on a cleared terminal opens the card update without signing on. Any user can update any card. The record does not say who changed it. PF3 then transfers to the main menu `COMEN01C`, because the fresh commarea names no calling program (`:435-476`); the start leaves the user ID and the user type blank (the INITIALIZE at `:391`), and PF3 itself sets the type to `U` just before the transfer (`:464`, DEF-CRDU-007), and the menu accepts it, so the main menu is reached without a sign-on. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
 - **Source:** `:388-394`, `:502-511`, `:435-476`; `app/cbl/COMEN01C.cbl:82-91`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDU-005)
