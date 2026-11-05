@@ -1,5 +1,7 @@
 # Area d2-batch-utilities: entity proposals
 
+Merged in f9ea11a into `../entities.md`.
+
 Proposed additions to `../entities.md` from the d2 specs (CBSTM03A, CBSTM03B, CBEXPORT, CBIMPORT, COBSWAIT, COBDATFT, MVSWAIT), written against commit b5e0139. Conventions as in `../entities.md` (Pos 1-based, Len in bytes). ENT-CUSTOMER and ENT-CARD, which these programs also use, are final in `../entities.md`; the d2 specs found no correction to them.
 
 ## ENT-EXPORT-RECORD · Multi-record export file

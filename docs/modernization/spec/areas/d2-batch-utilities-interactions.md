@@ -1,5 +1,7 @@
 # Area d2-batch-utilities: interaction proposals
 
+Merged in f9ea11a into `../interactions.md` (diagram and edges) and `../components.md` (component rows, data stores, CRUD rows; invariants as INV-022..INV-025, see the "Proposed as" column).
+
 Proposed additions to `../interactions.md` and `../components.md` from the d2 specs (CBSTM03A, CBSTM03B, CBEXPORT, CBIMPORT, COBSWAIT, COBDATFT, MVSWAIT), written against commit b5e0139. Entities are in `../entities.md` and `d2-batch-utilities-entities.md`. An independent review of this document is recorded in `../evidence/d2-batch-utilities-review.md`.
 
 ## Component rows for `../components.md`
