@@ -44,6 +44,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: make docs-check (docs/inventory.md is current)
         run: make docs-check
+      - name: make agents-md-check (AGENTS.md and skills name existing commands and paths)
+        run: make agents-md-check
 
   build-and-test:
     name: build-and-test

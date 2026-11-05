@@ -275,10 +275,10 @@ The suite (`tests/`) builds a `-ftrace` variant in `build/trace` and runs the jo
 ### All checks
 
 ```sh
-make check   # lint, docs-check, build and test, with a summary
+make check   # lint, docs-check, agents-md-check, build and test, with a summary
 ```
 
-`make check` runs every step even after one fails. It prints a summary with the test counts and coverage, and exits non-zero if any step failed or could not run. `make lint` (`scripts/lint.sh` and the linter's own tests) and `make docs-check` (`scripts/gen_inventory.py --check`) report "not present" when their tool is missing. CI (`.github/workflows/ci.yml`) runs the same steps in the jobs `lint`, `docs-check` and `build-and-test`.
+`make check` runs every step even after one fails. It prints a summary with the test counts and coverage, and exits non-zero if any step failed or could not run. `make lint` (`scripts/lint.sh` and the linter's own tests) and `make docs-check` (`scripts/gen_inventory.py --check`) report "not present" when their tool is missing. `make agents-md-check` (`scripts/check_agents_md.py`) fails when AGENTS.md or a skill names a command, option or path that no longer exists, or when a make target with a help comment is missing from AGENTS.md. CI (`.github/workflows/ci.yml`) runs the same steps in the jobs `lint`, `docs-check` (which also runs agents-md-check) and `build-and-test`.
 
 ### Releases
 
