@@ -382,7 +382,7 @@ The account number field shows the number as typed. `ACCT-ADDR-ZIP` is not shown
 | :-- | :-- | :-- |
 | Enter | Process the screen (first entry: show the empty screen) | 307, 353-374 |
 | PF3 (or PF15) | Leave to the caller (FLOW-ACVW-005) | 308, 324-352 |
-| PF1, PF2, PF4-PF12 (and PF13, PF14, PF16-PF24), PA1, PA2, Clear | Treated as Enter. No "invalid key" message (DEF-ACVW-012) | 306, 312-314 |
+| PF1, PF2, PF4-PF12 (and PF13, PF14, PF16-PF24), PA1, PA2, PA3, Clear | Treated as Enter. No "invalid key" message (DEF-ACVW-012) | 306, 312-314 |
 | PA3 or any AID not in the mapping table | `CCARD-AID` stays spaces, treated as Enter | `app/cpy/CSSTRPFY.cpy:21-78`, 312-314 |
 
 For PA1, PA2, PA3 and Clear the terminal sends no field data, so the receive finds no input (MAPFAIL, not checked, ERR-ACVW-005). The account field then holds whatever the receive area contained, very likely low-values, which gives `No input received` (VAL-ACVW-001).
@@ -850,7 +850,7 @@ Sample data (synthetic): account `00000000001` (`app/data/ASCII/acctdata.txt:1`)
 | S11 | test data: account with two cards | Enter, that account | `File Error: READ     on CXACAIX   returned RESP 000000015 ,RESP2 <9 digits> `; red; panels empty (platform-inferred) |
 | S12 | `ACCTDAT` closed | Enter, `00000000001` | `File Error: READ     on ACCTDAT   returned RESP <9 digits> ,RESP2 <9 digits> `; customer still read (DEF-ACVW-002) |
 | S13 | any screen, came from the menu | PF3 (or PF15) | XCTL to `COMEN01C`; commarea context 0, from `CAVW` / `COACTVWC`, user type `U`, last map `CACTVWA` / `COACTVW` |
-| S14 | any screen | PF5, PF7, PA1 or Clear | treated as Enter (PA1, PA2, Clear: `No input received`) |
+| S14 | any screen | PF5, PF7, PA1 or Clear | treated as Enter (PA1, PA2, PA3, Clear: `No input received`) |
 | S15 | commarea with `CDEMO-PGM-CONTEXT` = 2 | Enter | plain text `UNEXPECTED DATA SCENARIO`; no next transaction |
 | S16 | after S6 | Enter, `99999999999` | message as in S8; commarea `CDEMO-ACCT-ID` 99999999999, `CDEMO-CUST-ID` 000000001, `CDEMO-CARD-NUM` 9680294154603697 (DEF-ACVW-018) |
 

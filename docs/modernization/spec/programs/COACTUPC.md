@@ -300,7 +300,7 @@ stateDiagram-v2
     Shown --> Confirm: Enter, changes valid
     Errors --> Errors: Enter, still errors
     Errors --> Confirm: Enter, changes valid
-    Errors --> Errors: Enter, values back to the fetched ones (message No change detected...)
+    Errors --> Errors: Enter, values back to the fetched ones (No change detected..., unless a stored optional field is blank, DEF-ACUP-122)
     Confirm --> Confirm: Enter or any key except F5, F12, PF3
     Confirm --> Done: F5, both records rewritten or customer lock failed (ERR-ACUP-004)
     Confirm --> Failed: F5, account lock or a rewrite failed
@@ -453,7 +453,7 @@ Evaluated after the edits, in order; the state is the one the edits left.
 | --: | :-- | :-- | :-- |
 | 1 | state "not fetched", or key PF12 | if the account number edit passed (flag valid): clear the message, fetch (FLOW-ACUP-010); if the flag `FOUND-CUST-IN-MASTER` is set, state := `S`. In the search stage this means the customer read succeeded; on PF12 the edit step already set the flag (and the valid flag) before the fetch (`:1454-1456`), so the state becomes `S` even when the re-read fails (BR-ACUP-004, DEF-ACUP-019). If the edit failed: nothing (the edit message stays). | 2568-2580, 1452-1457 |
 | 2 | state `S` | if there is an input error or the message is `No change detected with respect to values fetched.`: nothing; otherwise state := `N` (normally not reached, because the edits move a changed screen to `E` or `N`) | 2585-2591 |
-| 3 | state `E` | nothing; the state stays `E`. This includes Enter after the user restored every value: the edit step finds no change and skips the edits (`:1463-1467`), so the screen shows the received values, information `Update account details presented above.`, message `No change detected with respect to values fetched.`, cursor on the account status and `F12=Cancel` bright | 2596-2597, 1463-1470, 3011-3012, 3573-3576 |
+| 3 | state `E` | nothing; the state stays `E`. This includes Enter after the user restored every value, but only for a record with no blank group ID, middle name, address line 2 or government ID; otherwise the edits run again and the first edit message is shown (DEF-ACUP-122, `:1213-1215, 1697-1700`). Without a blank stored field the edit step finds no change and skips the edits (`:1463-1467`), so the screen shows the received values, information `Update account details presented above.`, message `No change detected with respect to values fetched.`, cursor on the account status and `F12=Cancel` bright | 2596-2597, 1463-1470, 3011-3012, 3573-3576 |
 | 4 | state `N` and key PF5 | save (SE-ACUP-004 to SE-ACUP-007), then: account lock failed -> `L`; a rewrite failed -> `F`; record changed by someone else -> `S`; any other outcome -> `C` (ERR-ACUP-004) | 2602-2615 |
 | 5 | state `N` | nothing (Enter on the confirmation screen redisplays it) | 2620-2621 |
 | 6 | state `C` | state := `S`; if `CDEMO-FROM-TRANID` is blank, clear the account, card and status in the commarea. **Unreachable**: state `C` never gets here (FLOW-ACUP-004 row 3) | 2625-2632 |

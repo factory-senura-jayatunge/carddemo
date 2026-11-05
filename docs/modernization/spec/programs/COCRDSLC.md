@@ -257,7 +257,7 @@ The day of the expiry date, the CVV, the card's own account number and any custo
 
 #### BR-CRDV-003 · Called from the card list
 - **When:** first entry (`CDEMO-PGM-CONTEXT` = 0) with `CDEMO-FROM-PROGRAM` = `COCRDLIC`, and PF3 was not pressed.
-- **Then:** no screen is received and no edit runs. The account and card number from the commarea (`CDEMO-ACCT-ID`, `CDEMO-CARD-NUM`) become the search keys, the card is read (BR-CRDV-001) and the screen is sent. Because `CDEMO-LAST-MAPSET` is `COCRDLI` and `CDEMO-FROM-PROGRAM` is `COCRDLIC`, both search fields are protected, on this screen and on every later screen until the user leaves (neither of these two commarea fields changes before PF3). Any key except PF3, PA1, PA2 and Clear re-reads and re-shows the same card, because the protected fields are sent with the modified flag on and come back unchanged; to view another card the user goes back to the list with PF3. After Clear, PA1 or PA2 the screen shows `No input received` with a red `*` in the protected fields, both commarea numbers are zero, and only PF3 leads out (ERR-CRDV-004, DEF-CRDV-014).
+- **Then:** no screen is received and no edit runs. The account and card number from the commarea (`CDEMO-ACCT-ID`, `CDEMO-CARD-NUM`) become the search keys, the card is read (BR-CRDV-001) and the screen is sent. Because `CDEMO-LAST-MAPSET` is `COCRDLI` and `CDEMO-FROM-PROGRAM` is `COCRDLIC`, both search fields are protected, on this screen and on every later screen until the user leaves (neither of these two commarea fields changes before PF3). Any key except PF3, PA1, PA2, PA3 and Clear re-reads and re-shows the same card, because the protected fields are sent with the modified flag on and come back unchanged; to view another card the user goes back to the list with PF3. After Clear, PA1, PA2 or PA3 the screen shows `No input received` with a red `*` in the protected fields, both commarea numbers are zero, and only PF3 leads out (ERR-CRDV-004, DEF-CRDV-014).
 - **Source:** `:339-348, 505-512, 527-531, 297-299, 541-551`
 - **Fidelity:** must-preserve
 - **Confidence:** reviewed; the return of protected fields with the modified flag on, and the input content after MAPFAIL, are platform-inferred
@@ -372,10 +372,10 @@ Effect for the menu call: the menu's commarea is kept (user ID, user type, custo
 
 #### FLOW-CRDV-002 · Valid keys
 - **When:** any key.
-- **Then:** after FLOW-CRDV-012, only Enter and PF3 (PF3 or PF15) are accepted. Every other key (PF1, PF2, PF4-PF12, PF13, PF14, PF16-PF24, PA1, PA2, Clear) is treated exactly as Enter, with no message. For PA1, PA2 and Clear the terminal sends no field data, so the receive finds nothing (ERR-CRDV-004, DEF-CRDV-014).
+- **Then:** after FLOW-CRDV-012, only Enter and PF3 (PF3 or PF15) are accepted. Every other key (PF1, PF2, PF4-PF12, PF13, PF14, PF16-PF24, PA1, PA2, PA3, Clear) is treated exactly as Enter, with no message. For PA1, PA2, PA3 and Clear the terminal sends no field data, so the receive finds nothing (ERR-CRDV-004, DEF-CRDV-014).
 - **Source:** `:291-299`
 - **Fidelity:** must-preserve (the target may choose to reject other keys, Q-CRDV-004)
-- **Confidence:** reviewed; that PA1, PA2 and Clear send no field data (3270 short read) is platform-inferred
+- **Confidence:** reviewed; that PA1, PA2, PA3 and Clear send no field data (3270 short read) is platform-inferred
 
 #### FLOW-CRDV-003 · Main decision (decision table)
 
@@ -546,7 +546,7 @@ The file error text always replaces the message (there is no "first message wins
 - **Confidence:** reviewed
 
 #### ERR-CRDV-004 · Screen receive and send not checked
-- **What:** the responses of RECEIVE MAP and SEND MAP are stored and never tested. For PA1, PA2 or Clear (treated as Enter, FLOW-CRDV-002) the terminal sends no field data, so RECEIVE gets MAPFAIL and the input area keeps its content, which in a fresh task is its initial content (expected to be low-values; the symbolic map is in working storage, `:215`). The edits treat that as blank: `No input received`, two red `*`, and `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` are set to zero. On the screen called from the list this loses the card (DEF-CRDV-014). Enter on an unchanged screen does not give MAPFAIL, because `TRNNAME` and `ERRMSG` are defined with FSET (`app/bms/COCRDSL.bms:34, 144`) and the search fields are sent with the modified flag on (`:505-511`); empty search fields arrive as low-values and give the same `No input received` result. After a Clear the whole screen is rebuilt by the send.
+- **What:** the responses of RECEIVE MAP and SEND MAP are stored and never tested. For PA1, PA2, PA3 or Clear (treated as Enter, FLOW-CRDV-002) the terminal sends no field data, so RECEIVE gets MAPFAIL and the input area keeps its content, which in a fresh task is its initial content (expected to be low-values; the symbolic map is in working storage, `:215`). The edits treat that as blank: `No input received`, two red `*`, and `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` are set to zero. On the screen called from the list this loses the card (DEF-CRDV-014). Enter on an unchanged screen does not give MAPFAIL, because `TRNNAME` and `ERRMSG` are defined with FSET (`app/bms/COCRDSL.bms:34, 144`) and the search fields are sent with the modified flag on (`:505-511`); empty search fields arrive as low-values and give the same `No input received` result. After a Clear the whole screen is rebuilt by the send.
 - **Source:** `:569-576, 596-603, 505-511, 615-627, 659, 700`; `app/bms/COCRDSL.bms:34, 144`
 - **Fidelity:** incidental
 - **Confidence:** platform-inferred
@@ -585,7 +585,7 @@ sequenceDiagram
 - **Outbound:** XCTL to `CDEMO-FROM-PROGRAM` (normally `COCRDLIC`) or `COMEN01C` on PF3. No LINK or CALL.
 - **CSUTLDTC:** not called; no date is validated. The CSUTLDTC fix "CSUTLDTC reports the date it was given" (`CHANGELOG.md:50`, commit 8122736 on the agent-readiness branch, part of b5e0139 in this branch) does not affect any message of this program.
 - **Shared data:** `CARDDAT` is also read by the card list `COCRDLIC` and read and updated by card update `COCRDUPC`; the batch card reader `CBACT02C` and export/import read or load the same data set. See `components.md`.
-- **Shared contracts:** (1) The list must set `CDEMO-FROM-PROGRAM` = `COCRDLIC`, `CDEMO-LAST-MAPSET` = `COCRDLI` and context 0 for the call to be treated as a list selection (BR-CRDV-003). (2) The list must pass the card number in `CDEMO-CARD-NUM`; the account in `CDEMO-ACCT-ID` is only displayed. (3) The card file reload job closes `CARDDAT` in CICS (`app/jcl/CARDFILE.jcl:26-27`), during which the view reports a file error. (4) PF3 hands `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` back as this program left them: unchanged from the list, or as set by the edits on re-entry, including zero for missing or invalid input (`:331-334, 659, 673, 676, 700, 714, 717`). The list shows non-zero values in its filter fields when it gets control back (`app/cbl/COCRDLIC.cbl:844-867`) and keeps them in the commarea it passes to the menu on PF3 (`app/cbl/COCRDLIC.cbl:384-405`); this is how they reach a later menu call (DEF-CRDV-003).
+- **Shared contracts:** (1) The list must set `CDEMO-FROM-PROGRAM` = `COCRDLIC`, `CDEMO-LAST-MAPSET` = `COCRDLI` and context 0 for the call to be treated as a list selection (BR-CRDV-003). (2) The list must pass the card number in `CDEMO-CARD-NUM`; the account in `CDEMO-ACCT-ID` is only displayed. (3) The card file reload job closes `CARDDAT` in CICS (`app/jcl/CARDFILE.jcl:26-27`), during which the view reports a file error. (4) PF3 hands `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` back as this program left them: unchanged from the list, or as set by the edits on re-entry, including zero for missing or invalid input (`:331-334, 659, 673, 676, 700, 714, 717`). When the caller is the menu, the menu keeps them in the commarea for its next call (DEF-CRDV-003). When the caller is the card list, the list does not use them: it gets control with the key still PF3 and takes its "PF3 from another program" branch, which clears the whole commarea (`app/cbl/COCRDLIC.cbl:458-482`; COCRDLIC FLOW-CRDL-008), so it shows page 1 of all cards with empty filters.
 - **Menu and sign-on (area a):** the program does not send the user to sign-on when there is no commarea (DEF-CRDV-002). It keeps the menu's commarea (the intended reset never takes effect, DEF-CRDV-003) but forces `CDEMO-USER-TYPE` = `U` on PF3 (DEF-CRDV-004). After a direct start, PF3 reaches the menu with a blank commarea (no user ID). Today only the sign-on program sets `CDEMO-USER-ID` (`app/cbl/COSGN00C.cbl:132-134, 226`); no program reads it.
 
 ### Module extraction notes (selective conversion of card view)
@@ -595,7 +595,7 @@ sequenceDiagram
 | Entry from the list | Accepts account and card number; shows the card immediately; search fields read-only. |
 | Entry from the menu | Shows an empty search form and keeps the session data (Q-CRDV-003). |
 | Card data | One keyed read of ENT-CARD by card number; fields `CARD-EMBOSSED-NAME`, `CARD-ACTIVE-STATUS`, `CARD-EXPIRAION-DATE`. No lock, no write. |
-| Exit | Returns to the caller with `CDEMO-FROM-PROGRAM` = `COCRDSLC`, context 0, and `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` as last passed or edited, in the 160-byte commarea. The list shows them as its filters, so it does not start fresh (shared contract 4). |
+| Exit | Returns to the caller with `CDEMO-FROM-PROGRAM` = `COCRDSLC`, context 0, and `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` as last passed or edited, in the 160-byte commarea. The card list ignores them and starts fresh (`app/cbl/COCRDLIC.cbl:458-482`); the menu keeps them in the commarea it passes to its next choice (shared contract 4). |
 | Availability | Unavailable (file error) while the card file is closed for reload. |
 
 ## 12. Numeric, date and format details
@@ -649,7 +649,7 @@ None of these were changed in this branch: `COCRDSLC.cbl`, its BMS and symbolic 
 - **Confidence:** reviewed
 
 #### DEF-CRDV-003 · Intended reset on entry from the menu never takes effect
-- The intake tests "called from the menu, first entry" to reset the commarea, but it tests the program's own working-storage copy before the received commarea is copied into it (FLOW-CRDV-001), so the test is never true and the menu's commarea is always copied. Consequences: (a) the session data (user ID, user type) is kept, which is probably the better outcome; (b) a non-zero account or card number left in the commarea (for example by an earlier visit to the card list, shared contract 4 in section 11) is kept too, and the first screen then shows that search field filled with spaces instead of empty or prefilled; each field is affected on its own (FLOW-CRDV-006); (c) the code suggests that the author expected a clean start from the menu, so a target that "fixes" the test would discard the user ID.
+- The intake tests "called from the menu, first entry" to reset the commarea, but it tests the program's own working-storage copy before the received commarea is copied into it (FLOW-CRDV-001), so the test is never true and the menu's commarea is always copied. Consequences: (a) the session data (user ID, user type) is kept, which is probably the better outcome; (b) a non-zero account or card number left in the commarea (for example filters typed in the card list and then left with PF3, `app/cbl/COCRDLIC.cbl:384-405`, this program's own PF3 to the menu, or the account view's PF3) is kept too, and the first screen then shows that search field filled with spaces instead of empty or prefilled; each field is affected on its own (FLOW-CRDV-006); (c) the code suggests that the author expected a clean start from the menu, so a target that "fixes" the test would discard the user ID.
 - **Source:** `:268-279, 462-472`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDV-003)
@@ -726,11 +726,11 @@ None of these were changed in this branch: `COCRDSLC.cbl`, its BMS and symbolic 
 - **Confidence:** reviewed
 
 #### DEF-CRDV-014 · Clear or PA key on the list-called screen loses the card
-- On the screen reached from the card list (BR-CRDV-003), Clear, PA1 and PA2 are processed as Enter (FLOW-CRDV-002), but the receive finds no field data (ERR-CRDV-004). The edits see both search fields as blank, set `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` to zero and show `No input received`; the search fields stay protected (the protection test does not depend on the edits) but now show a red `*`, and no card details are shown. Every later Enter receives the `*` back, so the same error repeats and the card cannot be shown again. Only PF3 leads out, and it passes the zeros back to the list (FLOW-CRDV-004).
+- On the screen reached from the card list (BR-CRDV-003), Clear, PA1, PA2 and PA3 are processed as Enter (FLOW-CRDV-002), but the receive finds no field data (ERR-CRDV-004). The edits see both search fields as blank, set `CDEMO-ACCT-ID` and `CDEMO-CARD-NUM` to zero and show `No input received`; the search fields stay protected (the protection test does not depend on the edits) but now show a red `*`, and no card details are shown. Every later Enter receives the `*` back, so the same error repeats and the card cannot be shown again. Only PF3 leads out, and it passes the zeros back to the list (FLOW-CRDV-004).
 - **Source:** `:297-299, 357-363, 596-603, 615-627, 651-660, 691-701, 505-508, 541-551`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDV-004)
-- **Confidence:** platform-inferred (no field data after Clear, PA1 or PA2, and the input area content after MAPFAIL, Q-CRDV-005)
+- **Confidence:** platform-inferred (no field data after Clear, PA1, PA2 or PA3, and the input area content after MAPFAIL, Q-CRDV-005)
 ## 14. Open questions
 
 | ID | Question | For |

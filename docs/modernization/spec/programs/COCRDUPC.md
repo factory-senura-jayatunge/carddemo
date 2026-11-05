@@ -1016,7 +1016,7 @@ Sample card used below (`app/data/ASCII/carddata.txt:1`, `app/data/ASCII/cardxre
 | S23 | card list, `U` on the sample card's row | - | Details as S7 without a search screen |
 | S24 | any | PF3 | XCTL to the caller (`COMEN01C` or `COCRDLIC`), commarea user type `U`, context 0 |
 | S25 | Details reached from the menu (S7), card deleted meanwhile | PF12 | still Details (DEF-CRDU-021): message `No change detected with respect to values fetched.` (set by the edit, so the not-found text is suppressed), both keys red, name `ANIYA VON` and status `Y` kept, expiry month and year undefined |
-| S26 | search | account `0`, card `0500024453765740` | `Account number not provided` on GnuCOBOL (VAL-CRDU-001; mainframe per Q-CRDU-006) |
+| S26 | search | account `0`, card `0500024453765740` | `Account number not provided` on GnuCOBOL (VAL-CRDU-001; mainframe per Q-CRDU-006); the account field shows a red `*` instead of `0`, cursor on the account field, still the search screen (`:656-661, 1215-1217, 1247-1250`) |
 
 These scenarios cannot run locally (no CICS); they become acceptance tests for the target. The GnuCOBOL observations in NUM-CRDU-003 and NUM-CRDU-004 come from a small probe program compiled with the repository's flags; they show GnuCOBOL semantics, not the mainframe's. Review evidence (independent reviewer, every item checked, all WRONG and IMPRECISE findings fixed): [evidence/b-accounts-cards-review.md](../evidence/b-accounts-cards-review.md).
 
@@ -1074,4 +1074,4 @@ These scenarios cannot run locally (no CICS); they become acceptance tests for t
 | `ABEND-ROUTINE-EXIT` | 1554-1556 | FLOW-CRDU-020 |
 | (trailer, lines 1557-1560) | 1557-1560 | comment lines only (version stamp); no behaviour |
 
-43 of 43 program paragraphs covered, plus the two copybook paragraphs (45 in total), the data division and the trailer; no paragraph is unmapped.
+45 of 45 program paragraphs covered, plus the two copybook paragraphs (47 in total), the data division and the trailer; no paragraph is unmapped.

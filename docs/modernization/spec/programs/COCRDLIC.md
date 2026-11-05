@@ -758,7 +758,7 @@ None of these were changed in this branch: `COCRDLIC.cbl`, its BMS and symbolic 
 - **Confidence:** reviewed
 
 #### DEF-CRDL-009 · Backward paging to the start of the file shows a file error
-- When fewer than 7 cards (that pass the filter) lie before the first card of the page, the backward read reaches the start of the file. End of file is not handled: when the new page number is above 1, the screen shows `File Error: READ     on CARDDAT   returned RESP 000000020 ,RESP2 ...`, the rows found are in the bottom rows with blank rows above, the first key is not updated and the page number is already decreased. When the new page number is 1 (PF7 from page 2), the message is `NO PREVIOUS PAGES TO DISPLAY` instead and the information line is blank (FLOW-CRDL-016 row 2, DEF-CRDL-019); if no earlier card passes the filter, all rows are empty, because the only card read is the discarded start card. This is the common case after DEF-CRDL-007 on page 2 and after DEF-CRDL-008 from page 1. This happens after DEF-CRDL-006, DEF-CRDL-007 or DEF-CRDL-008, or after the page counter wrapped (DEF-CRDL-010).
+- When fewer than 7 cards (that pass the filter) lie before the first card of the page, the backward read reaches the start of the file. End of file is not handled: when the new page number is above 1, the screen shows `File Error: READ     on CARDDAT   returned RESP 000000020 ,RESP2 ...`, the rows found are in the bottom rows with blank rows above, the first key is not updated and the page number is already decreased. When the new page number is 1 (PF7 from page 2), the message is `NO PREVIOUS PAGES TO DISPLAY` instead and the information line is blank (FLOW-CRDL-016 row 2, DEF-CRDL-019); if no earlier card passes the filter, all rows are empty: either the start card is the first card of the file (DEF-CRDL-007), or every earlier card was read and skipped by the filter (DEF-CRDL-008, `:1320-1359`). This is the common case after DEF-CRDL-007 on page 2 and after DEF-CRDL-008 from page 1. This happens after DEF-CRDL-006, DEF-CRDL-007 or DEF-CRDL-008, or after the page counter wrapped (DEF-CRDL-010).
 - **Source:** `:1304-1318, 1361-1369, 1347-1353, 901-904`
 - **Status:** open
 - **Fidelity:** defect-decide
@@ -877,7 +877,7 @@ A reimplementation must reproduce, for each scenario: the rows shown (account, c
 | S21 | card detail shown from the list | PF3 there | list page `1`, all cards, filters empty; commarea user ID blank (DEF-CRDL-005) |
 | S22 | page 3 (first record 15) | account filter `00000000002`, Enter | page `3`; no rows; `NO MORE RECORDS TO SHOW` (current behaviour, DEF-CRDL-006) |
 | S23 | page 2 | `X` on row 2, Enter | page `2` shown with records 1-7 (current behaviour, DEF-CRDL-007); `INVALID ACTION CODE` |
-| S24 | any | Clear (or PA1, PA2, PA3) | unfiltered refresh from the first card of the page, page number unchanged, no message (no screen data arrives; platform-inferred, ERR-CRDL-003) |
+| S24 | any | Clear (or PA1, PA2, PA3) | unfiltered refresh from the first card of the page, page number unchanged; no message, or `NO MORE RECORDS TO SHOW` when the refreshed page reaches the end of the file (no screen data arrives; platform-inferred, ERR-CRDL-003) |
 
 These scenarios cannot run locally (no CICS); they become acceptance tests for the target. S3 and S21-S23 describe current behaviour that the decisions in sections 13 and 14 may change. Review evidence (independent reviewer, every item checked, all WRONG and IMPRECISE findings fixed): [evidence/b-accounts-cards-review.md](../evidence/b-accounts-cards-review.md).
 

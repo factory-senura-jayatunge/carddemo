@@ -167,3 +167,35 @@ COACTUPC was written in two parts, and each part was reviewed by a different rev
 | O2: failed F12 re-read | Omission | DEF-ACUP-019 |
 | O3: Enter in the error state with restored values | Omission | FLOW-ACUP-009 row 3 |
 | O4: no question about the FILLER content | Omission | DEF-ACUP-020, Q-ACUP-010 |
+
+## 3. Re-check of the fixes
+
+Two fresh reviewers, who had not seen the first review, re-read every item that the fixes in section 2 changed or added, plus the user-type and no-sign-on items shared by the five specs. They judged each item against the current source and did not trust the first reviewers' claims. Both compiled GnuCOBOL probes (`cobc -x -std=ibm -fsign=EBCDIC`) for the zero comparisons of partly blank numeric fields and the unsigned page counter, and checked the sample data in `app/data/ASCII`.
+
+| Spec | Re-checked | CORRECT | WRONG | IMPRECISE | UNVERIFIABLE | New contradictions |
+| :-- | --: | --: | --: | --: | --: | --: |
+| COACTUPC (validation part) | 19 | 19 | 0 | 0 | 0 | 0 |
+| COACTUPC (flow and update part) | 37 | 35 | 0 | 2 | 0 | 1 |
+| COCRDUPC | 21 | 19 | 1 | 1 | 0 | 0 |
+| COCRDLIC | 27 | 25 | 0 | 2 | 0 | 2 |
+| COCRDSLC | 14 | 7 | 2 | 5 | 0 | 2 |
+| COACTVWC | 19 | 18 | 0 | 0 | 1 | 0 |
+| **Total** | **137** | **123** | **3** | **10** | **1** | **5** |
+
+WRONG among the re-checked items: 2.2% (3 of 137); WRONG or IMPRECISE: 9.5%. All three WRONG items were introduced by the fixes: two followed a first-review omission (COCRDSLC O2) that was itself wrong, and one repeated a wrong paragraph count from the first review. Every WRONG and IMPRECISE finding is now fixed:
+
+| Spec | Item | Verdict | Change |
+| :-- | :-- | :-- | :-- |
+| COCRDSLC | Section 11 shared contract (4) | WRONG | The card list does not show or keep the returned account and card number. PF3 reaches it with the key still PF3, and its "PF3 from another program" branch clears the whole commarea (`app/cbl/COCRDLIC.cbl:458-482`), as COCRDLIC FLOW-CRDL-008 already said. Only the menu keeps the numbers. |
+| COCRDSLC | Section 11 module extraction, Exit row | WRONG | Restored: the card list starts fresh; the menu keeps the numbers. |
+| COCRDSLC | DEF-CRDV-003 | IMPRECISE | The example paths for non-zero numbers in the commarea now name the list's own PF3 (`app/cbl/COCRDLIC.cbl:384-405`), this program's PF3 to the menu and the account view's PF3. |
+| COCRDSLC | BR-CRDV-003, FLOW-CRDV-002, ERR-CRDV-004, DEF-CRDV-014 | IMPRECISE (4) | PA3 added to the keys that send no field data. `CSSTRPFY` does not map PA3, so it is treated as Enter, and it loses the card in the same way (`app/cpy/CSSTRPFY.cpy:26-28`). |
+| COCRDLIC | DEF-CRDL-009 | IMPRECISE | Empty rows on page 1: either the start card is the first card of the file, or every earlier card was read and skipped by the filter (`app/cbl/COCRDLIC.cbl:1320-1359`). |
+| COCRDLIC | S24 | IMPRECISE | The Clear refresh shows `NO MORE RECORDS TO SHOW` when the page reaches the end of the file. |
+| COCRDUPC | Section 16 closing line | WRONG | 45 of 45 program paragraphs, plus 2 copybook paragraphs (47 in total). |
+| COCRDUPC | S26 | IMPRECISE | Screen effect added: red `*` in the account field, cursor on it, search screen kept. |
+| COACTUPC | FLOW-ACUP-009 row 3 and the section 6 diagram edge | IMPRECISE (2) | `No change detected ...` after restoring every value only applies to a record with no blank optional field. Otherwise (every sample account) the edits run again (DEF-ACUP-122). |
+
+The UNVERIFIABLE item is COACTVWC BR-ACVW-001 (record locking and read integrity of CICS reads); it stays tagged platform-inferred. One item outside the re-check scope was fixed with the same PA3 cause: COACTVWC section 8 key table and S14. The user-type claim was confirmed in all five specs: only COCRDLIC sets user type `U` on a start without a commarea (`app/cbl/COCRDLIC.cbl:320`); the other four set it only on PF3.
+
+After the fixes, `check_spec.py` over all specs reports 0 errors and 0 warnings.
