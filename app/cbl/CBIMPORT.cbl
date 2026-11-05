@@ -37,7 +37,7 @@
            SELECT EXPORT-INPUT ASSIGN TO EXPFILE
                ORGANIZATION IS INDEXED
                ACCESS MODE IS SEQUENTIAL
-               RECORD KEY IS EXPORT-SEQUENCE-NUM
+               RECORD KEY IS EXPORT-IN-SEQUENCE-KEY
                FILE STATUS IS WS-EXPORT-STATUS.
                
            SELECT CUSTOMER-OUTPUT ASSIGN TO CUSTOUT
@@ -76,7 +76,12 @@
        FD  EXPORT-INPUT
            RECORDING MODE IS F
            RECORD CONTAINS 500 CHARACTERS.
-       01  EXPORT-INPUT-RECORD                        PIC X(500).
+      * The key must be inside the file's record: same bytes as
+      * EXPORT-SEQUENCE-NUM in CVEXPORT (offset 27, length 4).
+       01  EXPORT-INPUT-RECORD.
+           05  FILLER                                  PIC X(27).
+           05  EXPORT-IN-SEQUENCE-KEY                  PIC X(04).
+           05  FILLER                                  PIC X(469).
 
        FD  CUSTOMER-OUTPUT
            RECORDING MODE IS F
@@ -287,6 +292,7 @@
       *****************************************************************
        2300-PROCESS-CUSTOMER-RECORD.
       *****************************************************************
+           MOVE SPACES TO CUSTOMER-RECORD
            INITIALIZE CUSTOMER-RECORD
            
       *    Map export fields to customer record
@@ -322,6 +328,7 @@
       *****************************************************************
        2400-PROCESS-ACCOUNT-RECORD.
       *****************************************************************
+           MOVE SPACES TO ACCOUNT-RECORD
            INITIALIZE ACCOUNT-RECORD
            
       *    Map export fields to account record
@@ -351,6 +358,7 @@
       *****************************************************************
        2500-PROCESS-XREF-RECORD.
       *****************************************************************
+           MOVE SPACES TO CARD-XREF-RECORD
            INITIALIZE CARD-XREF-RECORD
            
       *    Map export fields to xref record
@@ -371,6 +379,7 @@
       *****************************************************************
        2600-PROCESS-TRAN-RECORD.
       *****************************************************************
+           MOVE SPACES TO TRAN-RECORD
            INITIALIZE TRAN-RECORD
            
       *    Map export fields to transaction record
@@ -401,6 +410,7 @@
       *****************************************************************
        2650-PROCESS-CARD-RECORD.
       *****************************************************************
+           MOVE SPACES TO CARD-RECORD
            INITIALIZE CARD-RECORD
            
       *    Map export fields to card record

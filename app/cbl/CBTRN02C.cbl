@@ -184,7 +184,7 @@
         01 WS-COUNTERS.                                                         
            05 WS-TRANSACTION-COUNT          PIC 9(09) VALUE 0.                  
            05 WS-REJECT-COUNT               PIC 9(09) VALUE 0.                  
-           05 WS-TEMP-BAL                   PIC S9(09)V99.                      
+           05 WS-TEMP-BAL                   PIC S9(11)V99.                      
                                                                                 
         01 WS-FLAGS.                                                            
            05 WS-CREATE-TRANCAT-REC         PIC X(01) VALUE 'N'.                
@@ -422,6 +422,7 @@
            EXIT.                                                                
       *---------------------------------------------------------------*         
        2000-POST-TRANSACTION.                                                   
+           MOVE SPACES TO TRAN-RECORD
            MOVE  DALYTRAN-ID            TO    TRAN-ID                           
            MOVE  DALYTRAN-TYPE-CD       TO    TRAN-TYPE-CD                      
            MOVE  DALYTRAN-CAT-CD        TO    TRAN-CAT-CD                       

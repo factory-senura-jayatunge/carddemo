@@ -1,0 +1,127 @@
+"""The read/print utilities (READACCT, READCARD, READXREF, READCUST) and TRANVALD."""
+from __future__ import annotations
+
+from decimal import Decimal
+
+from tests import oracle
+from tests.oracle import ACCOUNT, DALYTRAN, XREF, Record, zoned
+from tests.support import CardDemoTestCase, carddemo
+
+
+def program_lines(sysout: str, program: str) -> list[str]:
+    """SYSOUT lines between the program's START and END banners."""
+    lines = sysout.splitlines()
+    start = lines.index(f"START OF EXECUTION OF PROGRAM {program}")
+    end = lines.index(f"END OF EXECUTION OF PROGRAM {program}")
+    return lines[start + 1:end]
+
+
+def in_key_order(filename: str, key_len: int) -> list[str]:
+    return sorted(oracle.sample_records(filename), key=lambda r: r[:key_len])
+
+
+class ReaderJobsTest(CardDemoTestCase):
+    def test_readcard_prints_every_card_in_key_order(self):
+        _, (res,) = self.run_job("READCARD")
+        self.assert_rc(res, 0)
+        self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBACT02C")],
+                         [r.rstrip() for r in in_key_order("carddata.txt", 16)])
+
+    def test_readxref_prints_every_xref_record_once(self):
+        _, (res,) = self.run_job("READXREF")
+        self.assert_rc(res, 0)
+        expected = [r.rstrip() for r in in_key_order("cardxref.txt", 16)]
+        self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBACT03C")], expected)
+
+    def test_readcust_prints_every_customer_once(self):
+        _, (res,) = self.run_job("READCUST")
+        self.assert_rc(res, 0)
+        expected = [r.rstrip() for r in in_key_order("custdata.txt", 9)]
+        self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBCUS01C")], expected)
+
+    def test_readacct_writes_the_three_extract_files(self):
+        # Every sample account has a zero cycle debit; give some a non-zero one,
+        # next to zero ones, so both branches of the debit rule are exercised.
+        debits = {1: Decimal("123.45"), 2: Decimal("-67.89"), 5: Decimal("2525.01")}
+        raws = [r.encode("latin-1") for r in in_key_order("acctdata.txt", 11)]
+        raws = [oracle.set_fields(ACCOUNT, r, **{"ACCT-CURR-CYC-DEBIT": debits[i]}) if i in debits else r
+                for i, r in enumerate(raws)]
+        work = self.new_work()
+        work.load_ksds("ACCTDATA", raws)
+        _, (res,) = self.run_job("READACCT", work)
+        self.assert_rc(res, 0)
+        accounts = [Record(ACCOUNT, r) for r in raws]
+        out = carddemo.read_fixed(res.outputs["OUTFILE"][0], 107)
+        arry = carddemo.read_fixed(res.outputs["ARRYFILE"][0], 110)
+        vbrc = carddemo.read_vb(res.outputs["VBRCFILE"][0])
+        self.assertEqual((len(out), len(arry), len(vbrc)), (len(accounts), len(accounts), 2 * len(accounts)))
+        for i, a in enumerate(accounts):
+            with self.subTest(account=a.raw("ACCT-ID")):
+                o = out[i].decode("latin-1")
+                # OUT-ACCT-REC: id, status, balance, limits and dates copied; the reissue
+                # date converted by COBDATFT from YYYY-MM-DD to YYYYMMDD, which leaves
+                # the last two bytes of the X(10) field blank.
+                self.assertEqual(o[:48], a.text[:48])
+                self.assertEqual(o[48:68], a.text[48:68])
+                self.assertEqual(o[68:78], a.raw("ACCT-REISSUE-DATE").replace("-", "").ljust(10))
+                self.assertEqual(zoned(o[78:90], 2), a["ACCT-CURR-CYC-CREDIT"])
+                # The cycle debit is copied (COMP-3); a zero debit is replaced by 2525.00.
+                debit = a["ACCT-CURR-CYC-DEBIT"]
+                self.assertEqual(oracle.unpack_comp3(out[i][90:97], 2),
+                                 debit if debit != 0 else Decimal("2525.00"))
+                self.assertEqual(o[97:107], a.raw("ACCT-GROUP-ID").ljust(10))
+
+                r = arry[i]
+                self.assertEqual(r[:11].decode(), a.raw("ACCT-ID"))
+                slots = [(zoned(r[11 + 19 * k:23 + 19 * k].decode("latin-1"), 2),
+                          oracle.unpack_comp3(r[23 + 19 * k:30 + 19 * k], 2)) for k in range(5)]
+                bal = a["ACCT-CURR-BAL"]
+                self.assertEqual(slots, [(bal, Decimal("1005.00")), (bal, Decimal("1525.00")),
+                                         (Decimal("-1025.00"), Decimal("-2500.00")),
+                                         (0, 0), (0, 0)])
+                self.assertEqual(r[106:], b"    ")
+
+                self.assertEqual(vbrc[2 * i].decode("latin-1"), a.text[:12])
+                self.assertEqual(vbrc[2 * i + 1].decode("latin-1"),
+                                 a.raw("ACCT-ID") + a.text[12:36] + a.raw("ACCT-REISSUE-DATE")[:4])
+
+    def test_tranvald_verifies_cards_and_accounts(self):
+        work = self.new_work()
+        base = oracle.sample_records("dailytran.txt")[0].encode("latin-1")
+        orphan = oracle.build_record(XREF, **{"XREF-CARD-NUM": "4999999999999999",
+                                              "XREF-CUST-ID": "000000001", "XREF-ACCT-ID": "99999999999"})
+        xref = sorted([r.encode("latin-1") for r in oracle.sample_records("cardxref.txt")] + [orphan],
+                      key=lambda r: r[:16])
+        work.load_ksds("CARDXREF", xref)
+        daily = [oracle.set_fields(DALYTRAN, base, **{"DALYTRAN-ID": "V000000000000002",
+                                                      "DALYTRAN-CARD-NUM": "0000000000000000"}),
+                 oracle.set_fields(DALYTRAN, base, **{"DALYTRAN-ID": "V000000000000003",
+                                                      "DALYTRAN-CARD-NUM": "4999999999999999"}),
+                 oracle.set_fields(DALYTRAN, base, **{"DALYTRAN-ID": "V000000000000001"})]
+        carddemo.write_fixed(work.dataset_path("DALYTRAN"), daily, 350)
+        _, (res,) = self.run_job("TRANVALD", work)
+        self.assert_rc(res, 0)
+        lines = [l.rstrip() for l in program_lines(res.sysout, "CBTRN01C")]
+        # Per daily record, in file order: the record, its xref lookup (2000-LOOKUP-XREF)
+        # and, for a known card, its account read (3000-READ-ACCOUNT). Nothing after
+        # the last record.
+        xref_by_card = oracle.keyed(oracle.records_of(XREF, xref), "XREF-CARD-NUM")
+        accounts = {r.raw("ACCT-ID") for r in oracle.sample(ACCOUNT, "acctdata.txt")}
+        expected = []
+        for rec in daily:
+            t = Record(DALYTRAN, rec)
+            card = t.raw("DALYTRAN-CARD-NUM")
+            expected.append(rec.decode("latin-1").rstrip())
+            x = xref_by_card.get(card)
+            if x is None:
+                expected += ["INVALID CARD NUMBER FOR XREF",
+                             f"CARD NUMBER {card} COULD NOT BE VERIFIED. "
+                             f"SKIPPING TRANSACTION ID-{t.raw('DALYTRAN-ID')}"]
+                continue
+            expected += ["SUCCESSFUL READ OF XREF", f"CARD NUMBER: {card}",
+                         f"ACCOUNT ID : {x.raw('XREF-ACCT-ID')}", f"CUSTOMER ID: {x.raw('XREF-CUST-ID')}"]
+            if x.raw("XREF-ACCT-ID") in accounts:
+                expected.append("SUCCESSFUL READ OF ACCOUNT FILE")
+            else:
+                expected += ["INVALID ACCOUNT NUMBER FOUND", f"ACCOUNT {x.raw('XREF-ACCT-ID')} NOT FOUND"]
+        self.assertEqual(lines, expected)

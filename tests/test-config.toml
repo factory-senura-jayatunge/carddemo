@@ -1,0 +1,26 @@
+# Test suite configuration, read by tests/run_tests.py.
+
+[naming]
+# Python test modules: tests/unit/test_*.py and tests/integration/test_*.py.
+# Classes end in "Test"; methods start with "test_". The runner fails on
+# files in the suite directories that break these rules.
+python_module_pattern = "test_*.py"
+class_suffix = "Test"
+method_prefix = "test_"
+# COBOL test drivers, compiled to build/<variant>/tests/<stem>.
+cobol_driver_glob = "*/cobol/*_test.cbl"
+suites = ["unit", "integration"]
+# Non-test helper modules allowed next to the tests.
+helpers = ["__init__.py"]
+
+[run]
+retries = 2              # extra attempts for a failing test; a pass on retry is reported as flaky
+shuffle = true           # random order (seed printed) to catch order dependence
+program_timeout_seconds = 120  # per COBOL program run (CARDDEMO_TEST_TIMEOUT overrides)
+
+[coverage]
+# Paragraph coverage (program entry + paragraphs reached under -ftrace) over
+# every CardDemo program in tools/batch-programs.toml. The run fails below this.
+# Measured 87.0% (187/215); the gap is mostly CBSTM03A (26 entries), which
+# reads z/OS control blocks and is not run.
+min_percent = 85

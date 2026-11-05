@@ -216,10 +216,11 @@
                        PERFORM 1400-COMPUTE-FEES                                
                      END-IF                                                     
                    END-IF                                                       
-               ELSE                                                             
-                    PERFORM 1050-UPDATE-ACCOUNT                                 
                END-IF                                                           
            END-PERFORM.                                                         
+           IF WS-FIRST-TIME NOT = 'Y'
+               PERFORM 1050-UPDATE-ACCOUNT
+           END-IF.
                                                                                 
            PERFORM 9000-TCATBALF-CLOSE.                                         
            PERFORM 9100-XREFFILE-CLOSE.                                         
@@ -471,6 +472,7 @@
                                                                                 
       *---------------------------------------------------------------*         
        1300-B-WRITE-TX.                                                         
+           MOVE SPACES TO TRAN-RECORD
            ADD 1 TO WS-TRANID-SUFFIX                                            
                                                                                 
            STRING PARM-DATE,                                                    
