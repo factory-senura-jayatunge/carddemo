@@ -1,6 +1,6 @@
 # CardDemo component map
 
-System-level map of programs, entry points, data stores, CRUD and cross-component invariants. It started with the slice around the two pilot units, `COBIL00C` (bill payment) and `CBTRN02C` (POSTTRAN), and holds the proposals merged from areas a (sign-on and administration), c (transactions), d1 (core batch) and f (transaction type Db2 module and VSAM-MQ module). Sources: `docs/inventory.md`, `app/csd/CARDDEMO.CSD`, `app/jcl/`, `app/scheduler/`, `docs/runbooks/batch-cycle-restart.md`, the program and job specs and the `areas/` proposals. Components marked *(not yet decomposed)* are named from the inventory only; their behaviour will be specified when their own specs are merged.
+System-level map of programs, entry points, data stores, CRUD and cross-component invariants. It started with the slice around the two pilot units, `COBIL00C` (bill payment) and `CBTRN02C` (POSTTRAN), and holds the proposals merged from areas a (sign-on and administration), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Sources: `docs/inventory.md`, `app/csd/CARDDEMO.CSD`, `app/jcl/`, `app/scheduler/`, `docs/runbooks/batch-cycle-restart.md`, the program and job specs and the `areas/` proposals. Components marked *(not yet decomposed)* are named from the inventory only; their behaviour will be specified when their own specs are merged.
 
 ## Component map
 
@@ -26,9 +26,20 @@ System-level map of programs, entry points, data stores, CRUD and cross-componen
 | `CBTRN03C` | batch | job `TRANREPT` step `STEP10R` | core | Transaction detail report | [programs/CBTRN03C.md](programs/CBTRN03C.md) |
 | `CBTRN01C` | batch | `TRANVALD` (no JCL, no schedule) | core | Daily transaction validation that writes nothing | [programs/CBTRN01C.md](programs/CBTRN01C.md) |
 | `CBACT01C`, `CBACT02C`, `CBACT03C`, `CBCUS01C` | batch | jobs `READACCT`, `READCARD`, `READXREF`, `READCUST` | core | File readers; READACCT also writes three extract files | [CBACT01C](programs/CBACT01C.md), [CBACT02C](programs/CBACT02C.md), [CBACT03C](programs/CBACT03C.md), [CBCUS01C](programs/CBCUS01C.md) |
+| `CBSTM03A` | batch | job `CREASTMT` step `STEP040` | core | Account statements (text and HTML) for every card in the cross-reference | [programs/CBSTM03A.md](programs/CBSTM03A.md) |
+| `CBSTM03B` | batch subprogram | CALL from CBSTM03A | core | File access for the statement program (four DDs, one request area) | [programs/CBSTM03B.md](programs/CBSTM03B.md) |
+| `CBEXPORT` | batch | job `CBEXPORT` step `STEP02` | core | Branch migration export: five master files into one multi-record file | [programs/CBEXPORT.md](programs/CBEXPORT.md) |
+| `CBIMPORT` | batch | job `CBIMPORT` step `STEP01` | core | Branch migration import: the export file back into five sequential files and an error file | [programs/CBIMPORT.md](programs/CBIMPORT.md) |
+| `COBSWAIT` | batch | job `WAITSTEP` step `WAIT` | core | Waits for the interval on its SYSIN card | [programs/COBSWAIT.md](programs/COBSWAIT.md) |
+| `MVSWAIT` | assembler subroutine (shim locally) | CALL from COBSWAIT | core | `STIMER WAIT` for a binary interval in hundredths of a second | [programs/MVSWAIT.md](programs/MVSWAIT.md) |
+| `COBDATFT` | assembler subroutine (shim locally) | CALL from CBACT01C (job `READACCT`) | core | Date format conversion in the caller's parameter block | [programs/COBDATFT.md](programs/COBDATFT.md) |
+| CREASTMT | JCL (IDCAMS, SORT, IEFBR14, program) | CA-7, after CLOSEFIL | core | Rebuilds the TRXFL work file, deletes the previous statements, runs CBSTM03A | - |
+| CBEXPORT, CBIMPORT | JCL (IDCAMS, program) | not scheduled | core | Run the export and import programs | - |
+| WAITSTEP | JCL (program) | CA-7 and Control-M, between jobs | core | Runs COBSWAIT | - |
+| TXT2PDF1 | JCL (TSO REXX) | CA-7, after CREASTMT | core | Converts `STATEMNT.PS` to PDF | - |
 | CLOSEFIL, OPENFIL | JCL (CEMT) | batch cycle steps 1 and 9 | core | Close and reopen the CICS files around the batch window | - |
 | TRANBKP, COMBTRAN, TRANIDX | JCL (IDCAMS, SORT) | batch cycle steps 5, 6, 8 | core | Back up, rebuild and re-index `TRANSACT` | - |
-| `CEE3ABD`, `CEEDAYS` | LE services (shims locally) | CALL | runtime | Abend for batch programs; date conversion for CSUTLDTC | - |
+| `CEE3ABD`, `CEEDAYS` | LE services (shims locally) | CALL | runtime | Abend for batch programs (CBEXPORT, CBIMPORT and CBSTM03A call it without arguments, so their abend code is not set); date conversion for CSUTLDTC | - |
 | `COTRTLIC` | online, Db2 | `CTLI` | transaction type (Db2) | Transaction type list, update and delete | [programs/COTRTLIC.md](programs/COTRTLIC.md) |
 | `COTRTUPC` | online, Db2 | `CTTU` | transaction type (Db2) | Transaction type maintenance (add, update, delete) | [programs/COTRTUPC.md](programs/COTRTUPC.md) |
 | `COBTUPDT` | batch, Db2 | job `MNTTRDB2` | transaction type (Db2) | Batch type maintenance from `INPFILE` | [programs/COBTUPDT.md](programs/COBTUPDT.md) |
@@ -52,6 +63,12 @@ Online programs name a store by its CICS file name and batch programs by DD name
 | Report extract | ENT-TRANSACTION | `TRANSACT.DALY(+1)`, sorted by card | - | `TRANFILE` (CBTRN03C) | - |
 | Category balances | ENT-TCAT-BAL | `TCATBALF.VSAM.KSDS` | - | `TCATBALF` | account + type + category |
 | Daily transactions | ENT-DAILY-TRAN | `DALYTRAN.PS` | - | `DALYTRAN` | - |
+| Statement work file | ENT-STMT-TRAN | `TRXFL.SEQ`, then `TRXFL.VSAM.KSDS` | - | `TRNXFILE` | card + transaction ID (32 bytes) |
+| Text statements | - (80-byte print lines) | `STATEMNT.PS` | - | `STMTFILE` | - |
+| HTML statements | - (100-byte HTML lines) | `STATEMNT.HTML` | - | `HTMLFILE` | - |
+| Export file | ENT-EXPORT-RECORD | `EXPORT.DATA` (KSDS) | - | `EXPFILE` | sequence number (offset 27 in the programs, `KEYS(4 28)` in IDCAMS) |
+| Import outputs | ENT-CUSTOMER, ENT-ACCOUNT, ENT-CARD-XREF, ENT-TRANSACTION, ENT-CARD | `CUSTDATA.IMPORT`, `ACCTDATA.IMPORT`, `CARDXREF.IMPORT`, `TRANSACT.IMPORT`, `CARDDATA.IMPORT` | - | `CUSTOUT`, `ACCTOUT`, `XREFOUT`, `TRNXOUT`, `CARDOUT` | - |
+| Import errors | ENT-IMPORT-ERROR | `IMPORT.ERRORS` | - | `ERROUT` | - |
 | Daily rejects | ENT-DAILY-REJECT | `DALYREJS(+1)` GDG | - | `DALYREJS` | - |
 | Transaction types, categories | ENT-TRAN-TYPE, ENT-TRAN-CATEGORY | `TRANTYPE.VSAM.KSDS`, `TRANCATG.VSAM.KSDS` | - | `TRANTYPE`, `TRANCATG` | type; type + category |
 | Disclosure groups | ENT-DISC-GROUP | `DISCGRP.VSAM.KSDS` | - | `DISCGRP` | group + type + category |
@@ -127,6 +144,22 @@ R = read, RU = read for update, C = create, U = update, D = delete, B = browse.
 | COACCT01 | `CARD.DEMO.REPLY.ACCT` (ENT-MQ-ACCT-REPLY), `CARD.DEMO.ERROR` (ENT-MQ-ERROR-MSG) | C | SE-MQAC-003, SE-MQAC-004 | f |
 | CODATE01 | input queue | D (destructive get) | SE-MQDT-001 | f |
 | CODATE01 | `CARD.DEMO.REPLY.DATE` (ENT-MQ-DATE-REPLY), `CARD.DEMO.ERROR` (ENT-MQ-ERROR-MSG) | C | SE-MQDT-002, SE-MQDT-003 | f |
+| CBSTM03A (through CBSTM03B) | TRXFL (ENT-STMT-TRAN) | B (sequential, whole file into a table) | FLOW-STMT-003, SE-STIO-001 | d2 |
+| CBSTM03A (through CBSTM03B) | CARDXREF (ENT-CARD-XREF) | B (sequential) | FLOW-STMT-004, SE-STIO-002 | d2 |
+| CBSTM03A (through CBSTM03B) | CUSTDATA (ENT-CUSTOMER) | R (by `CUST-ID`) | BR-STMT-004, SE-STIO-003 | d2 |
+| CBSTM03A (through CBSTM03B) | ACCTDATA (ENT-ACCOUNT) | R (by `ACCT-ID`) | BR-STMT-004, SE-STIO-004 | d2 |
+| CBSTM03A | STATEMNT.PS (text statements) | C | SE-STMT-001 | d2 |
+| CBSTM03A | STATEMNT.HTML | C | SE-STMT-002 | d2 |
+| CREASTMT DELDEF01, STEP010, STEP020 | TRANSACT; TRXFL.SEQ; TRXFL.VSAM.KSDS | TRANSACT B (sort input); TRXFL.SEQ D, C, then R; TRXFL KSDS D, C | CBSTM03A §3 (Earlier steps of the same job) | d2 |
+| CREASTMT STEP030 | STATEMNT.PS, STATEMNT.HTML | D | CBSTM03A §3 (Earlier steps of the same job) | d2 |
+| TXT2PDF1 | STATEMNT.PS; STATEMNT.PS.PDF | R; C | CBSTM03A §4 (Downstream) | d2 |
+| CBEXPORT | CUSTDATA, ACCTDATA, CARDXREF, TRANSACT, CARDDATA | B (sequential, key order) | SE-EXPT-002 | d2 |
+| CBEXPORT job STEP01 | EXPORT.DATA | D, then define | DEF-EXPT-002 | d2 |
+| CBEXPORT | EXPORT.DATA (ENT-EXPORT-RECORD) | C | SE-EXPT-001 | d2 |
+| CBIMPORT | EXPORT.DATA (ENT-EXPORT-RECORD) | B (sequential, key order) | FLOW-IMPT-003 | d2 |
+| CBIMPORT | CUSTDATA.IMPORT, ACCTDATA.IMPORT, CARDXREF.IMPORT, TRANSACT.IMPORT, CARDDATA.IMPORT | C | SE-IMPT-002..006 | d2 |
+| CBIMPORT | IMPORT.ERRORS (ENT-IMPORT-ERROR) | C | SE-IMPT-007 | d2 |
+| COBSWAIT | SYSIN control card (`WAITSTEP.jcl` in-stream) | R | BR-WAIT-001 | d2 |
 
 The interaction diagrams and edges are in [interactions.md](interactions.md).
 
@@ -157,6 +190,10 @@ The interaction diagrams and edges are in [interactions.md](interactions.md).
 | INV-019 | The Db2 tables and the VSAM files ENT-TRAN-TYPE and ENT-TRAN-CATEGORY hold the same codes only after TRANEXTR and then the base TRANTYPE and TRANCATG jobs have run; nothing enforces it. It does **not** hold today for the descriptions (the seed text differs). | TRANEXTR, TRANTYPE, TRANCATG, every reader of the VSAM files | DEF-JTREX-001, DEF-JCRDB-005 | PINV-f-03 |
 | INV-020 | Online-written type codes are two digits from `01` to `99`; batch-written codes may be any two characters, so the invariant holds only if the MNTTRDB2 input is clean. | COTRTUPC, COTRTLIC, COBTUPDT | BR-TTUP-001, DEF-TTBU-003 | PINV-f-04 |
 | INV-021 | Each MQ request produces at most one reply, on a fixed reply queue, with the request's MsgId and CorrelId; a request whose processing fails produces an error record and no reply. | COACCT01, CODATE01 | BR-MQAC-005, DEF-MQAC-007 | PINV-f-05 |
+| INV-022 | The statement request area is declared twice, in CBSTM03A working storage and CBSTM03B linkage, and the two declarations stay byte-identical (1040 bytes, ENT-STMT-REQUEST). | CBSTM03A, CBSTM03B | `app/cbl/CBSTM03A.CBL:71-83`, `app/cbl/CBSTM03B.CBL:100-112` | PINV-d2-01 |
+| INV-023 | Export and import agree on the 500-byte layout (CVEXPORT, copied by both) and on the key: each program declares its own FD overlay with a 4-byte key at offset 27, the bytes of `EXPORT-SEQUENCE-NUM`. The IDCAMS definition `KEYS(4 28)` does not match. | CBEXPORT, CBIMPORT, CBEXPORT job | `app/cpy/CVEXPORT.cpy:9-16`, `app/cbl/CBEXPORT.cbl:65-69, 89-101`, `app/cbl/CBIMPORT.cbl:37-41, 76-84, 118`, `app/jcl/CBEXPORT.jcl:32`; DEF-EXPT-002, DEF-IMPT-004 | PINV-d2-02 |
+| INV-024 | A CBEXPORT run followed by CBIMPORT reproduces the five input files byte for byte (observed on the sample day after POSTTRAN), provided no field holds a value its export encoding cannot carry. | CBEXPORT, CBIMPORT | CBEXPORT BR-EXPT-004..008, CBIMPORT BR-IMPT-005..009, `tests/integration/test_export_import.py:11-36` | PINV-d2-03 |
+| INV-025 | TRXFL is rebuilt from `TRANSACT` (CREASTMT DELDEF01, STEP010-020) before CBSTM03A runs; a stale TRXFL gives statements that do not match the transaction master. | CREASTMT, CBSTM03A | `app/jcl/CREASTMT.JCL:22-62` | PINV-d2-04 |
 
 ## Candidate seams for the architecture step (observations, not decisions)
 
@@ -165,4 +202,5 @@ The interaction diagrams and edges are in [interactions.md](interactions.md).
 - The **batch window** (INV-002) is an operational coupling that the target can remove only if account updates from payments and from posting are made safe to run concurrently.
 - **Identity and users** (sign-on, menus, user administration) touch only `USRSEC` and the commarea. The target replaces the commarea identity with an authenticated session, which closes INV-006 and makes INV-007 and INV-009 design choices rather than data rules.
 - **Reference data** (transaction types and categories) exists twice, in Db2 and in VSAM, kept in step by hand (INV-019). One owned store with the Db2 foreign key (INV-017) removes the copy.
+- **Branch migration** (CBEXPORT, CBIMPORT) is a self-contained file round trip that nothing schedules and nothing downstream reads (CBIMPORT Q-IMPT-004); the target can replace it with a database export or drop it.
 - **MQ inquiries** (COACCT01, CODATE01) are request-reply services with fixed reply queues and no status field (INV-021); they map onto RabbitMQ request-reply or plain HTTP queries.
