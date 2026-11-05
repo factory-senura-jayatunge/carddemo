@@ -22,7 +22,7 @@ data_stores: []
 calls: []
 transfers_to: [COSGN00C, COUSR00C, COUSR01C, COUSR02C, COUSR03C, COTRTLIC, COTRTUPC]
 invoked_by: [COSGN00C, COUSR00C, COUSR01C, COUSR02C, COUSR03C, COTRTLIC, COTRTUPC]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COADM01C: Admin menu

@@ -25,7 +25,7 @@ data_stores:
 calls: []
 transfers_to: [COADM01C, COMEN01C]
 invoked_by: [COMEN01C, COADM01C, COUSR00C, COUSR01C, COUSR02C, COUSR03C, COBIL00C, CORPT00C, COTRN00C, COTRN01C, COTRN02C, COPAUS0C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COSGN00C: Online sign-on

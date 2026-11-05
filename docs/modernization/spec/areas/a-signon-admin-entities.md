@@ -8,7 +8,7 @@ Proposals from area `a-signon-admin` (COSGN00C, COMEN01C, COADM01C, COUSR00C-03C
 - **Dataset:** `AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS`, `KEYS(8,0)`, `RECORDSIZE(80,80)`, `REUSE`, `INDEXED`, `CISZ(8192)` (`app/jcl/DUSRSECJ.jcl:64-73`).
 - **CICS file:** `USRSEC` (`app/csd/CARDDEMO.CSD:88-99`): `READ(YES) BROWSE(YES) ADD(YES) UPDATE(YES) DELETE(YES)`, `RECOVERY(NONE)` (no backout of online changes), `STRINGS(1)` (one concurrent request), `RECORDFORMAT(V)` although the cluster has fixed 80-byte records. Opened and closed around the batch cycle by `app/jcl/OPENFIL.jcl:30` and `app/jcl/CLOSEFIL.jcl:30`.
 - **Primary key:** `SEC-USR-ID`, 8 bytes, unique. Key order is the EBCDIC byte order (lower case < upper case < digits).
-- **Loaded by:** `app/jcl/DUSRSECJ.jcl`: IEBGENER copies 10 in-stream records to `AWS.M2.CARDDEMO.USRSEC.PS` (`:32-49`), IDCAMS deletes and defines the cluster (`:58-73`) and REPRO loads it (`:82-83`). Copies as ESDS and RRDS are made by `app/jcl/ESDSRRDS.jcl:63-116` (not used by any program in this area). No batch program reads the file.
+- **Loaded by:** `app/jcl/DUSRSECJ.jcl`: IEBGENER copies 10 in-stream records to `AWS.M2.CARDDEMO.USRSEC.PS` (`app/jcl/DUSRSECJ.jcl:32-49`), IDCAMS deletes and defines the cluster (`app/jcl/DUSRSECJ.jcl:58-73`) and REPRO loads it (`app/jcl/DUSRSECJ.jcl:80-88`). Copies as ESDS and RRDS are made by `app/jcl/ESDSRRDS.jcl:63-116` (not used by any program in this area). No batch program reads the file.
 - **Used by:** `COSGN00C` (read), `COUSR00C` (browse), `COUSR01C` (write), `COUSR02C` (read for update, rewrite), `COUSR03C` (read for update, delete). `COMEN01C` and `COADM01C` copy the layout but never use it.
 
 | Field | Pos | Len | PIC | Type | Meaning |
@@ -31,7 +31,7 @@ Observations for the target:
 ## ENT-MAIN-MENU-OPTIONS · Main menu option table (compiled in)
 
 - **Copybook:** `app/cpy/COMEN02Y.cpy:19-98` (`CARDDEMO-MAIN-MENU-OPTIONS`), working storage of `COMEN01C`; not a file.
-- `CDEMO-MENU-OPT-COUNT` `9(02)` = 11 (`:21`); the data area has 11 entries of 46 bytes, redefined by a table of **12** occurrences (`:93-98`), so entry 12 overlays the storage after the table.
+- `CDEMO-MENU-OPT-COUNT` `9(02)` = 11 (`app/cpy/COMEN02Y.cpy:21`); the data area has 11 entries of 46 bytes, redefined by a table of **12** occurrences (`app/cpy/COMEN02Y.cpy:93-98`), so entry 12 overlays the storage after the table.
 
 | Field | Pos (in entry) | Len | PIC | Type | Meaning |
 | :-- | --: | --: | :-- | :-- | :-- |
@@ -40,12 +40,12 @@ Observations for the target:
 | `CDEMO-MENU-OPT-PGMNAME` | 38 | 8 | `X(08)` | text(8) | Program reached by XCTL |
 | `CDEMO-MENU-OPT-USRTYPE` | 46 | 1 | `X(01)` | code(1) | `A` = admin only, `U` = everyone; all 11 are `U` |
 
-Content: 1 `Account View` `COACTVWC`, 2 `Account Update` `COACTUPC`, 3 `Credit Card List` `COCRDLIC`, 4 `Credit Card View` `COCRDSLC`, 5 `Credit Card Update` `COCRDUPC`, 6 `Transaction List` `COTRN00C`, 7 `Transaction View` `COTRN01C`, 8 `Transaction Add` `COTRN02C` (formerly `(Admin Only)`, commented out at `:69`), 9 `Transaction Reports` `CORPT00C`, 10 `Bill Payment` `COBIL00C`, 11 `Pending Authorization View` `COPAUS0C` (optional authorisation module). See COMEN01C BR-MENU-001.
+Content: 1 `Account View` `COACTVWC`, 2 `Account Update` `COACTUPC`, 3 `Credit Card List` `COCRDLIC`, 4 `Credit Card View` `COCRDSLC`, 5 `Credit Card Update` `COCRDUPC`, 6 `Transaction List` `COTRN00C`, 7 `Transaction View` `COTRN01C`, 8 `Transaction Add` `COTRN02C` (formerly `(Admin Only)`, commented out at `app/cpy/COMEN02Y.cpy:69`), 9 `Transaction Reports` `CORPT00C`, 10 `Bill Payment` `COBIL00C`, 11 `Pending Authorization View` `COPAUS0C` (optional authorisation module). See COMEN01C BR-MENU-001.
 
 ## ENT-ADMIN-MENU-OPTIONS · Admin menu option table (compiled in)
 
 - **Copybook:** `app/cpy/COADM02Y.cpy:19-59` (`CARDDEMO-ADMIN-MENU-OPTIONS`), working storage of `COADM01C`; not a file.
-- `CDEMO-ADMIN-OPT-COUNT` `9(02)` = 6 (`:22`; the earlier value 4 is commented out at `:21`); 6 entries of 45 bytes redefined by a table of **9** occurrences (`:55-59`). There is no user-type column.
+- `CDEMO-ADMIN-OPT-COUNT` `9(02)` = 6 (`app/cpy/COADM02Y.cpy:22`; the earlier value 4 is commented out at `app/cpy/COADM02Y.cpy:21`); 6 entries of 45 bytes redefined by a table of **9** occurrences (`app/cpy/COADM02Y.cpy:55-59`). There is no user-type column.
 
 | Field | Pos (in entry) | Len | PIC | Type | Meaning |
 | :-- | --: | --: | :-- | :-- | :-- |

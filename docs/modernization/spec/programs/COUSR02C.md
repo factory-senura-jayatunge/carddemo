@@ -23,7 +23,7 @@ data_stores:
 calls: []
 transfers_to: [COSGN00C, COADM01C, COUSR00C]
 invoked_by: [COADM01C, COUSR00C]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COUSR02C: User update
