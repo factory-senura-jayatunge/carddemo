@@ -35,7 +35,8 @@ git config core.hooksPath .githooks
 | `make coverage` | All tests, then points to `build/test-results/coverage.json`. |
 | `make lint` | `scripts/lint.sh` (lint rules plus the cobc syntax check), then the linter's own tests. |
 | `make docs-check` | Fails when `docs/inventory.md` is stale. |
-| `make check` | lint, docs-check, build and test, with a summary. This is the single gate. |
+| `make agents-md-check` | Checks the commands and paths in AGENTS.md and the skills. |
+| `make check` | lint, docs-check, agents-md-check, build and test, with a summary. This is the single gate. |
 | `make package VERSION=v1.0.0` | Archives `build/release` into `dist/` with `SHA256SUMS`. |
 | `make changelog` | Regenerates `CHANGELOG.md` from the git history. |
 | `make clean` | Removes `build/` and `dist/`. |

@@ -33,7 +33,7 @@ jobs:
           load: true
           cache-from: type=gha,scope=devcontainer
           cache-to: type=gha,mode=max,scope=devcontainer
-      - name: make check (lint, docs-check, build, test)
+      - name: make check (lint, docs-check, agents-md-check, build, test)
         run: tools/ci-run.sh make check
       - name: Test summary
         if: ${{ !cancelled() }}
