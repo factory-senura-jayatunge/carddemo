@@ -267,7 +267,7 @@ Messages appear in `ERRMSG` (row 23, red unless noted).
 - **Inbound:** `COADM01C` option 2 (BR-ADMN-002).
 - **Outbound:** `COADM01C` (PF3), `COSGN00C` (no commarea).
 - **Shared data:** `USRSEC` (ENT-USER-SECURITY). Records created here are read by sign-on `COSGN00C`, which upper-cases the typed ID and password before reading and comparing (BR-SGN-001): a user added with lower-case letters in the ID or password can never sign on (DEF-SGN-011). They are listed by `COUSR00C` and maintained by `COUSR02C` and `COUSR03C`.
-- **Shared invariant (proposed, PINV-a-signon-admin-02):** a user can sign on only if the stored ID and password contain no lower-case letters.
+- **Shared invariant (INV-007):** a user can sign on only if the stored ID and password contain no lower-case letters.
 
 ### Module extraction notes
 

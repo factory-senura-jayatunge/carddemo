@@ -295,7 +295,7 @@ On PF5 the error flag does not stop the delete that follows (DEF-USRD-002).
 - **Inbound:** `COADM01C` option 4; `COUSR00C` with `D` (selected user ID in the commarea extension).
 - **Outbound:** PF3 to `CDEMO-FROM-PROGRAM` (`COUSR00C` or `COADM01C`); PF12 to `COADM01C`; `COSGN00C` without commarea.
 - **Shared data:** `USRSEC` (ENT-USER-SECURITY). A deleted user can no longer sign on (VAL-SGN-003); no other file refers to user IDs, so nothing else is affected.
-- **Shared invariant (proposed, PINV-a-signon-admin-05):** at least one user of type `A` must exist for the admin functions to be reachable; nothing enforces it.
+- **Shared invariant (INV-009):** at least one user of type `A` must exist for the admin functions to be reachable; nothing enforces it.
 
 ### Module extraction notes
 
