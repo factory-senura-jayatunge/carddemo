@@ -72,7 +72,7 @@ flowchart TB
 | COPAUS0C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary by account; `GNP` details | `COPAUS0C.cbl:461, 493, 973, 1002-1012` | BR-AUSM-002..006 |
 | COPAUS1C | COPAUS1C (`CPVD`) | RETURN TRANSID | ENT-COMMAREA | `COPAUS1C.cbl:202-205` | SE-AUDT-003 |
 | COPAUS1C | COPAUS0C | XCTL | ENT-COMMAREA (PF3, or no commarea) | `COPAUS1C.cbl:165-169, 184-186, 360-370` | FLOW-AUDT-001, BR-AUDT-005 |
-| COPAUS1C | COPAUS2C | LINK | `WS-FRAUD-DATA`: account ID, customer ID, ENT-AUTH-DETAIL image, action; back: status `S`/`F` and a 50-byte message | `COPAUS1C.cbl:93-104, 244-252` | BR-AUDT-007, SE-AUDT-002 |
+| COPAUS1C | COPAUS2C | LINK | `WS-FRAUD-DATA`: account ID, customer ID, ENT-AUTH-DETAIL image, action; back: status `S`/`F`, a 50-byte message and the detail image with `PA-FRAUD-RPT-DATE` set, which COPAUS1C writes back with `REPL` | `COPAUS1C.cbl:93-104, 244-252, 522-528` | BR-AUDT-007, SE-AUDT-002 |
 | COPAUS1C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary; `GNP` details; `REPL` detail (fraud flag) | `COPAUS1C.cbl:439, 465, 495, 525, 575-585` | BR-AUDT-001, BR-AUDT-006, SE-AUDT-001 |
 | COPAUS2C | `CARDDEMO.AUTHFRDS` | DB2 | `INSERT`; on duplicate key `UPDATE` of the fraud flag and report date | `COPAUS2C.cbl:141-145, 222-227` | SE-AUFR-001, SE-AUFR-002 |
 | CLOSEFIL | CBPAUP0J | scheduler | CA-7 trigger | `app/scheduler/CardDemo.ca7:42-43` | FLOW-JAUPG-002 |
@@ -90,7 +90,7 @@ flowchart TB
 | DBUNLDGS | `PAUTDB.ROOT.GSAM`, `PAUTDB.CHILD.GSAM` | IMS | GSAM `ISRT` of 100-byte summaries and 200-byte details | `DBUNLDGS.CBL:302, 321` | SE-DBUL-001, SE-DBUL-002 |
 | DBPAUTP0 (job) | `DBPAUTP0` (database) | JCL step | HD unload utility `DFSURGU0` in a `ULU` region; output `IMSDATA.DBPAUTP0` | `DBPAUTP0.jcl:15-32` | SE-JDBPA-002 |
 
-No edge leaves the module towards the base application except the menu return (COMEN01C) and the reads of the base VSAM files. Nothing in the base application calls into the module except menu option 11 of COMEN01C.
+No edge leaves the module towards the base application except the menu return (COMEN01C), the fallback XCTL to the sign-on program COSGN00C when no return program is set (`COPAUS0C.cbl:668-669`), and the reads of the base VSAM files. Nothing in the base application calls into the module except menu option 11 of COMEN01C and the CA-7 chain CLOSEFIL → CBPAUP0J → POSTTRAN (CBPAUP0J §3).
 
 ## CRUD rows
 
@@ -127,7 +127,7 @@ R = read, RU = read for update, C = create, U = update, D = delete, B = browse.
 | DBUNLDGS | `PAUTDB.CHILD.GSAM` (ENT-AUTH-CHILD-GSAM) | C | SE-DBUL-002 |
 | DFSURGU0 (job DBPAUTP0) | `DBPAUTP0` `PAUTSUM0`, `PAUTDTL1` | B | SE-JDBPA-002 |
 | DFSURGU0 (job DBPAUTP0) | `IMSDATA.DBPAUTP0` (ENT-AUTH-HD-UNLOAD) | D (previous, by IEFBR14), C | SE-JDBPA-001, SE-JDBPA-002 |
-| PAUDBUNL (job UNLDPADB, IEFBR14 step) | `PAUTDB.ROOT.FILEO`, `PAUTDB.CHILD.FILEO` | D (previous) | SE-JULPA-001 |
+| IEFBR14 (job UNLDPADB, step `STEP0`) | `PAUTDB.ROOT.FILEO`, `PAUTDB.CHILD.FILEO` | D (previous) | SE-JULPA-001 |
 
 Data stores to add to the component map:
 
@@ -143,10 +143,10 @@ Data stores to add to the component map:
 
 | ID | Invariant | Components | Evidence |
 | :-- | :-- | :-- | :-- |
-| PINV-e-authorization-01 | A pending authorization detail sits under the summary of the account that owns its card (card → `CCXREF` → account ID → summary). COPAUA0C breaks it for an unknown card or a missing account, filing the detail under the previous request's account. | COPAUA0C, COPAUS0C, COPAUS1C | COPAUA0C BR-AUTH-003, DEF-AUTH-002, DEF-AUTH-003 |
-| PINV-e-authorization-02 | A summary's approved and declined counts and amounts equal the totals of the details under it, and available credit is derived from them. Only COPAUA0C maintains the totals; the purge deletes details and keeps the stored totals, the reload restores whatever totals were unloaded, and the screens show the stored totals. Not held as-is. | COPAUA0C, CBPAUP0C, PAUDBLOD, COPAUS0C | COPAUA0C BR-AUTH-009, DEF-AUTH-005; CBPAUP0C DEF-AUPG-003; LOADPADB DEF-JLDPA-002; COPAUS0C BR-AUSM-002 |
+| PINV-e-authorization-01 | A pending authorization detail sits under the summary of the account that owns its card (card → `CCXREF` → account ID → summary). Held as-is for placement: an unknown card writes nothing to IMS (`COPAUA0C.cbl:463-465`), and for a missing account the detail still goes under the card's own `XREF-ACCT-ID` (`COPAUA0C.cbl:619-623, 911-919`). The exceptions are in the decision and the totals: a stale summary flag or account record from an earlier request (DEF-AUTH-002, DEF-AUTH-003). | COPAUA0C, COPAUS0C, COPAUS1C | COPAUA0C BR-AUTH-003, DEF-AUTH-002, DEF-AUTH-003 |
+| PINV-e-authorization-02 | A summary's approved and declined counts and amounts equal the totals of the details under it, and available credit is derived from them. Only COPAUA0C maintains the totals; the purge deletes details and keeps the stored totals, the reload merges instead of restoring (existing summaries keep their current totals, purged details come back), and the screens show the stored totals. Not held as-is. | COPAUA0C, CBPAUP0C, PAUDBLOD, COPAUS0C | COPAUA0C BR-AUTH-009, DEF-AUTH-005; CBPAUP0C DEF-AUPG-003; LOADPADB DEF-JLDPA-002; COPAUS0C BR-AUSM-002 |
 | PINV-e-authorization-03 | The fraud flag on a detail and its `AUTHFRDS` row change in one CICS unit of work: COPAUS1C replaces the detail only after COPAUS2C reports success, then syncpoints, and rolls back otherwise. A purge later deletes the detail but never the fraud row. | COPAUS1C, COPAUS2C, CBPAUP0C | COPAUS1C SE-AUDT-001, SE-AUDT-002; CBPAUP0C DEF-AUPG-009 |
-| PINV-e-authorization-04 | There is no batch window for `DBPAUTP0`: the online programs, the purge (BMP) and the reload (BMP) run concurrently through the IMS control region, which serializes their calls; the unloads (DL/I batch, DBRC off) read the data sets directly and are not protected. The base window INV-002 covers the VSAM files only, and CLOSEFIL closes `CCXREF` and `ACCTDAT` but not `CUSTDAT`, so COPAUA0C requests fail with a critical file error during the base batch window. | COPAUA0C, COPAUS0C, COPAUS1C, CBPAUP0C, PAUDBLOD, PAUDBUNL, DBUNLDGS | CBPAUP0J §3; UNLDGSAM DEF-JULGS-002; `app/jcl/CLOSEFIL.jcl:26-30`; COPAUA0C ERR-AUTH-005 |
+| PINV-e-authorization-04 | There is no batch window for `DBPAUTP0`: the online programs, the purge (BMP) and the reload (BMP) run concurrently through the IMS control region, which serializes their calls; the unloads (DL/I batch, DBRC off) read the data sets directly and are not protected. The base window INV-002 covers the VSAM files only, and CLOSEFIL closes `CCXREF`, `ACCTDAT` and `CXACAIX` but not `CUSTDAT`, so COPAUA0C requests fail with a critical file error and COPAUS0C cannot read the cross-reference during the base batch window. | COPAUA0C, COPAUS0C, COPAUS1C, CBPAUP0C, PAUDBLOD, PAUDBUNL, DBUNLDGS | CBPAUP0J §3; UNLDGSAM DEF-JULGS-002; `app/jcl/CLOSEFIL.jcl:26-30`; COPAUA0C ERR-AUTH-005 |
 | PINV-e-authorization-05 | The sequential unload and the reload are a matched pair: PAUDBUNL writes 100-byte summaries and 206-byte details with the packed parent key, which is exactly what PAUDBLOD reads, provided the parent key survives in the record area after each `WRITE` (DEF-PDUL-005). The GSAM unload (DBUNLDGS) drops the parent key and the HD unload (DFSURGU0) uses the IMS format; neither can be loaded by PAUDBLOD. | PAUDBUNL, PAUDBLOD, DBUNLDGS, DFSURGU0 | PAUDBUNL BR-PDUL-003, NUM-PDUL-001, DEF-PDUL-005; PAUDBLOD BR-PDLD-002; DBUNLDGS DEF-DBUL-001; DBPAUTP0 SE-JDBPA-002 |
 | PINV-e-authorization-06 | Every authorization request gets exactly one reply carrying the request's correlation ID. As-is the reply buffer is never reset, so later replies of a task carry earlier ones (DEF-AUTH-001), and a request whose reply put fails is lost after the get (DEF-AUTH-008). | COPAUA0C, the external requester | COPAUA0C SE-AUTH-001, SE-AUTH-002, DEF-AUTH-001, DEF-AUTH-008 |
 

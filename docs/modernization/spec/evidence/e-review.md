@@ -1,6 +1,6 @@
 # Area e-authorization: review evidence
 
-Independent review of the area E specs: the authorization module programs COPAUA0C, COPAUS0C, COPAUS1C, COPAUS2C, CBPAUP0C, DBUNLDGS, PAUDBLOD and PAUDBUNL, the module jobs CBPAUP0J, DBPAUTP0, LOADPADB, UNLDGSAM and UNLDPADB, and the module CSD file CRDDEMO2 (spec `jobs/CRDDEMO2-CSD.md`). The two area files `areas/e-authorization-entities.md` and `areas/e-authorization-interactions.md` were reviewed separately (section "Area files"). Source revision: 59cc6c2, the last commit that touches `app/app-authorization-ims-db2-mq/`, `app/cpy/` or `app/jcl/XREFFILE.jcl`.
+Independent review of the area E specs: the authorization module programs COPAUA0C, COPAUS0C, COPAUS1C, COPAUS2C, CBPAUP0C, DBUNLDGS, PAUDBLOD and PAUDBUNL, the module jobs CBPAUP0J, DBPAUTP0, LOADPADB, UNLDGSAM and UNLDPADB, and the module CSD file CRDDEMO2 (spec `jobs/CRDDEMO2-CSD.md`). The two area files `areas/e-authorization-entities.md` and `areas/e-authorization-interactions.md` were reviewed separately (section "Area files": 101 units, 2 WRONG, 11 MINOR, all fixed). Source revision: 59cc6c2, the last commit that touches `app/app-authorization-ims-db2-mq/`, `app/cpy/` or `app/jcl/XREFFILE.jcl`.
 
 ## Method
 
@@ -100,6 +100,24 @@ Five items were added after the review from reviewer findings: COPAUS0C DEF-AUSM
 - The CSD reviewer left `PRIORITY(HIGH)` in FLOW-JCSD2-004 as CORRECT but noted that its effect on open TCBs may be small in current CICS releases. The item is already platform-inferred.
 - PAUDBLOD BR-PDLD-003: a wording nit (no `GU`, so no asterisk lines, for a non-numeric key) that section 4.3 already states.
 
+## Area files
+
+A fifth reviewer agent, independent of the author and of the other four, checked the two area files after the spec fixes: each entity, field table, correction and relationship row of `areas/e-authorization-entities.md`, and each edge, CRUD row, data-store row and invariant of `areas/e-authorization-interactions.md`. It recomputed every offset and length from the copybooks, DBDs, DDL and DCLGEN, read every cited source line, checked that every referenced item ID exists, and parsed the sample unload.
+
+| File | Units | CORRECT | MINOR | WRONG |
+| :-- | --: | --: | --: | --: |
+| `e-authorization-entities.md` | 26 | 19 | 6 | 1 |
+| `e-authorization-interactions.md` | 75 | 69 | 5 | 1 |
+| **Total** | **101** | **88** | **11** | **2** |
+
+WRONG findings, both fixed:
+
+| Unit | Finding | Fix |
+| :-- | :-- | :-- |
+| ENT-AUTH-SUMMARY sample data | Said account 1's summary has the same limits as ENT-ACCOUNT account 1 (2,020.00 / 1,020.00). The unload holds the credit limit packed as `00000202200C`, 2,022.00; `app/data/ASCII/acctdata.txt` record 1 holds 2,020.00. | The summary holds 2,022.00 / 1,020.00, the account 2,020.00 / 1,020.00; the summary's copy is refreshed only by the next request. Re-checked by the author on the data file. |
+| PINV-e-authorization-01 | Said COPAUA0C files a detail under the previous request's account for an unknown card or a missing account. An unknown card writes nothing to IMS (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:463-465`); for a missing account the detail goes under the card's own `XREF-ACCT-ID` (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:619-623, 911-919`). | Placement holds as-is; the exceptions (DEF-AUTH-002, DEF-AUTH-003) are in the decision and totals. |
+
+MINOR findings, all fixed: the purge's in-memory approved count (ENT-AUTH-SUMMARY header); the `PA-AUTH-STATUS` sample values (space in 18 roots, X'00' in 3, X'F0' in the all-spaces root, re-counted by the author); `AUTHFRDS.ACCT_ID`/`CUST_ID` come from COPAUS1C's commarea, the customer from the cross-reference; the request amount is split into a 13-character field; `ERR-APPLICATION` holds `CP00` and the event-key contents per error; request to response is 1 : 0..1 as-is; the COPAUS1C → COPAUS2C edge returns the updated detail image; the module's outward edges also include the XCTL to COSGN00C and the CA-7 chain; the UNLDPADB delete row names IEFBR14; PINV-e-authorization-02 says the reload merges; PINV-e-authorization-04 adds `CXACAIX`, closed by CLOSEFIL, so COPAUS0C also fails in the base batch window.
 ## Sample data checks
 
 The batch and job reviewers parsed `app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat` independently of the author: 51,736 bytes, 226 variable-length records (2 × 88-byte header and trailer, 22 × 140-byte summaries, 202 × 240-byte details), in the order header, summary, its details, ..., trailer. One summary has an all-spaces key (`X'404040404040'`, counts `X'4040'` = 16448) and no details. All 202 details have response code `00`; for every other summary the stored approved count equals its number of details and the declined count is 0. Detail dates run from 23292 to 24096 (`YYDDD`). This confirms the sample-data statements in CBPAUP0C section 15, DBUNLDGS section 15, PAUDBUNL section 15 and DBPAUTP0 SE-JDBPA-002.
