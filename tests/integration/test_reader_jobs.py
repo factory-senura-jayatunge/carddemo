@@ -27,11 +27,10 @@ class ReaderJobsTest(CardDemoTestCase):
         self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBACT02C")],
                          [r.rstrip() for r in in_key_order("carddata.txt", 16)])
 
-    def test_readxref_prints_every_xref_record_twice(self):
-        # CBACT03C DISPLAYs the record both in 1000-XREFFILE-GET-NEXT and in its main loop.
+    def test_readxref_prints_every_xref_record_once(self):
         _, (res,) = self.run_job("READXREF")
         self.assert_rc(res, 0)
-        expected = [r.rstrip() for r in in_key_order("cardxref.txt", 16) for _ in range(2)]
+        expected = [r.rstrip() for r in in_key_order("cardxref.txt", 16)]
         self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBACT03C")], expected)
 
     def test_readcust_prints_every_customer_twice(self):
