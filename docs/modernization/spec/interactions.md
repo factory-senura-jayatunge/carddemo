@@ -1,6 +1,6 @@
 # CardDemo interaction view
 
-Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), c (transactions), d1 (core batch) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
+Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
 
 ## Online navigation (core)
 
@@ -96,10 +96,43 @@ flowchart TB
 
 The diagram follows the runbook (`docs/runbooks/batch-cycle-restart.md:11-21`). The schedulers differ from it:
 
-- **CA-7** chains CLOSEFIL, CBPAUP0J, POSTTRAN, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:19-127`). It does not list INTCALC, and another CLOSEFIL listing triggers CREASTMT (`app/scheduler/CardDemo.ca7:465-470`), so CA-7 runs the statements right after the files close, not between COMBTRAN and TRANIDX. The reader chain READACCT to WAITSTEP also starts from CLOSEFIL (`app/scheduler/CardDemo.ca7:335-455`).
+- **CA-7** chains CLOSEFIL, CBPAUP0J, POSTTRAN, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:19-127`). It does not list INTCALC, and another CLOSEFIL listing triggers CREASTMT (`app/scheduler/CardDemo.ca7:465-470`), so CA-7 runs the statements right after the files close, not between COMBTRAN and TRANIDX; CREASTMT then triggers TXT2PDF1, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:494-495, 521-527`). The reader chain READACCT to WAITSTEP also starts from CLOSEFIL (`app/scheduler/CardDemo.ca7:335-455`).
 - **Control-M** runs INTCALC monthly, after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:64-80`).
 
 Which order the target scheduler (Airflow) follows is an open question in area g's schedule specs; this view does not choose one. TRANVALD (CBTRN01C) has no JCL and no schedule entry (CBTRN01C DEF-TVAL-007).
+
+## Batch utilities: statements, export and import, wait
+
+```mermaid
+flowchart LR
+    CLO[CLOSEFIL] --> CST[CREASTMT]
+    TRAN[(TRANSACT)] -- "STEP010 SORT, STEP020 REPRO" --> TRX[(TRXFL)]
+    CST -- "DELDEF01 D, define" --> TRX
+    CST -- "STEP030 D" --> STMT[(STATEMNT.PS / .HTML)]
+    CST --> S3A[CBSTM03A]
+    S3A -- "CALL, request area" --> S3B[CBSTM03B]
+    S3B -- B --> TRX
+    S3B -- B --> XREF[(CARDXREF)]
+    S3B -- R --> CUST[(CUSTDATA)]
+    S3B -- R --> ACCT[(ACCTDATA)]
+    S3A -- C --> STMT
+    CST --> PDF[TXT2PDF1]
+    STMT -- "R (.PS only)" --> PDF
+    PDF --> WST
+    ST1[CBEXPORT STEP01 IDCAMS] -- "D, define" --> EXF
+    CUST & ACCT & XREF & TRAN & CARD[(CARDDATA)] -- B --> EXP[CBEXPORT]
+    EXP -- C --> EXF[(EXPORT.DATA)]
+    EXF -- B --> IMP[CBIMPORT] -- C --> OUT[("*.IMPORT, IMPORT.ERRORS")]
+    S3A & EXP & IMP -- "CALL, no args" --> ABD[CEE3ABD]
+    TBK[TRANBKP] & DGP[DISCGRP] & CMB[COMBTRAN] --> WST[WAITSTEP / COBSWAIT]
+    PST[POSTTRAN] & TTY[TRANTYPE] & TCG[TRANCATG] & TCB[TCATBALF] & RXR[READXREF] & PCB[PRTCATBL] --> WST
+    WST -- CALL --> MVW[MVSWAIT] -- "STIMER" --> ZOS[z/OS]
+    WST --> OPN[OPENFIL]
+    CLO --> RAC[READACCT] --> RCD[READCARD] --> RCU[READCUST] --> RXR
+    RAC -- STEP05 --> ACT1[CBACT01C] -- CALL --> DTF[COBDATFT]
+```
+
+WAITSTEP's successor depends on the scheduler entry (OPENFIL, CLOSEFIL, or CLOSEFIL1 and CLOSEFIL2); the diagram shows OPENFIL only, and the edge table has every pair. Nothing in the repository schedules CBEXPORT or CBIMPORT, and nothing reads the `*.IMPORT` or `IMPORT.ERRORS` datasets (CBIMPORT Q-IMPT-004).
 
 ## Optional modules: transaction type (Db2) and VSAM-MQ
 
@@ -133,7 +166,7 @@ flowchart LR
 
 ## Edges
 
-Merged from the area proposals. Where two areas proposed the same edge, the table keeps one row: the main menu's transfers to the transaction programs are in A's row for options 1-10, the admin menu's transfers to the transaction type programs are in A's row for options 5 and 6, and the report request's job submission is in C's rows.
+Merged from the area proposals. Where two areas proposed the same edge, the table keeps one row: the main menu's transfers to the transaction programs are in A's row for options 1-10, the admin menu's transfers to the transaction type programs are in A's row for options 5 and 6, the report request's job submission is in C's rows, and the CA-7 reader chain and the CBACT01C call to COBDATFT are in D1's rows.
 ### Sign-on and administration (area a)
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
@@ -242,3 +275,36 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | requester | CODATE01 | MQ | any message on the triggered input queue | `app/app-vsam-mq/cbl/CODATE01.cbl:286-322` | SE-MQDT-001 |
 | CODATE01 | requester | MQ | ENT-MQ-DATE-REPLY on `CARD.DEMO.REPLY.DATE` | `app/app-vsam-mq/cbl/CODATE01.cbl:366-403` | SE-MQDT-002 |
 | COACCT01, CODATE01 | operations | MQ | ENT-MQ-ERROR-MSG on `CARD.DEMO.ERROR` | `app/app-vsam-mq/cbl/COACCT01.cbl:501-523`, `app/app-vsam-mq/cbl/CODATE01.cbl:405-427` | SE-MQAC-004, SE-MQDT-003 |
+
+### Batch utilities (area d2)
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| CA-7 `CLOSEFIL` | `CREASTMT` | scheduler | trigger | `app/scheduler/CardDemo.ca7:465-468` | CBSTM03A §3 (Trigger) |
+| CA-7 `CREASTMT` | `TXT2PDF1` | scheduler | trigger; TXT2PDF1 reads `STATEMNT.PS` (INDD) and writes `STATEMNT.PS.PDF`; `STATEMNT.HTML` is not read | `app/scheduler/CardDemo.ca7:494-495`, `app/jcl/TXT2PDF1.JCL:24-39` | SE-STMT-001, CBSTM03A §4 (Downstream) |
+| CA-7 `TXT2PDF1` | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:521-527` | COBSWAIT §3 (Trigger) |
+| `CREASTMT` DELDEF01 (IDCAMS) | TRXFL.SEQ, TRXFL.VSAM.KSDS | JCL step | delete both, define the KSDS again with `KEYS(32 0)` | `app/jcl/CREASTMT.JCL:22-40` | CBSTM03A §3 (Earlier steps of the same job) |
+| `CREASTMT` STEP010 (SORT) | TRXFL.SEQ | JCL step | ENT-TRANSACTION from TRANSACT (`SORTIN`) sorted by card + ID, card moved in front (ENT-STMT-TRAN) | `app/jcl/CREASTMT.JCL:44-55` | CBSTM03A §3 (Earlier steps of the same job), ENT-STMT-TRAN |
+| `CREASTMT` STEP020 (IDCAMS REPRO) | TRXFL.VSAM.KSDS | JCL step | ENT-STMT-TRAN | `app/jcl/CREASTMT.JCL:56-62` | CBSTM03A §3 (Earlier steps of the same job), ENT-STMT-TRAN |
+| `CREASTMT` STEP030 (IEFBR14) | STATEMNT.HTML, STATEMNT.PS | JCL step | delete the previous statements | `app/jcl/CREASTMT.JCL:66-75` | CBSTM03A §3 (Earlier steps of the same job) |
+| `CREASTMT` STEP040 | CBSTM03A | JCL step | DDs TRNXFILE, XREFFILE, ACCTFILE, CUSTFILE, STMTFILE, HTMLFILE | `app/jcl/CREASTMT.JCL:79-96` | CBSTM03A §3 (Trigger) |
+| CBSTM03A | CBSTM03B | CALL | ENT-STMT-REQUEST (DD name, operation, key, key length in; return code, 1000-byte record out) | `app/cbl/CBSTM03A.CBL:351, 377, 401, 734, 746, 769, 787, 805, 835, 860, 877, 893, 909` | FLOW-STIO-001, BR-STIO-001 |
+| CBSTM03A | CEE3ABD | CALL | none (no arguments) | `app/cbl/CBSTM03A.CBL:923` | ERR-STMT-006 |
+| `CBEXPORT` job STEP01 (IDCAMS) | EXPORT.DATA | JCL step | delete and define the export KSDS | `app/jcl/CBEXPORT.jcl:24-38` | DEF-EXPT-002 |
+| `CBEXPORT` job STEP02 | CBEXPORT | JCL step | DDs CUSTFILE, ACCTFILE, XREFFILE, TRANSACT, CARDFILE, EXPFILE | `app/jcl/CBEXPORT.jcl:43-63` | FLOW-EXPT-001 |
+| CBEXPORT | CEE3ABD | CALL | none (no arguments) | `app/cbl/CBEXPORT.cbl:584` | ERR-EXPT-004 |
+| CBEXPORT | CBIMPORT | file | ENT-EXPORT-RECORD (`AWS.M2.CARDDEMO.EXPORT.DATA`) | `app/jcl/CBEXPORT.jcl:62-63`, `app/jcl/CBIMPORT.jcl:28-29` | SE-EXPT-001, FLOW-IMPT-003 |
+| `CBIMPORT` job STEP01 | CBIMPORT | JCL step | DDs EXPFILE, CUSTOUT, ACCTOUT, XREFOUT, TRNXOUT, CARDOUT, ERROUT | `app/jcl/CBIMPORT.jcl:22-65` | FLOW-IMPT-001 |
+| CBIMPORT | CEE3ABD | CALL | none (no arguments) | `app/cbl/CBIMPORT.cbl:494` | DEF-IMPT-003 |
+| `WAITSTEP` job | COBSWAIT | JCL step | SYSIN `00003600` (hundredths of a second) | `app/jcl/WAITSTEP.jcl:22-27` | BR-WAIT-001 |
+| CA-7 POSTTRAN | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:96-97, 123-124` | COBSWAIT §3 (Trigger) |
+| CA-7 TRANTYPE | `WAITSTEP`, then `CLOSEFIL1` and `CLOSEFIL2` | scheduler | trigger | `app/scheduler/CardDemo.ca7:188-189, 215-217` | COBSWAIT §3 (Trigger) |
+| CA-7 TRANCATG | `WAITSTEP`, then `CLOSEFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:297-298, 302-303` | COBSWAIT §3 (Trigger) |
+| CA-7 TCATBALF | `WAITSTEP`, then `CLOSEFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:329-330, 334-335` | COBSWAIT §3 (Trigger) |
+| CA-7 READXREF | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:447-448, 452-453` | COBSWAIT §3 (Trigger) |
+| CA-7 PRTCATBL | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:563-564, 568-569` | COBSWAIT §3 (Trigger) |
+| Control-M TRANBKP | `WAITSTEP` | scheduler | condition `DAILY-TransactionBackup-TRANBKP`; WAITSTEP then releases OPENFIL | `app/scheduler/CardDemo.controlm:14-24` | COBSWAIT §3 (Trigger) |
+| Control-M DISCGRP, COMBTRAN | `WAITSTEP` | scheduler | weekly and monthly folders, same pattern | `app/scheduler/CardDemo.controlm:44-54, 81-91` | COBSWAIT §3 (Trigger) |
+| COBSWAIT | MVSWAIT | CALL | fullword binary interval, hundredths of a second | `app/cbl/COBSWAIT.cbl:38` | BR-WAIT-001, BR-MWAT-001 |
+| MVSWAIT | z/OS `STIMER` | SVC (macro `ASMWAIT`) | `WAIT,BINTVL=` the interval | `app/asm/MVSWAIT.asm:23`, `app/maclib/ASMWAIT.mac:17-20` | BR-MWAT-001 |
+| `READACCT` job STEP05 | CBACT01C (area d1) | JCL step | DDs ACCTFILE, OUTFILE, ARRYFILE, VBRCFILE | `app/jcl/READACCT.jcl:32-50` | - (area d1) |
