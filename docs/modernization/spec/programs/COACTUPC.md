@@ -1484,7 +1484,7 @@ The update layout has no ZIP field, so the group ID lands in the ZIP slot and th
 None of these were changed in this branch: `COACTUPC.cbl`, its BMS and symbolic map and the copybooks it uses are not touched by commit b5e0139; `git log` for them shows only fb78417, a71da67 and 8c797e2. All are **open**.
 
 #### DEF-ACUP-001 · [security] No sign-on, role or ownership check
-- The program accepts a start without a commarea (typing `CAUP`) and shows the search screen instead of sending the user to sign-on. It never looks at `CDEMO-USER-ID` or `CDEMO-USER-TYPE`, the menu offers it to regular users, and it does not restrict the account to any user. Any terminal user can change any account and customer, including credit limits, balance and cycle totals, SSN and EFT account. Nothing records who changed what. PF3 then transfers to the main menu `COMEN01C`, because the fresh commarea names no calling program (`:927-959`); the start leaves the user ID and the user type blank (the INITIALIZE at `:883`), and PF3 itself sets the type to `U` just before the transfer (`:947`, DEF-ACUP-009), and the menu accepts it, so the main menu is reached without a sign-on. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
+- The program accepts a start without a commarea (typing `CAUP`) and shows the search screen instead of sending the user to sign-on. It never looks at `CDEMO-USER-ID` or `CDEMO-USER-TYPE`, the menu offers it to regular users, and it does not restrict the account to any user. Any terminal user can change any account and customer, including credit limits, balance and cycle totals, SSN and EFT account. Nothing records who changed what. PF3 then transfers to the main menu `COMEN01C`, because the fresh commarea names no calling program (`:927-959`); the start leaves the user ID and the user type blank (the INITIALIZE at `:883`), and PF3 itself sets the type to `U` just before the transfer (`:947`, DEF-ACUP-009), and the menu accepts it, so the main menu is reached without a sign-on. Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and INV-006.
 - **Source:** `:880-886, 964-973`; `app/cpy/COMEN02Y.cpy:31-35`, `:927-959`; `app/cbl/COMEN01C.cbl:82-91`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-ACUP-004)
@@ -1540,7 +1540,7 @@ None of these were changed in this branch: `COACTUPC.cbl`, its BMS and symbolic 
 - **Confidence:** platform-inferred (Q-ACUP-007)
 
 #### DEF-ACUP-009 · PF3 forces the user type to "regular user"
-- PF3 sets `CDEMO-USER-TYPE` to `U` whatever it was. An administrator who reached this screen through a commarea would continue as a regular user. The same overwrite is recorded from the session side in DEF-SGN-012 and PINV-a-signon-admin-01.
+- PF3 sets `CDEMO-USER-TYPE` to `U` whatever it was. An administrator who reached this screen through a commarea would continue as a regular user. The same overwrite is recorded from the session side in DEF-SGN-012 and INV-006.
 - **Source:** `:947`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-ACUP-006)

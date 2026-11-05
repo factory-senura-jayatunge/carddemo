@@ -716,14 +716,14 @@ None of these were changed in this branch: `COCRDLIC.cbl`, its BMS and symbolic 
 - **Confidence:** reviewed
 
 #### DEF-CRDL-003 · [security] List available without sign-on
-- Typing `CCLI` without a commarea shows the card list at once with a made-up session (user type `U`, no user ID). The menu, bill-payment, transaction, report and user programs send such a start to sign-on (for example `app/cbl/COMEN01C.cbl:82-84`, `app/cbl/COADM01C.cbl:86-88`, `app/cbl/COBIL00C.cbl:107-109`); the card and account programs also build a fresh commarea on such a start, but leave the user type blank until their PF3 sets it to `U`; only this program sets `U` at the start itself (`:320`) (`app/cbl/COCRDSLC.cbl:268-271`, `app/cbl/COCRDUPC.cbl:388-391`, `app/cbl/COACTVWC.cbl:282-285`, `app/cbl/COACTUPC.cbl:880-883`). PF3 on that list then transfers to the main menu `COMEN01C` with this commarea (`:384-405`), and the menu accepts it, so the main menu and every function on it are reached without a sign-on (DEF-CRDL-004 for the user type). Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and PINV-a-signon-admin-01.
+- Typing `CCLI` without a commarea shows the card list at once with a made-up session (user type `U`, no user ID). The menu, bill-payment, transaction, report and user programs send such a start to sign-on (for example `app/cbl/COMEN01C.cbl:82-84`, `app/cbl/COADM01C.cbl:86-88`, `app/cbl/COBIL00C.cbl:107-109`); the card and account programs also build a fresh commarea on such a start, but leave the user type blank until their PF3 sets it to `U`; only this program sets `U` at the start itself (`:320`) (`app/cbl/COCRDSLC.cbl:268-271`, `app/cbl/COCRDUPC.cbl:388-391`, `app/cbl/COACTVWC.cbl:282-285`, `app/cbl/COACTUPC.cbl:880-883`). PF3 on that list then transfers to the main menu `COMEN01C` with this commarea (`:384-405`), and the menu accepts it, so the main menu and every function on it are reached without a sign-on (DEF-CRDL-004 for the user type). Area A records the same path from the menu and sign-on side: DEF-SGN-012, DEF-MENU-003 and INV-006.
 - **Source:** `:315-325`, `:384-405`; `app/cbl/COMEN01C.cbl:82-91`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDL-008)
 - **Confidence:** reviewed
 
 #### DEF-CRDL-004 · [security] Session user type overwritten
-- Every transfer out (PF3, `S`, `U`) and every fresh start sets `CDEMO-USER-TYPE` to `U`, whatever the signed-on user's type. A program that later trusts the commarea sees a regular user. The same overwrite is recorded from the session side in DEF-SGN-012 and PINV-a-signon-admin-01.
+- Every transfer out (PF3, `S`, `U`) and every fresh start sets `CDEMO-USER-TYPE` to `U`, whatever the signed-on user's type. A program that later trusts the commarea sees a regular user. The same overwrite is recorded from the session side in DEF-SGN-012 and INV-006.
 - **Source:** `:320, 388, 466, 522, 550`
 - **Status:** open
 - **Fidelity:** defect-decide (Q-CRDL-004)
