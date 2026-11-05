@@ -157,7 +157,19 @@ def run_check(job: str, here: Path, script: str, unload: tuple[str, ...], compar
             shutil.copytree(SAMPLE_DATA, data)
             if prepare:
                 prepare(data, root)
-        run_reference(job, data, root / "ref", unload, hex_outputs=hex_outputs)
-        subprocess.run([sys.executable, str(here / script), "--data", str(data), "--out", str(root / "new")],
-                       check=False)
-        return compare(root / "ref", root / "new")
+        # gen_stress.py may write several independent data sets as data/case-*/
+        cases = sorted(d.name for d in data.iterdir() if d.is_dir() and d.name.startswith("case-"))
+        if not cases:
+            run_reference(job, data, root / "ref", unload, hex_outputs=hex_outputs)
+            subprocess.run([sys.executable, str(here / script), "--data", str(data), "--out", str(root / "new")],
+                           check=False)
+            return compare(root / "ref", root / "new")
+        rc = 0
+        for case in cases:
+            print(f"== {case}")
+            run_reference(job, data / case, root / "ref" / case, unload, hex_outputs=hex_outputs)
+            subprocess.run([sys.executable, str(here / script), "--data", str(data / case),
+                            "--out", str(root / "new" / case)], check=False)
+            rc |= compare(root / "ref" / case, root / "new" / case)
+        print("ALL CASES", "PASS" if rc == 0 else "FAIL")
+        return rc
