@@ -93,6 +93,7 @@ A change is done when `make check` ends with `make check: OK`. It runs every ste
 | `docs/modernization/spec/` | The [natural-language specification](docs/modernization/spec/README.md) of every program and job for the modernization: [format](docs/modernization/spec/format.md), program and job specs, entity catalog, component map, interaction view, area proposals, evidence and the checker `docs/modernization/spec/tools/check_spec.py`. A spec whose source changed fails `make spec-check` until it is re-checked and its `sha256` updated. |
 | `.github/workflows/` | `ci.yml` (jobs lint, docs-check, build-and-test), `release.yml` (`v*` tags), `label-sync.yml`, `agents-md.yml`. |
 | `.factory/skills/` | Step-by-step procedures for common tasks (listed below). |
+| `modernization/` | The modernized stack, in progress: local infrastructure (Docker Compose) and its own make targets. See [modernization/README.md](modernization/README.md). |
 
 Generated files, never edited by hand: `docs/inventory.md` (`python3 scripts/gen_inventory.py`), `CHANGELOG.md` (`make changelog`), `cobol-lint-baseline.json` (`python3 scripts/cobol_lint.py baseline`), and everything under `build/` and `dist/`.
 
