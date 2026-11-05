@@ -350,6 +350,15 @@ Admin users can perform the following functions:
 | **Base Application** | Customer<br>Account<br>Card<br>Transaction<br>Bill Payment<br>Statement/Report | COBOL<br>CICS<br>JCL (Batch)<br>VSAM (KSDS with AIX) |
 | **Optional Features** | Authorization<br>Fraud<br>Transaction Type (Extension) | DB2<br>MQ<br>IMS DB<br>JCL Utilities<br>Complex data formats<br>Various dataset types<br>Advanced copybook structures |
 
+## Linting
+
+COBOL, copybook and JCL sources are checked by `scripts/cobol_lint.py`, a standard-library Python 3.10+ linter configured by `cobol-lint.json`. Run all checks, both the lint rules and a GnuCOBOL `cobc -fsyntax-only` check for the programs without EXEC CICS/SQL/DLI, with:
+
+```sh
+scripts/lint.sh
+```
+
+The command exits non-zero only on findings that are not in `cobol-lint-baseline.json`, the list of findings that existed when the linter was introduced. `python3 scripts/cobol_lint.py report` shows the counts per rule. To lint staged files before every commit, enable the hook with `git config core.hooksPath .githooks`. [docs/linting.md](docs/linting.md) describes every rule and threshold, the baseline, the hook and the `fix` formatter.
 ## Support
 
 For questions, issues, or improvement requests, please raise an issue in the repository with detailed information about your concern. The maintainers will respond according to availability.
