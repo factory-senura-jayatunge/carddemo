@@ -1,5 +1,7 @@
 # Area f-trantype-vsam-mq: entity proposals
 
+Merged in eb23aae into `../entities.md`.
+
 Proposals for `../entities.md` from the transaction type (Db2) module (`app/app-transaction-type-db2`) and the VSAM-MQ module (`app/app-vsam-mq`). Positions are 1-based bytes. Db2 tables are described column by column; their host-variable layouts come from the DCLGEN members.
 
 ## ENT-DB2-TRAN-TYPE · Db2 table CARDDEMO.TRANSACTION_TYPE

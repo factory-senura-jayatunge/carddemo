@@ -1,5 +1,7 @@
 # Area a-signon-admin: entity proposals
 
+Merged in eb23aae into `../entities.md`.
+
 Proposals from area `a-signon-admin` (COSGN00C, COMEN01C, COADM01C, COUSR00C-03C) for `../entities.md`. Source revision `b5e0139`. The program specs reference these IDs already.
 
 ## ENT-USER-SECURITY · User security record (sign-on credentials and user type)

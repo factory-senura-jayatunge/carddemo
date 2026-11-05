@@ -1,5 +1,7 @@
 # Area d1-core-batch: entity proposals
 
+Merged in eb23aae into `../entities.md`.
+
 Proposals from the core batch area (CBACT01C-04C, CBCUS01C, CBTRN01C, CBTRN03C) for `../entities.md`, written at commit 8a8a80a. New entity IDs below are used by the area's specs; the customer and card records use the IDs `ENT-CUSTOMER` and `ENT-CARD` that the spec lead is adding, so this file only proposes corrections and observations for them.
 
 ## ENT-DISC-GROUP · Disclosure group (interest rate per group, type and category)

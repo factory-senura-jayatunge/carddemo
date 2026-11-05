@@ -1,5 +1,7 @@
 # Area c-transactions: interaction proposals
 
+Merged in eb23aae into `../interactions.md` (edges) and `../components.md` (CRUD rows; invariants as INV-002, INV-004 and INV-006..INV-021, see the "Proposed as" column).
+
 Proposals from area `c-transactions` (COTRN00C, COTRN01C, COTRN02C, CORPT00C, CSUTLDTC) for `../interactions.md` and `../components.md`, written against commit b5e0139. Layout as in `README.md` of this folder.
 
 ## Edges

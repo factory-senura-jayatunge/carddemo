@@ -1,5 +1,7 @@
 # Area a-signon-admin: interaction proposals
 
+Merged in eb23aae into `../interactions.md` (edges) and `../components.md` (CRUD rows; invariants as INV-002, INV-004 and INV-006..INV-021, see the "Proposed as" column).
+
 Proposals from area `a-signon-admin` (COSGN00C, COMEN01C, COADM01C, COUSR00C-03C) for `../interactions.md` and `../components.md`. Source revision `b5e0139`.
 
 ## Edges
