@@ -9,7 +9,7 @@ sources:
   - {path: app/cbl/CBACT02C.cbl, sha256: d290cbbbec1e, role: program}
   - {path: app/jcl/READCARD.jcl, sha256: 1b1ac8b46a65, role: job}
   - {path: app/cpy/CVACT02Y.cpy, sha256: 9f1c62ef31b9, role: record}
-entry_points: [{type: jcl-step, job: READCARD, step: STEP05}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "367-392"}]
+entry_points: [{type: jcl-step, job: READCARD, step: STEP05}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "367-394"}]
 mapsets: []
 copybooks: [CVACT02Y]
 data_stores:
@@ -18,7 +18,7 @@ calls: [CEE3ABD]
 transfers_to: []
 invoked_by: [READCARD.jcl]
 local_run: "make run-batch PROGRAM=READCARD"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBACT02C: Card file listing (READCARD)
@@ -36,7 +36,7 @@ The card listing program reads the card master (ENT-CARD) from start to end in k
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `READCARD`, step `STEP05` (`app/jcl/READCARD.jcl:22-28`). In the CA-7 schedule `READACCT` triggers `READCARD` and `READCARD` triggers `READCUST`, in the chain `CLOSEFIL` → `READACCT` → `READCARD` → `READCUST` → `READXREF` → `WAITSTEP` → `OPENFIL` (`app/scheduler/CardDemo.ca7:367-392`); the entry marks the job "maint only". Control-M does not list it.
+- **Trigger:** JCL job `READCARD`, step `STEP05` (`app/jcl/READCARD.jcl:22-28`). In the CA-7 schedule `READACCT` triggers `READCARD` and `READCARD` triggers `READCUST`, in the chain `CLOSEFIL` → `READACCT` → `READCARD` → `READCUST` → `READXREF` → `WAITSTEP` → `OPENFIL` (`app/scheduler/CardDemo.ca7:367-394`); the entry marks the job "maint only". Control-M does not list it.
 - **Preconditions:** the card file can be opened for input (the CA-7 chain runs after CLOSEFIL has closed the CICS files).
 - **Parameters:** none. The program does not use the date or the clock.
 

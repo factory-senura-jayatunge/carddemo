@@ -9,7 +9,7 @@ sources:
   - {path: app/cbl/CBACT03C.cbl, sha256: 1b77213da771, role: program}
   - {path: app/jcl/READXREF.jcl, sha256: 3ec9d1c9efd6, role: job}
   - {path: app/cpy/CVACT03Y.cpy, sha256: ffc6079e09b2, role: record}
-entry_points: [{type: jcl-step, job: READXREF, step: STEP05}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "421-447"}]
+entry_points: [{type: jcl-step, job: READXREF, step: STEP05}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "421-448"}]
 mapsets: []
 copybooks: [CVACT03Y]
 data_stores:
@@ -18,7 +18,7 @@ calls: [CEE3ABD]
 transfers_to: []
 invoked_by: [READXREF.jcl]
 local_run: "make run-batch PROGRAM=READXREF"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBACT03C: Card cross-reference file listing (READXREF)
@@ -36,7 +36,7 @@ The card cross-reference listing program reads the card cross-reference file (EN
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `READXREF`, step `STEP05` (`app/jcl/READXREF.jcl:22-28`). In the CA-7 schedule `READCUST` triggers `READXREF` and `READXREF` triggers `WAITSTEP`, in the chain `CLOSEFIL` → `READACCT` → `READCARD` → `READCUST` → `READXREF` → `WAITSTEP` → `OPENFIL` (`app/scheduler/CardDemo.ca7:421-447`); the entry marks the job "maint only". Control-M does not list it.
+- **Trigger:** JCL job `READXREF`, step `STEP05` (`app/jcl/READXREF.jcl:22-28`). In the CA-7 schedule `READCUST` triggers `READXREF` and `READXREF` triggers `WAITSTEP`, in the chain `CLOSEFIL` → `READACCT` → `READCARD` → `READCUST` → `READXREF` → `WAITSTEP` → `OPENFIL` (`app/scheduler/CardDemo.ca7:421-448`); the entry marks the job "maint only". Control-M does not list it.
 - **Preconditions:** the cross-reference file can be opened for input (the CA-7 chain runs after CLOSEFIL has closed the CICS files).
 - **Parameters:** none. The program does not use the date or the clock.
 

@@ -27,7 +27,7 @@ calls: [CEE3ABD]
 transfers_to: []
 invoked_by: []
 local_run: "make run-batch PROGRAM=TRANVALD (no JCL in the repository; the DDs come from the program's SELECT clauses)"
-spec_status: draft
+spec_status: verified
 ---
 
 # CBTRN01C: Daily transaction verification (TRANVALD)

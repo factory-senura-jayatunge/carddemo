@@ -153,10 +153,11 @@ class Run:
         xref, xref_keys = self.open_ksds(
             "cardxref.txt", 50, slice(0, 16),
             "ERROR OPENING CROSS REF FILE", xref=True)
-        # Alternate index XREF-ACCT-ID: first card in card-number order.
+        # The non-unique alternate key XREF-ACCT-ID returns the account's
+        # first record in load order (text-file order), not the lowest card
+        # number (BR-INTC-007). The dict keeps insertion order.
         xref_by_acct = {}
-        for key in xref_keys:
-            rec = xref[key]
+        for rec in xref.values():
             xref_by_acct.setdefault(rec[25:36], rec)
         disc, _ = self.open_ksds(
             "discgrp.txt", 50, slice(0, 16),

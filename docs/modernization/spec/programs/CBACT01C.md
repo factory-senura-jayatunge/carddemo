@@ -22,7 +22,7 @@ calls: [COBDATFT, CEE3ABD]
 transfers_to: []
 invoked_by: [READACCT.jcl]
 local_run: "make run-batch PROGRAM=READACCT (COBDATFT is the COBOL shim tools/shims/COBDATFT.cbl)"
-spec_status: draft
+spec_status: verified
 ---
 
 # CBACT01C: Account file listing and extract files (READACCT)

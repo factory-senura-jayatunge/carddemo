@@ -2,7 +2,7 @@
 
 Usage: python3 gen_stress.py OUT_DIR
 Targets: disclosure groups (own group, ZEROAPR, unknown group -> DEFAULT),
-several categories per account, zero and negative balances, truncation of
+several categories per account, two cards for one account, zero and negative balances, truncation of
 negative interest, large balances, a different PARM, non-zero cycle fields.
 """
 import random
@@ -70,6 +70,12 @@ def main() -> None:
             existing[key] = key + zoned(cents, 11) + filler
     tcat = [existing[k] for k in sorted(existing)]
     (out / "tcatbal.txt").write_text("\n".join(tcat) + "\n", encoding="latin-1")
+    # a second card for account 3, loaded after its first card but with a lower card number:
+    # the alternate-key read returns the first one loaded (BR-INTC-007)
+    xref = recs("cardxref.txt", 50)
+    first = next(i for i, x in enumerate(xref) if x[25:36] == "00000000003")
+    xref.insert(first + 1, "0000000000000003" + xref[first][16:])
+    (out / "cardxref.txt").write_text("".join(x.rstrip() + "\n" for x in xref), encoding="latin-1")
     (out / "parm.txt").write_text("2023013100\n")
     print("accounts", len(accts), "category balances", len(tcat))
 

@@ -9,7 +9,7 @@ sources:
   - {path: app/cbl/CBCUS01C.cbl, sha256: c894b02b933f, role: program}
   - {path: app/jcl/READCUST.jcl, sha256: 971f5e80ab02, role: job}
   - {path: app/cpy/CVCUS01Y.cpy, sha256: 944fd9a8eb10, role: record}
-entry_points: [{type: jcl-step, job: READCUST, step: STEP05}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "394-419"}]
+entry_points: [{type: jcl-step, job: READCUST, step: STEP05}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "394-421"}]
 mapsets: []
 copybooks: [CVCUS01Y]
 data_stores:
@@ -18,7 +18,7 @@ calls: [CEE3ABD]
 transfers_to: []
 invoked_by: [READCUST.jcl]
 local_run: "make run-batch PROGRAM=READCUST"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBCUS01C: Customer file listing (READCUST)
@@ -36,7 +36,7 @@ The customer listing program reads the customer master (ENT-CUSTOMER) from start
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `READCUST`, step `STEP05` (`app/jcl/READCUST.jcl:21-27`). In the CA-7 schedule `READCARD` triggers `READCUST` and `READCUST` triggers `READXREF`, in the chain `CLOSEFIL` → `READACCT` → `READCARD` → `READCUST` → `READXREF` → `WAITSTEP` → `OPENFIL` (`app/scheduler/CardDemo.ca7:394-419`); the entry marks the job "maint only". Control-M does not list it.
+- **Trigger:** JCL job `READCUST`, step `STEP05` (`app/jcl/READCUST.jcl:21-27`). In the CA-7 schedule `READCARD` triggers `READCUST` and `READCUST` triggers `READXREF`, in the chain `CLOSEFIL` → `READACCT` → `READCARD` → `READCUST` → `READXREF` → `WAITSTEP` → `OPENFIL` (`app/scheduler/CardDemo.ca7:394-421`); the entry marks the job "maint only". Control-M does not list it.
 - **Preconditions:** the customer file can be opened for input (the CA-7 chain runs after CLOSEFIL has closed the CICS files).
 - **Parameters:** none. The program does not use the date or the clock.
 

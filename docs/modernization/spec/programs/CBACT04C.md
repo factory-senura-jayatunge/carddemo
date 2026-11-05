@@ -27,7 +27,7 @@ calls: [CEE3ABD]
 transfers_to: []
 invoked_by: [INTCALC.jcl]
 local_run: "make run-batch PROGRAM=INTCALC (runs CBACT04C through PARMRUN with PARM 2022071800)"
-spec_status: draft
+spec_status: verified
 ---
 
 # CBACT04C: Monthly interest calculation (INTCALC)
@@ -207,7 +207,7 @@ flowchart TD
 #### BR-INTC-007 · Card number on the interest transaction
 - **When:** an account starts (BR-INTC-008).
 - **Then:** read ENT-CARD-XREF by its alternate key `XREF-ACCT-ID` = the account ID; the record found gives `XREF-CARD-NUM`, which goes on every interest transaction of the account.
-- **Several cards per account:** the alternate index is non-unique (ENT-CARD-XREF). Locally (GnuCOBOL with Berkeley DB) the read returns the first card in ascending card-number order and status `00`. On z/OS the read returns the first record of the alternate index for that key, with status `02` when more exist, which the program treats as an error (DEF-INTC-007). The sample data has one card per account.
+- **Several cards per account:** the alternate index is non-unique (ENT-CARD-XREF). Locally (GnuCOBOL with Berkeley DB) the read returns status `00` and the first record loaded for that account, in the load order of the cross-reference file (not card-number order); with the sorted sample file that is the lowest card number. On z/OS the read returns the first record of the alternate index for that key, with status `02` when more exist, which the program treats as an error (DEF-INTC-007). The sample data has one card per account.
 - **Source:** `:204-205, 394-414, 497`
 - **Fidelity:** must-preserve · **Confidence:** runtime-verified (local); platform-inferred (z/OS)
 
@@ -368,7 +368,7 @@ flowchart LR
 - **Status:** open (data question, Q-ENT-001, Q-INTC-001) · **Confidence:** runtime-verified
 
 #### DEF-INTC-007 · Several cards per account on z/OS
-- The `SELECT` declares the alternate key without `WITH DUPLICATES` (`:38`) while the alternate index is defined `NONUNIQUEKEY` (ENT-CARD-XREF). On z/OS a keyed read through a non-unique alternate index returns status `02` when more records have the same key, and the program accepts only `00` (ERR-INTC-004), so an account with two cards would abend the job; the open itself may also be rejected for the mismatched key attribute. Locally GnuCOBOL returns `00` and the lowest card number.
+- The `SELECT` declares the alternate key without `WITH DUPLICATES` (`:38`) while the alternate index is defined `NONUNIQUEKEY` (ENT-CARD-XREF). On z/OS a keyed read through a non-unique alternate index returns status `02` when more records have the same key, and the program accepts only `00` (ERR-INTC-004), so an account with two cards would abend the job; the open itself may also be rejected for the mismatched key attribute. Locally GnuCOBOL returns `00` and the account's first cross-reference record in load order (BR-INTC-007).
 - **Source:** `:34-39, 394-414` · **Status:** open · **Confidence:** platform-inferred (Q-INTC-002)
 
 #### DEF-INTC-008 · Only status `00` counts as success
@@ -416,7 +416,7 @@ A reimplementation is equivalent when, for the same input files (TCATBALF, XREFF
 - the account file after the run is byte-identical;
 - SYSOUT has the same lines in the same order (start line, one record line per balance, the "missing" pairs, end line, or the error lines).
 
-Sample check (`app/data/ASCII` after the sample POSTTRAN day, PARM `2022071800`): 100 category balances, 50 interest transactions (type 01 balances; the type 03 balances have rate 0), 50 accounts rewritten, return code 0. On the raw sample (before POSTTRAN, all balances zero): 50 transactions of 0.00. The spec-only reimplementation and its comparison against the GnuCOBOL runner are in `docs/modernization/spec/checks/intcalc_reimpl/` and `docs/modernization/spec/evidence/d1-core-batch-review.md`.
+Sample check (`app/data/ASCII` after the sample POSTTRAN day, that is POSTTRAN first and INTCALC on its account and category balance files, PARM `2022071800`; the local INTCALC job alone runs on the raw sample): 100 category balances, 50 interest transactions (type 01 balances; the type 03 balances have rate 0), 50 accounts rewritten, return code 0. On the raw sample (before POSTTRAN, all balances zero): 50 transactions of 0.00. The spec-only reimplementation and its comparison against the GnuCOBOL runner are in `docs/modernization/spec/checks/intcalc_reimpl/` and `docs/modernization/spec/evidence/d1-core-batch-review.md`.
 
 ## 16. Paragraph coverage
 

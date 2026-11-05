@@ -28,7 +28,7 @@ calls: [CEE3ABD]
 transfers_to: []
 invoked_by: [TRANREPT.jcl, TRANREPT.prc, CORPT00C]
 local_run: "make run-batch PROGRAM=TRANREPT (runs POSTTRAN first, then the REPRO and SORT stand-in, then CBTRN03C)"
-spec_status: draft
+spec_status: verified
 ---
 
 # CBTRN03C: Transaction detail report (TRANREPT)
@@ -51,7 +51,7 @@ The transaction report program prints the posted transactions of a date range as
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `TRANREPT`, step `STEP10R` (`app/jcl/TRANREPT.jcl:59-80`), after a REPRO of the transaction master to `TRANSACT.BKUP(+1)` and a SORT that keeps the processing dates 2022-01-01 to 2022-07-06 and sorts by card number (`app/jcl/TRANREPT.jcl:23-55`). The online report request `CORPT00C` submits the cataloged procedure `TRANREPT` (`app/proc/TRANREPT.prc:21-72`) through the `JOBS` transient data queue with the chosen dates written into both the SORT symbols and an in-stream DATEPARM record (`app/cbl/CORPT00C.cbl:94-121`). Neither scheduler lists the job.
+- **Trigger:** JCL job `TRANREPT`, step `STEP10R` (`app/jcl/TRANREPT.jcl:59-80`), after a REPRO of the transaction master to `TRANSACT.BKUP(+1)` and a SORT that keeps the processing dates 2022-01-01 to 2022-07-06 and sorts by card number (`app/jcl/TRANREPT.jcl:23-55`). The online report request `CORPT00C` submits the cataloged procedure `TRANREPT` (`app/proc/TRANREPT.prc:21-79`) through the `JOBS` transient data queue with the chosen dates written into both the SORT symbols and an in-stream DATEPARM record (`app/cbl/CORPT00C.cbl:94-121`). Neither scheduler lists the job.
 - **Preconditions:** the transaction master has been posted (POSTTRAN, and on a full cycle COMBTRAN); the SORT output is in card-number order; the reference files `CARDXREF`, `TRANTYPE`, `TRANCATG` hold every card, type and category that occurs.
 - **Parameters:** the DATEPARM record (BR-TRPT-001). The SORT step's date range is set separately in the JCL symbols; the program does not see it (DEF-TRPT-002).
 - Locally the job runs POSTTRAN first, then a Python stand-in for the REPRO and SORT steps (`tools/carddemo.py:621-629`).

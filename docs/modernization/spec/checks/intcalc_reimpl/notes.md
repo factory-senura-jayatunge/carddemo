@@ -12,13 +12,15 @@ Implementation: `intcalc_from_spec.py` in this folder, written from `programs/CB
 - **NUM-INTC-003, total interest.** `WS-TOTAL-INT` is wrapped to 11 digits after each addition (no size error), before it is added to `ACCT-CURR-BAL`, which is then wrapped to 12 digits.
 - **NUM-INTC-001, reading zoned digits.** The spec does not cover non-digit characters in the numeric positions. Decision: the low 4 bits of each byte are taken as the digit; a plain digit in the sign byte is positive (input contract).
 - **BR-INTC-006, cycle fields.** Both cycle fields are written as `00000000000{`, whatever they held; every other byte of the account record is unchanged.
-- **BR-INTC-007, several cards.** Locally the first card in ascending card-number order (status `00`); the z/OS status `02` abend (DEF-INTC-007) is not reproduced.
+- **BR-INTC-007, several cards.** Locally the read by `XREF-ACCT-ID` returns status `00` and the account's first cross-reference record in load order, which is the text-file order of `cardxref.txt` (input-contract clarification), not card-number order. When a primary key occurs twice, the first record in file order is the one loaded. The z/OS status `02` abend (DEF-INTC-007) is not reproduced.
 - **Input contract, duplicate keys.** The spec does not say what happens when a KSDS text file holds two records with one key. Decision: the first record in file order is kept. Lines longer than the record length are cut to the record length.
 - **NUM-INTC-004, PARM.** First line of `parm.txt` without CR/LF, first 10 characters, padded with spaces when shorter; an empty line gives 10 spaces. `2022071800` when the file is absent.
 - **ERR-INTC-003/004, missing account or cross-reference.** Status `23` is printed as `FILE STATUS IS: NNNN0023`. The order is: `ACCOUNT NOT FOUND: ` + the 11-character account ID from the balance record, the error line, the status line, `ABENDING PROGRAM`. The account check runs before the cross-reference check, so a balance whose account and cross-reference are both missing only reports the account.
 - **ERR-INTC-009, abend outputs.** On an abend, `TRANSACT.txt` holds the transactions written before it, `ACCTDATA.after.txt` holds the accounts rewritten before it (DEF-INTC-009), `rc.txt` is 16, and `stderr.txt` holds `CEE3ABD: USER ABEND U0999`. When `acctdata.txt` is missing, `ACCTDATA.after.txt` is written empty.
 
 ## Contradictions
+
+- BR-INTC-007 and DEF-INTC-007 first said that locally the alternate-key read returns the lowest card number. That was wrong. After an independent review, the spec was corrected to say it returns the first record in load order, and this implementation was changed to match.
 
 - NUM-INTC-005 says the clock is read once per transaction. The task contract asks for timestamps from one moment of the run. The equivalence contract (§15) only requires the layout, the run date and equality of the two fields, so both readings satisfy it; one reading per run was chosen.
 - The runbook behaviour quoted in DEF-INTC-001 (last account not updated) is described as fixed. The implementation follows the fixed behaviour (§6 step 3).
