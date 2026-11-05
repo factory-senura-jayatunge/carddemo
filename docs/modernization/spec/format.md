@@ -183,7 +183,7 @@ Job specs use the same 16 sections, read for JCL:
 | 12 `NUM` | Keys, record sizes, SORT fields, GDG limits, space. |
 | 16 Coverage | One row per step (rule 5). |
 
-File names: `jobs/<MEMBER>.md` for a JCL member; a procedure whose name is also a job gets the suffix `-PROC` (`jobs/TRANREPT-PROC.md`, id `TRANREPT-PROC`); the CSD is `jobs/CARDDEMO-CSD.md` (kind `csd`), the schedules `jobs/SCHED-CA7.md` and `jobs/SCHED-CONTROLM.md` (kind `schedule`). `jobs/README.md` is the operations view; it has no front matter and the checker skips it. Unit codes for jobs start with `J`.
+File names: `jobs/<MEMBER>.md` for a JCL member; a procedure whose name is also a job gets the suffix `-PROC` (`jobs/TRANREPT-PROC.md`, id `TRANREPT-PROC`); a job spec whose member name equals a program ID gets the suffix `-JOB` (`jobs/CBEXPORT-JOB.md`, id `CBEXPORT-JOB`; the same for CBIMPORT), so spec IDs stay unique across `programs/` and `jobs/`. The unit code is unaffected (`JEXPT`, `JIMPT`); the CSD is `jobs/CARDDEMO-CSD.md` (kind `csd`), the schedules `jobs/SCHED-CA7.md` and `jobs/SCHED-CONTROLM.md` (kind `schedule`). `jobs/README.md` is the operations view; it has no front matter and the checker skips it. Unit codes for jobs start with `J`.
 
 **What `--require-all` counts:** every COBOL program and assembler routine under `app/`, every member of a `jcl/` folder under `app/`, `app/proc`, every `*.csd` file and `app/scheduler`. It does not count `samples/jcl` and `samples/proc` (mainframe compile samples, not application behaviour; described in `jobs/README.md`), nor copybooks, DDL, DCL, DBD, PSB, control cards and data, which are described in `entities.md` and cited from the specs that use them.
 
