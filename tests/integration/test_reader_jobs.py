@@ -33,11 +33,10 @@ class ReaderJobsTest(CardDemoTestCase):
         expected = [r.rstrip() for r in in_key_order("cardxref.txt", 16)]
         self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBACT03C")], expected)
 
-    def test_readcust_prints_every_customer_twice(self):
-        # CBCUS01C DISPLAYs the record both in 1000-CUSTFILE-GET-NEXT and in its main loop.
+    def test_readcust_prints_every_customer_once(self):
         _, (res,) = self.run_job("READCUST")
         self.assert_rc(res, 0)
-        expected = [r.rstrip() for r in in_key_order("custdata.txt", 9) for _ in range(2)]
+        expected = [r.rstrip() for r in in_key_order("custdata.txt", 9)]
         self.assertEqual([l.rstrip() for l in program_lines(res.sysout, "CBCUS01C")], expected)
 
     def test_readacct_writes_the_three_extract_files(self):

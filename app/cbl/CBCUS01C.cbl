@@ -93,7 +93,7 @@
            READ CUSTFILE-FILE INTO CUSTOMER-RECORD.
            IF  CUSTFILE-STATUS = '00'
                MOVE 0 TO APPL-RESULT
-               DISPLAY CUSTOMER-RECORD 
+      *        DISPLAY CUSTOMER-RECORD
            ELSE
                IF  CUSTFILE-STATUS = '10'
                    MOVE 16 TO APPL-RESULT
