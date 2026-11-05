@@ -202,6 +202,7 @@ CardDemo includes several optional modules that extend the base functionality:
 - **Online Functions**: Start the CardDemo application using the CC00 transaction
   - Admin access: Use userid ADMIN001 with password PASSWORD
   - User access: Use userid USER0001 with password PASSWORD
+  - These are demo-only seed records in the user security file, not real secrets. Reset them before anyone else can reach the region. See [Secrets and credentials](./docs/security/secrets.md).
 - **Batch Functions**: See the "Running Batch Jobs" section below
 
 ## Running Batch Jobs
@@ -353,6 +354,10 @@ Admin users can perform the following functions:
 ## Support
 
 For questions, issues, or improvement requests, please raise an issue in the repository with detailed information about your concern. The maintainers will respond according to availability.
+
+- Operations: [Runbooks](./docs/runbooks/README.md) for batch restart, CICS files, daily rejects and the authorization purge
+- Security: [Secrets and credentials](./docs/security/secrets.md) and [Data handling (PII and cardholder data)](./docs/security/data-handling.md)
+- Report security vulnerabilities through the [AWS vulnerability reporting page](https://aws.amazon.com/security/vulnerability-reporting/), not in a public issue
 
 ## Roadmap
 
