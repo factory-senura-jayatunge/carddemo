@@ -61,7 +61,7 @@ COACCT01 is a CICS program (transaction `CDRA`) that serves account inquiries ar
 | `CARD.DEMO.REPLY.ACCT` | literal | `MQOO-OUTPUT + MQOO-PASS-ALL-CONTEXT + MQOO-FAIL-IF-QUIESCING` | MQPUT of replies, ENT-MQ-ACCT-REPLY | 198, 255-287 |
 | `CARD.DEMO.ERROR` | literal | `MQOO-OUTPUT + MQOO-PASS-ALL-CONTEXT + MQOO-FAIL-IF-QUIESCING` | MQPUT of error records, ENT-MQ-ERROR-MSG | 294, 289-322 |
 
-All three opens use the queue manager connection handle `QMGR-HANDLE-CONN` = 0 and a blank queue manager name; MQGET, MQPUT and MQCLOSE use `MQ-HCONN` = 0 (`:44, 104, 226, 233, 260, 267, 295, 302`). Under CICS the handle is the task's default connection (platform-inferred).
+All three opens use the queue manager connection handle `QMGR-HANDLE-CONN` = 0 and a blank queue manager name; MQGET, MQPUT and MQCLOSE use `MQ-HCONN` = 0 (`:44, 104, 226, 233, 260, 267, 295, 302, 352, 479, 516, 557, 579, 602`). Under CICS the handle is the task's default connection (platform-inferred).
 
 ### 4.2 Request message (ENT-MQ-ACCT-REQUEST)
 
@@ -119,6 +119,7 @@ Always 1000 bytes, format `MQFMT-STRING`, character set of the queue manager (NU
 
 Program-local data with behaviour (`:13-169`):
 
+- `PROGRAM-ID. COACCT01 IS INITIAL` (`:2`): working storage is set to its initial state on each entry; items without VALUE (`MQ-MSG-COUNT`, `MQ-BUFFER`) have no defined initial content, and the transaction is defined with `STORAGECLEAR(NO)` (`app/app-vsam-mq/csd/CRDDEMOM.csd:19`) (Q-MQAC-005; platform-inferred).
 - `WS-MQ-MSG-FLAG` / `NO-MORE-MSGS` (`:13-14`): ends the drain loop.
 - Queue-open flags (`:16-23`): `ERR-QUEUE-OPEN` for the error queue, `RESP-QUEUE-OPEN` for the reply queue and, by its name misleadingly, `REPLY-QUEUE-OPEN` for the **input** queue (`:245, 279, 314`; DEF-MQAC-009). They are never reset.
 - `SAVE-MSGID`, `SAVE-CORELID` (`:55-56`): request IDs reused in the reply.
@@ -205,8 +206,8 @@ else: error record 'INP MQGET ERR:', end task
 
 #### BR-MQAC-005 · Reply correlation
 - **When:** a reply is put.
-- **Then:** the reply's MQMD message ID is set to the **request's message ID** and its correlation ID to the **request's correlation ID** (both 24 bytes, saved at get time). The reply body contains no request identifier, so a requester can match a reply only through these descriptor fields. All other MQMD fields keep the values they had after the MQGET of the request (DEF-MQAC-003).
-- **Source:** `:364-365, 370, 372, 469-470`
+- **Then:** the reply's MQMD message ID is set to the **request's message ID** and its correlation ID to the **request's correlation ID** (both 24 bytes, saved at get time). The reply body contains no request identifier, so a requester can match a reply only through these descriptor fields. All other MQMD fields except Format (`MQFMT-STRING`, `:471`) and CodedCharSetId (`MQCCSI-Q-MGR`, `:473`) keep the values they had after the MQGET of the request (DEF-MQAC-003).
+- **Source:** `:364-365, 370, 372, 469-473`
 - **Fidelity:** must-preserve (the requester depends on it) · **Confidence:** platform-inferred (MQMD semantics)
 
 #### BR-MQAC-006 · Fixed reply queue
@@ -324,7 +325,7 @@ In execution order for one request. Everything is in one CICS unit of work per l
 - **Fidelity:** must-preserve · **Confidence:** platform-inferred
 
 #### SE-MQAC-004 · Put an error record
-- **What:** MQPUT on the error queue handle: `MQ-ERR-DISPLAY` padded with spaces to 1000 bytes, length 1000, `MQFMT-STRING`, CCSID of the queue manager, the same put options as SE-MQAC-003. Message ID and correlation ID are not set: they are whatever the shared MQMD holds (the current request's IDs after a get; DEF-MQAC-003). Committed by the CICS RETURN that always follows (FLOW-MQAC-004).
+- **What:** MQPUT on the error queue handle: `MQ-ERR-DISPLAY` padded with spaces to 1000 bytes, length 1000, `MQFMT-STRING`, CCSID of the queue manager, the same put options as SE-MQAC-003. Message ID and correlation ID are not set: they are whatever the shared MQMD holds (the current request's IDs after a get, DEF-MQAC-003; before the first get, the initial descriptor values, so the queue manager generates a message ID, platform-inferred). Committed by the CICS RETURN that follows, unless termination loops on a failed close (DEF-MQAC-008).
 - **Source:** `:501-523`
 - **Fidelity:** must-preserve (operations rely on the error queue) · **Confidence:** platform-inferred
 
@@ -355,8 +356,8 @@ In execution order for one request. Everything is in one CICS unit of work per l
 
 #### ERR-MQAC-004 · Get fails
 - **When:** MQGET returns a condition code other than OK and a reason other than 2033 (for example 2080, message longer than 1000 bytes; DEF-MQAC-012).
-- **Then:** error record `INP MQGET ERR:` with the input queue name, put; termination; return (commits the previous request if it was not yet committed).
-- **Source:** `:376-388`
+- **Then:** error record `INP MQGET ERR:` with the input queue name, put; termination; return. The previous request was already committed by the SYNCPOINT before the get (`:326-328`). The RETURN commits the error record, and also the failed get if the queue manager removed the message (for example a warning such as a data-conversion failure: the request is then consumed with no reply). For 2080 the message stays on the queue (DEF-MQAC-012).
+- **Source:** `:326-330, 376-388`
 - **Fidelity:** must-preserve · **Confidence:** platform-inferred (reason codes)
 
 #### ERR-MQAC-005 · Account file error
@@ -490,8 +491,8 @@ sequenceDiagram
 ## 13. Known defects and oddities
 
 #### DEF-MQAC-001 · The README describes a different program
-- The module README says CDRA is run "in CICS with an account number", sends a request to `CARDDEMO.REQUEST.QUEUE` and displays the response, with request `ACCT-REQUEST-MSG` (`REQUEST-TYPE` `ACCT`, `REQUEST-ID` X(8), `ACCOUNT-NUMBER` X(11)) and response `ACCT-RESPONSE-MSG` (`ACCOUNT-DATA` X(300)), and lists the queue definitions `CARDDEMO.REQUEST.QUEUE` / `CARDDEMO.RESPONSE.QUEUE`. The code is a trigger-started server: it uses function `INQA` + 11-digit key, the queues `CARD.DEMO.REPLY.ACCT` and `CARD.DEMO.ERROR`, and a 1000-byte labelled text reply; it has no terminal interaction.
-- **Source:** `app/app-vsam-mq/README.md:50-55, 67-73, 86-93, 114-128`; code `:191-198, 109-112, 130-169`
+- The module README says CDRA is run "in CICS with an account number", sends a request to `CARDDEMO.REQUEST.QUEUE` and displays the response, with request `ACCT-REQUEST-MSG` (`REQUEST-TYPE` `ACCT`, `REQUEST-ID` X(8), `ACCOUNT-NUMBER` X(11)) and response `ACCT-RESPONSE-MSG` (`RESPONSE-TYPE` `ACCT`, `RESPONSE-ID` X(8), `ACCOUNT-DATA` X(300)), and lists the queue definitions `CARDDEMO.REQUEST.QUEUE` / `CARDDEMO.RESPONSE.QUEUE`. The code is a trigger-started server: it uses function `INQA` + 11-digit key, the queues `CARD.DEMO.REPLY.ACCT` and `CARD.DEMO.ERROR`, and a 1000-byte labelled text reply; it has no terminal interaction. The README gives the serving role to an unnamed "listener program" (README `:83, 92`), which is what COACCT01 actually does.
+- **Source:** `app/app-vsam-mq/README.md:50-55, 67-73, 83, 86-93, 114-128`; code `:191-198, 109-112, 130-169`
 - **Status:** open · **Fidelity:** defect-decide (Q-MQAC-007) · **Confidence:** reviewed
 
 #### DEF-MQAC-002 · Request's reply-to queue is ignored
@@ -515,8 +516,8 @@ sequenceDiagram
 - **Status:** open · **Confidence:** platform-inferred
 
 #### DEF-MQAC-006 · Request length is ignored
-- The returned data length is not used and the 1000-byte buffer is not cleared before the get. A request shorter than 15 bytes leaves its missing function or key bytes as whatever the buffer held before: after the first reply, that is the previous reply's text (`MQ-BUFFER` = last reply); for the first request, the buffer's initial storage.
-- **Source:** `:50-51, 342, 352-360, 369, 373, 467`
+- The returned data length is not used and the 1000-byte buffer is not cleared before the get. A request shorter than 15 bytes leaves its missing function or key bytes as whatever the buffer held before: after the first reply, that is the previous reply's text (`MQ-BUFFER` = last reply); for the first request, the buffer's initial storage. The `INITIALIZE REQUEST-MSG-COPY REPLACING NUMERIC BY ZEROES` before each get (`:345`) and the blanking of `MQ-CORRELID`/`MQ-MSG-ID` (`:338-339`) have no effect: `:373` overwrites the whole layout from the uncleared buffer.
+- **Source:** `:50-51, 338-339, 342, 345, 352-360, 369, 373, 467`
 - **Status:** open · **Confidence:** platform-inferred
 
 #### DEF-MQAC-007 · A file error loses the request and stops the server
@@ -530,7 +531,7 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-MQAC-009 · Copy-paste and naming slips
-- The input queue's open flag is `REPLY-QUEUE-OPEN` (works, because termination tests the same flag, `:245, 540`). The reply-queue close error reports the input queue name (`:592`). The RETRIEVE error spells the paragraph field `CICS RETREIVE` (`:200`). RESP2 is moved to itself instead of to its display field (`:202`), so the error record always shows `00000000` for RESP2. Several comments (`:464, 502`) do not describe their paragraph.
+- The input queue's open flag is `REPLY-QUEUE-OPEN` (works, because termination tests the same flag, `:245, 540`). The reply-queue close error reports the input queue name (`:592`). The RETRIEVE error spells the paragraph field `CICS RETREIVE` (`:200`). RESP2 is moved to itself instead of to its display field (`:202`), so the error record always shows `00000000` for RESP2.
 - **Source:** `:200-202, 245, 592`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 

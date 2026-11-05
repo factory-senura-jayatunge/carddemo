@@ -86,7 +86,7 @@ None. The program declares the literal `ACCTDAT ` and file response fields (`:11
 | ENT-MQ-DATE-REPLY (all) | no | yes | section 4.3, NUM-MQDT-001 |
 | ENT-MQ-ERROR-MSG (all) | no | yes | section 4.4 |
 
-Program-local data with behaviour (`:13-120`): `WS-MQ-MSG-FLAG`/`NO-MORE-MSGS` (`:13-14`); the queue-open flags (`:16-23`, the input queue uses `REPLY-QUEUE-OPEN`, `:194`); `SAVE-MSGID`, `SAVE-CORELID` (`:55-56`); `MQ-ERR-DISPLAY` (`:58-67`); the date fields `WS-ABS-TIME` S9(15) COMP-3, `WS-MMDDYYYY` X(10), `WS-TIME` X(8) (`:35-38`). Declared without effect: `QMGR-NAME`, `QUEUE-MESSAGE`, `MQ-QUEUE`, `MQ-QUEUE-REPLY`/`SAVE-REPLY2Q`, `MQ-MSG-COUNT` (DEF-MQDT-008), `REQUEST-MSG-COPY`, `LIT-ACCTFILENAME`, `WS-RESP-CD`, `WS-REAS-CD`, `WS-CICS-RESP2-CD-D` (always zero).
+`PROGRAM-ID. CODATE01 IS INITIAL` (`:2`), transaction defined with `STORAGECLEAR(NO)` (`app/app-vsam-mq/csd/CRDDEMOM.csd:29`): items without VALUE have no defined initial content (platform-inferred). Program-local data with behaviour (`:13-120`): `WS-MQ-MSG-FLAG`/`NO-MORE-MSGS` (`:13-14`); the queue-open flags (`:16-23`, the input queue uses `REPLY-QUEUE-OPEN`, `:194`); `SAVE-MSGID`, `SAVE-CORELID` (`:55-56`); `MQ-ERR-DISPLAY` (`:58-67`); the date fields `WS-ABS-TIME` S9(15) COMP-3, `WS-MMDDYYYY` X(10), `WS-TIME` X(8) (`:35-38`). Declared without effect: `QMGR-NAME`, `QUEUE-MESSAGE`, `MQ-QUEUE`, `MQ-QUEUE-REPLY`/`SAVE-REPLY2Q`, `MQ-MSG-COUNT` (DEF-MQDT-008), `REQUEST-MSG-COPY`, `LIT-ACCTFILENAME`, `WS-RESP-CD`, `WS-REAS-CD`, `WS-CICS-RESP2-CD-D` (always zero).
 
 ## 6. Processing flow
 
@@ -134,8 +134,8 @@ Steps (`1000-CONTROL`, `:127-169`), identical to COACCT01 (section 6 of its spec
 
 #### BR-MQDT-003 · Reply correlation
 - **When:** a reply is put.
-- **Then:** the reply's MQMD message ID and correlation ID are set to the request's message ID and correlation ID; all other MQMD fields keep the values from the request's get. Same as BR-MQAC-005.
-- **Source:** `:313-314, 319, 321, 373-374`
+- **Then:** the reply's MQMD message ID and correlation ID are set to the request's message ID and correlation ID; all other MQMD fields except Format (`MQFMT-STRING`, `:375`) and CodedCharSetId (`MQCCSI-Q-MGR`, `:377`) keep the values from the request's get. Same as BR-MQAC-005.
+- **Source:** `:313-314, 319, 321, 373-377`
 - **Fidelity:** must-preserve · **Confidence:** platform-inferred
 
 #### BR-MQDT-004 · Fixed reply queue
@@ -341,7 +341,7 @@ sequenceDiagram
 ## 13. Known defects and oddities
 
 #### DEF-MQDT-001 · The README describes a different program
-- The README says CDRD is run in CICS, sends a request to a request queue and displays the response, with request `DATE-REQUEST-MSG` (`REQUEST-TYPE` `DATE`, `REQUEST-ID` X(8)) and response `DATE-RESPONSE-MSG` (`RESPONSE-TYPE`, `RESPONSE-ID`, `SYSTEM-DATE` X(10)), on `CARDDEMO.REQUEST.QUEUE` / `CARDDEMO.RESPONSE.QUEUE`. The code is a trigger-started server that ignores the request, sends a 46-character text with date and time and no request ID, on `CARD.DEMO.REPLY.DATE`.
+- The README says CDRD is run in CICS, sends a request to a request queue and displays the response, with request `DATE-REQUEST-MSG` (`REQUEST-TYPE` `DATE`, `REQUEST-ID` X(8)) and response `DATE-RESPONSE-MSG` (`RESPONSE-TYPE`, `RESPONSE-ID`, `SYSTEM-DATE` X(10)), on `CARDDEMO.REQUEST.QUEUE` / `CARDDEMO.RESPONSE.QUEUE`. The code is a trigger-started server that ignores the request, sends a 46-character text with date and time and no request ID, on `CARD.DEMO.REPLY.DATE`. The README gives the serving role to an unnamed "listener program" (README `:83`), which is what CODATE01 actually does.
 - **Source:** `app/app-vsam-mq/README.md:50-55, 77-84, 99-112`; code `:140-147, 355-360`
 - **Status:** open · **Fidelity:** defect-decide (Q-MQDT-003) · **Confidence:** reviewed
 
@@ -391,8 +391,8 @@ sequenceDiagram
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-MQDT-011 · Account-inquiry leftovers
-- The program was cloned from COACCT01: it keeps the file name literal `ACCTDAT `, the file response fields and the request layout `WS-FUNC`/`WS-KEY` (`:109-120`), and copies every request into it (`:322`), none of which is used.
-- **Source:** `:109-120, 322`
+- The program was cloned from COACCT01: it keeps the file name literal `ACCTDAT `, the file response fields and the request layout `WS-FUNC`/`WS-KEY` (`:109-120`), and copies every request into it (`:322`), none of which is used. The `INITIALIZE REQUEST-MSG-COPY` and the blanking of `MQ-CORRELID`/`MQ-MSG-ID` before each get (`:287-288, 294`) and `INITIALIZE WS-DATE-TIME` before ASKTIME (`:341`) have no effect.
+- **Source:** `:109-120, 287-288, 294, 322, 341`
 - **Status:** open (dead code) · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-MQDT-012 · Reply format is hard to parse
