@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -151,6 +151,20 @@ TRAN = parse_copybook("CVTRA05Y")
 DALYTRAN = parse_copybook("CVTRA06Y")
 
 
+# CBTRN02C's WS-TEMP-BAL is S9(11)V99. It holds CYC-CREDIT - CYC-DEBIT (both
+# S9(10)V99) + DALYTRAN-AMT (S9(09)V99), so every possible value fits; at the
+# original S9(09)V99 the high digits of a large sum were dropped.
+WS_TEMP_BAL_DIGITS = 11
+
+
+def cobol_store(value: Decimal, int_digits: int, decimals: int = 2) -> Decimal:
+    """Store value in a signed numeric DISPLAY field without ON SIZE ERROR:
+    digits beyond the field's integer part are dropped, the sign is kept."""
+    q = abs(value).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_DOWN)
+    kept = q % (Decimal(10) ** int_digits)
+    return -kept if value < 0 else kept
+
+
 def expected_posting(daily: list[Record], xref: dict[str, Record], accounts: dict[str, Record]):
     """Model CBTRN02C's validation (1500-*) and posting (2800-*) rules.
 
@@ -172,7 +186,7 @@ def expected_posting(daily: list[Record], xref: dict[str, Record], accounts: dic
         acct, amt = accounts[acct_id], t["DALYTRAN-AMT"]
         credit, debit, bal = state[acct_id]
         reason = 0
-        if not acct["ACCT-CREDIT-LIMIT"] >= credit - debit + amt:
+        if not acct["ACCT-CREDIT-LIMIT"] >= cobol_store(credit - debit + amt, WS_TEMP_BAL_DIGITS):
             reason = 102
         if not acct.raw("ACCT-EXPIRAION-DATE") >= t.raw("DALYTRAN-ORIG-TS")[:10]:
             reason = 103
