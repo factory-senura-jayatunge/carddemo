@@ -69,7 +69,7 @@ A pseudo-conversational CICS screen (transaction `CPVD`, map `COPAU1A`) that sho
 
 ### 4.1 Screen COPAU1A (mapset COPAU01), 24 x 80
 
-Every field is `ASKIP,NORM` without `FSET`: the user cannot type anything (`COPAU01.bms:29-292`).
+Every field is `ASKIP` (protected); all are `NORM` except the title label (`ASKIP,BRT`, `COPAU01.bms:75`), `ERRMSG` (`ASKIP,BRT,FSET`, `COPAU01.bms:284`) and the `Merchant Details` label, which has no `ATTRB` (`COPAU01.bms:229`). The user cannot type anything (`COPAU01.bms:29-292`).
 
 | Row,Col | Field | Len | Attributes | Content | Source |
 | :-- | :-- | --: | :-- | :-- | :-- |
@@ -200,7 +200,7 @@ flowchart TD
 
 #### BR-AUDT-001 · Read the selected authorization
 - **When:** Enter, first display, PF5, PF8 or an invalid key, with a numeric `CDEMO-ACCT-ID` and a selected key that is not spaces or low-values (PF5 and PF8 do not test this; see DEF-AUDT-001).
-- **Then:** schedule the PSB; `GU PAUTSUM0 WHERE ACCNTID = account`; when found, `GNP PAUTDTL1 WHERE PAUT9CTS = selected key`. `GE` or `GB` on either call sets the end flag; other statuses give ERR-AUDT-002. On Enter, first display and invalid key the program then takes a `SYNCPOINT` if the PSB is scheduled (SE-AUDT-003).
+- **Then:** schedule the PSB; `GU PAUTSUM0 WHERE ACCNTID = account`; unless the `GU` returned `GE` or `GB`, `GNP PAUTDTL1 WHERE PAUT9CTS = selected key` (the `GNP` is also issued after a `GU` system error, which leaves the end flag at its initial `N`, `:41, 452-464`). `GE` or `GB` on either call sets the end flag; other statuses give ERR-AUDT-002. On Enter, first display and invalid key the program then takes a `SYNCPOINT` if the PSB is scheduled (SE-AUDT-003).
 - **Source:** `:208-221, 431-491`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -215,13 +215,13 @@ flowchart TD
   - `AUTHCD` = `PA-PROCESSING-CODE` (DEF-AUDT-002); `POSEMD` = `PA-POS-ENTRY-MODE`; `AUTHSRC` = `PA-MESSAGE-SOURCE`; `MCCCD` = `PA-MERCHANT-CATAGORY-CODE`; `CRDEXP` (NUM-AUDT-003); `AUTHTYP` = `PA-AUTH-TYPE`; `TRNID` = `PA-TRANSACTION-ID`; `AUTHMTC` = `PA-MATCH-STATUS`;
   - `AUTHFRD`: BR-AUDT-004;
   - merchant name, ID, city, state and ZIP.
-- The record area is filled whether or not the read found the record; see DEF-AUDT-004.
+- The screen is filled from the record area whether or not the read found the record (`:294`); see DEF-AUDT-004.
 - **Source:** `:291-358`
 - **Fidelity:** must-preserve (content); incidental (colors) · **Confidence:** reviewed
 
 #### BR-AUDT-003 · Decline reason description
 - **When:** BR-AUDT-002.
-- **Then:** binary search (`SEARCH ALL`) of the table below by `PA-AUTH-RESP-REASON`. Found: `AUTHRSN` = code + `-` + description (16 characters). Not found: `9999-ERROR`.
+- **Then:** binary search (`SEARCH ALL`) of the table below by `PA-AUTH-RESP-REASON`. Found: `AUTHRSN` = code + `-` + description; the 16-character description goes into the 15 remaining positions of the 20-character field (`AUTHRSNO(6:)`), and every description is at most 15 characters, so nothing visible is lost. Not found: `9999-ERROR`.
 
   | Code | Description |
   | :-- | :-- |
@@ -236,7 +236,7 @@ flowchart TD
   | `5300` | `LOST CARD` |
   | `9000` | `UNKNOWN` |
 
-- The codes are the ones COPAUA0C sets (COPAUA0C BR-AUTH-007); `5300` is not set by COPAUA0C. The table is in ascending code order, which `SEARCH ALL` requires.
+- The codes are the ones COPAUA0C sets (COPAUA0C BR-AUTH-007); `4400` and `5300` are not set by COPAUA0C, which sets `0000`, `3100`, `4100`, `4200`, `4300`, `5100`, `5200` and `9000` (`COPAUA0C.cbl:698-716`). The table is in ascending code order, which `SEARCH ALL` requires.
 - **Source:** `:56-73, 319-328`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -397,7 +397,7 @@ flowchart LR
 - **Source:** `:331`, `CIPAUDTY.cpy:29, 33` · **Status:** open · **Fidelity:** defect-decide (Q-AUDT-001) · **Confidence:** reviewed
 
 #### DEF-AUDT-003 · Failed fraud change still shows the new status
-- The flag is toggled in the record area before COPAUS2C is called. When COPAUS2C fails or the LINK fails, the change is rolled back but the error flag stays off, so the screen shows the new flag (for example `F-` followed by the old, usually blank, report date) as if it had been saved. The next Enter shows the stored value again.
+- The flag is toggled in the record area before COPAUS2C is called. When COPAUS2C fails or the LINK fails, the change is rolled back but the error flag stays off, so the screen shows the new flag (for example `F-` followed by the old, usually blank, report date): with no message when the LINK failed (DEF-AUDT-005), and with COPAUS2C's Db2 error text when it returned status `F` (`:257`). The next Enter shows the stored value again.
 - **Source:** `:236-242, 253-265` · **Status:** open · **Fidelity:** defect-decide (Q-AUDT-002) · **Confidence:** reviewed
 
 #### DEF-AUDT-004 · Not found gives no message
@@ -413,7 +413,7 @@ flowchart LR
 - **Source:** `:187-189, 230-266` · **Status:** open · **Fidelity:** defect-decide (Q-AUDT-003) · **Confidence:** reviewed
 
 #### DEF-AUDT-007 · Debug DISPLAY left in the program
-- SE-AUDT-004 writes `RPT DT: ` and the date to the region's output on every successful fraud change.
+- SE-AUDT-004 writes `RPT DT: ` and the date to the region's output whenever COPAUS2C reports success, before the replace (`:523-525`), so also when the replace then fails and is rolled back.
 - **Source:** `:523` · **Status:** open (incidental)
 
 #### DEF-AUDT-008 · Unused 100-byte commarea extension

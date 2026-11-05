@@ -181,7 +181,7 @@ flowchart TD
     E & F & M & G & B & N & I --> SEND[SYNCPOINT if PSB scheduled,<br/>SEND map] --> RET([RETURN TRANSID CPVS])
 ```
 
-1. Reset the error, end-of-list, next-page and erase flags and the message (`:181-188`).
+1. Reset the error, end-of-list, next-page and erase flags and the message (`:181-188`). The next-page reset has no effect when a commarea is passed: the copy of the commarea at `:200` brings back the previous value (DEF-AUSM-011).
 2. No commarea: FLOW-AUSM-001. Commarea, first time: FLOW-AUSM-002. Commarea, reentry: receive the map and dispatch on the key (FLOW-AUSM-003) (`:190-252`).
 3. `RETURN TRANSID('CPVS')` with the commarea (`:254-257`).
 
@@ -196,7 +196,7 @@ flowchart TD
 #### FLOW-AUSM-002 · First display from the menu or the detail screen
 - **When:** a commarea is passed and the context is not reenter (the menu and COPAUS1C pass context 0).
 - **Then:** set the context to reenter; clear the map; if `CDEMO-ACCT-ID` is numeric, put it in the account field and gather the details (header, totals, first page; BR-AUSM-001 to BR-AUSM-004); else leave the field blank and show nothing. Send with `ERASE`.
-- **Note:** `CDEMO-ACCT-ID` is `9(11)` and is numeric even when it is all zeros, so arriving from the menu without an earlier account shows account `00000000000` and the not-found messages of ERR-AUSM-001.
+- **Note:** the account ID is whatever the commarea holds. Sign-on does not initialize the commarea and the menu only passes it on (`app/cbl/COMEN01C.cbl:86, 156-158`), so straight after sign-on the field is likely not numeric and nothing is shown (platform-inferred). When an earlier program moved zeros there (for example `app/cbl/COACTVWC.cbl:660`) or COPAUS1C initialized it, account `00000000000` is shown with the not-found messages of ERR-AUSM-001.
 - **Source:** `:199-219`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -213,7 +213,7 @@ flowchart TD
 #### BR-AUSM-001 · Account header
 - **When:** details are gathered for an account ID.
 - **Then:**
-  1. Read the cross-reference by account through `CXACAIX`; keep the first record's customer ID and card number in the commarea.
+  1. Read the cross-reference by account through `CXACAIX`; on `NORMAL`, keep the record's customer ID and card number in the commarea. `CXACAIX` is a non-unique alternate index (`app/jcl/XREFFILE.jcl:72-75`): for an account with several cards CICS answers `DUPKEY`, which the program treats as a system error (ERR-AUSM-001, DEF-AUSM-010; platform-inferred).
   2. Read the account by `XREF-ACCT-ID` and the customer by `XREF-CUST-ID`.
   3. Show: `CUSTID` = `CUST-ID`; `CNAME` = first word of the first name, space, first letter of the middle name, space, first word of the last name (each name is cut at its first space), truncated to 25; `ADDR001` = address line 1 up to its first double space, `,`, address line 2 up to its first double space; `ADDR002` = line 3 up to its first double space, `,`, state, `,`, first 5 characters of the ZIP; `PHONE1` = the first 13 of the 15 characters of phone 1; `CREDLIM` and `CASHLIM` from the account (NUM-AUSM-001).
 - A record that is not found does not stop the sequence (DEF-AUSM-001).
@@ -238,8 +238,8 @@ flowchart TD
 
 #### BR-AUSM-004 · Next-page look-ahead
 - **When:** five rows were filled without reaching the end.
-- **Then:** one more `GNP`; found: next page exists (`Y`), else `N`. When the end was reached while filling, the flag keeps its earlier value (set to `N` at the start of a search).
-- **Source:** `:445-452`
+- **Then:** one more `GNP`; found: next page exists (`Y`), else `N`. When the end was reached while filling, the flag is not set and keeps the value it had in the commarea from the previous interaction; the reset at `:183` is overwritten by the commarea copy at `:200` (DEF-AUSM-011).
+- **Source:** `:183, 200, 445-452`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 #### BR-AUSM-005 · Page forward (PF8)
@@ -296,13 +296,13 @@ Messages are shown in `ERRMSG` (row 23). The cursor is always placed on the acco
 
 #### VAL-AUSM-004 · Invalid key
 - **When:** any key other than Enter, PF3, PF7, PF8 (including PA keys and Clear).
-- **Then:** message `Invalid key pressed. Please see below...` (`CSMSG01Y.cpy:20-21`), screen sent with `ERASE`. The header fields that the terminal does not send back (name, customer ID, address, phone, counts) come back blank (DEF-AUSM-006).
+- **Then:** message `Invalid key pressed. Please see below...` (`CSMSG01Y.cpy:20-21`), screen sent with `ERASE`. Clear and the PA keys send no data, so `RECEIVE MAP` gets `MAPFAIL`, which is not checked (`:715-721`). The fields that the terminal does not send back (account ID after Clear or a PA key, name, customer ID, address, phone, counts, list rows) come back blank (DEF-AUSM-006).
 - **Source:** `:245-249`
-- **Fidelity:** must-preserve (rejection) · **Confidence:** reviewed (blank header: platform-inferred)
+- **Fidelity:** must-preserve (rejection) · **Confidence:** reviewed (`MAPFAIL` and blank fields: platform-inferred)
 
 #### VAL-AUSM-005 · Paging limits
-- **When:** PF7 with page number 1 or less → `You are already at the top of the page...`. PF8 when no next page exists → `You are already at the bottom of the page...`. The list stays as it was (no erase, nothing re-read).
-- **Source:** `:380-384, 408-411`
+- **When:** PF7 with page number 1 or less → `You are already at the top of the page...`. PF8 when no next page exists → `You are already at the bottom of the page...`. The list stays as it was (no erase, the list is not refilled). For PF8 with a saved last key the PSB is still scheduled, the summary read and the position restored before the flag is tested (`:391-398`).
+- **Source:** `:380-384, 391-411`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 ## 9. Side effects
@@ -324,7 +324,7 @@ The program writes no file, segment or table.
 None of these errors ends the task. Most of them send the screen with the message immediately and then let processing continue, so the screen can be sent several times in one interaction; the user sees the last one (DEF-AUSM-001).
 
 #### ERR-AUSM-001 · Cross-reference read
-- `NOTFND`: message `Account:` + account ID + ` not found in XREF file. Resp:` + RESP (9 digits) + ` Reas:` + RESP2 (9 digits); screen sent; processing continues with the account read (DEF-AUSM-001). Other response: same layout with ` System error while reading XREF file. Resp:`, error flag set, screen sent.
+- `NOTFND`: message `Account:` + account ID + ` not found in XREF file. Resp:` + RESP (9 digits) + ` Reas:` + RESP2 (9 digits); screen sent; processing continues with the account read (DEF-AUSM-001). Other response, including `DUPKEY` for an account with several cards (DEF-AUSM-010): same layout with ` System error while reading XREF file. Resp:`, error flag set, screen sent; the list is not filled (`:418`).
 - **Source:** `:832-860`
 
 #### ERR-AUSM-002 · Account read
@@ -391,7 +391,7 @@ flowchart LR
 - **Source:** `COPAU00.bms:111-117` · **Status:** open
 
 #### DEF-AUSM-004 · Truncated display values
-- Phone shows 13 of 15 characters; cash limit, cash balance and approved and declined totals show 5 integer digits; counts show 3 digits without sign (NUM-AUSM-001, NUM-AUSM-002); names show only their first word; addresses are cut at the first double space and at 25 characters.
+- Phone shows 13 of 15 characters; credit limit and credit balance show 8 of their 10 and 9 integer digits (`:56, 780-781, 792-793`); cash limit, cash balance and approved and declined totals show 5 integer digits; counts show 3 digits without sign (NUM-AUSM-001, NUM-AUSM-002); names show only their first word; addresses are cut at the first double space and at 25 characters.
 - **Source:** `:758-799` · **Status:** open (incidental)
 
 #### DEF-AUSM-005 · Account ID must be typed with leading zeros
@@ -410,6 +410,14 @@ flowchart LR
 - `SEL0005` (row 20, column 3) is defined after the other row-20 fields. BMS normally expects fields in screen order; whether the map assembles cleanly is not known (Q-AUSM-003). The symbolic map has `SEL0005` after `PAMT005`.
 - **Source:** `COPAU00.bms:453-496`, `COPAU00.cpy:337-384` · **Status:** open · **Confidence:** platform-inferred
 
+#### DEF-AUSM-010 · Accounts with several cards cannot be shown
+- The cross-reference is read through the non-unique alternate index `CXACAIX` (`app/jcl/XREFFILE.jcl:72-75`). For an account with more than one card, CICS returns `DUPKEY`, which falls under "other response" (ERR-AUSM-001): the customer ID and card number are not saved in the commarea, the error flag is set and the authorization list is not filled. The sample data has one card per account, so it does not show this.
+- **Source:** `:828-861, 418` · **Status:** open · **Fidelity:** defect-decide (Q-AUSM-004) · **Confidence:** platform-inferred
+
+#### DEF-AUSM-011 · Stale next-page flag gives an empty page
+- The next-page flag is reset at `:183` but the commarea copy at `:200` overwrites it, and BR-AUSM-004 sets it only when five rows were filled without reaching the end. After a page that was full with a next page (`Y`), a new Enter on an account with five or fewer authorizations, or a partial last page, leaves the old `Y`. The next PF8 passes the test at `:404`, clears the rows and shows an empty list with no message instead of VAL-AUSM-005.
+- **Source:** `:183, 200, 404-407, 445-452` · **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+
 #### DEF-AUSM-009 · Page-key table has no bound
 - `CDEMO-CPVS-PAUKEY-PREV-PG` has 20 entries but the page number is never limited. From page 21 on, the key is stored past the table, over `CDEMO-CPVS-PAUKEY-LAST`, then over the page number and the next-page flag, corrupting the paging state (and, with a corrupted page number, storage beyond the commarea). Reached after about 100 authorizations, or sooner with DEF-AUSM-002.
 - **Source:** `:120-122, 437-440` · **Status:** open · **Confidence:** reviewed (overlay without subscript checking: platform-inferred)
@@ -421,6 +429,7 @@ flowchart LR
 | Q-AUSM-001 | Confirm the intended paging: PF7 should go back one page each time down to page 1 (DEF-AUSM-002), with no limit on the number of pages (DEF-AUSM-009)? | business |
 | Q-AUSM-002 | Should users be limited to accounts they own, or should the option be admin-only (DEF-AUSM-007)? | business, security |
 | Q-AUSM-003 | Does `COPAU00` assemble without warnings with `SEL0005` out of order, and does row 5's selection work on the real terminal (DEF-AUSM-008)? | mainframe team |
+| Q-AUSM-004 | Does `CXACAIX` return `DUPKEY` for accounts with several cards, and which card should the summary screen show for such an account (DEF-AUSM-010)? | mainframe team, business |
 
 ## 15. Equivalence contract
 
@@ -440,11 +449,11 @@ Not runnable locally (CICS, IMS). Scenario check on the sample data: account 1 (
 | :-- | :-- | :-- |
 | (data division) | 32-174 | §4.2, §5, NUM-AUSM-001 |
 | (procedure division header) | 176 | §6 |
-| `MAIN-PARA` | 178-257 | FLOW-AUSM-001, FLOW-AUSM-002, FLOW-AUSM-003, BR-AUSM-008, VAL-AUSM-004, SE-AUSM-002 |
+| `MAIN-PARA` | 178-257 | FLOW-AUSM-001, FLOW-AUSM-002, FLOW-AUSM-003, BR-AUSM-008, VAL-AUSM-004, SE-AUSM-002, DEF-AUSM-011 |
 | `PROCESS-ENTER-KEY` | 261-338 | VAL-AUSM-001, VAL-AUSM-002, VAL-AUSM-003, BR-AUSM-007 |
 | `GATHER-DETAILS` | 342-358 | FLOW-AUSM-003, BR-AUSM-003 |
 | `PROCESS-PF7-KEY` | 362-385 | BR-AUSM-006, VAL-AUSM-005, DEF-AUSM-002 |
-| `PROCESS-PF8-KEY` | 388-412 | BR-AUSM-005, VAL-AUSM-005 |
+| `PROCESS-PF8-KEY` | 388-412 | BR-AUSM-005, VAL-AUSM-005, DEF-AUSM-011 |
 | `PROCESS-PAGE-FORWARD` | 415-454 | BR-AUSM-003, BR-AUSM-004, DEF-AUSM-009 |
 | `GET-AUTHORIZATIONS` | 458-486 | BR-AUSM-003, ERR-AUSM-005 |
 | `REPOSITION-AUTHORIZATIONS` | 488-519 | BR-AUSM-005, BR-AUSM-006, ERR-AUSM-005 |
@@ -455,7 +464,7 @@ Not runnable locally (CICS, IMS). Scenario check on the sample data: account 1 (
 | `RECEIVE-PAULST-SCREEN` | 712-722 | FLOW-AUSM-003 |
 | `POPULATE-HEADER-INFO` | 726-747 | NUM-AUSM-003 |
 | `GATHER-ACCOUNT-DETAILS` | 750-808 | BR-AUSM-001, BR-AUSM-002, NUM-AUSM-002, DEF-AUSM-004 |
-| `GETCARDXREF-BYACCT` | 812-862 | BR-AUSM-001, ERR-AUSM-001, DEF-AUSM-001 |
+| `GETCARDXREF-BYACCT` | 812-862 | BR-AUSM-001, ERR-AUSM-001, DEF-AUSM-001, DEF-AUSM-010 |
 | `GETACCTDATA-BYACCT` | 865-912 | BR-AUSM-001, ERR-AUSM-002 |
 | `GETCUSTDATA-BYCUST` | 915-963 | BR-AUSM-001, ERR-AUSM-003 |
 | `GET-AUTH-SUMMARY` | 966-997 | BR-AUSM-002, ERR-AUSM-004 |

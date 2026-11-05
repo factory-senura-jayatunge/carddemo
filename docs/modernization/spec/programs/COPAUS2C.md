@@ -69,7 +69,7 @@ Defined in `AUTHFRDS.ddl:1-28` with primary key (`CARD_NUM`, `AUTH_TS`) and the 
 
 | Entity field | Read | Written | Use |
 | :-- | :-- | :-- | :-- |
-| ENT-AUTH-DETAIL (commarea copy): every field except `PA-AUTH-DATE-9C`, `PA-AUTH-FRAUD` and `PA-FRAUD-RPT-DATE` | yes | - | BR-AUFR-002 |
+| ENT-AUTH-DETAIL (commarea copy): every field except `PA-AUTH-DATE-9C`, `PA-AUTH-ORIG-TIME`, `PA-AUTH-FRAUD` and `PA-FRAUD-RPT-DATE` | yes | - | BR-AUFR-002 |
 | ENT-AUTH-DETAIL.PA-AUTH-TIME-9C, PA-AUTH-ORIG-DATE | yes | - | NUM-AUFR-002 |
 | ENT-AUTH-DETAIL.PA-FRAUD-RPT-DATE (commarea copy) | - | yes | BR-AUFR-001 |
 | ENT-AUTH-FRAUD (all 26 columns) | - | insert | SE-AUFR-001 |
