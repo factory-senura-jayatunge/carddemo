@@ -125,6 +125,7 @@ Each item uses the same small template:
 8. **Copybooks and records are defined once**, in `entities.md`. Program specs list only the fields they read or write and what they do with them.
 9. **No COBOL in the rules.** COBOL names appear as identifiers in code format, never as statements. Pseudocode is allowed in the processing flow when it is clearer than prose.
 10. **Security-relevant observations** (missing authorisation, PII in logs or files) go in `DEF` with the tag `[security]`.
+11. **Input the loader rejects** (duplicate keys or out-of-order records for a KSDS, records shorter or longer than the record length) is specified only where the program itself handles it, for example by checking the file status of a `WRITE`. Otherwise the spec describes what loads the data: on z/OS, IDCAMS `REPRO` reports duplicate and out-of-sequence keys as errors; locally, `tools/carddemo.py` pads a short text line to the record length with spaces, fails on a long line or on a binary file whose size is not a multiple of the record length, and its KSDS loader (`tools/templates/repro.cbl.in`) stops with return code 12 on the first rejected `WRITE`. The spec marks such input as a data-preparation error, not as program behaviour. A reimplementation that has to choose (for example, keep the first record of a duplicate key) records the choice in its `notes.md`.
 
 ## Glossary for readers new to the mainframe
 
@@ -140,7 +141,7 @@ Each item uses the same small template:
 | Zoned decimal / overpunch | Numbers stored as digit characters with the sign folded into the last character (`{`, `A`-`I` positive; `}`, `J`-`R` negative in the ASCII sample data). |
 | File status | Two-character result of a batch file operation: `00` OK, `10` end of file, `23` record not found, `22` duplicate key, `35` file missing. |
 | RESP | The CICS equivalent: `NORMAL`, `NOTFND`, `DUPREC`, `DUPKEY`, `ENDFILE`. |
-| U0999 | User abend 999, raised through `CEE3ABD`; the job step ends abnormally. |
+| U0999 | User abend 999, raised through `CEE3ABD`; the job step ends abnormally. This holds for the batch programs that move 999 to `ABCODE` and call `CEE3ABD USING ABCODE, TIMING` (CBACT01C-04C, CBCUS01C, CBTRN01C-03C). CBEXPORT, CBIMPORT and CBSTM03A call `CEE3ABD` with no arguments, so the program does not set the abend code: on z/OS it depends on what Language Environment finds in place of the missing parameters (platform-inferred), and the local shim reports U0000. Each program spec states the code its own call produces. |
 
 ## Evidence and verification
 
