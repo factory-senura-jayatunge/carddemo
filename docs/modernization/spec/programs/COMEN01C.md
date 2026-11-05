@@ -321,7 +321,7 @@ None of these were changed in this branch (`COMEN01C.cbl` and `COMEN02Y.cpy` are
 - **Status:** open · **Fidelity:** defect-decide (Q-MENU-001) · **Confidence:** reviewed
 
 #### DEF-MENU-003 · [security] No check that the user is signed on
-- The menu accepts any commarea: it does not check that `CDEMO-USER-ID` is filled in or that the user type is valid. A direct `CM00` without commarea goes to sign-on, but that does not protect it: the account and card programs (`COACTVWC`, `COACTUPC`, `COCRDLIC`, `COCRDSLC`, `COCRDUPC`) treat "no commarea" as a normal first run, initialise the commarea with a blank user ID and type `U`, and transfer here on PF3 with context 0. Typing `CCLI` on a blank terminal and pressing PF3 therefore shows the main menu without a sign-on, and every main-menu function is open (DEF-SGN-012).
+- The menu accepts any commarea: it does not check that `CDEMO-USER-ID` is filled in or that the user type is valid. A direct `CM00` without commarea goes to sign-on, but that does not protect it: the account and card programs (`COACTVWC`, `COACTUPC`, `COCRDLIC`, `COCRDSLC`, `COCRDUPC`) treat "no commarea" as a normal first run, initialise the commarea (user ID and type blank; `COCRDLIC` sets type `U` at once); their PF3 sets type `U` and transfers here with context 0. Typing `CCLI` on a blank terminal and pressing PF3 therefore shows the main menu without a sign-on, and every main-menu function is open (DEF-SGN-012).
 - **Source:** `:82-91`; `app/cbl/COCRDLIC.cbl:315-325, 384-404`; `app/cbl/COACTVWC.cbl:338-352`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 

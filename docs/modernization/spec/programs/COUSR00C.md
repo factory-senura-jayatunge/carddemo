@@ -457,8 +457,8 @@ None of these were changed in this branch (`COUSR00C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-USRL-012 · Selection marks survive paging and act on another user
-- `INITIALIZE-USER-DATA` clears the user ID, name and type columns but never the selection fields `SEL0001`-`SEL0010`, and the input and output map areas share storage. A mark typed on row 3 followed by PF7, PF8 or an invalid key is sent back on the new page; the next Enter then opens update or delete for whichever user is now in row 3. For `D` the delete function opens a different user than the one the administrator marked.
-- **Source:** `:151-209, 446-501`; `app/cpy-bms/COUSR00.CPY` (`COUSR0AO REDEFINES COUSR0AI`)
+- `INITIALIZE-USER-DATA` clears the user ID, name and type columns but never the selection fields `SEL0001`-`SEL0010`, and the input and output map areas share storage. A mark typed on row 3 survives PF7, PF8 and invalid keys (the selection fields are `FSET`). When PF7 or PF8 loads a different page, the next Enter opens update or delete for whichever user is now in row 3; if that row is empty, the mark is ignored (`:187-188`). For `D` the delete function opens a different user than the one the administrator marked.
+- **Source:** `:151-209, 446-501`; `app/cpy-bms/COUSR00.CPY:373`; `app/bms/COUSR00.bms` (`SEL0001`-`SEL0010`, `FSET`)
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-USRL-013 · [security] The selected user ID comes from the terminal
@@ -472,8 +472,8 @@ None of these were changed in this branch (`COUSR00C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-USRL-015 · The search field is read only by Enter and cleared after each page
-- A search ID typed before PF7 or PF8 is ignored (only Enter reads it, `:218-222`). PF8 then blanks the field (`:328`); PF7 leaves it on screen, where it looks active but is not. Because every forward page clears it, a later Enter (including one with an invalid selection) restarts at the first user unless the ID is typed again, which reinforces DEF-USRL-006.
-- **Source:** `:218-222, 328`
+- A search ID typed before PF7 or PF8 is ignored (only Enter reads it, `:218-222`). A forward page blanks the field (`:328`); PF7, and PF8 at the bottom of the list, leave it on screen. Because `USRIDIN` is `FSET`, a value left on screen is returned and used by the next Enter. After a forward page the field holds spaces, so a later Enter (including one with an invalid selection) restarts at the first user unless the ID is typed again, which reinforces DEF-USRL-006.
+- **Source:** `:218-222, 270-277, 328`; `app/bms/COUSR00.bms:95`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions

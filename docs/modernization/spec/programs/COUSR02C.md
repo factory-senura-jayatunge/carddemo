@@ -355,7 +355,7 @@ On save the error flag does not stop the comparison and rewrite that follow (DEF
 - **Source:** `:296-315`
 
 #### NUM-USRU-004 · Cursor and message colour carry-over
-- The map is sent with `CURSOR` and no value, so BMS puts the cursor on the first field in map order whose length is -1; the user ID comes before first name. The fetch path sets the user ID to -1 at `:153` and the save path sets first name at `:211`; later `MOVE -1 TO FNAMEL` (`:351, 388`) move the cursor only when the user ID is not already -1.
+- The map is sent with `CURSOR` and no value, so BMS puts the cursor on the first field in map order whose length is -1; the user ID comes before first name. The fetch path sets the user ID to -1 at `:153` and the save path sets first name at `:211`; later `MOVE -1 TO FNAMEL` (`:351, 388`) never move the cursor, because on either path a field that comes first is already -1.
 - A successful READ sets the message colour to neutral (`:338`); only the green confirmation (`:371`) and the red `Please modify` (`:241`) set it again. So REWRITE errors after a successful READ appear in neutral, not in the map's red.
 - **Source:** `:150-153, 211, 277, 338, 344, 351, 381, 388`
 - **Confidence:** reviewed; BMS symbolic cursor rule platform-inferred
@@ -410,7 +410,7 @@ None of these were changed in this branch (`COUSR02C.cbl` is not touched after t
 - **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
 
 #### DEF-USRU-010 · Record held across the PF3 transfer
-- On PF3, when the save's READ UPDATE succeeded but nothing changed (the usual "just leave" case) or the REWRITE failed, the program transfers by XCTL in the same task while the record is still held. If the caller is `COUSR00C`, its first entry browses `USRSEC` (STARTBR, READNEXT) in that same task (`app/cbl/COUSR00C.cbl:115-118`); with `STRINGS(1)` the browse may have to wait for the string its own task holds. Whether CICS waits, fails the browse or lets it through depends on string management for the LSR pool. When the caller is `COADM01C` the hold ends with the task.
+- On PF3, when the save's READ UPDATE succeeded but nothing changed (the usual "just leave" case) or the REWRITE failed, the program transfers by XCTL in the same task while the record is still held. If the caller is `COUSR00C`, its first entry browses `USRSEC` (STARTBR, READNEXT) in that same task (`app/cbl/COUSR00C.cbl:115-118`); with `STRINGS(1)` the browse may have to wait for the string its own task holds. Whether CICS waits, abends the task (for example AFCF when it detects that the task would wait on itself) or lets the browse through depends on string management for the LSR pool. When the caller is `COADM01C` the hold ends with the task.
 - **Source:** `:111-119, 236-243, 250-261`; `app/csd/CARDDEMO.CSD:89-91`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (low)
 

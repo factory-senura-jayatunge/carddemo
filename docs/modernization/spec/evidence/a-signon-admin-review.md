@@ -77,7 +77,7 @@ All findings were fixed in the specs in commits `9df7198` (user programs) and `b
 | DEF-USRU-010 | The record stays held across the PF3 transfer. |
 | DEF-USRU-011 [security] | No password rules on update. |
 
-Also added to existing items: the privilege escalation path in DEF-USRA-005, the password echo in both directions in DEF-USRU-005, MAPFAIL on Clear and PA keys in the ERR "unchecked commands" items of the four user programs, `-` and `.` in the option field (NUM-MENU-001, Q-MENU-002), and the single VSAM string in the sign-on extraction contract. The items added in this section were written after the review and have not been independently re-checked.
+Also added to existing items: the privilege escalation path in DEF-USRA-005, the password echo in both directions in DEF-USRU-005, MAPFAIL on Clear and PA keys in the ERR "unchecked commands" items of the four user programs, `-` and `.` in the option field (NUM-MENU-001, Q-MENU-002), and the single VSAM string in the sign-on extraction contract. The items added in this section were written after the review; a separate reviewer checked them afterwards (section 4).
 
 ## 3. COBOL semantics checked with GnuCOBOL 3.2 (`-std=ibm`)
 
@@ -93,6 +93,28 @@ Small test programs (not part of the repository), compiled by the spec author an
 | Menu line building | `01. <name>`, 40 characters; the malformed `This option Accountis coming soon ...` | BR-MENU-001, DEF-MENU-004 |
 | `FUNCTION UPPER-CASE` | `Pass wd1` becomes `PASS WD1` | BR-SGN-001 |
 
-## 4. Status
+## 4. Follow-up review of the added items
+
+A fourth reviewer subagent, which had written none of the specs and had not done the first review, checked the 11 items added in section 2.3 against the source. It verified every Source citation and traced the DEF-USRL-014 example (25 users, search, PF7, PF8) through the code by hand.
+
+| Verdict | Items |
+| :-- | :-- |
+| CORRECT (5) | DEF-SGN-013, DEF-USRL-013, DEF-USRL-014, DEF-USRA-009, DEF-USRU-011 |
+| MINOR (3) | DEF-SGN-012, DEF-USRL-012, DEF-USRL-015 |
+| WRONG (0) | - |
+| PLATFORM (3, all agreed) | NUM-USRU-004 (high confidence), DEF-USRU-010 (low to medium), NUM-USRD-003 (high) |
+
+WRONG / non-PLATFORM: 0/8 = 0.0%; WRONG+MINOR / non-PLATFORM: 3/8 = 37.5%. The MINOR rate is high because the added items were written quickly from the first reviewers' notes; none of the findings changes the substance of an item.
+
+| Item | Finding | Change |
+| :-- | :-- | :-- |
+| DEF-SGN-012 | Outcome right, but most of the account, card and Db2 programs leave the user type blank on a start without commarea; only `COCRDLIC` (`U`) and `COTRTLIC` (`A`) set it at once, the others set it on PF3. The CTLI security attributes are in the Db2 module's CSD. | Corrected in DEF-SGN-012, DEF-MENU-003 and DEF-ADMN-001; citations `app/cbl/COACTVWC.cbl:282-286` and `app/app-transaction-type-db2/csd/CRDDEMOD.csd:25-32` added |
+| DEF-USRL-012 | A surviving mark acts on another user only when PF7 or PF8 actually loads a different page; an invalid key, PF7 on page 1 and PF8 at the bottom keep the same page; a mark on an empty row is ignored. | Corrected; `app/cpy-bms/COUSR00.CPY:373` cited |
+| DEF-USRL-015 | A search value that PF7, or PF8 at the bottom, leaves on screen is not inactive: the field is `FSET` and the next Enter uses it. | Corrected; `app/bms/COUSR00.bms:95` cited |
+| NUM-USRU-004 (agreed) | The later `MOVE -1 TO FNAMEL` lines never move the cursor on any path. | Wording tightened |
+| DEF-USRU-010 (agreed) | CICS may also abend the task (for example AFCF) when it detects a wait on itself. | Added |
+
+With these fixes all 243 items of the seven specs (232 at the first review plus the 11 added) have been checked by an independent reviewer.
+## 5. Status
 
 With every WRONG finding fixed, all seven specs move to `spec_status: reviewed` (format.md, "Spec status"). The PLATFORM items, the BMS cursor rule and Q-USRL-003, Q-MENU-002 and Q-SGN-006 remain for the mainframe team. `check_spec.py --program` reports 0 errors and 0 warnings for each of the seven specs after the fixes.
