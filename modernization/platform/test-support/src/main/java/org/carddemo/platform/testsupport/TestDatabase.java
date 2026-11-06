@@ -15,6 +15,7 @@ import org.carddemo.db.DatabaseProvisioner;
 import org.carddemo.db.DbSettings;
 import org.carddemo.db.ServiceLogin;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.mssqlserver.MSSQLServerContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -120,10 +121,15 @@ public final class TestDatabase {
         return JdbcClient.create(admin);
     }
 
-    /** A pool that connects as the service's own login, so the test runs under its grants. */
+    /**
+     * A pool that connects as the service's own login, so the test runs under its grants.
+     *
+     * <p>The pool lives as long as the JVM. The returned wrapper is not {@link AutoCloseable}, so a
+     * Spring context that registers it as a bean cannot close it for the tests that follow.
+     */
     public DataSource dataSource(ServiceLogin login) {
-        return services.computeIfAbsent(login, l ->
-                pool(settings.databaseUrl(), settings.loginName(l), settings.password(l), l.id()));
+        return new DelegatingDataSource(services.computeIfAbsent(login, l ->
+                pool(settings.databaseUrl(), settings.loginName(l), settings.password(l), l.id())));
     }
 
     public String loginName(ServiceLogin login) {
