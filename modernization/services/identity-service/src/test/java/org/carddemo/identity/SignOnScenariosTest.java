@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
@@ -20,7 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-/** COSGN00C section 15 scenarios S2 to S13, S18 and S19, through the API; both modes where the table has two. */
+/** COSGN00C section 15 scenarios S2 to S13, S18 and S19 and the user read, through the API; both modes where the table has two. */
 class SignOnScenariosTest extends IdentityTestBase {
 
     private static final String NEUTRAL = "Wrong User ID or Password. Try again ...";
@@ -127,9 +128,20 @@ class SignOnScenariosTest extends IdentityTestBase {
 
     @ParameterizedTest
     @EnumSource(FidelityMode.class)
-    @SpecItem({"VAL-SGN-003", "BR-SGN-002", "DEF-SGN-003"})
-    void s6_unknownUser(FidelityMode mode) {
+    @SpecItem({"SE-SGN-001", "BR-SGN-001"})
+    void se1_signOnReadsTheUserRecordOnceByTheUpperCasedId(FidelityMode mode) {
         switches.all(mode);
+        db.demoUsers();
+        clearInvocations(userRepository);
+        assertSignedOn(client().signOn("user0001", "PASSWORD"), "USER0001", "U", "USER", "/");
+        verify(userRepository, times(1)).find(anyString());
+        verify(userRepository).find("USER0001");
+    }
+
+    @ParameterizedTest
+    @EnumSource(FidelityMode.class)
+    @SpecItem({"VAL-SGN-003", "BR-SGN-002", "DEF-SGN-003", "SE-SGN-001"})
+    void s6_unknownUser(FidelityMode mode) {        switches.all(mode);
         db.demoUsers();
         Response r = client().signOn("NOUSER01", "PASSWORD");
         if (mode == FidelityMode.LEGACY) {
@@ -326,7 +338,7 @@ class SignOnScenariosTest extends IdentityTestBase {
     }
 
     @Test
-    @SpecItem({"ERR-SGN-001"})
+    @SpecItem({"ERR-SGN-001", "SE-SGN-001"})
     void databaseFailureIsUnableToVerify() {
         db.demoUsers();
         doThrow(new DataAccessResourceFailureException("connection refused")).when(userRepository).find(anyString());
