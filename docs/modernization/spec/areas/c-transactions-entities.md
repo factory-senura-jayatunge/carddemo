@@ -1,5 +1,7 @@
 # Area c-transactions: entity proposals
 
+Merged in eb23aae into `../entities.md`.
+
 Proposals from area `c-transactions` (COTRN00C, COTRN01C, COTRN02C, CORPT00C, CSUTLDTC) for `../entities.md`, written against commit b5e0139. Layout as in `README.md` of this folder.
 
 ## ENT-DATE-CHECK-RESULT · Result line of the date check CSUTLDTC

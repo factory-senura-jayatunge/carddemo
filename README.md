@@ -350,7 +350,7 @@ For a complete, generated cross-reference of programs, transactions, mapsets, JC
 
 | Job      | Program  | Function                                             | Optional Module |
 |:---------|:---------|:-----------------------------------------------------|:---------------|
-| DUSRSECJ | IEBGENER | Initial Load of User security file                   |                |
+| DUSRSECJ | IEFBR14, IEBGENER, IDCAMS | Initial Load of User security file                   |                |
 | DEFGDGB  | IDCAMS   | Setup GDG Bases                                      |                |
 | DEFGDGD  | IDCAMS   | Setup more GDG Bases for Db2                         |                |
 | ACCTFILE | IDCAMS   | Refresh Account Master                               |                |
@@ -363,12 +363,12 @@ For a complete, generated cross-reference of programs, transactions, mapsets, JC
 | TRANCATG | IDCAMS   | Load Transaction category types                      |                |
 | TRANTYPE | IDCAMS   | Load Transaction type file                           |                |
 | XREFFILE | IDCAMS   | Account, Card and Customer cross reference           |                |
-| CLOSEFIL | IEFBR14  | Close VSAM files in CICS                             |                |
+| CLOSEFIL | SDSF     | Close VSAM files in CICS                             |                |
 | TCATBALF | IDCAMS   | Refresh Transaction Category Balance                 |                |
 | TRANBKP  | IDCAMS   | Refresh Transaction Master                           |                |
 | POSTTRAN | CBTRN02C | Transaction processing job                           |                |
 | TRANIDX  | IDCAMS   | Define AIX for transaction file                      |                |
-| OPENFIL  | IEFBR14  | Open files in CICS                                   |                |
+| OPENFIL  | SDSF     | Open files in CICS                                   |                |
 | INTCALC  | CBACT04C | Run interest calculations                            |                |
 | COMBTRAN | SORT     | Combine transaction files                            |                |
 | CREASTMT | CBSTM03A | Produce transaction statement                        |                |
