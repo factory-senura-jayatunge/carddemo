@@ -83,6 +83,20 @@ class TestDatabaseTest {
     }
 
     @Test
+    void auditRowsNameFieldsAndAcceptOnlyKnownActions() {
+        db.admin().sql("""
+                INSERT INTO ops.audit (service, actor_user_id, action, subject_type, subject_key, field_names)
+                VALUES ('account-service', 'ADMIN001', 'UNMASK', 'ACCOUNT', '00000000001', 'dob,ssn')""").update();
+        Map<String, Object> row = db.admin().sql("SELECT occurred_at, field_names FROM ops.audit").query().singleRow();
+        assertThat(row.get("occurred_at")).isNotNull();
+        assertThat(row.get("field_names")).isEqualTo("dob,ssn");
+        assertThatThrownBy(() -> db.admin().sql("""
+                INSERT INTO ops.audit (service, actor_user_id, action, subject_type, subject_key)
+                VALUES ('account-service', 'ADMIN001', 'VIEW', 'ACCOUNT', '00000000001')""").update())
+                .hasMessageContaining("CK_audit_action");
+    }
+
+    @Test
     void databaseNameIsPerModule() {
         assertThat(TestDatabase.databaseName("carddemo_test", "billpay-service")).isEqualTo("carddemo_test_billpay_service");
         assertThat(db.databaseName()).endsWith("_test_support");
