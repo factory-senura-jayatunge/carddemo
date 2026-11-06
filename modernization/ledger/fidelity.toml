@@ -1,0 +1,2159 @@
+# Fidelity ledger: the decided behaviour of every defect-decide item that keeps a legacy mode, and
+# of the decided questions of the converted units. Items with no legacy mode are in deviations.toml.
+#
+# value        legacy (the COBOL behaviour) or fixed (the fix the item describes)
+# code_switch  true when the code branches on the item through FidelitySwitches; false when the
+#              behaviour is decided but the code has no branch (yet)
+# setting      the chosen variant when the fix has more than one (only with value = "fixed")
+# decision     the decision of docs/modernization/decisions/README.md, or "none"
+# approved_by, approved_on   who approved the value, and when (YYYY-MM-DD)
+# note         why, when it is not the plain fix
+#
+# platform/fidelity loads value into carddemo.fidelity.<ID>; a missing entry means legacy.
+# make verify-ledger checks this file against the spec, the catalog and the code.
+# Fields: modernization/verify/trace/README.md.
+
+schema = 1
+
+# jobs/CARDDEMO-CSD.md
+
+[switch."ERR-JCSD-001"]
+value = "fixed"
+code_switch = false
+decision = "D-16"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CBIMPORT-JOB.md
+
+[switch."ERR-JIMPT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CBPAUP0J.md
+
+[switch."BR-JAUPG-001"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-JAUPG-001"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-JAUPG-001"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CLOSEFIL.md
+
+[switch."DEF-JCLOSE-003"]
+value = "fixed"
+code_switch = false
+setting = "WRITES_BLOCKED"
+decision = "D-18"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-18 override: a batch window in mode WRITES_BLOCKED covers every table the cycle reads, so reads are stable and online writes wait; sign-on stays available."
+
+# jobs/CRDDEMO2-CSD.md
+
+[switch."DEF-JCSD2-001"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+# jobs/CREADB21.md
+
+[switch."DEF-JCRDB-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CREASTMT.md
+
+[switch."DEF-JSTMT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-JSTMT-005"]
+value = "fixed"
+code_switch = false
+decision = "D-43"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/INTCALC.md
+
+[switch."DEF-JINTC-001"]
+value = "fixed"
+code_switch = false
+decision = "D-59"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-JINTC-001"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-JINTC-001"]
+value = "fixed"
+code_switch = false
+decision = "D-59"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/POSTTRAN.md
+
+[switch."DEF-JPOST-003"]
+value = "fixed"
+code_switch = false
+decision = "D-23"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/PRTCATBL.md
+
+[switch."DEF-JPCAT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/SCHED-CONTROLM.md
+
+[switch."DEF-JCTLM-002"]
+value = "fixed"
+code_switch = false
+decision = "D-24"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TCATBALF.md
+
+[switch."DEF-JTCAT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-41"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANBKP.md
+
+[switch."DEF-JTBKP-001"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANFILE.md
+
+[switch."DEF-JTRAN-005"]
+value = "fixed"
+code_switch = false
+decision = "D-59"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANREPT-PROC.md
+
+[switch."ERR-JTRPTP-001"]
+value = "fixed"
+code_switch = false
+decision = "D-48"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANREPT.md
+
+[switch."BR-JTRPT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-46"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-JTRPT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-46"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-JTRPT-005"]
+value = "fixed"
+code_switch = false
+setting = "WRITES_BLOCKED"
+decision = "D-18"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-18 override: a batch window in mode WRITES_BLOCKED covers every table the cycle reads, so reads are stable and online writes wait; sign-on stays available."
+
+[switch."SE-JTRPT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBACT04C.md
+
+[switch."BR-INTC-001"]
+value = "legacy"
+code_switch = false
+decision = "D-25"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-25: truncation is kept for parity."
+
+[switch."DEF-INTC-004"]
+value = "legacy"
+code_switch = false
+decision = "D-26"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-26: no fees until fee rules are specified."
+
+[switch."DEF-INTC-010"]
+value = "fixed"
+code_switch = false
+decision = "D-59"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-INTC-012"]
+value = "fixed"
+code_switch = false
+decision = "D-25"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBEXPORT.md
+
+[switch."DEF-EXPT-003"]
+value = "fixed"
+code_switch = false
+decision = "D-60"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-EXPT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-60"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBIMPORT.md
+
+[switch."BR-IMPT-011"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-IMPT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-IMPT-004"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBPAUP0C.md
+
+[switch."BR-AUPG-001"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-AUPG-003"]
+value = "fixed"
+code_switch = false
+decision = "D-33"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-AUPG-004"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-001"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-002"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-003"]
+value = "fixed"
+code_switch = false
+decision = "D-33"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-004"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-006"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-008"]
+value = "fixed"
+code_switch = false
+decision = "D-10"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUPG-009"]
+value = "fixed"
+code_switch = false
+decision = "D-34"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBSTM03A.md
+
+[switch."BR-STMT-005"]
+value = "fixed"
+code_switch = false
+decision = "D-44"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-STMT-006"]
+value = "fixed"
+code_switch = false
+decision = "D-44"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-STMT-008"]
+value = "fixed"
+code_switch = false
+decision = "D-44"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-44"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-003"]
+value = "fixed"
+code_switch = false
+decision = "D-44"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-005"]
+value = "fixed"
+code_switch = false
+decision = "D-43"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-007"]
+value = "fixed"
+code_switch = false
+decision = "D-45"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STMT-010"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBSTM03B.md
+
+[switch."BR-STIO-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STIO-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-STIO-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBTRN01C.md
+
+[switch."ERR-TVAL-003"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBTRN02C.md
+
+[switch."BR-POST-001"]
+value = "legacy"
+code_switch = false
+decision = "D-19"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-19: the over-limit formula is kept for the first release so posting matches the reference run."
+
+[switch."DEF-POST-003"]
+value = "fixed"
+code_switch = false
+decision = "D-20"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-POST-005"]
+value = "legacy"
+code_switch = false
+decision = "D-19"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-19: the over-limit formula is kept for the first release so posting matches the reference run."
+
+[switch."DEF-POST-012"]
+value = "fixed"
+code_switch = false
+decision = "D-20"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBTRN03C.md
+
+[switch."DEF-TRPT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-46"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRPT-004"]
+value = "fixed"
+code_switch = false
+decision = "D-47"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."FLOW-TRPT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-46"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COACCT01.md
+
+[switch."DEF-MQAC-001"]
+value = "legacy"
+code_switch = false
+decision = "D-72"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-72: the code's contract is implemented, not the README's."
+
+[switch."DEF-MQAC-002"]
+value = "fixed"
+code_switch = false
+decision = "D-73"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-MQAC-007"]
+value = "fixed"
+code_switch = false
+decision = "D-74"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-MQAC-014"]
+value = "fixed"
+code_switch = false
+decision = "D-72"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-MQAC-005"]
+value = "fixed"
+code_switch = false
+decision = "D-74"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COACTUPC.md
+
+[switch."BR-ACUP-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-ACUP-006"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-ACUP-102"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-001"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-ACUP-002"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-003"]
+value = "fixed"
+code_switch = false
+decision = "D-14"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-006"]
+value = "fixed"
+code_switch = false
+decision = "D-17"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-007"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-010"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-012"]
+value = "fixed"
+code_switch = false
+decision = "D-61"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-016"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-019"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-020"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-101"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-104"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-106"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-107"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-109"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-110"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-111"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-112"]
+value = "fixed"
+code_switch = false
+decision = "D-49"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-113"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-114"]
+value = "fixed"
+code_switch = false
+decision = "D-08"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-115"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-118"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-120"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACUP-122"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-ACUP-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-ACUP-004"]
+value = "fixed"
+code_switch = false
+decision = "D-16"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-ACUP-102"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-ACUP-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-ACUP-005"]
+value = "fixed"
+code_switch = false
+decision = "D-14"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-ACUP-010"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-ACUP-101"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."SE-ACUP-006"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."SE-ACUP-007"]
+value = "fixed"
+code_switch = false
+decision = "D-16"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-004"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-005"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-019"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-021"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-026"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACUP-033"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COACTVWC.md
+
+[switch."DEF-ACVW-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-003"]
+value = "fixed"
+code_switch = false
+decision = "D-61"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-004"]
+value = "fixed"
+code_switch = false
+decision = "D-61"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-005"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-008"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-ACVW-010"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-012"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-016"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-017"]
+value = "fixed"
+code_switch = false
+decision = "D-14"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ACVW-018"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-ACVW-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-ACVW-004"]
+value = "fixed"
+code_switch = false
+decision = "D-14"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-ACVW-005"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACVW-003"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACVW-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-ACVW-006"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COADM01C.md
+
+[switch."BR-ADMN-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-ADMN-006"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COBIL00C.md
+
+[switch."DEF-BILL-009"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-BILL-010"]
+value = "fixed"
+code_switch = true
+decision = "D-28"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-BILL-014"]
+value = "fixed"
+code_switch = true
+decision = "D-30"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."Q-BILL-001"]
+value = "legacy"
+code_switch = false
+decision = "D-30"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Full-balance payment and one-step payment are kept; DEF-BILL-014 locks the account ID once the balance is shown."
+
+[switch."Q-BILL-002"]
+value = "fixed"
+code_switch = false
+decision = "D-28"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "The payment is posted like any transaction: negative amount, cycle total and category balance (DEF-BILL-010)."
+
+[switch."Q-BILL-003"]
+value = "fixed"
+code_switch = false
+decision = "D-29"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "All or nothing in one database transaction (DEF-BILL-001, DEF-BILL-003)."
+
+[switch."Q-BILL-004"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: any staff user may pay any account; the payer is recorded."
+
+[switch."Q-BILL-006"]
+value = "fixed"
+code_switch = false
+decision = "D-60"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Timestamps are DATETIME2 columns; the legacy text layouts come only from the exporter."
+
+# programs/COBTUPDT.md
+
+[switch."DEF-TTBU-001"]
+value = "fixed"
+code_switch = false
+decision = "D-57"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTBU-003"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COCRDLIC.md
+
+[switch."BR-CRDL-002"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."BR-CRDL-004"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-001"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-CRDL-002"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-006"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-007"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-008"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-009"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-010"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-018"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDL-019"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-CRDL-001"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COCRDSLC.md
+
+[switch."DEF-CRDV-001"]
+value = "fixed"
+code_switch = false
+decision = "D-13"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDV-002"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-CRDV-005"]
+value = "fixed"
+code_switch = false
+decision = "D-69"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDV-007"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDV-008"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDV-011"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDV-012"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDV-014"]
+value = "fixed"
+code_switch = false
+decision = "D-69"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-CRDV-008"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COCRDUPC.md
+
+[switch."BR-CRDU-002"]
+value = "fixed"
+code_switch = false
+decision = "D-13"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-CRDU-006"]
+value = "fixed"
+code_switch = false
+decision = "D-12"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-CRDU-007"]
+value = "fixed"
+code_switch = false
+decision = "D-13"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-CRDU-008"]
+value = "fixed"
+code_switch = false
+decision = "D-51"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-001"]
+value = "fixed"
+code_switch = false
+decision = "D-13"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-002"]
+value = "fixed"
+code_switch = false
+decision = "D-12"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-003"]
+value = "fixed"
+code_switch = false
+decision = "D-12"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-006"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-CRDU-008"]
+value = "fixed"
+code_switch = false
+decision = "D-51"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-009"]
+value = "fixed"
+code_switch = false
+decision = "D-51"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-012"]
+value = "fixed"
+code_switch = false
+decision = "D-69"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-CRDU-019"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."FLOW-CRDU-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-CRDU-003"]
+value = "fixed"
+code_switch = false
+decision = "D-51"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-CRDU-004"]
+value = "fixed"
+code_switch = false
+decision = "D-12"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CODATE01.md
+
+[switch."DEF-MQDT-001"]
+value = "legacy"
+code_switch = false
+decision = "D-72"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-72: the code's behaviour is implemented, not the README's."
+
+[switch."DEF-MQDT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-73"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-MQDT-003"]
+value = "fixed"
+code_switch = false
+decision = "D-73"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-MQDT-004"]
+value = "fixed"
+code_switch = false
+decision = "D-72"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-MQDT-012"]
+value = "fixed"
+code_switch = false
+decision = "D-72"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COMEN01C.md
+
+[switch."Q-MENU-003"]
+value = "fixed"
+code_switch = false
+decision = "D-05"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Back on a menu signs off."
+
+# programs/COPAUA0C.md
+
+[switch."BR-AUTH-003"]
+value = "fixed"
+code_switch = false
+decision = "D-31"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-AUTH-004"]
+value = "fixed"
+code_switch = false
+decision = "D-33"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-AUTH-007"]
+value = "fixed"
+code_switch = false
+decision = "D-32"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-AUTH-008"]
+value = "fixed"
+code_switch = false
+decision = "D-32"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-AUTH-009"]
+value = "fixed"
+code_switch = false
+decision = "D-31"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUTH-005"]
+value = "fixed"
+code_switch = false
+decision = "D-33"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUTH-006"]
+value = "fixed"
+code_switch = false
+decision = "D-32"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUTH-007"]
+value = "fixed"
+code_switch = false
+decision = "D-32"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUTH-008"]
+value = "fixed"
+code_switch = false
+decision = "D-35"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUTH-015"]
+value = "fixed"
+code_switch = false
+decision = "D-31"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."FLOW-AUTH-003"]
+value = "fixed"
+code_switch = false
+decision = "D-35"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-AUTH-003"]
+value = "fixed"
+code_switch = false
+decision = "D-31"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COPAUS0C.md
+
+[switch."BR-AUSM-006"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUSM-002"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUSM-007"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-AUSM-010"]
+value = "fixed"
+code_switch = false
+decision = "D-61"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUSM-011"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COPAUS1C.md
+
+[switch."DEF-AUDT-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUDT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUDT-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-AUDT-005"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COPAUS2C.md
+
+[switch."DEF-AUFR-001"]
+value = "fixed"
+code_switch = false
+decision = "D-36"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."NUM-AUFR-002"]
+value = "fixed"
+code_switch = false
+decision = "D-36"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CORPT00C.md
+
+[switch."DEF-RPTS-001"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-RPTS-002"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-RPTS-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-RPTS-006"]
+value = "fixed"
+code_switch = false
+decision = "D-48"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-RPTS-007"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+# programs/COSGN00C.md
+
+[switch."DEF-SGN-002"]
+value = "fixed"
+code_switch = true
+decision = "D-05"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-SGN-003"]
+value = "fixed"
+code_switch = true
+decision = "D-05"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-SGN-005"]
+value = "fixed"
+code_switch = true
+decision = "D-02"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-SGN-011"]
+value = "fixed"
+code_switch = true
+decision = "D-04"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Case-sensitive passwords, case-insensitive user IDs; migrated users must change their password."
+
+[switch."Q-SGN-001"]
+value = "fixed"
+code_switch = false
+decision = "D-04"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Passwords are stored as hashes (DEF-SGN-001)."
+
+[switch."Q-SGN-002"]
+value = "fixed"
+code_switch = false
+decision = "D-04"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Case-sensitive passwords, case-insensitive user IDs; migrated users must change their password (DEF-SGN-011)."
+
+[switch."Q-SGN-003"]
+value = "fixed"
+code_switch = false
+decision = "D-05"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "5 failures lock the user for 15 minutes (DEF-SGN-002)."
+
+[switch."Q-SGN-004"]
+value = "fixed"
+code_switch = false
+decision = "D-05"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "One neutral message for unknown user, wrong password and locked user (DEF-SGN-003)."
+
+[switch."Q-SGN-005"]
+value = "fixed"
+code_switch = false
+decision = "D-02"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "User types other than A and U are refused (DEF-SGN-005)."
+
+# programs/COTRN00C.md
+
+[switch."BR-TRNL-006"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-TRNL-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNL-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNL-005"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNL-006"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNL-007"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-TRNL-008"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNL-011"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNL-012"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRN01C.md
+
+[switch."DEF-TRNV-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNV-003"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNV-004"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNV-006"]
+value = "fixed"
+code_switch = false
+decision = "D-71"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRN02C.md
+
+[switch."BR-TRNA-003"]
+value = "fixed"
+code_switch = true
+decision = "D-59"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-TRNA-007"]
+value = "fixed"
+code_switch = false
+decision = "D-27"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-001"]
+value = "fixed"
+code_switch = false
+decision = "D-27"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-002"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-004"]
+value = "fixed"
+code_switch = false
+decision = "D-61"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-005"]
+value = "fixed"
+code_switch = false
+decision = "D-61"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-006"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-007"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-008"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TRNA-009"]
+value = "legacy"
+code_switch = false
+decision = "D-03"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."DEF-TRNA-014"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRTLIC.md
+
+[switch."BR-TTLS-003"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."BR-TTLS-008"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-001"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-002"]
+value = "legacy"
+code_switch = false
+decision = "D-64"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-64: deletion of a type with categories stays refused; the message names the categories."
+
+[switch."DEF-TTLS-003"]
+value = "fixed"
+code_switch = false
+decision = "D-17"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-004"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-005"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-006"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-007"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-008"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-014"]
+value = "fixed"
+code_switch = false
+decision = "D-17"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTLS-016"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRTUPC.md
+
+[switch."DEF-TTUP-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTUP-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTUP-003"]
+value = "fixed"
+code_switch = false
+decision = "D-17"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-TTUP-007"]
+value = "fixed"
+code_switch = false
+decision = "D-65"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR00C.md
+
+[switch."DEF-USRL-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRL-002"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRL-004"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRL-007"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRL-011"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRL-012"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRL-014"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."ERR-USRL-001"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-USRL-003"]
+value = "fixed"
+code_switch = false
+decision = "D-54"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR01C.md
+
+[switch."BR-USRA-001"]
+value = "fixed"
+code_switch = false
+decision = "D-53"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRA-001"]
+value = "fixed"
+code_switch = false
+decision = "D-04"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "Case-sensitive passwords, case-insensitive user IDs; migrated users must change their password."
+
+[switch."DEF-USRA-002"]
+value = "fixed"
+code_switch = false
+decision = "D-53"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRA-009"]
+value = "fixed"
+code_switch = false
+decision = "D-53"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."VAL-USRA-003"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR02C.md
+
+[switch."BR-USRU-005"]
+value = "fixed"
+code_switch = false
+decision = "D-68"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRU-001"]
+value = "fixed"
+code_switch = false
+decision = "D-68"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRU-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRU-003"]
+value = "fixed"
+code_switch = false
+decision = "D-15"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRU-004"]
+value = "fixed"
+code_switch = false
+decision = "D-53"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRU-011"]
+value = "fixed"
+code_switch = false
+decision = "D-04"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR03C.md
+
+[switch."BR-USRD-003"]
+value = "fixed"
+code_switch = false
+decision = "D-15"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRD-001"]
+value = "fixed"
+code_switch = false
+decision = "D-15"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRD-002"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[switch."DEF-USRD-004"]
+value = "fixed"
+code_switch = false
+decision = "D-06"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CSUTLDTC.md
+
+[switch."DEF-DTCK-004"]
+value = "fixed"
+code_switch = false
+decision = "D-52"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"

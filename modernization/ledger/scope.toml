@@ -1,0 +1,21 @@
+# Units the build has converted, so that make trace knows what must be covered.
+#
+# [unit.<CODE>]  the unit code of a spec (BILL for COBIL00C)
+# spec           the spec file
+# excluded       items of the unit the conversion leaves out, with the reason
+#
+# For each unit the trace gate requires a passing test for every must-preserve item that is not
+# excluded, passing tests in both modes for every code switch, and an entry in fidelity.toml or
+# deviations.toml for every defect-decide item. Fields: modernization/verify/trace/README.md.
+
+schema = 1
+
+[unit.BILL]
+spec = "docs/modernization/spec/programs/COBIL00C.md"
+
+[unit.SGN]
+spec = "docs/modernization/spec/programs/COSGN00C.md"
+
+[unit.MENU]
+spec = "docs/modernization/spec/programs/COMEN01C.md"
+excluded = { "BR-MENU-002" = "options 1-9 and 11 not converted", "FLOW-MENU-001" = "replaced by the route guard" }

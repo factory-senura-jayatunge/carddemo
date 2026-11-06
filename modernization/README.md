@@ -30,7 +30,7 @@ The Airflow work in Phase 3 adds the Postgres driver and the DAGs.
 ## Quick start
 
 ```sh
-make -C modernization setup   # toolchain check, creates modernization/.env with generated passwords
+make -C modernization setup   # toolchain check, creates .env and the JWT signing key with generated secrets
 make -C modernization up      # starts SQL Server, RabbitMQ and Postgres, waits until all are healthy
 make -C modernization status  # containers and health
 make -C modernization down    # stops and removes the containers; data volumes are kept
@@ -38,29 +38,53 @@ make -C modernization down    # stops and removes the containers; data volumes a
 
 ## Lifecycle
 
-These are the targets in the order you use them. Targets marked "not yet" exit with status 2 and print `not implemented yet: arrives with <phase>`.
+These are the targets in the order you use them. Every target ends with one line, `<target>: OK` or `<target>: FAILED (<reason>)`, and exits non-zero on failure (`make` itself always exits 2 when a recipe fails, so read the line, not the number). Targets marked "not yet" print `<target>: FAILED (not implemented yet: arrives with <phase>)`; `make -s stubs` lists them, which is how CI skips their jobs instead of passing them.
 
 | Order | Target | What it does | State |
 |:--|:--|:--|:--|
-| 1 | `setup` | Checks JDK 21, Node 24, Docker/Colima (with amd64 emulation on arm64) and the Airflow venv. Creates `.env` from `.env.example`, generates every empty password, and validates the compose file. Running it again keeps existing values and only adds keys that are new in the example. | Done |
-| 2 | `db-reset` | Drops and recreates the application schema (Flyway). | Not yet (Phase 3, Bill Pay pilot) |
-| 3 | `load` | Loads the sample data into SQL Server. | Not yet (Phase 3, data migration) |
-| 4 | `up` | Starts the infrastructure and waits for the health checks; the application services join in Phase 3. | Infrastructure done |
-| 5 | `smoke` | Quick health check of the running application. | Not yet (Phase 3) |
-| 6 | `billpay` | Runs the Bill Pay slice end to end. | Not yet (Phase 3, Bill Pay pilot) |
-| 7 | `down` | Stops and removes the containers; volumes are kept. | Infrastructure done |
+| 1 | `setup` | Checks JDK 21, Node 24, Docker/Colima (with amd64 emulation on arm64) and the Airflow venv. Creates `.env` from `.env.example`, generates every empty password and the JWT signing key, and validates the compose file. Running it again keeps existing values and only adds keys that are new in the example. | Done |
+| 2 | `db-reset` | Drops and recreates the application database and runs the Flyway migrations through `db-migrate`. | Not yet (Bill Pay slice) |
+| 3 | `load` | Loads the sample data into SQL Server (`dataLoadJob`). | Not yet (Bill Pay slice) |
+| 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). | Done; services join as they are converted |
+| 5 | `smoke` | Read-only check of the running stack. | Not yet (Bill Pay slice) |
+| 6 | `billpay` | Runs the Bill Pay slice end to end. | Not yet (Bill Pay slice) |
+| 7 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
 
 Other targets:
 
 | Target | What it does |
 |:--|:--|
 | `help` | Lists every target. |
-| `toolchain` | Shows the `JAVA_HOME`, `node`, `java` and `DOCKER_HOST` that recipes use. |
-| `status` | `docker compose ps` for this project. |
-| `logs` | Follows the logs; `SERVICE=mssql`, `rabbitmq` or `airflow-db` limits it to one service. |
+| `toolchain` | Shows the `JAVA_HOME`, `node`, `java`, `DOCKER_HOST` and shared paths that recipes use. |
+| `build` | Builds the jars of this checkout with the Maven wrapper, tests skipped. |
+| `status` | Containers and host processes with their health; fails when one is unhealthy or a recorded process is gone. |
+| `logs` | Follows the container logs; `SERVICE=mssql`, `rabbitmq` or `airflow-db` limits it to one service. Process logs are in `$CARDDEMO_VAR_DIR/log/<name>.log`. |
 | `infra-up`, `infra-down` | The infrastructure parts of `up` and `down`. |
-| `infra-wipe CONFIRM=1` | Removes this project's containers and volumes (all local data). It touches nothing outside the `carddemo-modern` compose project. |
+| `infra-wipe CONFIRM=1` | Removes this project's containers and volumes (all local data, for every checkout). It touches nothing outside the `carddemo-modern` compose project. |
+| `stubs` | Lists the targets that are not implemented yet. |
 
+### Host processes
+
+`up` runs each converted component on 127.0.0.1 (ports and heap caps from the architecture's deployables table):
+
+| Component | Port | Started when | Command |
+|:--|--:|:--|:--|
+| `identity-service` | 28081 | `services/identity-service/pom.xml` exists | `java -Xmx256m -XX:MaxMetaspaceSize=128m -Xss512k -jar target/identity-service-*-exec.jar --server.port=28081 --server.address=127.0.0.1 --spring.profiles.active=demo --carddemo.identity.jwt.private-key-path=$CARDDEMO_JWT_KEY_FILE` |
+| `billpay-service` | 28082 | `services/billpay-service/pom.xml` exists | the same pattern, 256 MiB |
+| `account-service`, `transaction-service`, `reference-service`, `authorization-service`, `inquiry-service` | 28083 to 28087 | their module exists | the same pattern (384, 384, 256, 384, 256 MiB) |
+| `web` (Vite) | 25173 | `web/package.json` exists | `npm run dev` in `web/` |
+| `batch-service` | 28090 | not started by `up`; `load` runs its jobs one-shot | |
+| Airflow API server | 28080 | arrives with the batch work | |
+
+A component whose module exists but has no jar (or no `node_modules`) fails `up` with the reason; one whose module does not exist yet is skipped. Health is `GET /actuator/health` for the services and `GET /` for Vite. Every process gets the values of the shared `.env` in its environment (the environment wins), and `CARDDEMO_LEDGER_DIR` set to this checkout's `ledger/`. PIDs are in `$CARDDEMO_VAR_DIR/run/<name>.pid`, logs in `$CARDDEMO_VAR_DIR/log/<name>.log`; both are machine-wide, so a second `up` from another worktree reports the running processes instead of starting copies. `CARDDEMO_SPRING_PROFILE` overrides `demo`.
+
+### Protecting the shared containers
+
+The containers are shared by every checkout, so the targets that would interrupt them say so:
+
+- `up` and `infra-up` first do a compose dry run. If it would recreate (restart) a running container, for example after a change to `docker-compose.yml` or `.env`, they stop with `would RECREATE (restart) running shared container(s): ...` and change nothing. `RECREATE=1` lets them go ahead, with a warning.
+- `down` and `infra-down` print which shared containers they stop, and refuse while a heavy target holds the heavy lock; `FORCE=1` overrides.
+- `infra-wipe` needs `CONFIRM=1`.
 ## Verification targets
 
 Only `verify-spec` is implemented so far; each of the others fails with the phase that delivers it. "Heavy" means it needs the running stack or Testcontainers, takes minutes, and should not run in parallel with other heavy targets on a laptop.
@@ -94,6 +118,8 @@ To implement a target, replace its stub: remove it from `STUBS` in the `Makefile
 
 Application data lives in SQL Server. Airflow can't keep its own metadata there, so it gets a separate Postgres.
 
+SQL Server limits its own memory to `MSSQL_MEMORY_LIMIT_MB` (2048 MiB by default, inside the 4 GiB container limit), so the 8 GiB Colima VM keeps room for a Testcontainers SQL Server and RabbitMQ during heavy tests. Changing the value recreates the container on the next `make up`; the data volume is kept.
+
 Every service has a health check, and `make up` waits for all of them (`UP_TIMEOUT`, default 300 seconds). On the tested Mac, with the images already pulled, `make up` takes about 8 seconds, both on fresh volumes and on existing ones. The first pull downloads about 3 GB, 2.4 GB of it for SQL Server.
 
 RabbitMQ is configured in `infra/rabbitmq/20-carddemo.conf` with `default_queue_type = quorum`. An AMQP client that declares a durable queue without `x-queue-type` gets a quorum queue. RabbitMQ 4.4 rejects transient non-exclusive queues, so declare queues durable. `rabbitmqadmin declare queue` is the exception: it sends `--type classic` unless you pass `--type quorum`.
@@ -113,6 +139,82 @@ Run RabbitMQ CLI commands as the `rabbitmq` user (`exec -u rabbitmq`). As root t
 
 `.env` is git-ignored, by `modernization/.gitignore` and by the root `.gitignore`. `make setup` creates it with mode 600. Only `.env.example` is committed, and its password values are empty. Compose refuses to start a service whose password is not set. The SQL Server SA password is fixed when the volume is first created. If you change it in `.env` later, run `make infra-wipe CONFIRM=1` and then `make up`.
 
+`make setup` also generates:
+
+- `CARDDEMO_SEED_USER_PASSWORD` in `.env`: the password of the 10 seed users (`ADMIN001`, `USER0001`, ...) that identity-service creates in the `demo` profile. It replaces the public `PASSWORD` of the mainframe demo data. It is 8 upper-case letters and digits, so it fits the legacy 8-character field, survives the legacy upper-casing and meets the fixed-mode minimum of 8.
+- `var/secrets/identity-jwt.pem`: the RSA 2048 private key (PKCS#8 PEM, mode 600, directory mode 700) that identity-service signs its RS256 access tokens with. The other services get the public key from its JWKS endpoint. The Makefile exports the path as `CARDDEMO_JWT_KEY_FILE`. An existing key is kept; delete it and rerun `make setup` to rotate it, which invalidates every issued token.
+
+Neither is ever printed. `var/` is git-ignored.
+
+## One stack per machine, shared by every worktree
+
+There is one `carddemo-modern` compose project per machine, and its volumes were created with the secrets of one `.env`. So every checkout of the repository, including linked git worktrees, uses the files of the main checkout (the one that owns `.git`):
+
+| Variable (exported to recipes) | Default |
+|:--|:--|
+| `CARDDEMO_ENV_FILE` | `<main checkout>/modernization/.env` |
+| `CARDDEMO_INFRA_DIR` | `<main checkout>/modernization` (its `docker-compose.yml`) |
+| `CARDDEMO_VAR_DIR` | `<main checkout>/modernization/var` (logs, PIDs, locks, keys, batch files) |
+| `CARDDEMO_JWT_KEY_FILE` | `$CARDDEMO_VAR_DIR/secrets/identity-jwt.pem` |
+
+`.env` also holds `CARDDEMO_DB_NAME` (default `carddemo`), the SQL login password of each service (`CARDDEMO_DB_<SERVICE>_PASSWORD` for identity, billpay, account, transaction, reference, authorization, inquiry and batch; db-migrate creates the logins) and `MSSQL_MEMORY_LIMIT_MB` (2048). `make setup` adds keys that are new in `.env.example` to an existing `.env` and generates their passwords; it never changes a value that is already there.
+
+Setting a variable in the environment overrides it. `make setup` in a worktree completes the main checkout's `.env` and key; it never creates a second set. A `modernization/.env` inside a worktree is ignored, and `make setup` warns about it. `make toolchain` shows the paths in use.
+
+## Running a command with the stack's settings
+
+`scripts/with_env.py` runs one command with every value of the shared `.env` in its environment, without printing any of them. A variable that is already set in the environment (even empty) wins over `.env`. Make recipes that need secrets (`db-reset`, the services in `up`, the test targets) run through it, and so can you:
+
+```sh
+modernization/scripts/with_env.py ./mvnw -pl services/identity-service verify
+```
+
+## Test database
+
+Backend tests (`platform/test-support`) read these variables:
+
+| Variable | Meaning | Default |
+|:--|:--|:--|
+| `CARDDEMO_TEST_MSSQL_URL` | JDBC URL of a running SQL Server, without `databaseName`. Empty or unset: the tests start a Testcontainers SQL Server (the image of `docker-compose.yml`, `MSSQL_MEMORY_LIMIT_MB=2048`). | empty in `.env.example`, so CI uses Testcontainers |
+| `CARDDEMO_TEST_MSSQL_USER` | Login for the tests | `sa` |
+| `CARDDEMO_TEST_MSSQL_PASSWORD` | Its password | `MSSQL_SA_PASSWORD` when the user is `sa` (filled in by `with_env.py`) |
+| `CARDDEMO_TEST_MSSQL_DB` | Name of the test database; test-support creates it when it is missing | `carddemo_test` |
+
+Policy on a workstation: the tests use the compose SQL Server (`make up`), not a container of their own, and every agent or checkout uses its own database, so parallel test runs never see each other's data and the VM never holds more than one SQL Server for tests. The shared `.env` on the main development machine sets `CARDDEMO_TEST_MSSQL_URL=jdbc:sqlserver://127.0.0.1:21433;encrypt=true;trustServerCertificate=true`. Each agent sets its database in its own environment:
+
+| Owner | `CARDDEMO_TEST_MSSQL_DB` |
+|:--|:--|
+| backend (platform, services, batch) | `carddemo_test_backend` |
+| identity-service | `carddemo_test_identity` |
+| data migration | `carddemo_test_data` |
+
+```sh
+CARDDEMO_TEST_MSSQL_DB=carddemo_test_backend modernization/scripts/with_env.py ./mvnw verify
+```
+
+Never point the tests at `CARDDEMO_DB_NAME` (`carddemo`, the database of `make up` and `load`). CI leaves the URL empty and uses Testcontainers.
+
+Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
+
+## CI
+
+`.github/workflows/modernization.yml` runs on pushes to `main` and `modernization` and on pull requests that touch `modernization/`, `docs/modernization/spec/` or the workflow, plus nightly. Each job runs `make setup` (throwaway secrets, no repository secrets) and then the same make targets as a developer:
+
+| Job | Targets | Needs |
+|:--|:--|:--|
+| `spec` | `verify-spec` in the dev container image (GnuCOBOL 3.2) | |
+| `backend` | `test-backend` (Testcontainers) | |
+| `billpay` | `test-billpay` | |
+| `web` | `web-build` | `backend` (runs when it was skipped, not when it failed) |
+| `airflow` | `test-airflow` | |
+| `batch` | `verify-harness verify-batch` | `spec` |
+| `data` | `db-reset load verify-data` | |
+| `e2e` | `up test-e2e` (Chromium; nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |
+| `cycle` | `up verify-cycle` (nightly, on demand, or on pull requests labelled `batch`) | `batch` |
+| `ledger` | `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |
+
+The `plan` job reads `make -s stubs`: a job whose targets are still stubs is skipped, and the run summary says why. A stub never shows as a pass. Jobs set `CARDDEMO_SETUP_SKIP` (any of `java node docker airflow`) so `make setup` doesn't fail on a tool the job doesn't use. Every job uploads its JUnit results (and process logs) as `test-results-<job>`.
+
 ## Toolchain pinning
 
 Nothing is installed or switched globally. `scripts/toolchain.sh` finds the tools, and the `Makefile` puts them first on `PATH` for its recipes:
@@ -125,7 +227,7 @@ The environment wins over `.env`, and `.env` wins over detection. In `.env` you 
 
 ## Troubleshooting
 
-- **`modernization/.env is missing; run make setup first`:** run `make setup`.
+- **`<path>/.env is missing; run make setup (in the main checkout) first`:** run `make setup`; from a worktree it creates the main checkout's `.env`.
 - **Port already in use:** change the `*_HOST_PORT` values in `.env`.
 - **SQL Server never gets healthy on Apple Silicon:** check `make toolchain` and `colima status`. The Colima VM needs Rosetta (`--vz-rosetta`) and at least 4 GiB; 8 GiB is the tested size.
 - **`docker engine not reachable`:** run `colima start` on macOS, or start the Docker daemon on Linux.
