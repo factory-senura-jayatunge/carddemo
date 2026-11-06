@@ -8,7 +8,7 @@ files over between CICS and batch.
 ## What CLOSEFIL and OPENFIL do
 
 Both jobs run `PGM=SDSF` and send MVS `MODIFY` commands to the CICS region `CICSAWSA`.
-(The README job table lists them as IEFBR14; the JCL uses SDSF.)
+Each `/F` command names the region, so change `CICSAWSA` in every line for your region.
 
 | CICS file | Dataset | Closed by CLOSEFIL | Also closed and reopened by |
 | :-------- | :------ | :----------------: | :-------------------------- |

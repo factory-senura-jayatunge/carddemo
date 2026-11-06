@@ -166,13 +166,13 @@ What CardDemo keeps today, from the JCL:
 
 | Data | Retention mechanism | Source |
 | :--- | :------------------ | :----- |
-| Transaction backups `TRANSACT.BKUP`, daily extracts `TRANSACT.DALY`, reports `TRANREPT`, category balance backups `TCATBALF.BKUP`, system transactions `SYSTRAN`, combined transactions `TRANSACT.COMBINED` | GDG, `LIMIT(5) SCRATCH`: the five newest generations are kept, older ones are deleted | `app/jcl/DEFGDGB.jcl` |
+| Transaction backups `TRANSACT.BKUP`, daily extracts `TRANSACT.DALY`, reports `TRANREPT`, category balance backups `TCATBALF.BKUP`, system transactions `SYSTRAN`, combined transactions `TRANSACT.COMBINED` | GDG, `LIMIT(5) SCRATCH` as defined by DEFGDGB: the five newest generations are kept, older ones are deleted. The shipped catalog shows `TRANSACT.BKUP` and `TRANSACT.DALY` as `NOSCRATCH` instead, with 71 and 25 rolled-off generations still cataloged, so check each base with `LISTCAT` before relying on deletion. The alternative job REPTFILE defines `TRANREPT` with `LIMIT(10)` and no `SCRATCH` | `app/jcl/DEFGDGB.jcl`, `app/jcl/REPTFILE.jcl`, `app/catlg/LISTCAT.txt` |
 | Daily rejects `DALYREJS` | GDG, `LIMIT(5) SCRATCH` | `app/jcl/DALYREJS.jcl` |
-| Statements `STATEMNT.PS`, `STATEMNT.HTML` | Deleted and re-created on every `CREASTMT` run | `app/jcl/CREASTMT.JCL` (`STEP030`) |
+| Statements `STATEMNT.PS`, `STATEMNT.HTML`; statement work files `TRXFL.SEQ` and `TRXFL.VSAM.KSDS` (a copy of every transaction keyed by card number); the PDF `STATEMNT.PS.PDF` | Statements and work files: deleted and re-created on every `CREASTMT` run, so the last run's copies stay cataloged until the next run. PDF: written by `TXT2PDF1` and never deleted by any job; whether a rerun overwrites it depends on the TXT2PDF exec | `app/jcl/CREASTMT.JCL` (`DELDEF01`, `STEP030`), `app/jcl/TXT2PDF1.JCL` |
 | Pending authorizations (IMS) | Deleted by `CBPAUP0J` once older than the expiry days given in its SYSIN | `app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl`, program `CBPAUP0C` |
 | Master files (customer, account, card, cross reference, transactions, users) | Kept until reloaded; no purge job | |
 | Fraud reports (`CARDDEMO.AUTHFRDS`) | Kept indefinitely; no purge job | |
-| Export file `EXPORT.DATA` | Kept until deleted by hand | `app/jcl/CBEXPORT.jcl` |
+| Export file `EXPORT.DATA`, with full customer PII, card numbers and CVVs | Deleted and defined again by `STEP01` of every `CBEXPORT` run; otherwise kept until deleted by hand | `app/jcl/CBEXPORT.jcl` |
 
 There is no online or batch function that deletes a customer. Deleting a person's data
 means removing records from every place that holds them, keyed by customer ID, account ID
@@ -181,7 +181,7 @@ and card number:
 1. Customer master (`CUSTDATA`), keyed by `CUST-ID`.
 2. Cross reference (`CARDXREF` and its AIX), which links `XREF-CUST-ID` to accounts and cards.
 3. Card master (`CARDDATA` and `CARDAIX`), and the account master (`ACCTDATA`) if the account closes.
-4. Transactions (`TRANSACT`), daily input (`DALYTRAN`), and every GDG generation listed above.
+4. Transactions (`TRANSACT`), daily input (`DALYTRAN`), and every GDG generation listed above, including rolled-off generations of `NOSCRATCH` bases.
 5. Category balances (`TCATBALF`), keyed by account.
 6. With the optional modules: the IMS pending authorization database, `CARDDEMO.AUTHFRDS`,
    and any MQ queues still holding messages.
