@@ -11,10 +11,11 @@ Steps, in order; the first failure ends the run:
   5. e2e-stack Playwright e2e/bill.spec.ts against the running slice
   6. trace     the traceability gate for the BILL unit
 
-Playwright empties web/test-results on every run, so Vitest writes its
-JUnit report straight to build/test-results/billpay/. Playwright writes
-web/playwright-report/e2e-<target>-<mode>.json, which no run empties and
-make trace reads in place; each Playwright step checks that it wrote it. Run under
+Vitest writes its JUnit report to build/test-results/billpay/, beside the
+other targets' results; Playwright keeps its own output in
+web/test-results/e2e. A Chromium-only run writes
+web/playwright-report/e2e-<target>-<mode>.json, which make trace reads in
+place; each Playwright step checks that it wrote it. Run under
 heavy.py and with_env.py, as make test-billpay does. The slice stays up.
 
 Ends with "test-billpay: OK" or "test-billpay: FAILED (<step>: <reason>)".
