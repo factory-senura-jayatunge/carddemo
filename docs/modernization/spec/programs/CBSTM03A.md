@@ -13,7 +13,7 @@ sources:
   - {path: app/cpy/CUSTREC.cpy, sha256: f87a0a041fbd, role: record}
   - {path: app/cpy/CVACT01Y.cpy, sha256: 81a08bad15af, role: record}
   - {path: app/cbl/CBSTM03B.CBL, sha256: ac004f7f40dc, role: subprogram-interface}
-entry_points: [{type: jcl-step, job: CREASTMT, step: STEP040}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "465-476"}]
+entry_points: [{type: jcl-step, job: CREASTMT, step: STEP040}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "465-468"}]
 mapsets: []
 copybooks: [COSTM01, CVACT03Y, CUSTREC, CVACT01Y]
 data_stores:
@@ -53,7 +53,7 @@ The statement job prints one account statement for every card in the card cross-
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `CREASTMT`, step `STEP040` (`app/jcl/CREASTMT.JCL:79-96`). In the CA-7 listing CREASTMT is triggered by CLOSEFIL and itself triggers TXT2PDF1 (`app/scheduler/CardDemo.ca7:465-476, 494-495`). The batch-cycle runbook places it at step 7, after COMBTRAN and before TRANIDX (`docs/runbooks/batch-cycle-restart.md:19`).
+- **Trigger:** JCL job `CREASTMT`, step `STEP040` (`app/jcl/CREASTMT.JCL:79-96`). In the CA-7 listing CREASTMT is triggered by CLOSEFIL and itself triggers TXT2PDF1 (`app/scheduler/CardDemo.ca7:465-468, 494-495`). The batch-cycle runbook places it at step 7, after COMBTRAN and before TRANIDX (`docs/runbooks/batch-cycle-restart.md:19`). The two orders differ: in CA-7 the same CLOSEFIL completion also starts CBPAUP0J, which leads to POSTTRAN (`app/scheduler/CardDemo.ca7:43, 70`), so CREASTMT runs in parallel with posting rather than after it.
 - **Earlier steps of the same job** (`app/jcl/CREASTMT.JCL:22-75`): `DELDEF01` deletes `TRXFL.SEQ` and the `TRXFL` KSDS and defines the KSDS again with a 32-byte key; `STEP010` sorts TRANSACT by card number and transaction ID and reformats it (ENT-STMT-TRAN); `STEP020` loads the sorted file into the KSDS with `REPRO`; `STEP030` (IEFBR14) deletes the previous `STATEMNT.HTML` and `STATEMNT.PS`. `STEP020`, `STEP030` and `STEP040` carry `COND=(0,NE)`: each is skipped when any earlier step ended with a return code other than 0. The job itself is specified by the jobs area; this spec covers STEP040 and the TRXFL layout it depends on.
 - **Preconditions:** TRXFL holds at least one record (DEF-STMT-010), at most 51 distinct cards and at most 10 transactions per card (DEF-STMT-001); every cross-reference record has its customer and its account (ERR-STMT-004); `STATEMNT.PS` and `STATEMNT.HTML` do not exist (they are allocated `NEW`).
 - **No parameters**, no control cards, and no use of the clock or the business date: the statement carries no date (DEF-STMT-005).
@@ -412,7 +412,7 @@ flowchart LR
 ```
 
 - **Calls:** `CBSTM03B` for every input-file operation (section 4.2, ENT-STMT-REQUEST; unit STIO); `CEE3ABD` with no arguments on error (ERR-STMT-006).
-- **Upstream:** `TRANSACT` as left by POSTTRAN and the following jobs of the cycle (`docs/runbooks/batch-cycle-restart.md:15-19`); the account balances printed are those after POSTTRAN and INTCALC. `CARDXREF`, `CUSTDATA`, `ACCTDATA` are read only.
+- **Upstream:** in the README and runbook order, `TRANSACT` as left by POSTTRAN and the following jobs of the cycle (`docs/runbooks/batch-cycle-restart.md:15-19`), with the account balances after POSTTRAN and INTCALC. This holds only in that order. CA-7 starts CREASTMT from CLOSEFIL at the same time as the CBPAUP0J-POSTTRAN chain (`app/scheduler/CardDemo.ca7:43, 70, 468`), with no dependency on POSTTRAN, INTCALC or COMBTRAN, so the statements can read `TRANSACT` and `ACCTDATA` before or while the day is posted. `CARDXREF`, `CUSTDATA`, `ACCTDATA` are read only.
 - **Downstream:** TXT2PDF1 converts `STATEMNT.PS` to PDF (`app/jcl/TXT2PDF1.JCL:33-39`); it is the job CA-7 triggers after CREASTMT. No job in the repository reads `STATEMNT.HTML`.
 - **Shared data with online programs:** the master files are closed in CICS during the batch cycle; CBSTM03A only reads them.
 - **Invariants it relies on:** TRXFL is in ascending card-number order in the collating sequence the table scan compares with (NUM-STMT-009); the cross-reference order only sets the order of the statements; every cross-reference record has a customer and an account.
@@ -663,7 +663,7 @@ May differ: the z/OS-only DD list of FLOW-STMT-001 (incidental), the abend mecha
 
 **How to check:** after `make build`, `python3 docs/modernization/spec/checks/cbstm03a_harness/run_harness.py OUTDIR` runs the program with only the TIOT prologue (`:266-291`) turned into comments, on TRANSACT as left by POSTTRAN on the sample data, and writes `OUTDIR/STMTFILE`, `OUTDIR/HTMLFILE`, `OUTDIR/sysout.txt` and `OUTDIR/rc.txt`; `--data DIR` takes `TRANSACT.ps`, `CARDXREF.ps`, `CUSTDATA.ps` and `ACCTDATA.ps` (fixed records, no line ends) instead. Compare a reimplementation's two files with these byte for byte.
 
-Sample result (harness default, TRANSACT as left by POSTTRAN alone; in the real cycle COMBTRAN adds INTCALC's interest transactions first, which the independent review simulated as 312 transactions, at most 7 per card, 1,262 text and 6,632 HTML records, still within the 10-per-card limit): return code 0, no console output, 50 statements, 262 transactions, `STMTFILE` 1,212 records x 80 bytes (19 per statement + 1 per transaction), `HTMLFILE` 6,082 records x 100 bytes (64 per statement + 11 per transaction). The first statement is for account `00000000050` (6 transactions, total 1453.87).
+Sample result (harness default, TRANSACT as left by POSTTRAN alone; in the README cycle order COMBTRAN adds INTCALC's interest transactions first, which the independent review simulated as 312 transactions, at most 7 per card, 1,262 text and 6,632 HTML records, still within the 10-per-card limit): return code 0, no console output, 50 statements, 262 transactions, `STMTFILE` 1,212 records x 80 bytes (19 per statement + 1 per transaction), `HTMLFILE` 6,082 records x 100 bytes (64 per statement + 11 per transaction). The first statement is for account `00000000050` (6 transactions, total 1453.87).
 
 Scenarios run with `--data` on edited copies of the sample data while writing this spec, which give the runtime-verified items: a blank middle name, multi-word first and last names, double spaces in address lines, a blank state, a two-word ZIP, a 10-digit balance, a card with no transactions, a card with only negative amounts, descriptions longer than 49 characters, three 25-character names and a 50-character city, a `*` in a description and a transaction ID, two transaction cards missing from the cross-reference, 11 transactions on one card, 52 cards, an unknown customer, an unknown account, and an empty TRANSACT. The independent review of this spec is recorded in `docs/modernization/spec/evidence/d2-batch-utilities-review.md`.
 
