@@ -15,13 +15,8 @@ export const identityApi = createClient<IdentityPaths>(options);
 export const billpayApi = createClient<BillpayPaths>(options);
 
 // Types by operation ID, so they do not depend on the schema names a service
-// chooses in its OpenAPI export. A Spring handler without an explicit produces
-// is exported as */*, so the body type falls back to whatever media type is declared.
-type JsonOf<R> = R extends { content: infer C }
-  ? C extends { 'application/json': infer B }
-    ? B
-    : C[keyof C]
-  : never;
+// chooses in its OpenAPI export.
+type JsonOf<R> = R extends { content: { 'application/json': infer B } } ? B : never;
 
 export type SessionView = JsonOf<IdentityOps['me']['responses'][200]>;
 export type Features = JsonOf<IdentityOps['features']['responses'][200]>;
