@@ -31,11 +31,11 @@ approved_on = "2026-11-06"
 | Field | Required | Meaning |
 | :-- | :-- | :-- |
 | `value` | yes | `legacy` (the COBOL behaviour) or `fixed` (the fix the item describes). `platform/fidelity` loads it into `carddemo.fidelity.<ID>`; a missing entry means `legacy`. |
-| `code_switch` | yes | `true` when the code branches on the item through `FidelitySwitches`; `false` when the behaviour is decided but the code has no branch, or none yet. |
+| `code_switch` | yes | `true` when the code branches on the item through `FidelitySwitches`: exactly the items of `docs/modernization/architecture/switches.md` (targeted policy). `false` when the item is built and tested in its decided mode only. |
 | `setting` | no | The chosen variant when the fix has more than one, for example `WRITES_BLOCKED` for the batch window. Only with `value = "fixed"`. |
 | `decision` | yes | A decision of `docs/modernization/decisions/README.md` (`D-28`), or `none`. |
 | `approved_by`, `approved_on` | yes | Who approved the value, and when. |
-| `note` | no | Why, when the value is not the plain fix. |
+| `note` | no | Why, when the value is not the plain fix. `Covered by the switch <ID>` marks an item with no switch of its own whose tests are the switch's: `code_switch` must be `false`, `<ID>` must be a code switch, and trace requires passing tests in both modes that cite the item. |
 
 ### deviations.toml
 
@@ -117,11 +117,11 @@ Only the tag forms above count. An ID written in brackets in a test name or titl
 | :-- | :-- |
 | excluded in `scope.toml` | nothing |
 | has a deviation | nothing (tests are listed if any cite it) |
-| code switch (`code_switch = true`), or defect-decide with no fidelity entry | passing tests in legacy and in fixed mode |
+| code switch (`code_switch = true`), item covered by a switch, or defect-decide with no fidelity entry | passing tests in legacy and in fixed mode |
 | defect-decide with a fidelity entry | a passing test in the entry's mode (a test without a mode counts) |
 | must-preserve, or no fidelity class in the spec | a passing test |
 | incidental only, question, invariant | nothing |
 
-In addition: a failing test that cites a required item is a gap; every item of the architecture-dependent table needs a deviation; every code switch needs both modes, whatever its unit; and any test that cites an ID the spec does not define is a gap, in or out of scope. An unreadable report is a gap too.
+In addition: a failing test that cites a required item is a gap; every item of the architecture-dependent table needs a deviation; every code switch, and every item covered by one, needs both modes, whatever its unit; and any test that cites an ID the spec does not define is a gap, in or out of scope. An unreadable report is a gap too.
 
 **Matrix.** `matrix.json` has the gate result (`ok`, the gated `units`, `gaps` and `ungated_gaps`), the units in scope, the tests with bracketed IDs (`uncounted_bracketed`), the report files, a status count per unit, and one record per spec item (and per question or invariant that the ledger or a test names): unit, kind, title, fidelity text and classes, ledger entry, deviation, exclusion, requirement, status (`covered`, `gap`, `deviation`, `excluded`, `not-required`, `out-of-scope`) and the tests with their result and mode. `matrix.md` shows the gaps, the gaps outside the gate, the tests with bracketed IDs, a table per unit in scope, the code switches, and the cited items of other units.

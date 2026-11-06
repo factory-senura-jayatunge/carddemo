@@ -135,6 +135,28 @@ class GateTest(unittest.TestCase):
     def test_no_scope_only_code_switches(self):
         self.assertEqual(self.gaps(ALL_PASSING, led=make_ledger(units=())), {})
 
+    def test_item_covered_by_a_switch_needs_both_modes_from_the_switch_tests(self):
+        s = make_spec()
+        s.items["FLOW-POST-001"] = spec.Item("FLOW-POST-001", "FLOW", "POST", "X", "p.md", 1, "t",
+                                             "must-preserve (defect-decide, BR-TRNA-003)", spec.classes_of("must-preserve (defect-decide, BR-TRNA-003)"))
+        led = make_ledger()
+        led.switches["FLOW-POST-001"] = {"value": "fixed", "code_switch": False, "note": "Covered by the switch BR-TRNA-003: tests cite both."}
+        both = [t for t in ALL_PASSING if t.name != "d"] + [r("d", ["BR-TRNA-003", "FLOW-POST-001"], mode=m) for m in ("LEGACY", "FIXED")]
+        m = matrix.build(s, led, both, {"DEF-BILL-001"})
+        self.assertEqual(m.gaps, [])
+        self.assertEqual((m.rows["FLOW-POST-001"].requirement, m.rows["FLOW-POST-001"].status), ("both-modes", "covered"))
+        fixed_only = [t for t in ALL_PASSING if t.name != "d"] + [r("d", ["BR-TRNA-003"], mode=m) for m in ("LEGACY", "FIXED")] \
+            + [r("e", ["FLOW-POST-001"], mode="FIXED")]
+        gaps = dict(matrix.build(s, led, fixed_only, {"DEF-BILL-001"}).gaps)
+        self.assertEqual(gaps, {"FLOW-POST-001": "no passing test in legacy mode (covered by the switch BR-TRNA-003: its tests must cite this item too)"})
+
+    def test_decided_fix_without_switch_needs_only_its_mode(self):
+        led = make_ledger()
+        led.switches["DEF-BILL-009"] = {"value": "fixed", "code_switch": False}
+        results = [t for t in ALL_PASSING if t.name != "b"] + [r("b", ["DEF-BILL-009"], mode="FIXED")]
+        self.assertEqual(self.gaps(results, led=led), {})
+        self.assertEqual(self.build(results, led=led).rows["DEF-BILL-009"].requirement, "ledger-mode:FIXED")
+
     def test_unit_selection_gates_only_those_units(self):
         results = [t for t in ALL_PASSING if t.name not in ("a", "d")]
         m = matrix.build(make_spec(), make_ledger(), results, {"DEF-BILL-001"}, ["BILL"])
@@ -299,7 +321,11 @@ class CliTest(unittest.TestCase):
             self.assertEqual(trace_cli.main(argv + ["--unit", "SGN", "--unit", "MENU"]), 1)
         data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
         self.assertEqual(data["gate"]["units"], ["BILL", "MENU", "SGN"])
-        self.assertEqual([g["id"] for g in data["gate"]["ungated_gaps"]], ["BR-TRNA-003"])
+        led = ledger.load(REPO / "modernization/ledger")
+        other_switches = {i for i, e in led.switches.items()
+                          if (e.get("code_switch") is True or ledger.covering_switch(e)) and i.split("-")[1] not in led.units}
+        self.assertIn("BR-TRNA-003", other_switches)
+        self.assertEqual({g["id"] for g in data["gate"]["ungated_gaps"]}, other_switches)
 
     def test_unit_option_rejects_a_unit_outside_the_scope(self):
         (self.tmp / "reports").mkdir()
