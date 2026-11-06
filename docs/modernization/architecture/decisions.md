@@ -41,6 +41,7 @@ Until a default is answered, the build keeps the COBOL behaviour (legacy mode). 
 | D-SEC-03 | Password storage and case | bcrypt hash of the upper-cased password; user IDs and passwords case-insensitive, as today | Case-sensitive passwords with a forced reset at migration | D-04 (same) | DEF-SGN-001, INV-007, BR-SGN-001 |
 | D-SEC-04 | Lockout, rate limit, failure message | Off; the two legacy messages stay | On, with a neutral message | D-05 (same) | Q-SGN-003, Q-SGN-004 |
 | D-SEC-05 | PII on screens | Shown as today, every view audited | Masked unless the user holds `PII_VIEWER` | D-09 (same) | DEF-ACVW-010, DEF-CRDL-002 |
+| D-SEC-07 | New-password rule | Legacy mode: 1 to 8 characters, upper-cased before hashing, different from the current one | Fixed mode (with D-04): 8 to 64 characters, case-sensitive, any printable character, different from the current one, not the user ID; the user-admin screens use the same rule ([billpay-slice.md](billpay-slice.md#new-password-rules-d-sec-07)) | D-04, D-53 (decided: fixed) | DEF-SGN-011 |
 | D-SEC-06 | Least privilege for services and jobs | Always on: per-service SQL logins and RabbitMQ users (no legacy mode) | same | D-07 (same) | DEF-JCRDB-003, DEF-MQAC-004 |
 
 ### Data

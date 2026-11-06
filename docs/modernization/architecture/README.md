@@ -1,6 +1,6 @@
 # CardDemo target architecture (proposal)
 
-Status: **proposal for review**. Nothing here is built yet. The build phase starts after the user approves this proposal (decision D10).
+Status: **approved** (decision D10), with the user's answers to the decision catalog (`docs/modernization/decisions/README.md`) applied. The build starts with the Bill Pay slice, whose build contract is [billpay-slice.md](billpay-slice.md).
 
 This folder describes how CardDemo moves from CICS, VSAM, Db2, IMS, MQ and JCL to React, Spring Boot, SQL Server, RabbitMQ, Spring Batch and Airflow. It starts with Bill Pay and converts the rest one bounded context at a time.
 
@@ -28,6 +28,7 @@ The proposal is derived **only** from these inputs. No COBOL, copybook, BMS, JCL
 | [repo-build-ci.md](repo-build-ci.md) | Layout under `modernization/`, build, the test strategy (differential, rule-ID, Testcontainers, Playwright), traceability, CI. |
 | [make-targets.md](make-targets.md) | Each `make -C modernization` target in one line: what it does and when it passes. |
 | [decisions.md](decisions.md) | Every decision this proposal needs, with the recommended default. |
+| [billpay-slice.md](billpay-slice.md) | The build contract for the first slice (sign-on, main menu, Bill Pay): modules, Flyway ranges, tables, endpoints, tokens, switches, scenarios in both modes, and when each make target is done. |
 
 ## Terms
 
