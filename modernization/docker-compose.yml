@@ -21,6 +21,9 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_PID: ${MSSQL_PID:-Developer}
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is not set in modernization/.env; run make setup}
+      # SQL Server's own memory cap (buffer pool and the rest), below the
+      # container limit; the 8 GiB VM also holds the test containers.
+      MSSQL_MEMORY_LIMIT_MB: ${MSSQL_MEMORY_LIMIT_MB:-2048}
     ports:
       - "127.0.0.1:${MSSQL_HOST_PORT:-21433}:1433"
     volumes:

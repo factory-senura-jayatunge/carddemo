@@ -94,6 +94,8 @@ To implement a target, replace its stub: remove it from `STUBS` in the `Makefile
 
 Application data lives in SQL Server. Airflow can't keep its own metadata there, so it gets a separate Postgres.
 
+SQL Server limits its own memory to `MSSQL_MEMORY_LIMIT_MB` (2048 MiB by default, inside the 4 GiB container limit), so the 8 GiB Colima VM keeps room for a Testcontainers SQL Server and RabbitMQ during heavy tests. Changing the value recreates the container on the next `make up`; the data volume is kept.
+
 Every service has a health check, and `make up` waits for all of them (`UP_TIMEOUT`, default 300 seconds). On the tested Mac, with the images already pulled, `make up` takes about 8 seconds, both on fresh volumes and on existing ones. The first pull downloads about 3 GB, 2.4 GB of it for SQL Server.
 
 RabbitMQ is configured in `infra/rabbitmq/20-carddemo.conf` with `default_queue_type = quorum`. An AMQP client that declares a durable queue without `x-queue-type` gets a quorum queue. RabbitMQ 4.4 rejects transient non-exclusive queues, so declare queues durable. `rabbitmqadmin declare queue` is the exception: it sends `--type classic` unless you pass `--type quorum`.
@@ -131,7 +133,44 @@ There is one `carddemo-modern` compose project per machine, and its volumes were
 | `CARDDEMO_VAR_DIR` | `<main checkout>/modernization/var` (logs, PIDs, locks, keys, batch files) |
 | `CARDDEMO_JWT_KEY_FILE` | `$CARDDEMO_VAR_DIR/secrets/identity-jwt.pem` |
 
+`.env` also holds `CARDDEMO_DB_NAME` (default `carddemo`), the SQL login password of each service (`CARDDEMO_DB_<SERVICE>_PASSWORD` for identity, billpay, account, transaction, reference, authorization, inquiry and batch; db-migrate creates the logins) and `MSSQL_MEMORY_LIMIT_MB` (2048). `make setup` adds keys that are new in `.env.example` to an existing `.env` and generates their passwords; it never changes a value that is already there.
+
 Setting a variable in the environment overrides it. `make setup` in a worktree completes the main checkout's `.env` and key; it never creates a second set. A `modernization/.env` inside a worktree is ignored, and `make setup` warns about it. `make toolchain` shows the paths in use.
+
+## Running a command with the stack's settings
+
+`scripts/with_env.py` runs one command with every value of the shared `.env` in its environment, without printing any of them. A variable that is already set in the environment (even empty) wins over `.env`. Make recipes that need secrets (`db-reset`, the services in `up`, the test targets) run through it, and so can you:
+
+```sh
+modernization/scripts/with_env.py ./mvnw -pl services/identity-service verify
+```
+
+## Test database
+
+Backend tests (`platform/test-support`) read these variables:
+
+| Variable | Meaning | Default |
+|:--|:--|:--|
+| `CARDDEMO_TEST_MSSQL_URL` | JDBC URL of a running SQL Server, without `databaseName`. Empty or unset: the tests start a Testcontainers SQL Server (the image of `docker-compose.yml`, `MSSQL_MEMORY_LIMIT_MB=2048`). | empty in `.env.example`, so CI uses Testcontainers |
+| `CARDDEMO_TEST_MSSQL_USER` | Login for the tests | `sa` |
+| `CARDDEMO_TEST_MSSQL_PASSWORD` | Its password | `MSSQL_SA_PASSWORD` when the user is `sa` (filled in by `with_env.py`) |
+| `CARDDEMO_TEST_MSSQL_DB` | Name of the test database; test-support creates it when it is missing | `carddemo_test` |
+
+Policy on a workstation: the tests use the compose SQL Server (`make up`), not a container of their own, and every agent or checkout uses its own database, so parallel test runs never see each other's data and the VM never holds more than one SQL Server for tests. The shared `.env` on the main development machine sets `CARDDEMO_TEST_MSSQL_URL=jdbc:sqlserver://127.0.0.1:21433;encrypt=true;trustServerCertificate=true`. Each agent sets its database in its own environment:
+
+| Owner | `CARDDEMO_TEST_MSSQL_DB` |
+|:--|:--|
+| backend (platform, services, batch) | `carddemo_test_backend` |
+| identity-service | `carddemo_test_identity` |
+| data migration | `carddemo_test_data` |
+
+```sh
+CARDDEMO_TEST_MSSQL_DB=carddemo_test_backend modernization/scripts/with_env.py ./mvnw verify
+```
+
+Never point the tests at `CARDDEMO_DB_NAME` (`carddemo`, the database of `make up` and `load`). CI leaves the URL empty and uses Testcontainers.
+
+Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
 
 ## Toolchain pinning
 
