@@ -224,10 +224,11 @@ class SignOnScenariosTest extends IdentityTestBase {
         assertThat(c.signOn("USER0001", "PASSWORD").status()).isEqualTo(200);
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(value = FidelityMode.class, names = "FIXED")
     @SpecItem({"DEF-SGN-002"})
-    void s19_fixedRateLimitsFailedAttemptsPerClient() {
-        switches.all(FidelityMode.FIXED);
+    void s19_fixedRateLimitsFailedAttemptsPerClient(FidelityMode mode) {
+        switches.all(mode);
         db.demoUsers();
         ApiClient c = client();
         for (int i = 0; i < 4; i++) {
@@ -261,10 +262,11 @@ class SignOnScenariosTest extends IdentityTestBase {
         assertThat(db.user("USER0001").failedAttempts()).isZero();
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(value = FidelityMode.class, names = "FIXED")
     @SpecItem({"DEF-SGN-002"})
-    void s19_fixedRateLimitCoversThePasswordChange() {
-        switches.all(FidelityMode.FIXED);
+    void s19_fixedRateLimitCoversThePasswordChange(FidelityMode mode) {
+        switches.all(mode);
         db.demoUsers();
         db.user("MUSTCHG1", "MUST", "CHANGE", 'U', "PASSWORD", true);
         ApiClient c = client();
@@ -279,10 +281,11 @@ class SignOnScenariosTest extends IdentityTestBase {
         assertThat(db.sessions()).isEmpty();
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(value = FidelityMode.class, names = "FIXED")
     @SpecItem({"DEF-SGN-002"})
-    void s19_fixedNeverLimitsSuccessesOrBlankFields() {
-        switches.all(FidelityMode.FIXED);
+    void s19_fixedNeverLimitsSuccessesOrBlankFields(FidelityMode mode) {
+        switches.all(mode);
         db.demoUsers();
         ApiClient c = client();
         for (int i = 0; i < 40; i++) {
@@ -292,10 +295,11 @@ class SignOnScenariosTest extends IdentityTestBase {
         assertThat(c.signOn("USER0001", "PASSWORD").status()).isEqualTo(200);
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(value = FidelityMode.class, names = "LEGACY")
     @SpecItem({"DEF-SGN-002"})
-    void s19_legacyHasNoLimit() {
-        switches.all(FidelityMode.LEGACY);
+    void s19_legacyHasNoLimit(FidelityMode mode) {
+        switches.all(mode);
         db.demoUsers();
         ApiClient c = client();
         for (int i = 0; i < 40; i++) {
