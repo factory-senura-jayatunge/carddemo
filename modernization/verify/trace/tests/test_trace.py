@@ -299,7 +299,10 @@ class CliTest(unittest.TestCase):
             self.assertEqual(trace_cli.main(argv + ["--unit", "SGN", "--unit", "MENU"]), 1)
         data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
         self.assertEqual(data["gate"]["units"], ["BILL", "MENU", "SGN"])
-        self.assertEqual([g["id"] for g in data["gate"]["ungated_gaps"]], ["BR-TRNA-003"])
+        led = ledger.load(REPO / "modernization/ledger")
+        other_switches = {i for i, e in led.switches.items() if e.get("code_switch") is True and i.split("-")[1] not in led.units}
+        self.assertIn("BR-TRNA-003", other_switches)
+        self.assertEqual({g["id"] for g in data["gate"]["ungated_gaps"]}, other_switches)
 
     def test_unit_option_rejects_a_unit_outside_the_scope(self):
         (self.tmp / "reports").mkdir()

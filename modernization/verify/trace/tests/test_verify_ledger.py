@@ -345,7 +345,7 @@ class RepositoryLedgerTest(unittest.TestCase):
         led = ledger.load(REPO / "modernization/ledger")
         switches = {i for i, e in led.switches.items() if e.get("code_switch") is True}
         self.assertEqual(switches, {"DEF-BILL-010", "DEF-BILL-014", "BR-TRNA-003", "DEF-SGN-011",
-                                    "DEF-SGN-002", "DEF-SGN-003", "DEF-SGN-005"})
+                                    "DEF-SGN-002", "DEF-SGN-003", "DEF-SGN-005", "DEF-DTCK-004"})
         for ident in ("DEF-BILL-009", "Q-BILL-001", "Q-BILL-002", "Q-BILL-003", "Q-BILL-004", "Q-BILL-006",
                       "Q-MENU-003", "Q-SGN-001", "Q-SGN-002", "Q-SGN-003", "Q-SGN-004", "Q-SGN-005"):
             self.assertIn(ident, led.switches)

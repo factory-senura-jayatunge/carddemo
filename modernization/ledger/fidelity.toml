@@ -2154,7 +2154,7 @@ approved_on = "2026-11-06"
 
 [switch."DEF-DTCK-004"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-52"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
