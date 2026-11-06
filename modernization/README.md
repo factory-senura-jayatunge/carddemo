@@ -44,11 +44,12 @@ These are the targets in the order you use them. Every target ends with one line
 |:--|:--|:--|:--|
 | 1 | `setup` | Checks JDK 21, Node 24, Docker/Colima (with amd64 emulation on arm64) and the Airflow venv. Creates `.env` from `.env.example`, generates every empty password and the JWT signing key, and validates the compose file. Running it again keeps existing values and only adds keys that are new in the example. | Done |
 | 2 | `db-reset` | Builds `db/db-migrate`, starts the containers if needed, drops and recreates the application database `CARDDEMO_DB_NAME` (it warns first), runs every Flyway migration, creates the service logins and checks their grants (`--reset --check-logins`). | Done |
-| 3 | `load` | Builds `batch/batch-service` and runs its `dataLoadJob` once (a one-shot JVM, profile `demo`) on `app/data/ASCII` (`CARDDEMO_LOAD_SOURCE_DIR`): the core tables of `CARDDEMO_DB_NAME`. A reload after payments exist fails on a foreign key; run `db-reset` first. `up` then seeds the sign-on users (identity-service), after which `verify-data` can run. | Done |
+| 3 | `load` | Builds `batch/batch-service` and runs its `dataLoadJob` once (a one-shot JVM, profile `demo`) on `app/data/ASCII` (`CARDDEMO_LOAD_SOURCE_DIR`): the core tables of `CARDDEMO_DB_NAME`. A reload after payments exist fails on a foreign key; run `db-reset` first. `verify-data` comes after `up`, because identity-service seeds the sign-on users when it starts. | Done |
 | 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). `ONLY=identity-service,web` starts only those components. | Done; services join as they are converted |
-| 5 | `smoke` | Read-only check of the running slice in under 60 s: health of every running service, sign-on as `USER0001` with the seed password, `me`, `features`, a Bill Pay preview for account `00000000001` (needs `load`), the JWKS, the web app when it runs, and sign-off. It counts the rows of every table in `CARDDEMO_DB_NAME` before and after; only `iam.session` and `iam.audit_event` may change. | Done |
-| 6 | `billpay` | Builds identity-service and billpay-service, runs `db-reset` and `load` when `CARDDEMO_DB_NAME` has no accounts, starts the slice (`up` for identity-service, billpay-service and web), then makes one scripted payment through the API (`scripts/billpay_e2e.py`): sign-on, preview, pay with confirm `Y`, and checks the stored transaction and the zero balance. The slice stays up at `http://127.0.0.1:25173/bill-pay`. | Done; needs `load` |
-| 7 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
+| 5 | `verify-data` | Reconciles the loaded tables and the sign-on users with the sample files (details under Verification targets). It needs identity-service to have started once on this database (`up`, or `up ONLY=identity-service`); otherwise the `iam.app_user` check fails and the target prints that hint. | Done |
+| 6 | `smoke` | Read-only check of the running slice in under 60 s: health of every running service, sign-on as `USER0001` with the seed password, `me`, `features`, a Bill Pay preview for account `00000000001` (needs `load`), the JWKS, the web app when it runs, and sign-off. It counts the rows of every table in `CARDDEMO_DB_NAME` before and after; only `iam.session` and `iam.audit_event` may change. | Done |
+| 7 | `billpay` | Builds identity-service and billpay-service, runs `db-reset` and `load` when `CARDDEMO_DB_NAME` has no accounts, starts the slice (`up` for identity-service, billpay-service and web), then makes one scripted payment through the API (`scripts/billpay_e2e.py`): sign-on, preview, pay with confirm `Y`, and checks the stored transaction and the zero balance. The slice stays up at `http://127.0.0.1:25173/bill-pay`. | Done; needs `load` |
+| 8 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
 
 Other targets:
 
@@ -210,7 +211,7 @@ Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `ver
 | `web` | `web-build` | `backend` (runs when it was skipped, not when it failed) |
 | `airflow` | `test-airflow` | |
 | `batch` | `verify-harness verify-batch` | `spec` |
-| `data` | `db-reset load verify-data` | |
+| `data` | `db-reset load up verify-data ONLY=identity-service` (identity-service seeds the users that `verify-data` checks) | |
 | `e2e` | `db-reset load up test-e2e` (Chromium; nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |
 | `cycle` | `db-reset load up verify-cycle` (nightly, on demand, or on pull requests labelled `batch`) | `batch` |
 | `ledger` | the unit tests of `verify/trace/`, then `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |

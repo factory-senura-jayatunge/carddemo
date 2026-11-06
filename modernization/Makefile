@@ -204,14 +204,18 @@ test-billpay: require-env ## Bill Pay: Maven verify, Vitest, Playwright on the m
 	@cd '$(HERE)' && $(WITH_ENV) $(HEAVY) $@ $(PYTHON) scripts/test_billpay.py
 verify-batch: ## GnuCOBOL vs Spring Batch differential tests (heavy) [not implemented yet]
 verify-batch: PHASE = Phase 3, the batch jobs (differential tests against GnuCOBOL)
-verify-data: require-env ## Reconcile the loaded tables with the sample files: counts, keys, control totals, re-export, relations, users
+verify-data: require-env ## Reconcile the loaded tables with the sample files: counts, keys, control totals, re-export, relations, users (after up: identity-service seeds the users)
 	@$(call need,verify/data/pom.xml,arrives with the data migration)
 	@$(STACK) ensure-infra $@
 	@cd '$(HERE)' && ./mvnw -q -B -pl verify/data -am package -DskipTests || { echo '$@: FAILED (building verify/data)' >&2; exit 1; }
 	@cd '$(HERE)' && jar=$$(ls verify/data/target/verify-data-*-exec.jar 2>/dev/null | tail -n 1) \
 	&& { [ -n "$$jar" ] || { echo '$@: FAILED (no verify/data/target/verify-data-*-exec.jar after the build)' >&2; exit 1; }; } \
-	&& CARDDEMO_LOAD_SOURCE_DIR='$(HERE)/../app/data/ASCII' $(WITH_ENV) '$(JAVA)' -jar "$$jar" --users-jcl '$(HERE)/../app/jcl/DUSRSECJ.jcl' \
-	&& echo '$@: OK' || { echo '$@: FAILED (see the fail lines above)' >&2; exit 1; }
+	&& out=$$(mktemp) && trap 'rm -f "$$out"' EXIT \
+	&& if CARDDEMO_LOAD_SOURCE_DIR='$(HERE)/../app/data/ASCII' $(WITH_ENV) '$(JAVA)' -jar "$$jar" --users-jcl '$(HERE)/../app/jcl/DUSRSECJ.jcl' >"$$out" 2>&1; \
+	then cat "$$out"; echo '$@: OK'; \
+	else cat "$$out"; \
+		if grep -Eq '^fail +iam\.app_user' "$$out"; then echo 'hint  users are seeded when identity-service starts: run make up (or make up ONLY=identity-service) first'; fi; \
+		echo '$@: FAILED (see the fail lines above)' >&2; exit 1; fi
 verify-harness: ## Self-test of the differential test harness [not implemented yet]
 verify-harness: PHASE = Phase 3, the batch jobs (differential harness)
 verify-cycle: ## Full batch cycle through Airflow and Spring Batch (heavy) [not implemented yet]

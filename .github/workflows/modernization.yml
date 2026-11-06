@@ -91,7 +91,7 @@ jobs:
           job web web-build
           job airflow test-airflow
           job batch verify-harness verify-batch
-          job data db-reset load verify-data
+          job data db-reset load up verify-data
           job e2e db-reset load up test-e2e
           job cycle db-reset load up verify-cycle
           job ledger verify-ledger trace
@@ -330,8 +330,9 @@ jobs:
           cache-dependency-path: modernization/**/pom.xml
       - name: make setup build
         run: make -C modernization setup build
-      - name: make db-reset load verify-data (migrations, sample load, reconciliation)
-        run: make -C modernization db-reset load verify-data
+      # identity-service seeds the sign-on users that verify-data checks.
+      - name: make db-reset load up verify-data (migrations, sample load, identity-service, reconciliation)
+        run: make -C modernization db-reset load up verify-data ONLY=identity-service
       - name: Upload results and logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
