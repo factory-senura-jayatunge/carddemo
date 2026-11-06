@@ -93,5 +93,5 @@ The online programs cannot run locally (no CICS translator or region); their ite
 
 - PLATFORM items (22) rest on reviewer opinion about CICS, BMS, VSAM, JES and LE behaviour; they are collected in the mainframe questions Q-DTCK-001..004, Q-TRNL-003, Q-TRNV-003, Q-TRNA-004 and Q-RPTS-003.
 - Business and security decisions: Q-TRNL-001, -002, -004; Q-TRNV-001, -002; Q-TRNA-001, -002, -003, -005; Q-RPTS-001, -002, -004.
-- For the batch area: Q-RPTS-005 (`TRANREPT.prc` starts `//REPROC PROC` and nests `PROC=REPROC`) and the CBTRN03C `NEXT SENTENCE` behaviour noted under NUM-RPTS-003.
+- For the batch area: the CBTRN03C `NEXT SENTENCE` behaviour noted under NUM-RPTS-003. Q-RPTS-005 (`TRANREPT.prc` starts `//REPROC PROC` and nests `PROC=REPROC`) is closed by the batch area's DEF-JTRPTP-001.
 - Each item was checked once, by one reviewer. No spec-only reimplementation was run for this area: four of the five programs are CICS programs that cannot run locally, and CSUTLDTC's behaviour is covered by the probes above.

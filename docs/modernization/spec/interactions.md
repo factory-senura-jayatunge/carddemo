@@ -1,6 +1,6 @@
 # CardDemo interaction view
 
-Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities), e (authorization module, IMS, Db2 and MQ) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
+Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities), e (authorization module, IMS, Db2 and MQ), f (transaction type Db2 module and VSAM-MQ module) and g (jobs, procedures, CSD and schedules). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
 
 ## Online navigation (core)
 
@@ -95,14 +95,14 @@ Each program also returns to itself with RETURN TRANSID and a 2000-byte area; on
 ```mermaid
 flowchart TB
     subgraph Daily["Batch cycle, runbook order"]
-        CLO[CLOSEFIL] --> PST[POSTTRAN<br/>CBTRN02C]
+        CLO[CLOSEFIL] --> BK0[TRANBKP<br/>reset: empty TRANSACT] --> PST[POSTTRAN<br/>CBTRN02C]
         PST --> INT[INTCALC<br/>CBACT04C]
         INT --> BKP[TRANBKP] --> CMB[COMBTRAN] --> STM[CREASTMT] --> IDX[TRANIDX] --> OPN[OPENFIL]
     end
     subgraph Readers["CA-7 reader chain"]
         RA[READACCT<br/>CBACT01C] --> RC[READCARD<br/>CBACT02C] --> RU[READCUST<br/>CBCUS01C] --> RX[READXREF<br/>CBACT03C] --> WT[WAITSTEP]
     end
-    RPT[CORPT00C] -- "TDQ JOBS" --> TR[TRANREPT<br/>CBTRN03C]
+    RPT[CORPT00C] -- "TDQ JOBS, job TRNRPT00" --> TR[procedure TRANREPT<br/>CBTRN03C]
     ACCT[(ACCTDATA)]
     XREF[(CARDXREF<br/>+ AIX by account)]
     TRAN[(TRANSACT)]
@@ -130,12 +130,12 @@ flowchart TB
     ACCT -- B --> RA
 ```
 
-The diagram follows the runbook (`docs/runbooks/batch-cycle-restart.md:11-21`). The schedulers differ from it:
+The diagram follows the runbook (`docs/runbooks/batch-cycle-restart.md:11-21`) and adds the TRANBKP reset before POSTTRAN, which the runbook keeps inside its demo-only data refresh (`docs/runbooks/batch-cycle-restart.md:14, 34-36`): POSTTRAN needs an empty `TRANSACT`, and without the reset a repeated cycle fails at POSTTRAN's open (INV-003). The schedulers differ from it; `jobs/README.md` compares the seven cycle orders in the repository.
 
-- **CA-7** chains CLOSEFIL, CBPAUP0J, POSTTRAN, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:19-127`); CBPAUP0J is the purge of the authorization module (see "Optional module: authorization"). It does not list INTCALC, and another CLOSEFIL listing triggers CREASTMT (`app/scheduler/CardDemo.ca7:465-470`), so CA-7 runs the statements right after the files close, not between COMBTRAN and TRANIDX; CREASTMT then triggers TXT2PDF1, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:494-495, 521-527`). The reader chain READACCT to WAITSTEP also starts from CLOSEFIL (`app/scheduler/CardDemo.ca7:335-455`).
-- **Control-M** runs INTCALC monthly, after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:64-80`).
+- **CA-7** keeps triggers per job name and schedule ID (SCHID). Read with CA-7's trigger rules (platform-inferred), a trigger fires only for a run of the triggering job under its SCHID, and the triggered job keeps that SCHID (FLOW-JCA7-005). A CLOSEFIL run under 030 starts four paths at once: CBPAUP0J and then POSTTRAN (`app/scheduler/CardDemo.ca7:18-124`; CBPAUP0J is the purge of the authorization module, see "Optional module: authorization"), TRANTYPE (`app/scheduler/CardDemo.ca7:159-189`), the reader chain READACCT to READXREF (`app/scheduler/CardDemo.ca7:337-453`) and CREASTMT, then TXT2PDF1 (`app/scheduler/CardDemo.ca7:465-527`). Each path ends with WAITSTEP, which under 030 triggers both OPENFIL and CLOSEFIL (`app/scheduler/CardDemo.ca7:303, 335`), so the round starts again (DEF-JCA7-002, DEF-JCA7-006). CA-7 lists no INTCALC, TRANBKP, COMBTRAN or TRANIDX, and it runs the statements right after the files close, in parallel with posting, not between COMBTRAN and TRANIDX (INV-054). The TRANCATG, TCATBALF and PRTCATBL chains run only under SCHIDs 031 and 032, which no 030 run reaches (DEF-JCA7-008). What starts a run is not in the listing (DEF-JCA7-001).
+- **Control-M** has no posting. Its daily folder runs CLOSEFIL, TRANBKP, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.controlm:3-25`, DEF-JCTLM-001, INV-055). Its monthly folder lists INTCALC after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:64-80`), but neither that folder nor MNTTRDB2 has scheduling days, so both run only when an operator forces them (DEF-JCTLM-002).
 
-Which order the target scheduler (Airflow) follows is an open question in area g's schedule specs; this view does not choose one. TRANVALD (CBTRN01C) has no JCL and no schedule entry (CBTRN01C DEF-TVAL-007).
+Which order the target scheduler (Airflow) follows is the decision described in `jobs/README.md` (Q-JCA7-001, Q-JCTLM-001); area g recommends an order derived from the data dependencies, and this view does not choose one. TRANVALD (CBTRN01C) has no JCL and no schedule entry (CBTRN01C DEF-TVAL-007).
 
 ## Batch utilities: statements, export and import, wait
 
@@ -168,7 +168,61 @@ flowchart LR
     RAC -- STEP05 --> ACT1[CBACT01C] -- CALL --> DTF[COBDATFT]
 ```
 
-WAITSTEP's successor depends on the scheduler entry (OPENFIL, CLOSEFIL, or CLOSEFIL1 and CLOSEFIL2); the diagram shows OPENFIL only, and the edge table has every pair. Nothing in the repository schedules CBEXPORT or CBIMPORT, and nothing reads the `*.IMPORT` or `IMPORT.ERRORS` datasets (CBIMPORT Q-IMPT-004).
+WAITSTEP's successor depends on the scheduler and, in CA-7, on the schedule ID it runs under: OPENFIL and CLOSEFIL under 030, OPENFIL and CLOSEFIL1 under 031, CLOSEFIL2 alone under 032 (`app/scheduler/CardDemo.ca7:124, 216-217, 303, 335, 569`, FLOW-JCA7-006); in Control-M it is OPENFIL. The diagram shows OPENFIL only, and the edge tables have every pair. Nothing in the repository schedules CBEXPORT or CBIMPORT, and nothing reads the `*.IMPORT` or `IMPORT.ERRORS` datasets (CBIMPORT Q-IMPT-004).
+
+## Batch cycle data hand-offs (README order, area g)
+
+The README and runbook order (CLOSEFIL, data refresh, POSTTRAN, INTCALC, TRANBKP, COMBTRAN, CREASTMT, TRANIDX, OPENFIL). Of the data refresh only the TRANBKP reset is drawn; the reload jobs' hand-offs are in the file edge table. The schedulers' orders differ (`jobs/README.md`).
+
+```mermaid
+flowchart LR
+    CLO[CLOSEFIL<br/>SDSF CEMT CLO] --> BK0[TRANBKP<br/>reset: empty TRANSACT]
+    BK0 --> PST[POSTTRAN<br/>CBTRN02C]
+    PST --> INT[INTCALC<br/>CBACT04C]
+    INT --> BK1[TRANBKP<br/>backup]
+    BK1 --> CMB[COMBTRAN<br/>SORT + REPRO]
+    CMB --> STM[CREASTMT<br/>SORT + CBSTM03A]
+    STM --> IDX[TRANIDX]
+    IDX --> OPN[OPENFIL<br/>SDSF CEMT OPE]
+    TRAN[(TRANSACT KSDS)]
+    AIX[(TRANSACT AIX and path)]
+    ACCT[(ACCTDATA KSDS)]
+    TCB[(TCATBALF KSDS)]
+    BKUP[(TRANSACT.BKUP GDG)]
+    SYS[(SYSTRAN GDG)]
+    COMB[(TRANSACT.COMBINED GDG)]
+    REJ[(DALYREJS GDG)]
+    TRX[(TRXFL work KSDS)]
+    STMT[(STATEMNT.PS / HTML)]
+    TRAN -- "R" --> BK0
+    BK0 -- "C (+1)" --> BKUP
+    BK0 -- "D, C empty" --> TRAN
+    BK0 -- "D" --> AIX
+    PST -- "C posted" --> TRAN
+    PST -- "C" --> REJ
+    PST -- "C / U" --> TCB
+    PST -- "U" --> ACCT
+    TCB -- "R" --> INT
+    INT -- "U interest" --> ACCT
+    INT -- "C (+1)" --> SYS
+    TRAN -- "R" --> BK1
+    BK1 -- "C (+1)" --> BKUP
+    BK1 -- "D, C empty" --> TRAN
+    BK1 -- "D" --> AIX
+    BKUP -- "R (0)" --> CMB
+    SYS -- "R (0)" --> CMB
+    CMB -- "C (+1)" --> COMB
+    COMB -- "REPRO" --> TRAN
+    TRAN -- "R" --> STM
+    ACCT -- "R" --> STM
+    STM -- "C" --> TRX
+    STM -- "C" --> STMT
+    TRAN -- "R" --> IDX
+    IDX -- "C" --> AIX
+    STMT --> PDF[TXT2PDF1<br/>CA-7 only]
+    RPT[CORPT00C<br/>CR00] -. "TDQ JOBS, internal reader" .-> PROC[procedure TRANREPT]
+    PROC -. "C (+1), any time" .-> BKUP
+```
 
 ## Optional modules: transaction type (Db2) and VSAM-MQ
 
@@ -349,13 +403,13 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
 | :-- | :-- | :-- | :-- | :-- | :-- |
-| Control-M folder `MONTHLY-InterestCalculation` | INTCALC | scheduler | monthly, after CLOSEFIL, before COMBTRAN (conditions `...-INTCALC`) | `app/scheduler/CardDemo.controlm:64-80` | CBACT04C BR-INTC-008 (§3) |
-| INTCALC (CBACT04C) | COMBTRAN | file | interest transactions in `AWS.M2.CARDDEMO.SYSTRAN(+1)` (FB 350, ENT-TRANSACTION layout); COMBTRAN reads `SYSTRAN(0)` and merges it into the transaction master | `app/jcl/INTCALC.jcl:37-41`, `app/jcl/COMBTRAN.jcl:26` | CBACT04C SE-INTC-001 |
+| Control-M folder `MONTHLY-InterestCalculation` | INTCALC | scheduler | after CLOSEFIL, before COMBTRAN (conditions `...-INTCALC`); the folder has no scheduling days, so it runs only when forced (DEF-JCTLM-002) | `app/scheduler/CardDemo.controlm:64-80` | CBACT04C BR-INTC-008 (§3) |
+| INTCALC (CBACT04C) | COMBTRAN | file | interest transactions in `AWS.M2.CARDDEMO.SYSTRAN(+1)` (ENT-SYSTRAN, `RECFM=F`, 350, ENT-TRANSACTION layout); COMBTRAN reads `SYSTRAN(0)` and merges it into the transaction master | `app/jcl/INTCALC.jcl:37-41`, `app/jcl/COMBTRAN.jcl:26` | CBACT04C SE-INTC-001 |
 | INTCALC (CBACT04C) | ACCTDATA | file | current balance += interest, cycle credit and debit := 0 | `app/cbl/CBACT04C.cbl:351-370` | CBACT04C BR-INTC-006, SE-INTC-002 |
 | CBACT04C | CEE3ABD | CALL | abend code 999, timing 0 | `app/cbl/CBACT04C.cbl:630-634` | CBACT04C ERR-INTC-009 |
 | TRANREPT STEP05R | TRANREPT STEP10R | JCL step | REPRO of the transaction master to `TRANSACT.BKUP(+1)`, SORT by card with the date INCLUDE to `TRANSACT.DALY(+1)`, read as TRANFILE | `app/jcl/TRANREPT.jcl:23-55, 59-80` | CBTRN03C BR-TRPT-002, DEF-TRPT-002 |
 | CBTRN03C | CEE3ABD | CALL | abend code 999, timing 0 | `app/cbl/CBTRN03C.cbl:627-631` | CBTRN03C ERR-TRPT-006 |
-| CA-7 `CLOSEFIL` | READACCT | scheduler | trigger (SCHID 030) | `app/scheduler/CardDemo.ca7:335-340` | CBACT01C BR-ACRD-001 (§3) |
+| CA-7 `CLOSEFIL` | READACCT | scheduler | trigger (SCHID 030) | `app/scheduler/CardDemo.ca7:337-340` | CBACT01C BR-ACRD-001 (§3) |
 | READACCT | READCARD | scheduler | trigger (SCHID 030) | `app/scheduler/CardDemo.ca7:342-367` | CBACT02C BR-CDRD-001 (§3) |
 | READCARD | READCUST | scheduler | trigger (SCHID 030) | `app/scheduler/CardDemo.ca7:369-394` | CBCUS01C BR-CURD-001 (§3) |
 | READCUST | READXREF | scheduler | trigger (SCHID 030) | `app/scheduler/CardDemo.ca7:396-421` | CBACT03C BR-XRRD-001 (§3) |
@@ -377,7 +431,7 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | COTRTLIC | CARDDEMO.TRANSACTION_TYPE | DB2 | count, forward and backward cursors, UPDATE, DELETE | `app/app-transaction-type-db2/cbl/COTRTLIC.cbl:338-366, 1626-2034` | SE-TTLS-001 .. SE-TTLS-006 |
 | COTRTUPC | CARDDEMO.TRANSACTION_TYPE | DB2 | SELECT by code, UPDATE then INSERT, DELETE | `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:1475-1637` | SE-TTUP-001 .. SE-TTUP-004 |
 | CARDDEMO.TRANSACTION_TYPE_CATEGORY | COTRTLIC, COTRTUPC, COBTUPDT | DB2 | foreign key `ON DELETE RESTRICT` refuses a type delete (-532) | `app/app-transaction-type-db2/ctl/DB2CREAT.ctl:96-99` | BR-TTLS-009, BR-TTUP-004, BR-TTBU-004 |
-| Control-M | MNTTRDB2 | scheduler | folder `WEEKLY-TransactionTypesDBRefresh` | `app/scheduler/CardDemo.controlm:26-31` | FLOW-JMNTT-001 |
+| Control-M | MNTTRDB2 | scheduler | folder `WEEKLY-TransactionTypesDBRefresh`; MNTTRDB2 has no scheduling days, so it runs only when forced, and the two Saturday smart folders that wait for its condition are blocked with it (DEF-JCTLM-002, DEF-JCTLM-004) | `app/scheduler/CardDemo.controlm:26-31` | FLOW-JMNTT-001 |
 | MNTTRDB2 | COBTUPDT | JCL step | `IKJEFT01` / `DSN RUN PROGRAM(COBTUPDT) PLAN(CARDDEMO)`, DD `INPFILE` | `app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:21-30` | BR-JMNTT-001 |
 | INPFILE | COBTUPDT | file | ENT-TTYP-MAINT-INPUT, 53-byte records | `app/app-transaction-type-db2/cbl/COBTUPDT.cbl:31-46, 100-107` | FLOW-TTBU-002 |
 | COBTUPDT | CARDDEMO.TRANSACTION_TYPE | DB2 | INSERT, UPDATE, DELETE per record | `app/app-transaction-type-db2/cbl/COBTUPDT.cbl:137-148, 171-175, 201-204` | SE-TTBU-001 .. SE-TTBU-004 |
@@ -402,9 +456,9 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
 | :-- | :-- | :-- | :-- | :-- | :-- |
-| CA-7 `CLOSEFIL` | `CREASTMT` | scheduler | trigger | `app/scheduler/CardDemo.ca7:465-468` | CBSTM03A §3 (Trigger) |
-| CA-7 `CREASTMT` | `TXT2PDF1` | scheduler | trigger; TXT2PDF1 reads `STATEMNT.PS` (INDD) and writes `STATEMNT.PS.PDF`; `STATEMNT.HTML` is not read | `app/scheduler/CardDemo.ca7:494-495`, `app/jcl/TXT2PDF1.JCL:24-39` | SE-STMT-001, CBSTM03A §4 (Downstream) |
-| CA-7 `TXT2PDF1` | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:521-527` | COBSWAIT §3 (Trigger) |
+| CA-7 `CLOSEFIL` | `CREASTMT` | scheduler | trigger, SCHID 030 | `app/scheduler/CardDemo.ca7:465-468` | CBSTM03A §3 (Trigger) |
+| CA-7 `CREASTMT` | `TXT2PDF1` | scheduler | trigger, SCHID 030; TXT2PDF1 reads `STATEMNT.PS` (INDD) and writes `STATEMNT.PS.PDF`; `STATEMNT.HTML` is not read | `app/scheduler/CardDemo.ca7:495`, `app/jcl/TXT2PDF1.JCL:24-39` | SE-STMT-001, CBSTM03A §4 (Downstream) |
+| CA-7 `TXT2PDF1` | `WAITSTEP`, then `OPENFIL` and `CLOSEFIL` | scheduler | trigger, SCHID 030 | `app/scheduler/CardDemo.ca7:303, 335, 522, 527` | FLOW-JCA7-003, FLOW-JCA7-006 |
 | `CREASTMT` DELDEF01 (IDCAMS) | TRXFL.SEQ, TRXFL.VSAM.KSDS | JCL step | delete both, define the KSDS again with `KEYS(32 0)` | `app/jcl/CREASTMT.JCL:22-40` | CBSTM03A §3 (Earlier steps of the same job) |
 | `CREASTMT` STEP010 (SORT) | TRXFL.SEQ | JCL step | ENT-TRANSACTION from TRANSACT (`SORTIN`) sorted by card + ID, card moved in front (ENT-STMT-TRAN) | `app/jcl/CREASTMT.JCL:44-55` | CBSTM03A §3 (Earlier steps of the same job), ENT-STMT-TRAN |
 | `CREASTMT` STEP020 (IDCAMS REPRO) | TRXFL.VSAM.KSDS | JCL step | ENT-STMT-TRAN | `app/jcl/CREASTMT.JCL:56-62` | CBSTM03A §3 (Earlier steps of the same job), ENT-STMT-TRAN |
@@ -419,12 +473,12 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | `CBIMPORT` job STEP01 | CBIMPORT | JCL step | DDs EXPFILE, CUSTOUT, ACCTOUT, XREFOUT, TRNXOUT, CARDOUT, ERROUT | `app/jcl/CBIMPORT.jcl:22-65` | FLOW-IMPT-001 |
 | CBIMPORT | CEE3ABD | CALL | none (no arguments) | `app/cbl/CBIMPORT.cbl:494` | DEF-IMPT-003 |
 | `WAITSTEP` job | COBSWAIT | JCL step | SYSIN `00003600` (hundredths of a second) | `app/jcl/WAITSTEP.jcl:22-27` | BR-WAIT-001 |
-| CA-7 POSTTRAN | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:96-97, 123-124` | COBSWAIT §3 (Trigger) |
-| CA-7 TRANTYPE | `WAITSTEP`, then `CLOSEFIL1` and `CLOSEFIL2` | scheduler | trigger | `app/scheduler/CardDemo.ca7:188-189, 215-217` | COBSWAIT §3 (Trigger) |
-| CA-7 TRANCATG | `WAITSTEP`, then `CLOSEFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:297-298, 302-303` | COBSWAIT §3 (Trigger) |
-| CA-7 TCATBALF | `WAITSTEP`, then `CLOSEFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:329-330, 334-335` | COBSWAIT §3 (Trigger) |
-| CA-7 READXREF | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:447-448, 452-453` | COBSWAIT §3 (Trigger) |
-| CA-7 PRTCATBL | `WAITSTEP`, then `OPENFIL` | scheduler | trigger | `app/scheduler/CardDemo.ca7:563-564, 568-569` | COBSWAIT §3 (Trigger) |
+| CA-7 POSTTRAN | `WAITSTEP`, then `OPENFIL` and `CLOSEFIL` | scheduler | trigger, SCHID 030 | `app/scheduler/CardDemo.ca7:97, 124, 303, 335` | FLOW-JCA7-001, FLOW-JCA7-006 |
+| CA-7 TRANTYPE | `WAITSTEP`, then `OPENFIL` and `CLOSEFIL` | scheduler | trigger, SCHID 030; WAITSTEP's `CLOSEFIL1` (031) and `CLOSEFIL2` (032) triggers do not fire for this run (platform-inferred) | `app/scheduler/CardDemo.ca7:124, 189, 216-217, 303, 335` | FLOW-JCA7-002, FLOW-JCA7-005, FLOW-JCA7-006 |
+| CA-7 TRANCATG | `WAITSTEP`, then `OPENFIL` and `CLOSEFIL1` | scheduler | trigger, SCHID 031; WAITSTEP's 030 `CLOSEFIL` trigger does not fire for this run (platform-inferred) | `app/scheduler/CardDemo.ca7:216, 298, 303, 569` | FLOW-JCA7-002, FLOW-JCA7-005, FLOW-JCA7-006 |
+| CA-7 TCATBALF | `WAITSTEP`, then `CLOSEFIL2` | scheduler | trigger, SCHID 032; no OPENFIL or `CLOSEFIL` trigger exists under 032, so the files stay closed (platform-inferred) | `app/scheduler/CardDemo.ca7:217, 330` | FLOW-JCA7-002, FLOW-JCA7-005, FLOW-JCA7-006 |
+| CA-7 READXREF | `WAITSTEP`, then `OPENFIL` and `CLOSEFIL` | scheduler | trigger, SCHID 030 | `app/scheduler/CardDemo.ca7:303, 335, 448, 453` | FLOW-JCA7-002, FLOW-JCA7-006 |
+| CA-7 PRTCATBL | `WAITSTEP`, then `OPENFIL` and `CLOSEFIL1` | scheduler | trigger, SCHID 031 | `app/scheduler/CardDemo.ca7:216, 564, 569` | FLOW-JCA7-004, FLOW-JCA7-006 |
 | Control-M TRANBKP | `WAITSTEP` | scheduler | condition `DAILY-TransactionBackup-TRANBKP`; WAITSTEP then releases OPENFIL | `app/scheduler/CardDemo.controlm:14-24` | COBSWAIT §3 (Trigger) |
 | Control-M DISCGRP, COMBTRAN | `WAITSTEP` | scheduler | weekly and monthly folders, same pattern | `app/scheduler/CardDemo.controlm:44-54, 81-91` | COBSWAIT §3 (Trigger) |
 | COBSWAIT | MVSWAIT | CALL | fullword binary interval, hundredths of a second | `app/cbl/COBSWAIT.cbl:38` | BR-WAIT-001, BR-MWAT-001 |
@@ -453,8 +507,8 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | COPAUS1C | COPAUS2C | LINK | `WS-FRAUD-DATA`: account ID, customer ID, ENT-AUTH-DETAIL image, action; back: status `S`/`F`, a 50-byte message and the detail image with `PA-FRAUD-RPT-DATE` set, which COPAUS1C writes back with `REPL` | `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:93-104, 244-252, 522-528` | BR-AUDT-007, SE-AUDT-002 |
 | COPAUS1C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary; `GNP` details; `REPL` detail (fraud flag) | `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:439, 465, 495, 525, 575-585` | BR-AUDT-001, BR-AUDT-006, SE-AUDT-001 |
 | COPAUS2C | `CARDDEMO.AUTHFRDS` | DB2 | `INSERT`; on duplicate key `UPDATE` of the fraud flag and report date | `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl:141-145, 222-227` | SE-AUFR-001, SE-AUFR-002 |
-| CA-7 `CLOSEFIL` | `CBPAUP0J` | scheduler | CA-7 trigger | `app/scheduler/CardDemo.ca7:42-43` | FLOW-JAUPG-002 |
-| CA-7 `CBPAUP0J` | `POSTTRAN` | scheduler | CA-7 trigger (also after return code 16) | `app/scheduler/CardDemo.ca7:69-70` | FLOW-JAUPG-002, DEF-JAUPG-003 |
+| CA-7 `CLOSEFIL` | `CBPAUP0J` | scheduler | CA-7 trigger, SCHID 030 | `app/scheduler/CardDemo.ca7:42-43` | FLOW-JAUPG-002 |
+| CA-7 `CBPAUP0J` | `POSTTRAN` | scheduler | CA-7 trigger, SCHID 030; also after return code 16, unless the CA-7 job definition tests the condition code (Q-JAUPG-001) | `app/scheduler/CardDemo.ca7:69-70` | FLOW-JAUPG-002, DEF-JAUPG-003 |
 | CBPAUP0J | CBPAUP0C | JCL step | `PARM='BMP,CBPAUP0C,PSBPAUTB'`, SYSIN card `00,00001,00001,Y` | `app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl:24-25, 36-37` | FLOW-JAUPG-001, BR-JAUPG-001 |
 | CBPAUP0C | `DBPAUTP0` | IMS | `GN` summaries, `GNP` details, `DLET` details and summaries, `CHKP` | `app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:223, 255, 310, 335, 355` | FLOW-AUPG-002, SE-AUPG-001..003 |
 | UNLDPADB | PAUDBUNL | JCL step | `PARM='DLI,PAUDBUNL,PAUTBUNL,,,,,,,,,,,N'` | `app/app-authorization-ims-db2-mq/jcl/UNLDPADB.JCL:38-39` | FLOW-JULPA-001 |
@@ -467,3 +521,78 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | DBUNLDGS | `DBPAUTP0` | IMS | `GN` summaries, `GNP` details | `app/app-authorization-ims-db2-mq/cbl/DBUNLDGS.CBL:222, 267` | FLOW-DBUL-001 |
 | DBUNLDGS | `PAUTDB.ROOT.GSAM`, `PAUTDB.CHILD.GSAM` | IMS | GSAM `ISRT` of 100-byte summaries and 200-byte details | `app/app-authorization-ims-db2-mq/cbl/DBUNLDGS.CBL:302, 321` | SE-DBUL-001, SE-DBUL-002 |
 | DBPAUTP0 (job) | `DBPAUTP0` (database) | JCL step | HD unload utility `DFSURGU0` in a `ULU` region; output `IMSDATA.DBPAUTP0` | `app/app-authorization-ims-db2-mq/jcl/DBPAUTP0.jcl:15-32` | SE-JDBPA-002 |
+
+### Jobs and operations (area g)
+
+Job-level edges from the job and schedule specs in `jobs/`. Edges already listed in another area's table are not repeated: the CA-7 reader chain (d1), the CREASTMT, TXT2PDF1 and WAITSTEP rows (d2), CLOSEFIL to CBPAUP0J to POSTTRAN (e), the MNTTRDB2 conditions (f), the report request's TDQ write and its job (c), and the job steps of CREASTMT, READACCT, WAITSTEP, CBEXPORT and CBIMPORT (d2). `jobs/SCHED-CA7.md` and `jobs/SCHED-CONTROLM.md` list every trigger and condition. A CA-7 `DEMAND` without a SCHID runs CLOSEFIL alone and triggers nothing (DEF-JCA7-009).
+
+#### Scheduler: CA-7 (remaining edges)
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| CLOSEFIL | TRANTYPE | scheduler | completion trigger, SCHID 030 | `app/scheduler/CardDemo.ca7:159-162` | FLOW-JCA7-002 |
+| WAITSTEP | OPENFIL | scheduler | completion triggers, SCHID 030 (three `LJOB` entries) and 031 | `app/scheduler/CardDemo.ca7:99-124, 450-453, 524-527, 566-569` | FLOW-JCA7-006 |
+| WAITSTEP | CLOSEFIL | scheduler | completion trigger, SCHID 030: fires for every WAITSTEP run under 030, which closes the loop | `app/scheduler/CardDemo.ca7:300-303, 332-335` | DEF-JCA7-002, DEF-JCA7-006 |
+| WAITSTEP | CLOSEFIL1, CLOSEFIL2 | scheduler | completion triggers, SCHID 031 and 032; both names have nine characters, which z/OS does not allow | `app/scheduler/CardDemo.ca7:191-217` | FLOW-JCA7-002, DEF-JCA7-003 |
+| CLOSEFIL1 | TRANCATG | scheduler | completion trigger, SCHID 031 | `app/scheduler/CardDemo.ca7:219-244` | FLOW-JCA7-002 |
+| CLOSEFIL2 | TCATBALF | scheduler | completion trigger, SCHID 032 | `app/scheduler/CardDemo.ca7:246-271` | FLOW-JCA7-002 |
+| OPENFIL | CLOSEFIL | scheduler | completion trigger, SCHID 031: fires only for an OPENFIL run under 031; OPENFIL's own entry says it triggers no jobs, which contradicts this trigger list | `app/scheduler/CardDemo.ca7:138, 529-532` | FLOW-JCA7-004, DEF-JCA7-002 |
+| CLOSEFIL | PRTCATBL | scheduler | completion trigger, SCHID 031: only for a CLOSEFIL run under 031 | `app/scheduler/CardDemo.ca7:534-537` | FLOW-JCA7-004 |
+
+#### Scheduler: Control-M (remaining edges)
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| CLOSEFIL (daily) | TRANBKP | scheduler | condition `DAILY-TransactionBackup-CLOSEFIL` | `app/scheduler/CardDemo.controlm:5, 9` | FLOW-JCTLM-001, DEF-JCTLM-001 |
+| WAITSTEP (daily) | OPENFIL (daily) | scheduler | condition `DAILY-TransactionBackup-WAITSTEP` | `app/scheduler/CardDemo.controlm:17, 21` | FLOW-JCTLM-001 |
+| CLOSEFIL (weekly) | DISCGRP | scheduler | condition `WEEKLY-DisclosureGroupsRefresh-CLOSEFIL` | `app/scheduler/CardDemo.controlm:35, 39` | FLOW-JCTLM-003 |
+| CLOSEFIL (monthly) | INTCALC | scheduler | condition `MONTHLY-InterestCalculation-CLOSEFIL` | `app/scheduler/CardDemo.controlm:66, 70` | FLOW-JCTLM-005, DEF-JCTLM-002 |
+| INTCALC | COMBTRAN | scheduler | condition `MONTHLY-InterestCalculation-INTCALC` | `app/scheduler/CardDemo.controlm:72, 76` | FLOW-JCTLM-005, DEF-JCTLM-006 |
+
+#### Job submission outside the schedulers
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| TDQ `JOBS` | JES internal reader | TDQ | extrapartition queue on DD `INREADER`, `RECORDSIZE(80)`, `ERROROPTION(IGNORE)`. That DD `INREADER` of the CICS region is a JES internal reader (`SYSOUT=(A,INTRDR)`) is inferred from the description `SUBMIT JOBS FROM CICS`; the region JCL is not in the repository (platform-inferred, high) | `app/csd/CARDDEMO.CSD:499-505` | SE-JCSD-002, ERR-JCSD-002 |
+| INTRDRJ1 | INTRDRJ2 | JCL step | member `AWS.M2.CARDDEMO.JCL(INTRDRJ2)` copied by IEBGENER to `SYSOUT=(A,INTRDR)` | `app/jcl/INTRDRJ1.JCL:14-18` | SE-JIRD1-002, FLOW-JIRD1-001 |
+
+#### JCL step: job to program or procedure
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| POSTTRAN | CBTRN02C | JCL step | DDs `TRANFILE`, `DALYTRAN`, `XREFFILE`, `DALYREJS(+1)`, `ACCTFILE`, `TCATBALF` | `app/jcl/POSTTRAN.jcl:23-42` | FLOW-JPOST-001 |
+| INTCALC | CBACT04C | JCL step | `PARM='2022071800'`; DDs `TCATBALF`, `XREFFILE`, `XREFFIL1` (AIX path), `ACCTFILE`, `DISCGRP`, `TRANSACT` = `SYSTRAN(+1)` | `app/jcl/INTCALC.jcl:22-41` | FLOW-JINTC-001, DEF-JINTC-001 |
+| TRANREPT | CBTRN03C | JCL step | DDs `TRANFILE` = `TRANSACT.DALY(+1)`, `CARDXREF`, `TRANTYPE`, `TRANCATG`, `DATEPARM`, `TRANREPT(+1)` | `app/jcl/TRANREPT.jcl:59-80` | FLOW-JTRPT-001 |
+| procedure TRANREPT | CBTRN03C | JCL step | the same DDs as the batch member; in a job submitted by CORPT00C, `DATEPARM` is the in-stream card with the user's dates instead of the `DATEPARM` dataset (`app/cbl/CORPT00C.cbl:115-121`) | `app/proc/TRANREPT.prc:57-78` | FLOW-JTRPTP-002 |
+| TRANBKP, TRANREPT, procedure TRANREPT, PRTCATBL | REPROC | JCL step | `CNTLLIB=AWS.M2.CARDDEMO.CNTL`; overrides `PRC001.FILEIN` and `PRC001.FILEOUT` | `app/jcl/TRANBKP.jcl:23-33`, `app/jcl/TRANREPT.jcl:23-33`, `app/proc/TRANREPT.prc:21-31`, `app/jcl/PRTCATBL.jcl:29-39` | SE-JTBKP-001, SE-JTRPT-001, SE-JTRPTP-001, SE-JPCAT-002 |
+| REPROC | IDCAMS | JCL step | control card member `REPROCT`: `REPRO INFILE(FILEIN) OUTFILE(FILEOUT)` | `app/proc/REPROC.prc:21-28`, `app/ctl/REPROCT.ctl:15` | SE-JRPROC-001, VAL-JRPROC-001 |
+| READCARD | CBACT02C | JCL step | DD `CARDFILE` | `app/jcl/READCARD.jcl:22-28` | FLOW-JRCARD-001 |
+| READCUST | CBCUS01C | JCL step | DD `CUSTFILE` | `app/jcl/READCUST.jcl:21-27` | FLOW-JRCUST-001 |
+| READXREF | CBACT03C | JCL step | DD `XREFFILE` | `app/jcl/READXREF.jcl:22-28` | FLOW-JRXREF-001 |
+| TXT2PDF1 | TXT2PDF exec (not in the repository) | JCL step | `IKJEFT1B`; `INDD` = `STATEMNT.PS`; output `STATEMNT.PS.PDF` | `app/jcl/TXT2PDF1.JCL:24-40` | FLOW-JPDF-001, DEF-JPDF-001 |
+| CLOSEFIL | CICS region `CICSAWSA` | JCL step | SDSF `MODIFY` with `CEMT SET FIL(...) CLO` for `TRANSACT`, `CCXREF`, `ACCTDAT`, `CXACAIX`, `USRSEC` | `app/jcl/CLOSEFIL.jcl:22-31` | FLOW-JCLOSE-001, SE-JCLOSE-001 |
+| OPENFIL | CICS region `CICSAWSA` | JCL step | the same five files, `OPE` | `app/jcl/OPENFIL.jcl:22-31` | FLOW-JOPEN-001, SE-JOPEN-001 |
+| CARDFILE, CUSTFILE, TRANFILE | CICS region `CICSAWSA` | JCL step | in-job close and reopen: `CARDDAT` and `CARDAIX`; `CUSTDAT`; `TRANSACT` and `CXACAIX` | `app/jcl/CARDFILE.jcl:22-28, 118-124`, `app/jcl/CUSTFILE.jcl:22-27, 76-81`, `app/jcl/TRANFILE.jcl:22-28, 116-122` | SE-JCARD-001, SE-JCARD-008, SE-JCUST-001, SE-JCUST-005, SE-JTRAN-001, SE-JTRAN-008, DEF-JTRAN-004 |
+
+#### File: data handed from one job to another
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| TRANBKP | POSTTRAN | file | empty `TRANSACT.VSAM.KSDS` (POSTTRAN opens it for output) | `app/jcl/TRANBKP.jcl:51-67`, `app/cbl/CBTRN02C.cbl:256` | SE-JTBKP-004, DEF-JPOST-002 |
+| POSTTRAN | TRANBKP | file | posted transactions in `TRANSACT.VSAM.KSDS` | `app/jcl/POSTTRAN.jcl:28-29`, `app/jcl/TRANBKP.jcl:26-27` | SE-JPOST-002, SE-JTBKP-001 |
+| TRANBKP | COMBTRAN | file | ENT-TRAN-BACKUP written as `(+1)`, read as `(0)` | `app/jcl/TRANBKP.jcl:29-33`, `app/jcl/COMBTRAN.jcl:23-24` | SE-JTBKP-001, SE-JCOMB-001, DEF-JCOMB-001 |
+| COMBTRAN | CREASTMT, TRANIDX, online programs | file | reloaded `TRANSACT.VSAM.KSDS` | `app/jcl/COMBTRAN.jcl:41-48`, `app/jcl/CREASTMT.JCL:45`, `app/jcl/TRANIDX.jcl:22-55` | SE-JCOMB-002, SE-JSTMT-003, SE-JTIDX-001 |
+| TRANBKP | TRANIDX | file | the alternate index TRANBKP deletes, TRANIDX defines and builds again | `app/jcl/TRANBKP.jcl:43-44`, `app/jcl/TRANIDX.jcl:22-55` | SE-JTBKP-003, SE-JTIDX-001..003 |
+| TRANREPT, procedure TRANREPT | COMBTRAN | file | an extra ENT-TRAN-BACKUP generation that becomes `BKUP(0)` if the report runs between TRANBKP and COMBTRAN | `app/jcl/TRANREPT.jcl:29-33`, `app/proc/TRANREPT.prc:27-31`, `app/jcl/COMBTRAN.jcl:23-24` | DEF-JTRPT-002, DEF-JTRPTP-003, DEF-JCOMB-001 |
+| POSTTRAN | INTCALC | file | category balances `TCATBALF.VSAM.KSDS`, written and rewritten by CBTRN02C and read in key order by CBACT04C as the input that drives the interest calculation; accounts `ACCTDATA.VSAM.KSDS`, rewritten by both (INTCALC adds the interest to `ACCT-CURR-BAL` and sets the cycle credit and debit to zero) | `app/jcl/POSTTRAN.jcl:39-42`, `app/cbl/CBTRN02C.cbl:511, 529, 555`, `app/jcl/INTCALC.jcl:27-28, 33-34`, `app/cbl/CBACT04C.cbl:327, 351-357` | FLOW-JPOST-001, FLOW-JINTC-001 |
+| POSTTRAN | TRANREPT, procedure TRANREPT | file | the posted transactions in `TRANSACT.VSAM.KSDS`, which the report's first step unloads | `app/jcl/POSTTRAN.jcl:28-29`, `app/jcl/TRANREPT.jcl:26-27`, `app/proc/TRANREPT.prc:24-25` | SE-JPOST-002, SE-JTRPT-001, SE-JTRPTP-001 |
+| INTCALC | CREASTMT | file | `ACCTDATA.VSAM.KSDS` with the interest added, which CBSTM03A reads for the statement balances | `app/cbl/CBACT04C.cbl:351-357`, `app/jcl/CREASTMT.JCL:85` | FLOW-JINTC-001, SE-JSTMT-006 |
+| ACCTFILE, XREFFILE, TCATBALF | POSTTRAN, INTCALC | file | reloaded `ACCTDATA`, `CARDXREF` (with its AIX path, which INTCALC reads as `XREFFIL1`) and `TCATBALF` KSDS | `app/jcl/ACCTFILE.jcl:57`, `app/jcl/XREFFILE.jcl:60`, `app/jcl/TCATBALF.jcl:57`, `app/jcl/POSTTRAN.jcl:32-33, 39-42`, `app/jcl/INTCALC.jcl:27-34` | SE-JACCT-001..003, SE-JXREF-001..006, SE-JTCAT-001..003 |
+| DISCGRP | INTCALC | file | reloaded `DISCGRP.VSAM.KSDS` (interest rates by disclosure group) | `app/jcl/DISCGRP.jcl:54-62`, `app/jcl/INTCALC.jcl:35-36` | SE-JDISC-001..003, FLOW-JINTC-001 |
+| TRANTYPE, TRANCATG | TRANREPT, procedure TRANREPT | file | reloaded `TRANTYPE.VSAM.KSDS` and `TRANCATG.VSAM.KSDS` for the report descriptions | `app/jcl/TRANTYPE.jcl:56-61`, `app/jcl/TRANCATG.jcl:56-61`, `app/jcl/TRANREPT.jcl:69-72`, `app/proc/TRANREPT.prc:67-70` | SE-JTTYP-001..003, SE-JTCATG-001..003, FLOW-JTRPT-001, FLOW-JTRPTP-002 |
+| ACCTFILE, CUSTFILE, XREFFILE | CREASTMT | file | reloaded `ACCTDATA`, `CUSTDATA` and `CARDXREF` KSDS | `app/jcl/ACCTFILE.jcl:57`, `app/jcl/CUSTFILE.jcl:67`, `app/jcl/XREFFILE.jcl:60`, `app/jcl/CREASTMT.JCL:84-86` | SE-JACCT-001..003, SE-JCUST-002..004, SE-JXREF-001..006, SE-JSTMT-006 |
+| CREASTMT | TXT2PDF1 | file | `STATEMNT.PS` (80-byte statement lines) | `app/jcl/CREASTMT.JCL:87-91`, `app/jcl/TXT2PDF1.JCL:33` | SE-JSTMT-006, FLOW-JPDF-001 |
+| TRANEXTR (Db2 module) | TRANTYPE, TRANCATG | file | `TRANTYPE.PS`, `TRANCATG.PS` flat files | `app/app-transaction-type-db2/jcl/TRANEXTR.jcl:31-122`, `app/jcl/TRANTYPE.jcl:56-57`, `app/jcl/TRANCATG.jcl:56-57` | SE-JTTYP-003, SE-JTCATG-003, DEF-JCTLM-005 |
+| DEFGDGB | TRANBKP, TRANREPT, INTCALC, COMBTRAN, PRTCATBL | file | the six GDG bases they allocate `(+1)` in | `app/jcl/DEFGDGB.jcl:24-59` | SE-JGDGB-001..006 |
+| DALYREJS | POSTTRAN | file | the `DALYREJS` GDG base | `app/jcl/DALYREJS.jcl:24-28`, `app/jcl/POSTTRAN.jcl:34-38` | SE-JREJS-001, DEF-JPOST-001 |
+| DEFGDGD | TRANEXTR (Db2 module) | file | GDG bases `TRANTYPE.BKUP`, `TRANCATG.PS.BKUP` and their first generations | `app/jcl/DEFGDGD.jcl:24-66` | SE-JGDGD-001..004, DEF-JGDGD-003 |
