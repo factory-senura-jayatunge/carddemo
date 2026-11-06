@@ -81,7 +81,7 @@ need = [ -e '$(HERE)/$(1)' ] || { echo '$@: FAILED (no modernization/$(1) in thi
 # "<target>: FAILED (<reason>)".
 STUBS := load billpay test-billpay verify-batch verify-data verify-harness \
 	verify-cycle test-airflow
-.PHONY: help stubs setup toolchain build up down status logs infra-up infra-down \
+.PHONY: help stubs setup toolchain build up stop down status logs infra-up infra-down \
 	infra-wipe require-env verify-spec db-reset db-migrate smoke verify-ledger \
 	test-backend web-build test-e2e trace $(STUBS)
 
@@ -123,8 +123,11 @@ build: ## Build the service and batch jars of this checkout (Maven, tests skippe
 	cd '$(HERE)' && ./mvnw -B -q -T 1C -DskipTests package \
 	&& echo 'build: OK' || { echo 'build: FAILED (Maven, see above)' >&2; exit 1; }
 
-up: require-env ## Start the infrastructure, then every converted service and the web app, and wait until healthy
-	@$(STACK) up
+up: require-env ## Start the infrastructure, then every converted service and the web app, and wait until healthy (ONLY=name,... for some)
+	@$(STACK) up $(if $(ONLY),--only '$(ONLY)')
+
+stop: require-env ## Stop the web app and the services; the shared containers keep running
+	@$(STACK) stop
 
 down: require-env ## Stop the web app, the services and the containers (for every checkout); data volumes are kept
 	@$(STACK) down

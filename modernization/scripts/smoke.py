@@ -21,6 +21,9 @@ import time
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from with_env import main_modernization  # noqa: E402
+
 IDENTITY = "http://127.0.0.1:28081"
 BILLPAY = "http://127.0.0.1:28082"
 WEB = "http://127.0.0.1:25173"
@@ -46,8 +49,8 @@ class Client:
     def __init__(self):
         self.cookies = {}
 
-    def call(self, method, url, body=None, csrf=False):
-        headers = {"Accept": "application/json"}
+    def call(self, method, url, body=None, csrf=False, accept="application/json"):
+        headers = {"Accept": accept}
         data = None
         if body is not None:
             data = json.dumps(body).encode()
@@ -62,6 +65,8 @@ class Client:
                 status, raw, hdrs = r.status, r.read(), r.headers
         except urllib.error.HTTPError as e:
             status, raw, hdrs = e.code, e.read(), e.headers
+        except (urllib.error.URLError, OSError):
+            return 0, None
         for cookie in hdrs.get_all("Set-Cookie") or []:
             name, _, rest = cookie.partition("=")
             value = rest.split(";", 1)[0]
@@ -76,9 +81,14 @@ class Client:
         return status, payload
 
 
+def code(status):
+    return f"HTTP {status}" if status else "unreachable"
+
+
 def row_counts(db):
-    cmd = ["docker", "compose", "--project-directory", os.environ.get("CARDDEMO_INFRA_DIR", HERE),
-           "-f", os.path.join(os.environ.get("CARDDEMO_INFRA_DIR", HERE), "docker-compose.yml"),
+    infra = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
+    cmd = ["docker", "compose", "--project-directory", infra,
+           "-f", os.path.join(infra, "docker-compose.yml"),
            "--env-file", os.environ["CARDDEMO_ENV_FILE"],
            "exec", "-T", "mssql", "sh", "-c",
            'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
@@ -119,32 +129,33 @@ def main() -> int:
     c = Client()
     for name, base in (("identity health", IDENTITY), ("billpay health", BILLPAY)):
         status, body = c.call("GET", base + "/actuator/health")
-        check(name, status == 200 and (body or {}).get("status") == "UP", f"HTTP {status} {(body or {}).get('status', '')}")
+        check(name, status == 200 and (body or {}).get("status") == "UP", f"{code(status)} {(body or {}).get('status', '')}")
 
     status, body = c.call("POST", IDENTITY + "/api/auth/sign-on", {"userId": SEED_USER, "password": password})
     signed_on = check("sign-on", status == 200 and (body or {}).get("userId") == SEED_USER and "cd_at" in c.cookies,
-                      f"HTTP {status} {SEED_USER} role {(body or {}).get('role')} "
-                      f"cookies {sorted(c.cookies)}" if status == 200 else f"HTTP {status} {(body or {}).get('code', '')}")
+                      f"{code(status)} {SEED_USER} role {(body or {}).get('role')} "
+                      f"cookies {sorted(c.cookies)}" if status == 200 else f"{code(status)} {(body or {}).get('code', '')}")
     if signed_on:
         status, body = c.call("GET", IDENTITY + "/api/auth/me")
-        check("me", status == 200 and (body or {}).get("userId") == SEED_USER, f"HTTP {status}")
+        check("me", status == 200 and (body or {}).get("userId") == SEED_USER, f"{code(status)}")
         status, body = c.call("GET", IDENTITY + "/api/features")
         check("features", status == 200 and isinstance((body or {}).get("modules"), dict),
-              f"HTTP {status} converted {(body or {}).get('converted')}")
+              f"{code(status)} converted {(body or {}).get('converted')}")
         status, body = c.call("GET", f"{BILLPAY}/api/billpay/accounts/{ACCOUNT}")
         hint = " (no sample data: run make load)" if status == 404 else ""
         check("preview", status == 200 and (body or {}).get("acctId") == ACCOUNT,
-              f"HTTP {status} {ACCOUNT} payable {(body or {}).get('payable')} {(body or {}).get('code', '')}{hint}")
+              f"{code(status)} {ACCOUNT} payable {(body or {}).get('payable')} {(body or {}).get('code', '')}{hint}")
     status, body = c.call("GET", IDENTITY + "/api/auth/.well-known/jwks.json")
     keys = (body or {}).get("keys") or []
     check("jwks", status == 200 and bool(keys) and all(k.get("kty") == "RSA" for k in keys),
-          f"HTTP {status} {len(keys)} key(s)")
+          f"{code(status)} {len(keys)} key(s)")
     if os.path.exists(os.path.join(HERE, "web", "package.json")):
-        status, _ = c.call("GET", WEB + "/")
-        check("web", status == 200, f"HTTP {status} {WEB}/")
+        # Vite serves index.html only to requests that accept HTML.
+        status, _ = c.call("GET", WEB + "/", accept="text/html")
+        check("web", status == 200, f"{code(status)} {WEB}/")
     if signed_on:
         status, body = c.call("POST", IDENTITY + "/api/auth/sign-off", csrf=True)
-        check("sign-off", status == 200, f"HTTP {status}")
+        check("sign-off", status == 200, f"{code(status)}")
 
     after = row_counts(db)
     changed = sorted(t for t in set(before) | set(after)
