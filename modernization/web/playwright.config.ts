@@ -21,16 +21,23 @@ const baseURL = process.env.CARDDEMO_WEB_URL ?? `http://127.0.0.1:${port}`;
 // Workers load this file again without the command line, so the main process hands the
 // answer down in CARDDEMO_E2E_PROJECTS.
 const asked = new Set(`${process.env.E2E_BROWSERS ?? ''} ${process.env.CARDDEMO_E2E_PROJECTS ?? ''}`.split(/[\s,]+/));
+const named: string[] = [];
 process.argv.forEach((arg, i) => {
   const value = arg.startsWith('--project=') ? arg.slice('--project='.length) : arg === '--project' ? process.argv[i + 1] : undefined;
-  value?.split(',').forEach((name) => asked.add(name));
+  value?.split(',').forEach((name) => named.push(name));
 });
+named.forEach((name) => asked.add(name));
 process.env.CARDDEMO_E2E_PROJECTS = [...asked].filter(Boolean).join(' ');
 const desktop = { viewport: { width: 1280, height: 860 } };
 const others = [
   { name: 'firefox', use: { ...devices['Desktop Firefox'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
   { name: 'webkit', use: { ...devices['Desktop Safari'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
 ].filter((project) => asked.has(project.name));
+// The projects this run covers name its report, so that a run of another browser (one that fails
+// to launch, say) never replaces or joins the Chromium results. A Chromium-only run keeps the plain
+// name, which scripts/test_billpay.py checks.
+const covered = named.length > 0 ? [...new Set(named)] : ['chromium', ...others.map((project) => project.name)];
+const reportSuffix = covered.every((name) => name === 'chromium') ? '' : `-${covered.join('+')}`;
 
 export default defineConfig({
   testDir: 'e2e',
@@ -44,10 +51,11 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   grepInvert: skip,
   // The JSON report is what make trace reads (@<item ID> and @fixed/@legacy tags). One file per
-  // target and mode, outside the html folder and test-results, which each run empties.
+  // target and mode (plus the projects, when not just Chromium), outside the html folder and
+  // test-results, which each run empties.
   reporter: [
     ['list'],
-    ['json', { outputFile: `playwright-report/e2e-${target}-${mode}.json` }],
+    ['json', { outputFile: `playwright-report/e2e-${target}-${mode}${reportSuffix}.json` }],
     ['html', { open: 'never', outputFolder: 'playwright-report/html' }],
   ],
   use: {

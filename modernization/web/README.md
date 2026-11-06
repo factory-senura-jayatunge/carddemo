@@ -40,4 +40,4 @@ On a stack, `CARDDEMO_E2E_MODE=legacy` runs the legacy-mode expectations instead
 
 ## Tests
 
-Test names carry the scenario (`BILL-S5`), the spec items they cover as tags (`@DEF-BILL-014`) and, where the result depends on the fidelity mode, `@fixed` or `@legacy`. `make trace` reads them from `test-results/vitest-junit.xml` (Vitest) and `playwright-report/e2e-<target>-<mode>.json` (Playwright, one file per target and mode, so a fixed and a legacy run on the stack both count). The Playwright HTML report is in `playwright-report/html`.
+Test names carry the scenario (`BILL-S5`), the spec items they cover as tags (`@DEF-BILL-014`) and, where the result depends on the fidelity mode, `@fixed` or `@legacy`. `make trace` reads them from `test-results/vitest-junit.xml` (Vitest) and `playwright-report/e2e-<target>-<mode>.json` (Playwright on Chromium; one file per target and mode, so a fixed and a legacy run on the stack both count). Runs of other projects get their own file, such as `e2e-mock-fixed-firefox+webkit.json`, so a browser that fails to launch never touches the Chromium results. The Playwright HTML report is in `playwright-report/html`.
