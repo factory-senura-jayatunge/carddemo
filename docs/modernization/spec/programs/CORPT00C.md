@@ -500,7 +500,7 @@ sequenceDiagram
 | Q-RPTS-002 | Should the target reject a start after the end, years before 1582 and two-digit years (DEF-RPTS-001, DEF-RPTS-002)? | business |
 | Q-RPTS-003 | On the mainframe: confirm that DD `INREADER` of the CICS region is `SYSOUT=(A,INTRDR)`; what happens to records already written when a later write fails; can two tasks' writes to `JOBS` interleave; how do duplicate job names `TRNRPT00` run (DEF-RPTS-004, DEF-RPTS-005)? | mainframe team |
 | Q-RPTS-004 | Should report requests be limited to admins, or the report limited to the user's own cards (DEF-RPTS-007)? | business, security |
-| Q-RPTS-005 | `app/proc/TRANREPT.prc` begins with `//REPROC PROC` and its first step runs `PROC=REPROC`; is that the member the job's `EXEC PROC=TRANREPT` finds in `AWS.M2.CARDDEMO.PROC`, and is the nested call intended? (For the batch area, which owns the procedure.) | batch area, mainframe team |
+| Q-RPTS-005 | Closed, answered by the batch area in DEF-JTRPTP-001 (`jobs/TRANREPT-PROC.md`): the job's `EXEC PROC=TRANREPT` finds the cataloged member `TRANREPT` in `AWS.M2.CARDDEMO.PROC`; the `REPROC` label on its `PROC` statement is ignored, and the nested `EXEC PROC=REPROC` intentionally calls the separate member `app/proc/REPROC.prc`. Only the label is misleading (latent: it would break the procedure if copied in-stream). Original question: `app/proc/TRANREPT.prc` begins with `//REPROC PROC` and its first step runs `PROC=REPROC`; is that the member the job finds, and is the nested call intended? | batch area (answered) |
 
 ## 15. Equivalence contract
 

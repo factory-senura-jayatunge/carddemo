@@ -606,7 +606,7 @@ flowchart LR
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (Q-IMPT-003)
 
 #### DEF-IMPT-004 · Key position differs from the cluster definition
-- CBEXPORT.jcl defines the export cluster with `KEYS(4 28)`: length 4 at offset 28, bytes 29-32. The program's record key is at offset 27, bytes 28-31, the position of `EXPORT-SEQUENCE-NUM` (`:79-83`). Locally the indexed file is defined from the program, so the two agree. On z/OS the key position in the program does not match the catalog, which for a VSAM file is expected to make the OPEN fail with status `39` (ERR-IMPT-001) in CBEXPORT and CBIMPORT. If the OPEN did succeed, the cluster would order records by bytes 29-32 (3 bytes of the sequence number and the first byte of the branch ID).
+- CBEXPORT.jcl defines the export cluster with `KEYS(4 28)`: length 4 at offset 28, bytes 29-32. The program's record key is at offset 27, bytes 28-31, the position of `EXPORT-SEQUENCE-NUM` (`:79-83`). Locally the indexed file is defined from the program, so the two agree. On z/OS the key position in the program does not match the catalog, which for a VSAM file is expected to make the OPEN fail with a file-status error (most likely `39`, attributes that conflict with the catalog; platform-inferred) (ERR-IMPT-001) in CBEXPORT and CBIMPORT. If the OPEN did succeed, the cluster would order records by bytes 29-32 (3 bytes of the sequence number and the first byte of the branch ID).
 - **Source:** `:37-41, 81-84`, `app/jcl/CBEXPORT.jcl:30-33`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (Q-IMPT-003)
 
@@ -656,7 +656,7 @@ flowchart LR
 | :-- | :-- | :-- |
 | Q-IMPT-001 | What should the import validate (checksums, record counts against the export, referential integrity, numeric validity)? Should `No validation errors detected` reflect the outcome? | business |
 | Q-IMPT-002 | Should unknown record types or failed error writes end the job with a non-zero return code (for example 4)? Today the run always ends with 0. | operations |
-| Q-IMPT-003 | On z/OS: does the export cluster's `KEYS(4 28)` make the OPEN fail (status 39) against the program's key at offset 27? What does `CEE3ABD` do when called with no arguments? Does opening a defined but never loaded export cluster fail? The modernized system does not depend on the answer (VSAM key offsets and z/OS control blocks do not carry over). Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
+| Q-IMPT-003 | On z/OS: does the export cluster's `KEYS(4 28)` make the OPEN fail (with which file status; `39` expected) against the program's key at offset 27? What does `CEE3ABD` do when called with no arguments? Does opening a defined but never loaded export cluster fail? The modernized system does not depend on the answer (VSAM key offsets and z/OS control blocks do not carry over). Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
 | Q-IMPT-004 | Nothing loads the `*.IMPORT` datasets into VSAM. In the target, should the import write directly into the operational stores, and how should it handle records that already exist? | architecture |
 
 ## 15. Equivalence contract

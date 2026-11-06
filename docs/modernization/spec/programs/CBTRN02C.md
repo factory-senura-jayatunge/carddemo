@@ -13,7 +13,7 @@ sources:
   - {path: app/cpy/CVACT03Y.cpy, sha256: ffc6079e09b2, role: record}
   - {path: app/cpy/CVACT01Y.cpy, sha256: 81a08bad15af, role: record}
   - {path: app/cpy/CVTRA01Y.cpy, sha256: 50637f13692c, role: record}
-entry_points: [{type: jcl-step, job: POSTTRAN, step: STEP15}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "70-78"}]
+entry_points: [{type: jcl-step, job: POSTTRAN, step: STEP15}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "69-70"}]
 mapsets: []
 copybooks: [CVTRA06Y, CVTRA05Y, CVACT03Y, CVACT01Y, CVTRA01Y]
 data_stores:
@@ -22,7 +22,7 @@ data_stores:
   - {dd: ACCTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, entity: ENT-ACCOUNT, access: [read-random, rewrite]}
   - {dd: TCATBALF, dataset: AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS, entity: ENT-TCAT-BAL, access: [read-random, write, rewrite]}
   - {dd: TRANFILE, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [open-output, write]}
-  - {dd: DALYREJS, dataset: "AWS.M2.CARDDEMO.DALYREJS(+1)", entity: ENT-DAILY-REJECT, access: [write-sequential]}
+  - {dd: DALYREJS, dataset: "AWS.M2.CARDDEMO.DALYREJS(+1)", entity: ENT-DAILY-REJECT, access: [create, write-sequential]}
 calls: [CEE3ABD]
 transfers_to: []
 invoked_by: [POSTTRAN.jcl]
@@ -53,7 +53,7 @@ The nightly posting job reads the day's card transactions one by one. For each i
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `POSTTRAN`, step `STEP15` (`app/jcl/POSTTRAN.jcl:23-42`), scheduled daily in CA-7 (`app/scheduler/CardDemo.ca7:70-78`). It is step 3 of the batch cycle, after CLOSEFIL has closed the CICS files and before INTCALC (`docs/runbooks/batch-cycle-restart.md:9-24`).
+- **Trigger:** JCL job `POSTTRAN`, step `STEP15` (`app/jcl/POSTTRAN.jcl:23-42`), triggered in CA-7 by the completion of CBPAUP0J under schedule ID 030 (`app/scheduler/CardDemo.ca7:69-70`); the listing shows no calendar, so nothing in the repository schedules it daily (SCHED-CA7 DEF-JCA7-001, DEF-JCA7-007). It is step 3 of the batch cycle, after CLOSEFIL has closed the CICS files and before INTCALC (`docs/runbooks/batch-cycle-restart.md:9-24`).
 - **Preconditions:** the online files are closed in CICS; `TRANSACT` is empty (it is opened for output; on the mainframe the cluster is defined without `REUSE`, so a non-empty file makes the open fail; `docs/runbooks/batch-cycle-restart.md:34-35`); the `DALYREJS` generation data group exists.
 - **No parameters**, no control cards. The only external input besides files is the system clock (NUM-POST-007).
 

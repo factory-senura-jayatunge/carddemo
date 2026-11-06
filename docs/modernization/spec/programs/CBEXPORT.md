@@ -325,7 +325,7 @@ There is no commit or rollback. Each export record is permanent in the KSDS as s
 | 5 | CARDFILE | `ERROR: Cannot open CARD-INPUT, Status: ` | `:233-238` |
 | 6 | EXPFILE | `ERROR: Cannot open EXPORT-OUTPUT, Status: ` | `:240-245` |
 
-- Observed locally: a missing input dataset gives status `35` (for example `ERROR: Cannot open CARD-INPUT, Status: 35`, with the four earlier inputs implicitly closed), an export path in a directory that does not exist gives `ERROR: Cannot open EXPORT-OUTPUT, Status: 30`. With the JCL as written, the export open is expected to fail on z/OS with status `39` (DEF-EXPT-002).
+- Observed locally: a missing input dataset gives status `35` (for example `ERROR: Cannot open CARD-INPUT, Status: 35`, with the four earlier inputs implicitly closed), an export path in a directory that does not exist gives `ERROR: Cannot open EXPORT-OUTPUT, Status: 30`. With the JCL as written, the export open is expected to fail on z/OS with a file-status error (most likely `39`, attributes that conflict with the catalog; platform-inferred) (DEF-EXPT-002).
 - **Source:** `:203-245`
 - **Fidelity:** must-preserve (stop before any record is written); message text incidental · **Confidence:** runtime-verified (`tests/integration/test_abends.py:32-38`, and local runs with CUSTFILE missing, CARDFILE missing and an unwritable EXPFILE)
 
@@ -452,7 +452,7 @@ flowchart LR
 - **Status:** fixed in this branch, "batch: put the export file RECORD KEY inside its record" (`CHANGELOG.md:53`, commit 6076eff, squashed into b5e0139).
 
 #### DEF-EXPT-002 · IDCAMS key position differs from the program
-- `STEP01` defines the cluster with `KEYS(4 28)`: length 4 at offset 28 (bytes 29-32). The program, the local build and the mainframe sample file all put the key at offset 27 (bytes 28-31). On z/OS the open of a KSDS whose key position differs from the program's declaration fails (file status `39`), so the job as written would end with `ERROR: Cannot open EXPORT-OUTPUT, Status: 39` and an abend, before any record is written. `RECORDSIZE(500 500)` matches the 500-byte record.
+- `STEP01` defines the cluster with `KEYS(4 28)`: length 4 at offset 28 (bytes 29-32). The program, the local build and the mainframe sample file all put the key at offset 27 (bytes 28-31). On z/OS the open of a KSDS whose key position differs from the program's declaration is expected to fail with a file-status error (most likely `39`, attributes that conflict with the catalog; platform-inferred), so the job as written would end with `ERROR: Cannot open EXPORT-OUTPUT, Status: ` followed by that status, and an abend, before any record is written. `RECORDSIZE(500 500)` matches the 500-byte record.
 - **Source:** `app/jcl/CBEXPORT.jcl:32-33`, `:65-69, 94-97`, `tools/batch-programs.toml:255-258`
 - **Status:** open · **Confidence:** platform-inferred (Q-EXPT-002) · **Fidelity:** defect-decide
 
@@ -520,7 +520,7 @@ flowchart LR
 | ID | Question | For |
 | :-- | :-- | :-- |
 | Q-EXPT-001 | Which program version produced the mainframe sample export (26-character timestamp `.000000`, sequence gap 451-459, 300 transactions)? Is that timestamp the intended format, so that the 4 undefined bytes and the dropped fraction (DEF-EXPT-003) should be fixed? | mainframe team |
-| Q-EXPT-002 | Confirm that the JCL as written fails the export open with status 39 (DEF-EXPT-002), and whether the fix is `KEYS(4 27)` in the JCL. CBIMPORT reads the same cluster. The modernized system does not depend on the answer (VSAM key offsets and z/OS control blocks do not carry over). Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
+| Q-EXPT-002 | Confirm that the JCL as written fails the export open, and with which file status (`39` expected; DEF-EXPT-002), and whether the fix is `KEYS(4 27)` in the JCL. CBIMPORT reads the same cluster. The modernized system does not depend on the answer (VSAM key offsets and z/OS control blocks do not carry over). Evidence: `docs/modernization/spec/evidence/d2-batch-utilities-review.md` sections 3 and 5. | mainframe team |
 | Q-EXPT-003 | Should a migration export carry the SSN, government ID, date of birth, EFT account, full card number and CVV at all, and if so encrypted or tokenised? | business, security |
 | Q-EXPT-004 | What do branch `0001` and region `NORTH` mean for the target? Should the export be selected or grouped by branch or by customer? | business |
 | Q-EXPT-005 | Must the export run with the CICS files closed, to get a consistent snapshot? | operations |
