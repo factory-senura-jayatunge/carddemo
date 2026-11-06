@@ -3,7 +3,8 @@
 
 Copies the example when .env is missing, adds keys that the example has and
 .env lacks, and fills every empty *_PASSWORD / *_PASS value with a random
-password. Existing values are never changed, and no value is printed.
+password (CARDDEMO_SEED_USER_PASSWORD: 8 upper-case letters and digits).
+Existing values are never changed, and no value is printed.
 
 Usage: init_env.py EXAMPLE ENV
 """
@@ -27,6 +28,19 @@ def password(length: int = 32) -> str:
         if (any(c.isupper() for c in value) and any(c.islower() for c in value)
                 and any(c.isdigit() for c in value)):
             return value
+
+
+def seed_password() -> str:
+    # 8 upper-case letters and digits: fits the 8-character legacy password
+    # field, survives legacy upper-casing, and meets the fixed-mode minimum.
+    alphabet = string.ascii_uppercase + string.digits
+    while True:
+        value = "".join(secrets.choice(alphabet) for _ in range(8))
+        if any(c.isalpha() for c in value) and any(c.isdigit() for c in value):
+            return value
+
+
+GENERATORS = {"CARDDEMO_SEED_USER_PASSWORD": seed_password}
 
 
 def main(argv: list) -> int:
@@ -56,7 +70,7 @@ def main(argv: list) -> int:
     for i, line in enumerate(lines):
         m = KEY_RE.match(line)
         if m and SECRET_RE.search(m.group(1)) and not m.group(2).strip():
-            lines[i] = f"{m.group(1)}={password()}"
+            lines[i] = f"{m.group(1)}={GENERATORS.get(m.group(1), password)()}"
             filled.append(m.group(1))
 
     old_umask = os.umask(0o077)
