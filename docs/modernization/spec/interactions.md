@@ -1,6 +1,6 @@
 # CardDemo interaction view
 
-Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
+Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
 
 ## Online navigation (core)
 
@@ -52,7 +52,43 @@ flowchart TB
     BIL -. "R by account" .-> XREF
 ```
 
-Every program in the diagram transfers to `COSGN00C` when it starts without a commarea. The account and card programs and the Db2 transaction type programs instead set the user type themselves and carry on, which reaches a menu without a sign-on (INV-006).
+Every other program in the diagram transfers to `COSGN00C` when it starts without a commarea. The account and card programs instead treat that start as a first run with a blank user ID, and their PF3 then opens the main menu; the Db2 transaction type programs set the user type `A` and carry on, and their PF3 opens the admin menu. Both reach a menu without a sign-on (INV-006).
+
+## Online navigation (accounts and cards, area b)
+
+```mermaid
+flowchart LR
+    subgraph Online["CICS region: accounts and cards"]
+        MEN[COMEN01C<br/>CM00 main menu]
+        AVW[COACTVWC<br/>CAVW account view]
+        AUP[COACTUPC<br/>CAUP account update]
+        CLI[COCRDLIC<br/>CCLI card list]
+        CSL[COCRDSLC<br/>CCDL card view]
+        CUP[COCRDUPC<br/>CCUP card update]
+        MEN -- "options 1-5, XCTL" --> AVW & AUP & CLI & CSL & CUP
+        AVW & AUP & CLI -- "PF3, XCTL" --> MEN
+        CLI -- "S, XCTL" --> CSL
+        CLI -- "U, XCTL" --> CUP
+        CSL & CUP -- "PF3 (card update also after a save from the list), XCTL to caller" --> CLI
+        CSL & CUP -- "PF3, XCTL to caller" --> MEN
+        AUP -- "CALL date check" --> DTC[CSUTLDTC]
+    end
+    CARD[(CARDDATA<br/>CARDDAT)]
+    XREF[(CARDXREF<br/>CXACAIX)]
+    ACCT[(ACCTDATA<br/>ACCTDAT)]
+    CUST[(CUSTDATA<br/>CUSTDAT)]
+    AVW -. "R by account" .-> XREF
+    AVW -. R .-> ACCT
+    AVW -. R .-> CUST
+    CLI -. B .-> CARD
+    CSL -. "R by card" .-> CARD
+    CUP -. "R, RU, U" .-> CARD
+    AUP -. "R by account" .-> XREF
+    AUP -. "R, RU, U" .-> ACCT
+    AUP -. "R, RU, U" .-> CUST
+```
+
+Each program also returns to itself with RETURN TRANSID and a 2000-byte area; only the 160-byte base commarea crosses an XCTL (INV-026). Each can be started from a terminal without a sign-on (INV-006).
 
 ## Batch cycle (core)
 
@@ -166,7 +202,7 @@ flowchart LR
 
 ## Edges
 
-Merged from the area proposals. Where two areas proposed the same edge, the table keeps one row: the main menu's transfers to the transaction programs are in A's row for options 1-10, the admin menu's transfers to the transaction type programs are in A's row for options 5 and 6, the report request's job submission is in C's rows, and the CA-7 reader chain and the CBACT01C call to COBDATFT are in D1's rows.
+Merged from the area proposals. Where two areas proposed the same edge, the table keeps one row: the main menu's transfers to the transaction programs are in A's row for options 1-10, the admin menu's transfers to the transaction type programs are in A's row for options 5 and 6, the main menu's transfers to the account and card programs are in A's row for options 1-10, account update's call to the date check is in C's rows, the report request's job submission is in C's rows, and the CA-7 reader chain and the CBACT01C call to COBDATFT are in D1's rows.
 ### Sign-on and administration (area a)
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
@@ -198,6 +234,39 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | COMEN01C, COADM01C | COSGN00C | XCTL | none, when started without a commarea | `app/cbl/COMEN01C.cbl:82-84`; `app/cbl/COADM01C.cbl:86-88` | FLOW-MENU-001, FLOW-ADMN-001 |
 | CLOSEFIL / OPENFIL jobs | USRSEC | file (CEMT close/open) | none; sign-on and user administration fail while closed | `app/jcl/CLOSEFIL.jcl:30`; `app/jcl/OPENFIL.jcl:30` | ERR-SGN-001 |
 
+### Accounts and cards (area b)
+
+"Terminal" means the transaction code typed at a terminal with no commarea; none of these programs checks for a signed-on user in that case (INV-006).
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| terminal | COACTVWC | START | transaction `CAVW`, no commarea | `app/csd/CARDDEMO.CSD:317-326`, `app/cbl/COACTVWC.cbl:282-286` | FLOW-ACVW-002, DEF-ACVW-009 |
+| COACTVWC | COACTVWC | RETURN TRANSID | `CAVW`, 2000-byte area (base, 12-byte extension, spaces), context 1 | `app/cbl/COACTVWC.cbl:394-407` | FLOW-ACVW-008 |
+| COACTVWC | `CDEMO-FROM-PROGRAM` (normally COMEN01C; COMEN01C when blank) | XCTL | 160-byte commarea, from `CAVW`/`COACTVWC`, context 0, user type `U`, account, customer and card of the last lookup | `app/cbl/COACTVWC.cbl:324-352` | FLOW-ACVW-005, BR-ACVW-005 |
+| COACTVWC | CXACAIX | file | READ by account number (11) | `app/cbl/COACTVWC.cbl:727-735` | SE-ACVW-001 |
+| COACTVWC | ACCTDAT | file | READ by account number (11) | `app/cbl/COACTVWC.cbl:776-784` | SE-ACVW-002 |
+| COACTVWC | CUSTDAT | file | READ by customer number (9) from the cross-reference record | `app/cbl/COACTVWC.cbl:826-834` | SE-ACVW-003 |
+| terminal | COCRDLIC | START | transaction `CCLI`, no commarea | `app/csd/CARDDEMO.CSD:357-366`, `app/cbl/COCRDLIC.cbl:315-325` | FLOW-CRDL-001, DEF-CRDL-003 |
+| COCRDLIC | COCRDLIC | RETURN TRANSID | `CCLI`, 2000-byte area (base, 254-byte list extension, spaces) | `app/cbl/COCRDLIC.cbl:604-619` | FLOW-CRDL-012 |
+| COCRDLIC | COMEN01C | XCTL | PF3: 160-byte commarea, from `CCLI`/`COCRDLIC`, user type `U`, context 0, last filter values in `CDEMO-ACCT-ID`/`CDEMO-CARD-NUM` | `app/cbl/COCRDLIC.cbl:384-405` | FLOW-CRDL-007 |
+| COCRDLIC | COCRDSLC | XCTL | `S` and Enter: 160-byte commarea with account and card of the selected row, from `CCLI`/`COCRDLIC`, last map `CCRDLIA`/`COCRDLI`, user type `U`, context 0 (INV-027) | `app/cbl/COCRDLIC.cbl:517-541` | FLOW-CRDL-009, FLOW-CRDV-005, BR-CRDV-003 |
+| COCRDLIC | COCRDUPC | XCTL | `U` and Enter: the same data as for COCRDSLC | `app/cbl/COCRDLIC.cbl:545-569` | FLOW-CRDL-010, FLOW-CRDU-005 |
+| COCRDLIC | CARDDAT | file | STARTBR GTEQ, READNEXT and READPREV by card number (16) | `app/cbl/COCRDLIC.cbl:1129-1136` | SE-CRDL-001, SE-CRDL-002 |
+| terminal | COCRDSLC | START | transaction `CCDL`, no commarea | `app/csd/CARDDEMO.CSD:347-356`, `app/cbl/COCRDSLC.cbl:268-272` | FLOW-CRDV-006, DEF-CRDV-002 |
+| COCRDSLC | COCRDSLC | RETURN TRANSID | `CCDL`, 2000-byte area (base, 12-byte extension, spaces) | `app/cbl/COCRDSLC.cbl:394-406` | FLOW-CRDV-008 |
+| COCRDSLC | `CDEMO-FROM-PROGRAM` (COCRDLIC or COMEN01C; COMEN01C when blank) | XCTL | PF3: 160-byte commarea, from `CCDL`/`COCRDSLC`, context 0, user type `U`, last map `CCRDSLA`/`COCRDSL`; the card list, seeing PF3, clears the whole commarea | `app/cbl/COCRDSLC.cbl:305-334`, `app/cbl/COCRDLIC.cbl:458-482` | FLOW-CRDV-004, FLOW-CRDL-008 |
+| COCRDSLC | CARDDAT | file | READ by card number (16) | `app/cbl/COCRDSLC.cbl:740-750` | SE-CRDV-001 |
+| terminal | COCRDUPC | START | transaction `CCUP`, no commarea | `app/csd/CARDDEMO.CSD:367-376` | FLOW-CRDU-001, DEF-CRDU-006 |
+| COCRDUPC | COCRDUPC | RETURN TRANSID | `CCUP`, 2000-byte area (base, 329-byte extension, spaces) | `app/cbl/COCRDUPC.cbl:546-558` | FLOW-CRDU-019 |
+| COCRDUPC | `CDEMO-FROM-PROGRAM` (COCRDLIC or COMEN01C; COMEN01C when blank) | XCTL | after SYNCPOINT, on PF3 or at the end of a list-path save: 160-byte commarea, from `CCUP`/`COCRDUPC`, user type `U`, context 0, account and card zeroed when returning to the list | `app/cbl/COCRDUPC.cbl:435-476` | FLOW-CRDU-004, SE-CRDU-004, FLOW-CRDL-008, FLOW-CRDL-011 |
+| COCRDUPC | CARDDAT | file | READ by card number (16); READ UPDATE by card number; REWRITE of the whole 150-byte record | `app/cbl/COCRDUPC.cbl:1380-1390`, `app/cbl/COCRDUPC.cbl:1425-1436`, `app/cbl/COCRDUPC.cbl:1477-1480` | SE-CRDU-001, SE-CRDU-002, SE-CRDU-003 |
+| terminal | COACTUPC | START | transaction `CAUP`, no commarea | `app/csd/CARDDEMO.CSD:306-316`, `app/cbl/COACTUPC.cbl:880-886` | FLOW-ACUP-006, DEF-ACUP-001 |
+| COACTUPC | COACTUPC | RETURN TRANSID | `CAUP`, 2000-byte area (base, 873-byte extension, spaces) | `app/cbl/COACTUPC.cbl:1007-1020` | FLOW-ACUP-011 |
+| COACTUPC | `CDEMO-FROM-PROGRAM` (in practice COMEN01C; COMEN01C when blank) | XCTL | PF3, after SYNCPOINT: 160-byte commarea, from `CAUP`/`COACTUPC`, user type `U`, context 0 | `app/cbl/COACTUPC.cbl:927-959` | FLOW-ACUP-005, SE-ACUP-008, DEF-ACUP-009 |
+| COACTUPC | CXACAIX | file | READ by account number (11) | `app/cbl/COACTUPC.cbl:3654-3662` | SE-ACUP-001 |
+| COACTUPC | ACCTDAT | file | READ by account number; READ UPDATE by account number; REWRITE of the 300-byte record from `ACCT-UPDATE-RECORD` (INV-039) | `app/cbl/COACTUPC.cbl:3703-3711`, `app/cbl/COACTUPC.cbl:3894-3903`, `app/cbl/COACTUPC.cbl:4065-4071` | SE-ACUP-002, SE-ACUP-004, SE-ACUP-006 |
+| COACTUPC | CUSTDAT | file | READ by customer number (9) from the cross-reference record; READ UPDATE by `CDEMO-CUST-ID`; REWRITE of the 500-byte record from `CUST-UPDATE-RECORD` | `app/cbl/COACTUPC.cbl:3753-3761`, `app/cbl/COACTUPC.cbl:3921-3930`, `app/cbl/COACTUPC.cbl:4085-4091` | SE-ACUP-003, SE-ACUP-005, SE-ACUP-007 |
+
 ### Transactions (area c)
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
@@ -220,7 +289,7 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | CORPT00C | CSUTLDTC | CALL | date (10), picture `YYYY-MM-DD` (10), result (80) | `app/cbl/CORPT00C.cbl:388-426` | VAL-RPTS-004 |
 | CORPT00C | JES internal reader | TDQ | 17 records of 80 bytes (ENT-REPORT-JOB) to queue `JOBS` | `app/cbl/CORPT00C.cbl:496-523`; `app/csd/CARDDEMO.CSD:499-505` | SE-RPTS-001 |
 | JES (job `TRNRPT00`) | procedure TRANREPT | JCL step | `STEP10 EXEC PROC=TRANREPT` with `SYMNAMES` and `DATEPARM` overrides holding the date range | `app/cbl/CORPT00C.cbl:93-125`; `app/proc/TRANREPT.prc:35-72` | BR-RPTS-006 |
-| COACTUPC | CSUTLDTC | CALL | date (8), picture `YYYYMMDD` (8), result (80) | `app/cpy/CSUTLDPY.cpy:284-321` | FLOW-DTCK-002, DEF-DTCK-003 |
+| COACTUPC | CSUTLDTC | CALL | static call by reference through `CSUTLDPY`: date (8), picture `YYYYMMDD` (8), both declared 10 by CSUTLDTC (INV-040), result (80) of which COACTUPC uses the severity (bytes 1-4) and message number (bytes 16-19) | `app/cpy/CSUTLDPY.cpy:284-321`; `app/cpy/CSUTLDWY.cpy:4-85`; `app/cbl/CSUTLDTC.cbl:83-124` | FLOW-DTCK-002, DEF-DTCK-003, VAL-ACUP-009, DEF-ACUP-105 |
 | CSUTLDTC | CEEDAYS (LE) | CALL | varying date, varying picture, Lilian day, feedback code | `app/cbl/CSUTLDTC.cbl:116-120` | BR-DTCK-002 |
 
 ### Core batch (area d1)
