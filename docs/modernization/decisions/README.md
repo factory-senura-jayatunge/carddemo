@@ -26,7 +26,7 @@ How to use it: read the short list, answer each decision with an option number (
 | 16 | [D-27](#d-27) Transactions added online are never posted | Should a transaction added online change the account balance, and through which path? | Feed the posting input; it keeps one posting path and one set of rules. | high |
 | 17 | [D-28](#d-28) Payments update cycle totals and category balances | Should an online payment update the cycle credit total and category balance like posting does, and with which sign? | Fix through the same posting service as D-27, after checking the effect on interest results; payments should count toward interest and statements. | high |
 | 18 | [D-29](#d-29) Payment errors leave partial updates | Should a payment be all-or-nothing and stop at the first error? | Fix, unless operations name a reconciliation that relies on the partial updates. | high |
-| 19 | [D-37](#d-37) Which batch cycle the scheduler runs | Which batch cycle do the Airflow DAGs implement (options A-F of `jobs/README.md` on nl/G)? | Option F; it is the only order consistent with every data hand-off. It needs D-24, D-38, D-39 and D-40. | high |
+| 19 | [D-37](#d-37) Which batch cycle the scheduler runs | Which batch cycle do the Airflow DAGs implement (options A-F of the decision table in `jobs/README.md`)? | Option F; it is the only order consistent with every data hand-off. With monthly interest (D-24) the daily cycle must skip COMBTRAN. It needs D-24, D-38, D-39 and D-40. | high |
 | 20 | [D-41](#d-41) Demo reloads of master data in production | May production run the delete-and-reload jobs that replace accounts, cards, customers, cross-references and category balances with the shipped sample data? | Seed-only; a production reload destroys customer data. | high |
 | 21 | [D-43](#d-43) What a statement covers | Is a statement per account or per card, which period does it cover, and what must it show? | Fix; the as-is output is not a usable billing statement. Keep a parity mode only for the migration check. | high |
 | 22 | [D-49](#d-49) Validate only changed fields on account update | Should account update validate only the fields the user changed, or every field (with migrated data cleaned first)? | Validate changed fields only; otherwise the screen does not work on real data. | high |
@@ -43,7 +43,7 @@ How to use it: read the short list, answer each decision with an option number (
 | of which `DEF` items (defect-decide or `[security]`) | 380 |
 | of which other items marked defect-decide (`BR`, `VAL`, `FLOW`, `SE`, `ERR`, `NUM`) | 138 |
 | Items marked defect-decide / tagged `[security]` (overlapping) | 502 / 88 |
-| From branch `modernization` / from branch `nl/G` (job and schedule specs) | 617 / 208 |
+| From program specs / job and schedule specs / other spec files | 576 / 247 / 2 |
 | (a) product or business decision | 460 |
 | (b) security decision | 150 |
 | (c) mainframe-only or platform question, no decision needed | 214 |
@@ -262,7 +262,7 @@ How to use it: read the short list, answer each decision with an option number (
 **Sensitive data in reports, logs and files** · priority high · 32 items (32 security)
 
 - **Question:** What may batch reports, job logs, extracts and export files contain?
-- **As-is:** Reader jobs print every card with full number and CVV, every customer with SSN (DEF-CDRD-001, DEF-CURD-001, DEF-XRRD-001, DEF-JRCARD-001); posting and validation log card numbers (DEF-POST-011, DEF-TVAL-002); the transaction report prints full card numbers (DEF-TRPT-006, DEF-JTRPT-004); statements show the FICO score (DEF-STMT-008); export and import files hold everything in clear (DEF-EXPT-009, DEF-IMPT-008, DEF-JEXPT-002); the purge logs account numbers (DEF-AUPG-008); backup generations are kept beyond policy (DEF-JGDGB-002).
+- **As-is:** Reader jobs print every card with full number and CVV, every customer with SSN (DEF-CDRD-001, DEF-CURD-001, DEF-XRRD-001, DEF-JRCARD-001); posting and validation log card numbers (DEF-POST-011, DEF-TVAL-002); the transaction report prints full card numbers (DEF-TRPT-006, DEF-JTRPT-004); statements show the FICO score (DEF-STMT-008); export and import files hold everything in clear (DEF-EXPT-009, DEF-IMPT-008, DEF-JEXPT-002); the purge logs account numbers (DEF-AUPG-008); 71 and 25 rolled-off backup generations with card numbers stay cataloged beyond the five the job defines (DEF-JGDGB-002); the statement PDF is never deleted (DEF-JPDF-003).
 - **Options:**
   1. Keep.
   2. Fix: card numbers masked to the last 4 in every report and log; never output CVV, SSN or government ID; drop full-record dumps; encrypt export files and backups; remove the FICO score from statements.
@@ -632,14 +632,14 @@ How to use it: read the short list, answer each decision with an option number (
 
 **Which batch cycle the scheduler runs** · priority high · 13 items
 
-- **Question:** Which batch cycle do the Airflow DAGs implement (options A-F of `jobs/README.md` on nl/G)?
-- **As-is:** Seven sources describe the cycle and no two agree; CA-7 has no interest cycle and loops (DEF-JCA7-005), Control-M has no posting and empties the transaction master daily (DEF-JCTLM-001); posting needs `TRANSACT` empty (DEF-JPOST-002, INV-003); WAITSTEP is a fixed pause instead of a check (Q-WAIT-002). Options: A README with demo reloads, B runbook, C split posting/interest scripts, D CA-7, E Control-M, F derived from the data dependencies (Q-JCA7-001, Q-JCTLM-001).
+- **Question:** Which batch cycle do the Airflow DAGs implement (options A-F of the decision table in `jobs/README.md`)?
+- **As-is:** The repository describes the cycle seven times (README table, restart runbook, three demo scripts, CA-7, Control-M) and no two agree. CA-7 has no interest, backup or combine (DEF-JCA7-005); under schedule ID 030 one CLOSEFIL starts the purge and posting, the readers and the statements in parallel, and every WAITSTEP closes the files again and restarts the round (DEF-JCA7-002, DEF-JCA7-006); the category reloads and the balance listing run only under schedule IDs 031 and 032, which loop without end (DEF-JCA7-008); what starts a run is not in the listing (DEF-JCA7-001). Control-M has no posting and empties the transaction master daily (DEF-JCTLM-001); posting needs `TRANSACT` empty (DEF-JPOST-002, INV-003); WAITSTEP is a fixed pause instead of a check (Q-WAIT-002). Options: A README with demo reloads, B runbook, C split posting/interest scripts, D CA-7, E Control-M, F derived from the data dependencies (Q-JCA7-001, Q-JCTLM-001). COMBTRAN picks its inputs by relative generation, so on a cycle without INTCALC it merges the previous cycle's interest again unless it is skipped (PINV-g-jobs-ops-03).
 - **Options:**
   1. A: README (resets all data each cycle; demo only).
   2. C: split daily posting and periodic interest.
-  3. F: CLOSE, reset, POSTTRAN, INTCALC at the chosen frequency, backup, COMBTRAN, statements, OPEN; reloads and reports on demand; completion checks replace WAITSTEP.
+  3. F: CLOSE, reset, POSTTRAN, INTCALC at the chosen frequency, backup, COMBTRAN, statements, OPEN; reloads and reports on demand; completion checks replace WAITSTEP; on a cycle without INTCALC, COMBTRAN is skipped or gets an empty interest generation.
   4. B, D, E are not runnable repeatedly as written.
-- **Recommendation:** Option F; it is the only order consistent with every data hand-off. It needs D-24, D-38, D-39 and D-40.
+- **Recommendation:** Option F; it is the only order consistent with every data hand-off. With monthly interest (D-24) the daily cycle must skip COMBTRAN. It needs D-24, D-38, D-39 and D-40.
 - **Affects:** All Airflow DAGs, Spring Batch job boundaries.
 - **Items:** DEF-JCA7-005, Q-JCA7-001, DEF-JCOMB-002, DEF-JCTLM-001, DEF-JCTLM-006, Q-JCTLM-001, Q-JCTLM-004, DEF-JPOST-002, DEF-JRACCT-005, DEF-WAIT-001, NUM-WAIT-001, Q-WAIT-001, Q-WAIT-002
 
@@ -662,7 +662,7 @@ How to use it: read the short list, answer each decision with an option number (
 **Where the authorization purge runs** · priority medium · 3 items
 
 - **Question:** Does the authorization purge run before posting (CA-7) or after the cycle (README), and may it run beside online work?
-- **As-is:** CA-7 starts posting only after the optional module's purge (DEF-JCA7-007); README and runbook put it after the cycle (Q-JCA7-003); IMS has no batch window for it (Q-JAUPG-002, INV-049).
+- **As-is:** CA-7 starts posting only after the optional module's purge, and because the purge reports errors with return code 16 instead of an abend, a failed purge may still trigger posting (DEF-JCA7-007); README and runbook put it after the cycle (Q-JCA7-003); IMS has no batch window for it (Q-JAUPG-002, INV-049).
 - **Options:**
   1. Before posting (CA-7).
   2. After the cycle, as its own task (README).
@@ -937,7 +937,7 @@ How to use it: read the short list, answer each decision with an option number (
 **Transaction ID scheme** · priority high · 11 items
 
 - **Question:** How are transaction IDs generated, and does the key stay the 16-character text ID?
-- **As-is:** Online add and bill payment take 'highest ID + 1' with nothing reserving it; posting takes IDs from the daily file; interest builds IDs from an unchecked run parameter, so two runs can collide (INV-001, DEF-TRNA-003, DEF-INTC-010, DEF-JINTC-001). A binary-zero seed record exists so 'highest + 1' works on an empty file (DEF-JTRAN-005). Q-ENT-002 asks about a numeric surrogate key.
+- **As-is:** Online add and bill payment take 'highest ID + 1' with nothing reserving it; posting takes IDs from the daily file; interest builds IDs from an unchecked run parameter, so two runs with the same parameter give the same IDs, which collide across cycles or in a store that keeps earlier cycles (INV-001, DEF-TRNA-003, DEF-INTC-010, DEF-JINTC-001). A binary-zero seed record exists so 'highest + 1' works on an empty file (DEF-JTRAN-005). Q-ENT-002 asks about a numeric surrogate key.
 - **Options:**
   1. Keep 'highest + 1' and the text key.
   2. One database sequence shared by all writers, keeping the 16-digit format; no seed record.
@@ -1216,10 +1216,10 @@ How to use it: read the short list, answer each decision with an option number (
 | DEF-IMPT-002 | `programs/CBIMPORT.md` | The import counts an error record as written even when the write failed, so its error count always equals the unknown-type count. |
 | DEF-JCRDB-002 | `jobs/CREADB21.md` | On a new installation the setup job loads the transaction types but skips the categories because of its step conditions. |
 | Q-JCRDB-001 | `jobs/CREADB21.md` | Whether categories should be loaded on a new installation and the setup made rerunnable; as-is they are skipped and a rerun fails on duplicates. |
-| ERR-JIMPT-002 | `jobs/CBIMPORT-JOB.md (nl/G)` | Fix the import so a failed error-file write fails or flags the run and the end message reflects the real error count; as-is it continues and always says no validation errors. |
-| DEF-JPCAT-001 | `jobs/PRTCATBL.md (nl/G)` | The category balance listing prints negative balances without a sign, so -12.34 looks like +12.34. |
-| Q-JPCAT-001 | `jobs/PRTCATBL.md (nl/G)` | The user must confirm the listing shows the sign of negative balances; as-is it does not. |
-| SE-JTRPT-002 | `jobs/TRANREPT.md (nl/G)` | The report is sorted by card number, but the order of transactions within one card is not guaranteed. |
+| ERR-JIMPT-002 | `jobs/CBIMPORT-JOB.md` | Fix the import so a failed error-file write fails or flags the run and the end message reflects the real error count; as-is it continues and always says no validation errors. |
+| DEF-JPCAT-001 | `jobs/PRTCATBL.md` | The category balance listing prints negative balances without a sign, so -12.34 looks like +12.34. |
+| Q-JPCAT-001 | `jobs/PRTCATBL.md` | The user must confirm the listing shows the sign of negative balances; as-is it does not. |
+| SE-JTRPT-002 | `jobs/TRANREPT.md` | The report is sorted by card number, but the order of transactions within one card is not guaranteed. |
 | DEF-RPTS-003 | `programs/CORPT00C.md` | Non-digit date parts are turned into zeros, so the not-a-valid-year messages can never be shown. |
 | BR-STIO-004 | `programs/CBSTM03B.md` | Account keys passed to the statement file-access routine are right-aligned to 11 digits; non-digit keys are interpreted unpredictably. |
 | DEF-STIO-002 | `programs/CBSTM03B.md` | The statement file-access routine silently cuts account keys longer than 11 digits and interprets non-digit characters, so a malformed key can read the wrong account. |
@@ -1255,118 +1255,118 @@ Class (c): a mainframe-only or platform question that the modernized system does
 
 | Item | Spec | Class | Why no decision is needed |
 | :-- | :-- | :-- | :-- |
-| DEF-JACCT-001 | `jobs/ACCTFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JACCT-001 | `jobs/ACCTFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JCSD-009 | `jobs/CARDDEMO-CSD.md (nl/G)` | c | CICS trace with CONFDATA(NO) is a region setting; the target has no CICS trace, and its log masking is covered by the pii-in-batch-outputs decision. |
-| Q-JCSD-003 | `jobs/CARDDEMO-CSD.md (nl/G)` | c | Whether DFHCSDUP accepts the CSD export with metadata is a CICS tooling question; the target has no CSD. |
-| Q-JCSD-004 | `jobs/CARDDEMO-CSD.md (nl/G)` | c | COCRDSEC and CDV1 have no source in the repository, so the target has nothing to rebuild; only the CICS definition refers to them. |
-| DEF-JCARD-001 | `jobs/CARDFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JCARD-002 | `jobs/CARDFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| DEF-JCARD-004 | `jobs/CARDFILE.md (nl/G)` | c | VSAM alternate-index record size limits a card index record to 8 cards; a SQL index has no such limit, and the business limit is decided under Q-JCARD-001. |
-| ERR-JCARD-001 | `jobs/CARDFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JCARD-002 | `jobs/CARDFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| ERR-JCARD-003 | `jobs/CARDFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| Q-JCSDUP-001 | `jobs/CBADMCDJ.md (nl/G)` | c | Whether the CBADMCDJ CSD-definition job is still used is a mainframe operations question; the target has no CICS resource definitions. |
-| Q-JCSDUP-002 | `jobs/CBADMCDJ.md (nl/G)` | c | DFHCSDUP handling of duplicate DEFINE commands is CICS utility behaviour; the target has no CSD. |
-| DEF-JEXPT-003 | `jobs/CBEXPORT-JOB.md (nl/G)` | c | Unconditional IDCAMS return-code reset before the export define; the target batch framework writes its export output without VSAM delete/define. |
-| ERR-JEXPT-001 | `jobs/CBEXPORT-JOB.md (nl/G)` | c | Missing JCL COND and CEE3ABD abend after an I/O error in the export job; the target batch framework fails the step and marks the run failed, and partial-output handling is a framework setting. |
-| DEF-JIMPT-001 | `jobs/CBIMPORT-JOB.md (nl/G)` | c | Import JCL allocates its outputs as NEW without a pre-delete, so a rerun fails at allocation; the target has no dataset catalog. |
-| ERR-JCLOSE-001 | `jobs/CLOSEFIL.md (nl/G)` | c | The CICS close command result not reaching the job return code is a CICS/SDSF behaviour; the target replaces the CICS file close with its own batch-window control. |
-| Q-JCLOSE-002 | `jobs/CLOSEFIL.md (nl/G)` | c | Waiting for a CICS close confirmation is a mainframe question; the target has no CICS files to close. |
-| DEF-JCOMB-001 | `jobs/COMBTRAN.md (nl/G)` | c | Selecting inputs by newest GDG generation is a z/OS GDG behaviour; the target replaces GDGs and selects a cycle's data by cycle identifier. |
-| ERR-JCOMB-001 | `jobs/COMBTRAN.md (nl/G)` | c | A SORT step without COND letting the load step run is a JCL defect in a utility step that the target replaces. |
-| Q-JCOMB-001 | `jobs/COMBTRAN.md (nl/G)` | c | The target replaces GDG relative generations; selecting the posted and interest sets by cycle identifier is the natural design of a database-backed merge and needs no user choice. |
+| DEF-JACCT-001 | `jobs/ACCTFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JACCT-001 | `jobs/ACCTFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JCSD-009 | `jobs/CARDDEMO-CSD.md` | c | CICS trace with CONFDATA(NO) is a region setting; the target has no CICS trace, and its log masking is covered by the pii-in-batch-outputs decision. |
+| Q-JCSD-003 | `jobs/CARDDEMO-CSD.md` | c | Whether DFHCSDUP accepts the CSD export with metadata is a CICS tooling question; the target has no CSD. |
+| Q-JCSD-004 | `jobs/CARDDEMO-CSD.md` | c | COCRDSEC and CDV1 have no source in the repository, so the target has nothing to rebuild; only the CICS definition refers to them. |
+| DEF-JCARD-001 | `jobs/CARDFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JCARD-002 | `jobs/CARDFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| DEF-JCARD-004 | `jobs/CARDFILE.md` | c | VSAM alternate-index record size limits a card index record to 8 cards; a SQL index has no such limit, and the business limit is decided under Q-JCARD-001. |
+| ERR-JCARD-001 | `jobs/CARDFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JCARD-002 | `jobs/CARDFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| ERR-JCARD-003 | `jobs/CARDFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| Q-JCSDUP-001 | `jobs/CBADMCDJ.md` | c | Whether the CBADMCDJ CSD-definition job is still used is a mainframe operations question; the target has no CICS resource definitions. |
+| Q-JCSDUP-002 | `jobs/CBADMCDJ.md` | c | DFHCSDUP handling of duplicate DEFINE commands is CICS utility behaviour; the target has no CSD. |
+| DEF-JEXPT-003 | `jobs/CBEXPORT-JOB.md` | c | Unconditional IDCAMS return-code reset before the export define; the target batch framework writes its export output without VSAM delete/define. |
+| ERR-JEXPT-001 | `jobs/CBEXPORT-JOB.md` | c | Missing JCL COND and CEE3ABD abend after an I/O error in the export job; the target batch framework fails the step and marks the run failed, and partial-output handling is a framework setting. |
+| DEF-JIMPT-001 | `jobs/CBIMPORT-JOB.md` | c | Import JCL allocates its outputs as NEW without a pre-delete, so a rerun fails at allocation; the target has no dataset catalog. |
+| ERR-JCLOSE-001 | `jobs/CLOSEFIL.md` | c | The CICS close command result not reaching the job return code is a CICS/SDSF behaviour; the target replaces the CICS file close with its own batch-window control. |
+| Q-JCLOSE-002 | `jobs/CLOSEFIL.md` | c | Waiting for a CICS close confirmation is a mainframe question; the target has no CICS files to close. |
+| DEF-JCOMB-001 | `jobs/COMBTRAN.md` | c | Selecting inputs by newest GDG generation is a z/OS GDG behaviour; the target replaces GDGs and selects a cycle's data by cycle identifier. |
+| ERR-JCOMB-001 | `jobs/COMBTRAN.md` | c | A SORT step without COND letting the load step run is a JCL defect in a utility step that the target replaces. |
+| Q-JCOMB-001 | `jobs/COMBTRAN.md` | c | The target replaces GDG relative generations; selecting the posted and interest sets by cycle identifier is the natural design of a database-backed merge and needs no user choice. |
 | Q-JCSD2-001 | `jobs/CRDDEMO2-CSD.md` | c | Asks where the CICS MQ, IMS and Db2 connections are defined, which the target replaces with Spring Boot configuration for RabbitMQ and SQL Server. |
 | Q-JCSD2-002 | `jobs/CRDDEMO2-CSD.md` | c | Db2 THREADLIMIT is a CICS-Db2 attachment setting; the target uses a SQL Server connection pool. |
 | Q-JCSDD-001 | `jobs/CRDDEMOD-CSD.md` | c | Where the CICS Db2 connection is defined is CICS region setup; the target connects to SQL Server through Spring configuration. |
 | Q-JCSDD-002 | `jobs/CRDDEMOD-CSD.md` | c | THREADLIMIT is a CICS Db2 thread setting; the target sizes its own connection pool. |
 | Q-JCSDM-001 | `jobs/CRDDEMOM-CSD.md` | c | IBM MQ trigger objects are platform definitions; the target uses RabbitMQ consumers, not triggered transactions. |
 | Q-JCRDB-002 | `jobs/CREADB21.md` | c | Whether DSNTEP4 accepts the seed SQL syntax is a Db2 utility question; the target seeds data through its own SQL Server migration. |
-| ERR-JSTMT-002 | `jobs/CREASTMT.md (nl/G)` | c | The undefined abend code from calling CEE3ABD without arguments is an LE behaviour; the target reports failures through its own job status. |
-| DEF-JCUST-001 | `jobs/CUSTFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JCUST-002 | `jobs/CUSTFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| ERR-JCUST-001 | `jobs/CUSTFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JCUST-002 | `jobs/CUSTFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| ERR-JSTMT-002 | `jobs/CREASTMT.md` | c | The undefined abend code from calling CEE3ABD without arguments is an LE behaviour; the target reports failures through its own job status. |
+| DEF-JCUST-001 | `jobs/CUSTFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JCUST-002 | `jobs/CUSTFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| ERR-JCUST-001 | `jobs/CUSTFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JCUST-002 | `jobs/CUSTFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
 | DEF-JDBPA-001 | `jobs/DBPAUTP0.md` | c | The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this unload data set deletion order does not carry over. |
 | Q-JDBPA-001 | `jobs/DBPAUTP0.md` | c | The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this question about the HD unload purpose and reload job is mainframe-only. |
 | Q-JDBPA-002 | `jobs/DBPAUTP0.md` | c | IMS /DBR and batch read authorization do not exist in the target; SQL Server handles concurrent reads. |
-| DEF-JDCUST-001 | `jobs/DEFCUST.md (nl/G)` | c | Obsolete DEFCUST job deletes and defines different VSAM cluster names; the target needs no equivalent of this job. |
-| DEF-JDCUST-002 | `jobs/DEFCUST.md (nl/G)` | c | Obsolete DEFCUST cluster name and key do not match the customer master; the target defines its own customer table. |
-| ERR-JDCUST-001 | `jobs/DEFCUST.md (nl/G)` | c | IDCAMS delete of a non-existent cluster returns 8 in an obsolete job; the target needs no equivalent. |
-| ERR-JDCUST-002 | `jobs/DEFCUST.md (nl/G)` | c | Obsolete define job fails on rerun because the cluster exists; the target needs no equivalent. |
-| Q-JDCUST-001 | `jobs/DEFCUST.md (nl/G)` | c | Asks whether the obsolete DEFCUST job can be removed from the repository; the spec states the target needs no equivalent, so it is repository housekeeping, not a target decision. |
-| DEF-JGDGB-001 | `jobs/DEFGDGB.md (nl/G)` | c | IDCAMS LASTCC/MAXCC reset in the GDG base definition job; the target has no GDGs. |
-| DEF-JGDGB-003 | `jobs/DEFGDGB.md (nl/G)` | c | Two JCL jobs define the same GDG base with different attributes; the target has no GDGs, and report retention is decided under Q-JREPT-001. |
-| DEF-JDISC-001 | `jobs/DISCGRP.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JDISC-001 | `jobs/DISCGRP.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JUSEC-002 | `jobs/DUSRSECJ.md (nl/G)` | c | The SYSAD unit name is a JCL typo in an allocation step; the target replaces the JCL reload with its own provisioning. |
-| DEF-JUSEC-003 | `jobs/DUSRSECJ.md (nl/G)` | c | The unconditional IDCAMS return code reset is a JCL utility defect; the target replaces the delete-define-load job. |
-| ERR-JUSEC-001 | `jobs/DUSRSECJ.md (nl/G)` | c | Step sequencing without COND parameters is JES behaviour of the reload job; the target replaces the job with its own provisioning. |
-| DEF-JESRR-002 | `jobs/ESDSRRDS.md (nl/G)` | c | UNIT=SYSAD typo in JCL dataset allocation; the target has no JCL unit allocation. |
-| DEF-JESRR-004 | `jobs/ESDSRRDS.md (nl/G)` | c | Unconditional IDCAMS return-code reset in an ESDS/RRDS sample job; the target has no VSAM ESDS or RRDS. |
-| DEF-JFTP-002 | `jobs/FTPJCL.md (nl/G)` | c | Misspelled high-level qualifier on a z/OS dataset name in a sample FTP job; the target has no dataset catalog. |
-| ERR-JFTP-001 | `jobs/FTPJCL.md (nl/G)` | c | z/OS batch FTP client does not set a failing return code without the EXIT option; platform behaviour the target does not use. |
-| Q-JFTP-002 | `jobs/FTPJCL.md (nl/G)` | c | Asks the mainframe team about the z/OS FTP client log location and FTP.DATA settings; a pure platform question. |
-| DEF-JINTC-004 | `jobs/INTCALC.md (nl/G)` | c | The mismatch between a non-unique VSAM alternate index and a program that expects unique keys is VSAM AIX DUPKEY semantics; the target reads cards by account with SQL, and the program-side item covers the business rule. |
-| DEF-JIRD1-002 | `jobs/INTRDRJ1.md (nl/G)` | c | Missing JCL COND before an internal-reader submit step in a sample job; the target has no JES internal reader. |
-| ERR-JIRD1-001 | `jobs/INTRDRJ1.md (nl/G)` | c | JCL step and allocation failure behaviour of an internal-reader sample job; the target has no JES or IEBGENER. |
+| DEF-JDCUST-001 | `jobs/DEFCUST.md` | c | Obsolete DEFCUST job deletes and defines different VSAM cluster names; the target needs no equivalent of this job. |
+| DEF-JDCUST-002 | `jobs/DEFCUST.md` | c | Obsolete DEFCUST cluster name and key do not match the customer master; the target defines its own customer table. |
+| ERR-JDCUST-001 | `jobs/DEFCUST.md` | c | IDCAMS delete of a non-existent cluster returns 8 in an obsolete job; the target needs no equivalent. |
+| ERR-JDCUST-002 | `jobs/DEFCUST.md` | c | Obsolete define job fails on rerun because the cluster exists; the target needs no equivalent. |
+| Q-JDCUST-001 | `jobs/DEFCUST.md` | c | Asks whether the obsolete DEFCUST job can be removed from the repository; the spec states the target needs no equivalent, so it is repository housekeeping, not a target decision. |
+| DEF-JGDGB-001 | `jobs/DEFGDGB.md` | c | IDCAMS LASTCC/MAXCC reset in the GDG base definition job; the target has no GDGs. |
+| DEF-JGDGB-003 | `jobs/DEFGDGB.md` | c | Two JCL jobs define the same GDG base with different attributes; the target has no GDGs, and report retention is decided under Q-JREPT-001. |
+| DEF-JDISC-001 | `jobs/DISCGRP.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JDISC-001 | `jobs/DISCGRP.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JUSEC-002 | `jobs/DUSRSECJ.md` | c | The SYSAD unit name is a JCL typo in an allocation step; the target replaces the JCL reload with its own provisioning. |
+| DEF-JUSEC-003 | `jobs/DUSRSECJ.md` | c | The unconditional IDCAMS return code reset is a JCL utility defect; the target replaces the delete-define-load job. |
+| ERR-JUSEC-001 | `jobs/DUSRSECJ.md` | c | Step sequencing without COND parameters is JES behaviour of the reload job; the target replaces the job with its own provisioning. |
+| DEF-JESRR-002 | `jobs/ESDSRRDS.md` | c | UNIT=SYSAD typo in JCL dataset allocation; the target has no JCL unit allocation. |
+| DEF-JESRR-004 | `jobs/ESDSRRDS.md` | c | Unconditional IDCAMS return-code reset in an ESDS/RRDS sample job; the target has no VSAM ESDS or RRDS. |
+| DEF-JFTP-002 | `jobs/FTPJCL.md` | c | Misspelled high-level qualifier on a z/OS dataset name in a sample FTP job; the target has no dataset catalog. |
+| ERR-JFTP-001 | `jobs/FTPJCL.md` | c | z/OS batch FTP client does not set a failing return code without the EXIT option; platform behaviour the target does not use. |
+| Q-JFTP-002 | `jobs/FTPJCL.md` | c | Asks the mainframe team about the z/OS FTP client log location and FTP.DATA settings; a pure platform question. |
+| DEF-JINTC-004 | `jobs/INTCALC.md` | c | The mismatch between a non-unique VSAM alternate index and a program that expects unique keys is VSAM AIX DUPKEY semantics; the target reads cards by account with SQL, and the program-side item covers the business rule. |
+| DEF-JIRD1-002 | `jobs/INTRDRJ1.md` | c | Missing JCL COND before an internal-reader submit step in a sample job; the target has no JES internal reader. |
+| ERR-JIRD1-001 | `jobs/INTRDRJ1.md` | c | JCL step and allocation failure behaviour of an internal-reader sample job; the target has no JES or IEBGENER. |
 | DEF-JLDPA-002 | `jobs/LOADPADB.md` | c | The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this merge-versus-restore behaviour of the IMS load job does not carry over. |
 | Q-JLDPA-001 | `jobs/LOADPADB.md` | c | The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this question of who empties the IMS database before reload is mainframe-only. |
-| ERR-JOPEN-001 | `jobs/OPENFIL.md (nl/G)` | c | CICS open command failures not reaching the job return code are a CICS/SDSF behaviour; the target has no CICS files to reopen. |
-| Q-JOPEN-001 | `jobs/OPENFIL.md (nl/G)` | c | Confirming that CICS files are open again is a mainframe question; the target replaces the file hand-over (see Q-JCLOSE-001 for the batch/online choice). |
-| DEF-JRACCT-001 | `jobs/READACCT.md (nl/G)` | c | UNIT=SYSAD typo in JCL dataset allocation; the target has no JCL unit allocation. |
-| DEF-JRCUST-002 | `jobs/READCUST.md (nl/G)` | c | NOTIFY=&SYUID typo on the JCL job card; a JCL typo the target does not carry over. |
-| DEF-JREPT-001 | `jobs/REPTFILE.md (nl/G)` | c | Conflicting GDG base definitions between REPTFILE and DEFGDGB; the target has no GDGs, and report retention is decided under Q-JREPT-001. |
-| NUM-JREPT-001 | `jobs/REPTFILE.md (nl/G)` | c | GDG LIMIT and NOSCRATCH space behaviour for report generations; the target has no GDGs, and report retention is decided under Q-JREPT-001. |
-| SE-JREPT-001 | `jobs/REPTFILE.md (nl/G)` | c | IDCAMS definition of the report GDG base; the target has no GDGs. |
-| DEF-JCA7-001 | `jobs/SCHED-CA7.md (nl/G)` | c | What starts the CA-7 chains (schedule member 000652) is CA-7 configuration; the target defines its own Airflow schedules. |
-| DEF-JCA7-002 | `jobs/SCHED-CA7.md (nl/G)` | c | Endless CA-7 trigger loops under schedule ID 030 are CA-7 trigger semantics; the Airflow DAGs are written fresh. |
-| DEF-JCA7-006 | `jobs/SCHED-CA7.md (nl/G)` | c | Parallel CA-7 paths started from one CLOSEFIL are CA-7 trigger semantics; the Airflow DAG orders its tasks explicitly. |
-| DEF-JCA7-008 | `jobs/SCHED-CA7.md (nl/G)` | c | Endless loops under schedule IDs 031 and 032 are CA-7 trigger semantics; the Airflow DAGs are written fresh. |
-| DEF-JCA7-009 | `jobs/SCHED-CA7.md (nl/G)` | c | The CA-7 default schedule ID on DEMAND is a CA-7 behaviour; the target starts DAGs through Airflow. |
-| FLOW-JCA7-001 | `jobs/SCHED-CA7.md (nl/G)` | c | Describes CA-7 trigger chain 1 as listed; the business content is decided under batch-cycle-order and the Airflow DAG is written fresh. |
-| FLOW-JCA7-002 | `jobs/SCHED-CA7.md (nl/G)` | c | Describes CA-7 trigger chain 2 as listed; the business content is decided under batch-cycle-order and reference-data-reload. |
-| FLOW-JCA7-003 | `jobs/SCHED-CA7.md (nl/G)` | c | Describes CA-7 trigger chain 3 as listed; statement placement is decided under statements-schedule. |
-| FLOW-JCA7-004 | `jobs/SCHED-CA7.md (nl/G)` | c | Describes the CA-7 schedule ID 031 loop; CA-7 trigger semantics the target does not reproduce. |
-| FLOW-JCA7-006 | `jobs/SCHED-CA7.md (nl/G)` | c | Describes CA-7 schedule ID inheritance across the listing; CA-7 trigger semantics the target does not reproduce. |
-| Q-JCA7-002 | `jobs/SCHED-CA7.md (nl/G)` | c | Whether the CA-7 listing is real and what schedule member 000652 contains is a pure mainframe confirmation; the target defines its own schedule. |
-| DEF-JCTLM-004 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Two smart folders deleting the same condition is Control-M condition semantics; the Airflow DAGs are written fresh. |
-| DEF-JCTLM-008 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Daily and monthly Control-M folders running concurrently without a linking condition is Control-M configuration; Airflow serialises DAG runs explicitly. |
-| DEF-JCTLM-009 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Order-date scoped Control-M conditions not serialising days is Control-M semantics; the Airflow DAG can limit itself to one active run. |
-| FLOW-JCTLM-001 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Describes the Control-M daily folder as defined; its business content is decided under batch-cycle-order. |
-| FLOW-JCTLM-003 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Describes the Control-M Saturday disclosure group folder; its business content is decided under reference-data-reload. |
-| FLOW-JCTLM-004 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Describes the Control-M Saturday Db2 extract folder; its business content is decided under reference-data-reload. |
-| FLOW-JCTLM-005 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Describes the forced-only Control-M monthly folder; its business content is decided under interest-frequency. |
-| Q-JCTLM-005 | `jobs/SCHED-CONTROLM.md (nl/G)` | c | Which Control-M platform runs the table is a pure platform confirmation; the target uses Airflow. |
-| DEF-JTCAT-001 | `jobs/TCATBALF.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JTCAT-001 | `jobs/TCATBALF.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JTBKP-002 | `jobs/TRANBKP.md (nl/G)` | c | An IDCAMS MAXCC reset hiding a failed delete is a defect in a utility step the target replaces. |
-| DEF-JTBKP-005 | `jobs/TRANBKP.md (nl/G)` | c | A never-loaded VSAM cluster failing to open for REPRO is VSAM/IDCAMS behaviour the target does not have. |
-| ERR-JTBKP-001 | `jobs/TRANBKP.md (nl/G)` | c | An IDCAMS delete step without COND is a JCL defect in a utility step the target replaces. |
-| DEF-JTCATG-001 | `jobs/TRANCATG.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JTCATG-001 | `jobs/TRANCATG.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JTRAN-001 | `jobs/TRANFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JTRAN-002 | `jobs/TRANFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| DEF-JTRAN-006 | `jobs/TRANFILE.md (nl/G)` | c | VSAM alternate-index record size limits one processed timestamp to 19 transactions; a SQL index has no such limit. |
-| DEF-JTRAN-007 | `jobs/TRANFILE.md (nl/G)` | c | An unused VSAM alternate index on the transaction file; the target defines its own SQL indexes as its queries need. |
-| ERR-JTRAN-001 | `jobs/TRANFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JTRAN-002 | `jobs/TRANFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| ERR-JTRAN-003 | `jobs/TRANFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| SE-JTRAN-004 | `jobs/TRANFILE.md (nl/G)` | c | Describes the VSAM REPRO load of the seed file into the new cluster; the target does not load VSAM, and whether a seed record is needed at all is decided under Q-JTRAN-001. |
-| Q-JTRAN-002 | `jobs/TRANFILE.md (nl/G)` | c | Asks whether the unused VSAM timestamp index is used externally; nothing in the repository reads it (DEF-JTRAN-007) and SQL indexes have no 19-per-timestamp limit, so the target simply indexes what its queries need. |
-| DEF-JTIDX-001 | `jobs/TRANIDX.md (nl/G)` | c | An IDCAMS index job that does not delete the old index first is a defect in a utility step the target replaces. |
-| DEF-JTIDX-002 | `jobs/TRANIDX.md (nl/G)` | c | The limit on transaction IDs per alternate key record is VSAM AIX behaviour; a SQL index has no such limit. |
-| DEF-JTIDX-003 | `jobs/TRANIDX.md (nl/G)` | c | An alternate index missing from the CICS upgrade set is CICS/VSAM behaviour; the target maintains SQL indexes automatically. |
-| ERR-JTIDX-001 | `jobs/TRANIDX.md (nl/G)` | c | IDCAMS index steps without COND failing on an existing index is a defect in utility steps the target replaces. |
-| DEF-JTRPTP-003 | `jobs/TRANREPT-PROC.md (nl/G)` | c | Online report requests consuming backup generations is a GDG behaviour; the target report reads the store directly and does not write backups. |
-| DEF-JTRPTP-006 | `jobs/TRANREPT-PROC.md (nl/G)` | c | Interleaved job lines in a CICS transient data queue and JES duplicate job names are platform behaviour; the target submits a report as one API call. |
-| DEF-JTRPT-002 | `jobs/TRANREPT.md (nl/G)` | c | A report job writing into the backup generation that COMBTRAN reads is GDG relative-generation behaviour; the target report does not write backups. |
-| ERR-JTRPT-001 | `jobs/TRANREPT.md (nl/G)` | c | Steps without COND running after a failed unload is a JCL defect in utility steps the target replaces. |
-| Q-JTRPT-002 | `jobs/TRANREPT.md (nl/G)` | c | Copying the whole transaction master before reporting is an IDCAMS/SORT artefact; the target report queries the store directly. |
-| DEF-JTTYP-001 | `jobs/TRANTYPE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JTTYP-001 | `jobs/TRANTYPE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| ERR-JPDF-001 | `jobs/TXT2PDF1.md (nl/G)` | c | A COND test that can never fire and the CA-7 trigger guard are JCL and CA-7 behaviour; the target orders the PDF task after a successful statement task. |
-| Q-JPDF-003 | `jobs/TXT2PDF1.md (nl/G)` | c | Which condition-code test the CA-7 definitions use is a pure CA-7 confirmation; the target stops downstream tasks on failure. |
+| ERR-JOPEN-001 | `jobs/OPENFIL.md` | c | CICS open command failures not reaching the job return code are a CICS/SDSF behaviour; the target has no CICS files to reopen. |
+| Q-JOPEN-001 | `jobs/OPENFIL.md` | c | Confirming that CICS files are open again is a mainframe question; the target replaces the file hand-over (see Q-JCLOSE-001 for the batch/online choice). |
+| DEF-JRACCT-001 | `jobs/READACCT.md` | c | UNIT=SYSAD typo in JCL dataset allocation; the target has no JCL unit allocation. |
+| DEF-JRCUST-002 | `jobs/READCUST.md` | c | NOTIFY=&SYUID typo on the JCL job card; a JCL typo the target does not carry over. |
+| DEF-JREPT-001 | `jobs/REPTFILE.md` | c | Conflicting GDG base definitions between REPTFILE and DEFGDGB; the target has no GDGs, and report retention is decided under Q-JREPT-001. |
+| NUM-JREPT-001 | `jobs/REPTFILE.md` | c | GDG LIMIT and NOSCRATCH space behaviour for report generations; the target has no GDGs, and report retention is decided under Q-JREPT-001. |
+| SE-JREPT-001 | `jobs/REPTFILE.md` | c | IDCAMS definition of the report GDG base; the target has no GDGs. |
+| DEF-JCA7-001 | `jobs/SCHED-CA7.md` | c | What starts the CA-7 chains (schedule member 000652) is CA-7 configuration; the target defines its own Airflow schedules. |
+| DEF-JCA7-002 | `jobs/SCHED-CA7.md` | c | Endless CA-7 trigger loops under schedule ID 030 are CA-7 trigger semantics; the Airflow DAGs are written fresh. |
+| DEF-JCA7-006 | `jobs/SCHED-CA7.md` | c | Parallel CA-7 paths started from one CLOSEFIL are CA-7 trigger semantics; the Airflow DAG orders its tasks explicitly. |
+| DEF-JCA7-008 | `jobs/SCHED-CA7.md` | c | Endless loops under schedule IDs 031 and 032 are CA-7 trigger semantics; the Airflow DAGs are written fresh. |
+| DEF-JCA7-009 | `jobs/SCHED-CA7.md` | c | The CA-7 default schedule ID on DEMAND is a CA-7 behaviour; the target starts DAGs through Airflow. |
+| FLOW-JCA7-001 | `jobs/SCHED-CA7.md` | c | Describes CA-7 trigger chain 1 as listed; the business content is decided under batch-cycle-order and the Airflow DAG is written fresh. |
+| FLOW-JCA7-002 | `jobs/SCHED-CA7.md` | c | Describes CA-7 trigger chain 2 as listed; the business content is decided under batch-cycle-order and reference-data-reload. |
+| FLOW-JCA7-003 | `jobs/SCHED-CA7.md` | c | Describes CA-7 trigger chain 3 as listed; statement placement is decided under statements-schedule. |
+| FLOW-JCA7-004 | `jobs/SCHED-CA7.md` | c | Describes the CA-7 schedule ID 031 loop; CA-7 trigger semantics the target does not reproduce. |
+| FLOW-JCA7-006 | `jobs/SCHED-CA7.md` | c | Describes CA-7 schedule ID inheritance across the listing; CA-7 trigger semantics the target does not reproduce. |
+| Q-JCA7-002 | `jobs/SCHED-CA7.md` | c | Whether the CA-7 listing is real and what schedule member 000652 contains is a pure mainframe confirmation; the target defines its own schedule. |
+| DEF-JCTLM-004 | `jobs/SCHED-CONTROLM.md` | c | Two smart folders deleting the same condition is Control-M condition semantics; the Airflow DAGs are written fresh. |
+| DEF-JCTLM-008 | `jobs/SCHED-CONTROLM.md` | c | Daily and monthly Control-M folders running concurrently without a linking condition is Control-M configuration; Airflow serialises DAG runs explicitly. |
+| DEF-JCTLM-009 | `jobs/SCHED-CONTROLM.md` | c | Order-date scoped Control-M conditions not serialising days is Control-M semantics; the Airflow DAG can limit itself to one active run. |
+| FLOW-JCTLM-001 | `jobs/SCHED-CONTROLM.md` | c | Describes the Control-M daily folder as defined; its business content is decided under batch-cycle-order. |
+| FLOW-JCTLM-003 | `jobs/SCHED-CONTROLM.md` | c | Describes the Control-M Saturday disclosure group folder; its business content is decided under reference-data-reload. |
+| FLOW-JCTLM-004 | `jobs/SCHED-CONTROLM.md` | c | Describes the Control-M Saturday Db2 extract folder; its business content is decided under reference-data-reload. |
+| FLOW-JCTLM-005 | `jobs/SCHED-CONTROLM.md` | c | Describes the forced-only Control-M monthly folder; its business content is decided under interest-frequency. |
+| Q-JCTLM-005 | `jobs/SCHED-CONTROLM.md` | c | Which Control-M platform runs the table is a pure platform confirmation; the target uses Airflow. |
+| DEF-JTCAT-001 | `jobs/TCATBALF.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JTCAT-001 | `jobs/TCATBALF.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JTBKP-002 | `jobs/TRANBKP.md` | c | An IDCAMS MAXCC reset hiding a failed delete is a defect in a utility step the target replaces. |
+| DEF-JTBKP-005 | `jobs/TRANBKP.md` | c | A never-loaded VSAM cluster failing to open for REPRO is VSAM/IDCAMS behaviour the target does not have. |
+| ERR-JTBKP-001 | `jobs/TRANBKP.md` | c | An IDCAMS delete step without COND is a JCL defect in a utility step the target replaces. |
+| DEF-JTCATG-001 | `jobs/TRANCATG.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JTCATG-001 | `jobs/TRANCATG.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JTRAN-001 | `jobs/TRANFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JTRAN-002 | `jobs/TRANFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| DEF-JTRAN-006 | `jobs/TRANFILE.md` | c | VSAM alternate-index record size limits one processed timestamp to 19 transactions; a SQL index has no such limit. |
+| DEF-JTRAN-007 | `jobs/TRANFILE.md` | c | An unused VSAM alternate index on the transaction file; the target defines its own SQL indexes as its queries need. |
+| ERR-JTRAN-001 | `jobs/TRANFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JTRAN-002 | `jobs/TRANFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| ERR-JTRAN-003 | `jobs/TRANFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| SE-JTRAN-004 | `jobs/TRANFILE.md` | c | Describes the VSAM REPRO load of the seed file into the new cluster; the target does not load VSAM, and whether a seed record is needed at all is decided under Q-JTRAN-001. |
+| Q-JTRAN-002 | `jobs/TRANFILE.md` | c | Asks whether the unused VSAM timestamp index is used externally; nothing in the repository reads it (DEF-JTRAN-007) and SQL indexes have no 19-per-timestamp limit, so the target simply indexes what its queries need. |
+| DEF-JTIDX-001 | `jobs/TRANIDX.md` | c | An IDCAMS index job that does not delete the old index first is a defect in a utility step the target replaces. |
+| DEF-JTIDX-002 | `jobs/TRANIDX.md` | c | The limit on transaction IDs per alternate key record is VSAM AIX behaviour; a SQL index has no such limit. |
+| DEF-JTIDX-003 | `jobs/TRANIDX.md` | c | An alternate index missing from the CICS upgrade set is CICS/VSAM behaviour; the target maintains SQL indexes automatically. |
+| ERR-JTIDX-001 | `jobs/TRANIDX.md` | c | IDCAMS index steps without COND failing on an existing index is a defect in utility steps the target replaces. |
+| DEF-JTRPTP-003 | `jobs/TRANREPT-PROC.md` | c | Online report requests consuming backup generations is a GDG behaviour; the target report reads the store directly and does not write backups. |
+| DEF-JTRPTP-006 | `jobs/TRANREPT-PROC.md` | c | Interleaved job lines in a CICS transient data queue and JES duplicate job names are platform behaviour; the target submits a report as one API call. |
+| DEF-JTRPT-002 | `jobs/TRANREPT.md` | c | A report job writing into the backup generation that COMBTRAN reads is GDG relative-generation behaviour; the target report does not write backups. |
+| ERR-JTRPT-001 | `jobs/TRANREPT.md` | c | Steps without COND running after a failed unload is a JCL defect in utility steps the target replaces. |
+| Q-JTRPT-002 | `jobs/TRANREPT.md` | c | Copying the whole transaction master before reporting is an IDCAMS/SORT artefact; the target report queries the store directly. |
+| DEF-JTTYP-001 | `jobs/TRANTYPE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JTTYP-001 | `jobs/TRANTYPE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| ERR-JPDF-001 | `jobs/TXT2PDF1.md` | c | A COND test that can never fire and the CA-7 trigger guard are JCL and CA-7 behaviour; the target orders the PDF task after a successful statement task. |
+| Q-JPDF-003 | `jobs/TXT2PDF1.md` | c | Which condition-code test the CA-7 definitions use is a pure CA-7 confirmation; the target stops downstream tasks on failure. |
 | DEF-JULGS-001 | `jobs/UNLDGSAM.md` | c | GSAM data set allocation is z/OS-specific and no job reads these files; the target does not use GSAM. |
 | DEF-JULGS-002 | `jobs/UNLDGSAM.md` | c | DBRC and batch-region DISP=SHR access are IMS mechanics; the target reads SQL Server with normal transaction isolation. |
 | DEF-JULGS-003 | `jobs/UNLDGSAM.md` | c | The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this kept partial GSAM files do not carry over. |
@@ -1375,13 +1375,13 @@ Class (c): a mainframe-only or platform question that the modernized system does
 | DEF-JULPA-001 | `jobs/UNLDPADB.md` | c | A JCL disposition defect in a delete step that the target does not have. |
 | DEF-JULPA-002 | `jobs/UNLDPADB.md` | c | DBRC-off batch reads are IMS mechanics; the target reads SQL Server with normal transaction isolation. |
 | Q-JULPA-001 | `jobs/UNLDPADB.md` | c | Unload file space sizing is a z/OS data set question; the target does not produce IMS unload files. |
-| DEF-JWAIT-002 | `jobs/WAITSTEP.md (nl/G)` | c | How the pause length is converted on z/OS is compiler and platform behaviour; the target replaces WAITSTEP with completion checks. |
-| DEF-JWAIT-003 | `jobs/WAITSTEP.md (nl/G)` | c | A fixed pause between jobs replaces no business rule; the target replaces WAITSTEP with explicit task dependencies. |
-| Q-JWAIT-001 | `jobs/WAITSTEP.md (nl/G)` | c | What the pause protects against is a mainframe question; the target replaces it with explicit task dependencies and checks. |
-| DEF-JXREF-001 | `jobs/XREFFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
-| DEF-JXREF-002 | `jobs/XREFFILE.md (nl/G)` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
-| DEF-JXREF-003 | `jobs/XREFFILE.md (nl/G)` | c | VSAM alternate-index record size limits a cross-reference index record to 2 cards; a SQL index has no such limit, and the business limit is decided under Q-JXREF-001. |
-| ERR-JXREF-001 | `jobs/XREFFILE.md (nl/G)` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JWAIT-002 | `jobs/WAITSTEP.md` | c | How the pause length is converted on z/OS is compiler and platform behaviour; the target replaces WAITSTEP with completion checks. |
+| DEF-JWAIT-003 | `jobs/WAITSTEP.md` | c | A fixed pause between jobs replaces no business rule; the target replaces WAITSTEP with explicit task dependencies. |
+| Q-JWAIT-001 | `jobs/WAITSTEP.md` | c | What the pause protects against is a mainframe question; the target replaces it with explicit task dependencies and checks. |
+| DEF-JXREF-001 | `jobs/XREFFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
+| DEF-JXREF-002 | `jobs/XREFFILE.md` | c | SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over. |
+| DEF-JXREF-003 | `jobs/XREFFILE.md` | c | VSAM alternate-index record size limits a cross-reference index record to 2 cards; a SQL index has no such limit, and the business limit is decided under Q-JXREF-001. |
+| ERR-JXREF-001 | `jobs/XREFFILE.md` | c | IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this. |
 | Q-INTC-002 | `programs/CBACT04C.md` | c | How z/OS VSAM reacts to two cards per account in the alternate index is platform behaviour; the target reads accounts and cards from SQL tables. |
 | DEF-EXPT-002 | `programs/CBEXPORT.md` | c | The VSAM key offset in the IDCAMS define is a JCL utility step the target replaces; the target does not store the export in a VSAM cluster. |
 | DEF-EXPT-005 | `programs/CBEXPORT.md` | c | The abend call without parameters is a z/OS Language Environment service quirk; the target job reports failure through its own exit status. |
@@ -1434,7 +1434,7 @@ Class (c): a mainframe-only or platform question that the modernized system does
 | DEF-RPTS-005 | `programs/CORPT00C.md` | c | Interleaved writes to the CICS internal-reader queue and duplicate JES job names are platform behaviour; the target submits report runs through its own job API. |
 | DEF-RPTS-008 | `programs/CORPT00C.md` | c | The hard-coded job card, procedure library and DD names are JCL environment details; the target configures the report job outside the code. |
 | Q-RPTS-003 | `programs/CORPT00C.md` | c | Internal-reader DD, partial writes, interleaving and duplicate job names are JES and CICS questions; the target does not submit JCL. |
-| Q-RPTS-005 | `programs/CORPT00C.md` | d | Answered in the TRANREPT-PROC job spec: the cataloged member is found through JCLLIB and the REPROC label is ignored. Answered in jobs/TRANREPT-PROC.md (nl/G), "Answer to Q-RPTS-005" and DEF-JTRPTP-001. |
+| Q-RPTS-005 | `programs/CORPT00C.md` | d | Closed in the spec: the cataloged member TRANREPT is found, the REPROC label is ignored and the nested call to REPROC is intended (DEF-JTRPTP-001). Answered in jobs/TRANREPT-PROC.md (the Q row is now marked closed). |
 | DEF-SGN-004 | `programs/COSGN00C.md` | c | Sending the typed password back in the 3270 output map is BMS data-stream behaviour; a web form keeps typed values in the browser and the server need not return the password. |
 | Q-SGN-006 | `programs/COSGN00C.md` | c | CICS terminal upper-case translation and the LE storage option are region settings; the target decides case handling itself in the password-storage decision. |
 | Q-TRNL-003 | `programs/COTRN00C.md` | c | Whether ENDBR after NOTFND abends, EIBAID survives an XCTL, and READPREV after STARTBR on a missing key are CICS questions; the target uses database queries and its own navigation. |
@@ -1478,50 +1478,50 @@ Every (a) and (b) item, grouped by the spec that holds it, with its decision.
 | Spec | Items (decision) |
 | :-- | :-- |
 | `entities.md` | Q-ENT-001 (D-11), Q-ENT-002 (D-59) |
-| `jobs/ACCTFILE.md (nl/G)` | Q-JACCT-001 (D-41) |
-| `jobs/CARDDEMO-CSD.md (nl/G)` | DEF-JCSD-003 (D-02), DEF-JCSD-004 (D-07), ERR-JCSD-001 (D-16), Q-JCSD-001 (D-02), Q-JCSD-002 (D-16) |
-| `jobs/CARDFILE.md (nl/G)` | Q-JCARD-001 (D-61), Q-JCARD-002 (D-41) |
-| `jobs/CBEXPORT-JOB.md (nl/G)` | DEF-JEXPT-001 (D-62), DEF-JEXPT-002 (D-10), Q-JEXPT-001 (D-62), Q-JEXPT-002 (D-10) |
-| `jobs/CBIMPORT-JOB.md (nl/G)` | DEF-JIMPT-002 (D-10), DEF-JIMPT-003 (D-62), ERR-JIMPT-002 (D-75), Q-JIMPT-001 (D-62) |
+| `jobs/ACCTFILE.md` | Q-JACCT-001 (D-41) |
+| `jobs/CARDDEMO-CSD.md` | DEF-JCSD-003 (D-02), DEF-JCSD-004 (D-07), ERR-JCSD-001 (D-16), Q-JCSD-001 (D-02), Q-JCSD-002 (D-16) |
+| `jobs/CARDFILE.md` | Q-JCARD-001 (D-61), Q-JCARD-002 (D-41) |
+| `jobs/CBEXPORT-JOB.md` | DEF-JEXPT-001 (D-62), DEF-JEXPT-002 (D-10), Q-JEXPT-001 (D-62), Q-JEXPT-002 (D-10) |
+| `jobs/CBIMPORT-JOB.md` | DEF-JIMPT-002 (D-10), DEF-JIMPT-003 (D-62), ERR-JIMPT-002 (D-75), Q-JIMPT-001 (D-62) |
 | `jobs/CBPAUP0J.md` | BR-JAUPG-001 (D-34), DEF-JAUPG-001 (D-34), DEF-JAUPG-003 (D-57), ERR-JAUPG-001 (D-57), Q-JAUPG-001 (D-57), Q-JAUPG-002 (D-39) |
-| `jobs/CLOSEFIL.md (nl/G)` | DEF-JCLOSE-003 (D-18), Q-JCLOSE-001 (D-18) |
-| `jobs/COMBTRAN.md (nl/G)` | DEF-JCOMB-002 (D-37) |
+| `jobs/CLOSEFIL.md` | DEF-JCLOSE-003 (D-18), Q-JCLOSE-001 (D-18) |
+| `jobs/COMBTRAN.md` | DEF-JCOMB-002 (D-37) |
 | `jobs/CRDDEMO2-CSD.md` | DEF-JCSD2-001 (D-03) |
 | `jobs/CRDDEMOD-CSD.md` | DEF-JCSDD-001 (D-02) |
 | `jobs/CRDDEMOM-CSD.md` | DEF-JCSDM-003 (D-07) |
 | `jobs/CREADB21.md` | DEF-JCRDB-002 (D-75), DEF-JCRDB-003 (D-07), DEF-JCRDB-005 (D-63), Q-JCRDB-001 (D-75), Q-JCRDB-003 (D-07), Q-JCRDB-004 (D-63) |
-| `jobs/CREASTMT.md (nl/G)` | DEF-JSTMT-001 (D-57), DEF-JSTMT-005 (D-43), DEF-JSTMT-006 (D-38), Q-JSTMT-001 (D-38), Q-JSTMT-002 (D-43), Q-JSTMT-003 (D-57) |
-| `jobs/CUSTFILE.md (nl/G)` | Q-JCUST-001 (D-41) |
-| `jobs/DALYREJS.md (nl/G)` | DEF-JREJS-003 (D-10), Q-JREJS-001 (D-40) |
-| `jobs/DEFGDGB.md (nl/G)` | DEF-JGDGB-002 (D-10), Q-JGDGB-001 (D-40) |
-| `jobs/DEFGDGD.md (nl/G)` | Q-JGDGD-001 (D-63) |
-| `jobs/DISCGRP.md (nl/G)` | Q-JDISC-001 (D-67) |
-| `jobs/DUSRSECJ.md (nl/G)` | DEF-JUSEC-001 (D-04), Q-JUSEC-001 (D-06), Q-JUSEC-002 (D-06) |
-| `jobs/ESDSRRDS.md (nl/G)` | DEF-JESRR-001 (D-07), Q-JESRR-001 (D-42) |
-| `jobs/FTPJCL.md (nl/G)` | DEF-JFTP-004 (D-07), Q-JFTP-001 (D-42) |
-| `jobs/INTCALC.md (nl/G)` | DEF-JINTC-001 (D-59), ERR-JINTC-001 (D-57), NUM-JINTC-001 (D-59), Q-JINTC-001 (D-59), Q-JINTC-002 (D-24) |
-| `jobs/INTRDRJ1.md (nl/G)` | Q-JIRD1-001 (D-42) |
+| `jobs/CREASTMT.md` | DEF-JSTMT-001 (D-57), DEF-JSTMT-005 (D-43), DEF-JSTMT-006 (D-38), Q-JSTMT-001 (D-38), Q-JSTMT-002 (D-43), Q-JSTMT-003 (D-57) |
+| `jobs/CUSTFILE.md` | Q-JCUST-001 (D-41) |
+| `jobs/DALYREJS.md` | DEF-JREJS-003 (D-10), Q-JREJS-001 (D-40) |
+| `jobs/DEFGDGB.md` | DEF-JGDGB-002 (D-10), Q-JGDGB-001 (D-40) |
+| `jobs/DEFGDGD.md` | Q-JGDGD-001 (D-63) |
+| `jobs/DISCGRP.md` | Q-JDISC-001 (D-67) |
+| `jobs/DUSRSECJ.md` | DEF-JUSEC-001 (D-04), Q-JUSEC-001 (D-06), Q-JUSEC-002 (D-06) |
+| `jobs/ESDSRRDS.md` | DEF-JESRR-001 (D-07), Q-JESRR-001 (D-42) |
+| `jobs/FTPJCL.md` | DEF-JFTP-004 (D-07), Q-JFTP-001 (D-42) |
+| `jobs/INTCALC.md` | DEF-JINTC-001 (D-59), ERR-JINTC-001 (D-57), NUM-JINTC-001 (D-59), Q-JINTC-001 (D-59), Q-JINTC-002 (D-24) |
+| `jobs/INTRDRJ1.md` | Q-JIRD1-001 (D-42) |
 | `jobs/MNTTRDB2.md` | Q-JMNTT-001 (D-63), Q-JMNTT-002 (D-63) |
-| `jobs/POSTTRAN.md (nl/G)` | DEF-JPOST-002 (D-37), DEF-JPOST-003 (D-23), Q-JPOST-001 (D-40) |
-| `jobs/PRTCATBL.md (nl/G)` | DEF-JPCAT-001 (D-75), Q-JPCAT-001 (D-75) |
-| `jobs/READACCT.md (nl/G)` | DEF-JRACCT-002 (D-10), DEF-JRACCT-005 (D-37), Q-JRACCT-001 (D-42) |
-| `jobs/READCARD.md (nl/G)` | DEF-JRCARD-001 (D-10), Q-JRCARD-001 (D-42) |
-| `jobs/READCUST.md (nl/G)` | DEF-JRCUST-001 (D-10), Q-JRCUST-001 (D-42) |
-| `jobs/READXREF.md (nl/G)` | DEF-JRXREF-001 (D-10), Q-JRXREF-001 (D-42) |
-| `jobs/REPTFILE.md (nl/G)` | Q-JREPT-001 (D-40) |
-| `jobs/SCHED-CA7.md (nl/G)` | DEF-JCA7-005 (D-37), DEF-JCA7-007 (D-39), Q-JCA7-001 (D-37), Q-JCA7-003 (D-39), Q-JCA7-004 (D-42) |
-| `jobs/SCHED-CONTROLM.md (nl/G)` | DEF-JCTLM-001 (D-37), DEF-JCTLM-002 (D-24), DEF-JCTLM-005 (D-63), DEF-JCTLM-006 (D-37), Q-JCTLM-001 (D-37), Q-JCTLM-002 (D-24), Q-JCTLM-003 (D-57), Q-JCTLM-004 (D-37) |
-| `jobs/TCATBALF.md (nl/G)` | DEF-JTCAT-002 (D-41), Q-JTCAT-001 (D-41) |
-| `jobs/TRANBKP.md (nl/G)` | DEF-JTBKP-001 (D-57), Q-JTBKP-001 (D-57), Q-JTBKP-002 (D-40) |
-| `jobs/TRANCATG.md (nl/G)` | Q-JTCATG-001 (D-63) |
+| `jobs/POSTTRAN.md` | DEF-JPOST-002 (D-37), DEF-JPOST-003 (D-23), Q-JPOST-001 (D-40) |
+| `jobs/PRTCATBL.md` | DEF-JPCAT-001 (D-75), Q-JPCAT-001 (D-75) |
+| `jobs/READACCT.md` | DEF-JRACCT-002 (D-10), DEF-JRACCT-005 (D-37), Q-JRACCT-001 (D-42) |
+| `jobs/READCARD.md` | DEF-JRCARD-001 (D-10), Q-JRCARD-001 (D-42) |
+| `jobs/READCUST.md` | DEF-JRCUST-001 (D-10), Q-JRCUST-001 (D-42) |
+| `jobs/READXREF.md` | DEF-JRXREF-001 (D-10), Q-JRXREF-001 (D-42) |
+| `jobs/REPTFILE.md` | Q-JREPT-001 (D-40) |
+| `jobs/SCHED-CA7.md` | DEF-JCA7-005 (D-37), DEF-JCA7-007 (D-39), Q-JCA7-001 (D-37), Q-JCA7-003 (D-39), Q-JCA7-004 (D-42) |
+| `jobs/SCHED-CONTROLM.md` | DEF-JCTLM-001 (D-37), DEF-JCTLM-002 (D-24), DEF-JCTLM-005 (D-63), DEF-JCTLM-006 (D-37), Q-JCTLM-001 (D-37), Q-JCTLM-002 (D-24), Q-JCTLM-003 (D-57), Q-JCTLM-004 (D-37) |
+| `jobs/TCATBALF.md` | DEF-JTCAT-002 (D-41), Q-JTCAT-001 (D-41) |
+| `jobs/TRANBKP.md` | DEF-JTBKP-001 (D-57), Q-JTBKP-001 (D-57), Q-JTBKP-002 (D-40) |
+| `jobs/TRANCATG.md` | Q-JTCATG-001 (D-63) |
 | `jobs/TRANEXTR.md` | DEF-JTREX-001 (D-63), Q-JTREX-001 (D-63), Q-JTREX-002 (D-63) |
-| `jobs/TRANFILE.md (nl/G)` | DEF-JTRAN-005 (D-59), Q-JTRAN-001 (D-59) |
-| `jobs/TRANIDX.md (nl/G)` | DEF-JTIDX-004 (D-42), Q-JTIDX-001 (D-42) |
-| `jobs/TRANREPT-PROC.md (nl/G)` | DEF-JTRPTP-004 (D-10), DEF-JTRPTP-005 (D-07), ERR-JTRPTP-001 (D-48), Q-JTRPTP-001 (D-48) |
-| `jobs/TRANREPT.md (nl/G)` | BR-JTRPT-001 (D-46), DEF-JTRPT-001 (D-46), DEF-JTRPT-004 (D-10), DEF-JTRPT-005 (D-18), SE-JTRPT-002 (D-75), Q-JTRPT-001 (D-42) |
-| `jobs/TRANTYPE.md (nl/G)` | Q-JTTYP-001 (D-63) |
-| `jobs/TXT2PDF1.md (nl/G)` | DEF-JPDF-001 (D-45), DEF-JPDF-003 (D-10), Q-JPDF-001 (D-45), Q-JPDF-002 (D-45) |
-| `jobs/XREFFILE.md (nl/G)` | Q-JXREF-001 (D-61), Q-JXREF-002 (D-41) |
+| `jobs/TRANFILE.md` | DEF-JTRAN-005 (D-59), Q-JTRAN-001 (D-59) |
+| `jobs/TRANIDX.md` | DEF-JTIDX-004 (D-42), Q-JTIDX-001 (D-42) |
+| `jobs/TRANREPT-PROC.md` | DEF-JTRPTP-004 (D-10), DEF-JTRPTP-005 (D-07), ERR-JTRPTP-001 (D-48), Q-JTRPTP-001 (D-48) |
+| `jobs/TRANREPT.md` | BR-JTRPT-001 (D-46), DEF-JTRPT-001 (D-46), DEF-JTRPT-004 (D-10), DEF-JTRPT-005 (D-18), SE-JTRPT-002 (D-75), Q-JTRPT-001 (D-42) |
+| `jobs/TRANTYPE.md` | Q-JTTYP-001 (D-63) |
+| `jobs/TXT2PDF1.md` | DEF-JPDF-001 (D-45), DEF-JPDF-003 (D-10), Q-JPDF-001 (D-45), Q-JPDF-002 (D-45) |
+| `jobs/XREFFILE.md` | Q-JXREF-001 (D-61), Q-JXREF-002 (D-41) |
 | `programs/CBACT01C.md` | BR-ACRD-005 (D-42), BR-ACRD-006 (D-42), DEF-ACRD-002 (D-42), Q-ACRD-001 (D-42), Q-ACRD-002 (D-42) |
 | `programs/CBACT02C.md` | DEF-CDRD-001 (D-10), Q-CDRD-001 (D-10) |
 | `programs/CBACT03C.md` | DEF-XRRD-001 (D-10), Q-XRRD-001 (D-10) |
@@ -1566,7 +1566,8 @@ Every (a) and (b) item, grouped by the spec that holds it, with its decision.
 
 ## Appendix D. Method
 
-- **Sources:** branch `modernization` at `9540387` (all program specs, the area A-F job specs, `entities.md`, `components.md`, `interactions.md`, `areas/*.md`) and branch `nl/G` at `a609e82` (the area G job, CSD and schedule specs and `jobs/README.md`). Items are unioned by ID; where both branches have the same spec, the `modernization` copy is used.
+- **Sources:** branch `modernization` at `e6e50c2`, with every program, job, CSD and schedule spec, `jobs/README.md`, `entities.md`, `components.md`, `interactions.md` and `areas/*.md`.
+- **Refresh:** the first version was built from `modernization` at `9540387` plus the area G specs on branch `nl/G` at `a609e82`. Re-extracting from `e6e50c2` found 0 new and 0 removed items and 13 items with changed text: DEF-EXPT-002, DEF-IMPT-004, DEF-INTC-010, DEF-JCA7-007, DEF-JGDGB-002, DEF-JPDF-003, DEF-JWAIT-002, FLOW-JCA7-006, Q-EXPT-002, Q-IMPT-003, Q-JCA7-001, Q-JCTLM-001, Q-RPTS-005. None of them changed class; the as-is text of D-10, D-37, D-39 and D-59 was updated to match. The README, runbook and data-handling corrections that area G marked as corrected in the docs were never defect-decide items, so they were not in the catalog.
 - **Extraction:** every table row `| Q-<UNIT>-<NNN> |`, and every item heading `#### <KIND>-<UNIT>-<NNN>` whose `Fidelity` contains *defect-decide* or whose title is tagged `[security]`, in every spec outside `checks/`, `evidence/` and `tools/`. `areas/*.md`, `components.md` and `interactions.md` hold no `Q-` rows or defect-decide items of their own; their invariants (`INV-`, `PINV-`) are cited in the decisions.
 - **Classification:** each item was read with its spec and classed (a) to (d), then items asking the same thing were merged into one decision across programs and areas. An item that says "Expected yes" is a recommendation, not an answer, so it stays a decision. The only answered item is Q-RPTS-005, answered in the TRANREPT-PROC job spec.
 - **Pilot questions:** Q-BILL-001 → D-30; Q-BILL-002 → D-28; Q-BILL-003 → D-29; Q-BILL-004 → D-03; Q-BILL-005 → class c; Q-BILL-006 → D-60; Q-ENT-001 → D-11; Q-ENT-002 → D-59; Q-POST-001 → D-19; Q-POST-002 → D-21; Q-POST-003 → D-20; Q-POST-004 → D-22; Q-POST-005 → class c.
