@@ -9,3 +9,6 @@ var/
 # Generated reports (make trace writes build/trace/).
 build/
 __pycache__/
+
+# Build output (Maven).
+target/

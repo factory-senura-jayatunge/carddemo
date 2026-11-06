@@ -12,6 +12,7 @@ PIDs go to $CARDDEMO_VAR_DIR/run/<name>.pid, logs to $CARDDEMO_VAR_DIR/log/.
 Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 
 Usage: stack.py infra-up | infra-down | up [--only NAME,...] | down | status
+       stack.py ensure-infra TARGET   (infra-up for another target; prints only on failure)
 """
 
 import fcntl
@@ -52,11 +53,9 @@ SPRING_PROFILE = os.environ.get("CARDDEMO_SPRING_PROFILE", "demo")
 
 
 def service_args(name: str) -> list:
-    args = [f"--spring.profiles.active={SPRING_PROFILE}"]
-    if name == "identity-service":
-        key = os.environ.get("CARDDEMO_JWT_KEY_FILE") or os.path.join(VAR_DIR, "secrets", "identity-jwt.pem")
-        args.append(f"--carddemo.identity.jwt.private-key-path={key}")
-    return args
+    # identity-service reads its signing key from CARDDEMO_JWT_KEY_FILE,
+    # which the Makefile exports.
+    return [f"--spring.profiles.active={SPRING_PROFILE}"]
 WEB_PORT = 25173
 HEALTH_PATH = "/actuator/health"
 
@@ -221,8 +220,14 @@ def infra_up(target: str) -> int:
             print(f"{target}: FAILED (would restart shared container(s) {names}; rerun with RECREATE=1 when nobody uses them)")
             return 1
         say("WARN", "compose", f"RECREATING (restarting) shared container(s) {names}; connections drop for every checkout")
-    rc = subprocess.run(compose("up", "--detach", "--wait", "--wait-timeout", str(UP_TIMEOUT))).returncode
-    subprocess.run(compose("ps", "--format", "table {{.Service}}\t{{.Status}}\t{{.Ports}}"))
+    quiet = target not in ("infra-up", "up")
+    res = subprocess.run(compose("up", "--detach", "--wait", "--wait-timeout", str(UP_TIMEOUT)),
+                         capture_output=quiet, text=True)
+    rc = res.returncode
+    if not quiet:
+        subprocess.run(compose("ps", "--format", "table {{.Service}}\t{{.Status}}\t{{.Ports}}"))
+    elif rc != 0:
+        print(res.stderr.strip())
     if rc != 0:
         print(f"{target}: FAILED (containers not healthy within {UP_TIMEOUT} s; see make logs)")
         return 1
@@ -440,6 +445,8 @@ def main(argv) -> int:
     cmd = argv[1] if len(argv) > 1 else ""
     if cmd == "infra-up":
         return infra_up("infra-up")
+    if cmd == "ensure-infra" and len(argv) == 3:
+        return infra_up(argv[2])
     if cmd == "infra-down":
         return infra_down("infra-down")
     if cmd == "up":

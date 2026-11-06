@@ -62,9 +62,16 @@ endif
 COMPOSE = docker compose --project-directory '$(CARDDEMO_INFRA_DIR)' -f '$(CARDDEMO_INFRA_DIR)/docker-compose.yml' --env-file '$(ENV_FILE)'
 
 STACK = $(PYTHON) '$(HERE)/scripts/stack.py'
+# Runs a command with the shared .env in its environment (never printed).
 WITH_ENV = $(PYTHON) '$(HERE)/scripts/with_env.py'
-# Heavy targets run their command through $(HEAVY) <target> -- <command>.
+# Heavy targets run their command through $(HEAVY) <target> <command>.
 HEAVY = $(PYTHON) '$(HERE)/scripts/heavy.py'
+JAVA = $(if $(JAVA_HOME),$(JAVA_HOME)/bin/java,java)
+DB_NAME = $(or $(CARDDEMO_DB_NAME),$(call env_value,CARDDEMO_DB_NAME),carddemo)
+# verify/trace needs tomllib.
+PY311 = $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' || { echo '$@: FAILED ($(PYTHON) is older than 3.11; set PYTHON=python3.11 or newer)' >&2; exit 1; }
+# $(call need,<path>,<what builds it>) fails the target when a file is missing.
+need = [ -e '$(HERE)/$(1)' ] || { echo '$@: FAILED (no modernization/$(1) in this checkout; $(2))' >&2; exit 1; }
 
 .DEFAULT_GOAL := help
 
@@ -72,12 +79,11 @@ HEAVY = $(PYTHON) '$(HERE)/scripts/heavy.py'
 # that delivers it; replace the stub with the real recipe (and drop it from
 # STUBS) when that work lands. Every target ends with "<target>: OK" or
 # "<target>: FAILED (<reason>)".
-STUBS := db-reset load smoke billpay verify-ledger test-backend \
-	test-billpay verify-batch verify-data verify-harness verify-cycle \
-	test-airflow web-build test-e2e trace
-
+STUBS := load billpay test-billpay verify-batch verify-data verify-harness \
+	verify-cycle test-airflow
 .PHONY: help stubs setup toolchain build up down status logs infra-up infra-down \
-	infra-wipe require-env verify-spec $(STUBS)
+	infra-wipe require-env verify-spec db-reset db-migrate smoke verify-ledger \
+	test-backend web-build test-e2e trace $(STUBS)
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -140,20 +146,35 @@ infra-wipe: require-env ## Remove this project's containers AND volumes (CONFIRM
 logs: require-env ## Follow the infrastructure logs (SERVICE=mssql|rabbitmq|airflow-db for one); app logs are in $CARDDEMO_VAR_DIR/log
 	$(COMPOSE) logs --follow --tail 100 $(SERVICE)
 
-db-reset: ## Drop and recreate the application database schema [not implemented yet]
-db-reset: PHASE = Phase 3, the Bill Pay pilot (Flyway migrations on SQL Server)
+db-reset: require-env ## Recreate the application database (CARDDEMO_DB_NAME) and run every migration, then check the logins' grants
+	@$(call need,mvnw,arrives with the backend)
+	@$(STACK) ensure-infra $@
+	@echo 'WARN  db-reset drops and recreates database $(DB_NAME) on the shared SQL Server'
+	@cd '$(HERE)' && ./mvnw -q -B -pl db/db-migrate -am package -DskipTests || { echo '$@: FAILED (building db-migrate)' >&2; exit 1; }
+	@cd '$(HERE)' && $(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --reset --check-logins \
+	&& echo '$@: OK' || { echo '$@: FAILED (db-migrate, see above)' >&2; exit 1; }
+db-migrate: require-env ## Apply new migrations to CARDDEMO_DB_NAME without dropping it, then check the logins' grants
+	@$(call need,mvnw,arrives with the backend)
+	@$(STACK) ensure-infra $@
+	@cd '$(HERE)' && ./mvnw -q -B -pl db/db-migrate -am package -DskipTests || { echo '$@: FAILED (building db-migrate)' >&2; exit 1; }
+	@cd '$(HERE)' && $(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --check-logins \
+	&& echo '$@: OK' || { echo '$@: FAILED (db-migrate, see above)' >&2; exit 1; }
 load: ## Load the sample data into SQL Server [not implemented yet]
-load: PHASE = Phase 3, the data migration (sample files into SQL Server)
-smoke: ## Quick health check of the running application stack [not implemented yet]
-smoke: PHASE = Phase 3, the Bill Pay pilot (end-to-end smoke check)
+load: PHASE = Phase 3, the data migration (dataLoadJob)
+smoke: require-env ## Read-only check of the running slice: health, sign-on, me, features, a Bill Pay preview, JWKS, no row changes
+	@$(WITH_ENV) $(PYTHON) '$(HERE)/scripts/smoke.py'
 billpay: ## Run the Bill Pay slice end to end [not implemented yet]
-billpay: PHASE = Phase 3, the Bill Pay pilot
+billpay: PHASE = Phase 3, the Bill Pay pilot (needs load)
 verify-spec: ## Check the NL spec (format, paragraph coverage) and run its GnuCOBOL equivalence checks
 	@$(PYTHON) '$(HERE)/../docs/modernization/spec/tools/verify_spec.py' --require-all
-verify-ledger: ## Check the ledger evidence and its links [not implemented yet]
-verify-ledger: PHASE = Phase 4, validation (ledger evidence checks)
-test-backend: ## Spring Boot service tests (heavy: Testcontainers) [not implemented yet]
-test-backend: PHASE = Phase 3, the backend services (Spring Boot tests)
+verify-ledger: ## Check the ledger against the code and the spec (switches, decisions, deviations)
+	@$(PY311)
+	@$(call need,verify/trace/verify_ledger.py,arrives with the ledger)
+	@$(PYTHON) '$(HERE)/verify/trace/verify_ledger.py'
+test-backend: require-env ## ./mvnw verify: unit, integration (Testcontainers or the per-agent test database), contract, ArchUnit (heavy)
+	@$(call need,mvnw,arrives with the backend)
+	@cd '$(HERE)' && $(WITH_ENV) $(HEAVY) $@ ./mvnw -B verify \
+	&& echo '$@: OK' || { echo '$@: FAILED (Maven, see above)' >&2; exit 1; }
 test-billpay: ## Bill Pay service, API and UI tests [not implemented yet]
 test-billpay: PHASE = Phase 3, the Bill Pay pilot (service, API and UI tests)
 verify-batch: ## GnuCOBOL vs Spring Batch differential tests (heavy) [not implemented yet]
@@ -166,12 +187,20 @@ verify-cycle: ## Full batch cycle through Airflow and Spring Batch (heavy) [not 
 verify-cycle: PHASE = Phase 3, Airflow (end-to-end batch cycle run)
 test-airflow: ## Airflow DAG integrity and ordering tests [not implemented yet]
 test-airflow: PHASE = Phase 3, Airflow (DAG tests)
-web-build: ## Build the React front end [not implemented yet]
-web-build: PHASE = Phase 3, the front end (React and Vite build)
-test-e2e: ## Playwright end-to-end tests (heavy) [not implemented yet]
-test-e2e: PHASE = Phase 3, the front end (Playwright tests)
-trace: ## Rule-to-test traceability matrix [not implemented yet]
-trace: PHASE = Phase 4, validation (traceability matrix)
+web-build: ## npm ci, API client from the snapshots, tsc, ESLint, Vitest, vite build, bundle budget
+	@$(call need,web/package.json,arrives with the web app)
+	@cd '$(HERE)/web' && npm ci && npm run verify \
+	&& echo '$@: OK' || { echo '$@: FAILED (see above)' >&2; exit 1; }
+test-e2e: require-env ## Playwright against the running stack (make up first); E2E_BROWSERS="chromium firefox webkit" (heavy)
+	@$(call need,web/playwright.config.ts,arrives with the web app)
+	@cd '$(HERE)/web' && browsers='$(or $(E2E_BROWSERS),chromium)' \
+	&& npx playwright install $$browsers \
+	&& $(HEAVY) $@ env CARDDEMO_E2E_TARGET=stack npx playwright test $$(for b in $$browsers; do printf -- '--project=%s ' $$b; done) \
+	&& echo '$@: OK' || { echo '$@: FAILED (see above)' >&2; exit 1; }
+trace: ## Rule-to-test traceability matrix and its gate (build/trace/matrix.md)
+	@$(PY311)
+	@$(call need,verify/trace/trace_matrix.py,arrives with the ledger)
+	@$(PYTHON) '$(HERE)/verify/trace/trace_matrix.py'
 
 $(STUBS):
 	@printf '%s: FAILED (not implemented yet: arrives with %s)\n' '$@' '$(PHASE)' >&2
