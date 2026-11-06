@@ -51,7 +51,7 @@ The monthly interest job reads every transaction category balance (one balance p
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `INTCALC`, step `STEP15`, `EXEC PGM=CBACT04C,PARM='2022071800'` (`app/jcl/INTCALC.jcl:22-41`). Control-M runs it monthly in folder `MONTHLY-InterestCalculation`, after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:64-80`). The batch-cycle runbook places it after POSTTRAN and before TRANBKP and COMBTRAN (`docs/runbooks/batch-cycle-restart.md:11-21`). The CA-7 schedule does not list it.
+- **Trigger:** JCL job `INTCALC`, step `STEP15`, `EXEC PGM=CBACT04C,PARM='2022071800'` (`app/jcl/INTCALC.jcl:22-41`). Control-M lists it in folder `MONTHLY-InterestCalculation`, after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:64-80`), but that folder has no scheduling days, so Control-M runs it only when an operator forces the folder (SCHED-CONTROLM DEF-JCTLM-002); the README and the full-batch script run it in every cycle (INTCALC Q-JINTC-002). The batch-cycle runbook places it after POSTTRAN and before TRANBKP and COMBTRAN (`docs/runbooks/batch-cycle-restart.md:11-21`). The CA-7 schedule does not list it.
 - **Preconditions:** the CICS files are closed (the job rewrites `ACCTDATA`); POSTTRAN has run so `TCATBALF` holds the cycle's category balances; `DISCGRP` is loaded and has `DEFAULT` records for every type and category that occurs (ERR-INTC-005); the `SYSTRAN` generation data group exists.
 - **Parameter:** the JCL PARM. The program uses its first 10 characters (`PARM-DATE`) as the prefix of every transaction ID (BR-INTC-005); the length halfword is ignored. The runbook asks operators to set it to the cycle date (`docs/runbooks/batch-cycle-restart.md:37-39`).
 - **Clock:** the transaction timestamps come from the system clock (NUM-INTC-005).
@@ -343,7 +343,7 @@ flowchart LR
 
 #### DEF-INTC-001 · The last account was not updated (fixed in this branch)
 - The account update was in the loop's "end of file" branch, which never ran because the loop ended first, so the account that came last in `TCATBALF` got its interest transactions but no balance update and no cycle reset. Now done after the loop (`:221-223`).
-- **Status:** fixed in this branch, "batch: CBACT04C updates the last account and blanks its records" (`CHANGELOG.md:49`, commit 268af56, squashed into b5e0139). The runbook section "Known defect: last account" (`docs/runbooks/batch-cycle-restart.md:115-121`) still describes the old behaviour.
+- **Status:** fixed in this branch, "batch: CBACT04C updates the last account and blanks its records" (`CHANGELOG.md:49`, commit 268af56, squashed into b5e0139). The runbook section "Known defect: last account" (`docs/runbooks/batch-cycle-restart.md:115-121`) now records it as a fixed defect and tells operators to check the last account by hand only when the load module was built from an older source.
 
 #### DEF-INTC-002 · Interest transaction was not cleared (fixed in this branch)
 - The transaction record was built field by field without clearing it, so FILLER kept its initial working-storage content (low-values on GnuCOBOL, undefined on z/OS). Now cleared to spaces first (`:475`).
@@ -380,7 +380,7 @@ flowchart LR
 - **Source:** `app/jcl/INTCALC.jcl:37-41`, `:630-634` · **Status:** open · **Confidence:** platform-inferred (disposition processing)
 
 #### DEF-INTC-010 · PARM not validated; IDs not unique across runs
-- The PARM length is ignored and the text is not checked. With a PARM shorter than 10 characters the ID prefix contains whatever follows the PARM in storage on z/OS (spaces locally). The same PARM in two runs (the JCL hardcodes `2022071800`) gives the same transaction IDs, and COMBTRAN then loads two records with one key into the transaction master.
+- The PARM length is ignored and the text is not checked. With a PARM shorter than 10 characters the ID prefix contains whatever follows the PARM in storage on z/OS (spaces locally). The same PARM in two runs (the JCL hardcodes `2022071800`) gives the same transaction IDs. In the cycle as designed TRANBKP empties the transaction master before POSTTRAN, so COMBTRAN combines only the latest backup with one INTCALC run and the duplicates do not meet; they collide across cycles, when two runs with the same PARM reach one COMBTRAN or when a store keeps transactions from earlier cycles, and COMBTRAN's `REPRO` then meets two records with one key (COMBTRAN VAL-JCOMB-001, INTCALC DEF-JINTC-001).
 - **Source:** `:176-178, 478-482`, `app/jcl/INTCALC.jcl:22` · **Status:** open · **Fidelity:** defect-decide (Q-INTC-006)
 
 #### DEF-INTC-011 · [security] Balances printed to SYSOUT
