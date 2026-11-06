@@ -30,7 +30,7 @@ The Airflow work in Phase 3 adds the Postgres driver and the DAGs.
 ## Quick start
 
 ```sh
-make -C modernization setup   # toolchain check, creates modernization/.env with generated passwords
+make -C modernization setup   # toolchain check, creates .env and the JWT signing key with generated secrets
 make -C modernization up      # starts SQL Server, RabbitMQ and Postgres, waits until all are healthy
 make -C modernization status  # containers and health
 make -C modernization down    # stops and removes the containers; data volumes are kept
@@ -113,6 +113,26 @@ Run RabbitMQ CLI commands as the `rabbitmq` user (`exec -u rabbitmq`). As root t
 
 `.env` is git-ignored, by `modernization/.gitignore` and by the root `.gitignore`. `make setup` creates it with mode 600. Only `.env.example` is committed, and its password values are empty. Compose refuses to start a service whose password is not set. The SQL Server SA password is fixed when the volume is first created. If you change it in `.env` later, run `make infra-wipe CONFIRM=1` and then `make up`.
 
+`make setup` also generates:
+
+- `CARDDEMO_SEED_USER_PASSWORD` in `.env`: the password of the 10 seed users (`ADMIN001`, `USER0001`, ...) that identity-service creates. It replaces the public `PASSWORD` of the mainframe demo data.
+- `var/secrets/identity-jwt.pem`: the RSA 3072 private key (PKCS#8 PEM, mode 600, directory mode 700) that identity-service signs its RS256 access tokens with. The other services get the public key from its JWKS endpoint. The Makefile exports the path as `CARDDEMO_JWT_KEY_FILE`. An existing key is kept; delete it and rerun `make setup` to rotate it, which invalidates every issued token.
+
+Neither is ever printed. `var/` is git-ignored.
+
+## One stack per machine, shared by every worktree
+
+There is one `carddemo-modern` compose project per machine, and its volumes were created with the secrets of one `.env`. So every checkout of the repository, including linked git worktrees, uses the files of the main checkout (the one that owns `.git`):
+
+| Variable (exported to recipes) | Default |
+|:--|:--|
+| `CARDDEMO_ENV_FILE` | `<main checkout>/modernization/.env` |
+| `CARDDEMO_INFRA_DIR` | `<main checkout>/modernization` (its `docker-compose.yml`) |
+| `CARDDEMO_VAR_DIR` | `<main checkout>/modernization/var` (logs, PIDs, locks, keys, batch files) |
+| `CARDDEMO_JWT_KEY_FILE` | `$CARDDEMO_VAR_DIR/secrets/identity-jwt.pem` |
+
+Setting a variable in the environment overrides it. `make setup` in a worktree completes the main checkout's `.env` and key; it never creates a second set. A `modernization/.env` inside a worktree is ignored, and `make setup` warns about it. `make toolchain` shows the paths in use.
+
 ## Toolchain pinning
 
 Nothing is installed or switched globally. `scripts/toolchain.sh` finds the tools, and the `Makefile` puts them first on `PATH` for its recipes:
@@ -125,7 +145,7 @@ The environment wins over `.env`, and `.env` wins over detection. In `.env` you 
 
 ## Troubleshooting
 
-- **`modernization/.env is missing; run make setup first`:** run `make setup`.
+- **`<path>/.env is missing; run make setup (in the main checkout) first`:** run `make setup`; from a worktree it creates the main checkout's `.env`.
 - **Port already in use:** change the `*_HOST_PORT` values in `.env`.
 - **SQL Server never gets healthy on Apple Silicon:** check `make toolchain` and `colima status`. The Colima VM needs Rosetta (`--vz-rosetta`) and at least 4 GiB; 8 GiB is the tested size.
 - **`docker engine not reachable`:** run `colima start` on macOS, or start the Docker daemon on Linux.
