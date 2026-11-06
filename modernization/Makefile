@@ -113,7 +113,7 @@ smoke: PHASE = Phase 3, the Bill Pay pilot (end-to-end smoke check)
 billpay: ## Run the Bill Pay slice end to end [not implemented yet]
 billpay: PHASE = Phase 3, the Bill Pay pilot
 verify-spec: ## Check the NL spec (format, paragraph coverage) and run its GnuCOBOL equivalence checks
-	$(PYTHON) '$(HERE)/../docs/modernization/spec/tools/verify_spec.py'
+	$(PYTHON) '$(HERE)/../docs/modernization/spec/tools/verify_spec.py' --require-all
 verify-ledger: ## Check the ledger evidence and its links [not implemented yet]
 verify-ledger: PHASE = Phase 4, validation (ledger evidence checks)
 test-backend: ## Spring Boot service tests (heavy: Testcontainers) [not implemented yet]

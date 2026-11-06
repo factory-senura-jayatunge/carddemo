@@ -1,5 +1,7 @@
 # Area e-authorization: entity proposals
 
+Merged in 3ec58c3 into `../entities.md`.
+
 Proposed additions to `../entities.md` for the optional authorization module (`app/app-authorization-ims-db2-mq/`), written at commit b5e0139. Conventions follow `../entities.md`; in addition:
 
 - `packed(p,s)` is packed decimal (`COMP-3`): `p` digits of which `s` are decimals, two digits per byte, sign in the last half-byte (`C` or `F` positive, `D` negative); its length is `(p+1)/2` rounded up.
