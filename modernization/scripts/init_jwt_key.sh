@@ -29,8 +29,8 @@ command -v openssl >/dev/null 2>&1 || {
 tmp="$key.tmp.$$"
 trap 'rm -f "$tmp"' EXIT
 # PKCS#8 PEM ("BEGIN PRIVATE KEY"), which Spring and Nimbus read directly.
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$tmp" 2>/dev/null
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmp" 2>/dev/null
 chmod 600 "$tmp"
 mv "$tmp" "$key"
 trap - EXIT
-printf 'ok    %-16s %s\n' jwt-key "$key: generated RSA 3072 (mode 600)"
+printf 'ok    %-16s %s\n' jwt-key "$key: generated RSA 2048 (mode 600)"

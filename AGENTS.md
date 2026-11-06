@@ -92,7 +92,7 @@ A change is done when `make check` ends with `make check: OK`. It runs every ste
 | `scripts/` | `cobol_lint.py` and `lint.sh` with their tests in `scripts/tests/`, `gen_inventory.py`, `check_agents_md.py`. The older `remote_*.sh`, `run_*.sh` and `upld_module.sh` drive a real mainframe through an FTP tunnel and do not run locally; `local_compile.sh`, `git-addSrcVersionInfo.sh`, `pad.awk` and `markers/` are legacy helpers that the local build does not use. |
 | `docs/` | [Inventory](docs/inventory.md), [linting](docs/linting.md), [runbooks](docs/runbooks/README.md), [security](docs/security/secrets.md). |
 | `docs/modernization/spec/` | The [natural-language specification](docs/modernization/spec/README.md) of every program and job for the modernization: [format](docs/modernization/spec/format.md), program and job specs, entity catalog, component map, interaction view, area proposals, evidence and the checker `docs/modernization/spec/tools/check_spec.py`. A spec whose source changed fails `make spec-check` until it is re-checked and its `sha256` updated. |
-| `.github/workflows/` | `ci.yml` (jobs lint, docs-check, build-and-test), `release.yml` (`v*` tags), `label-sync.yml`, `agents-md.yml`. |
+| `.github/workflows/` | `ci.yml` (jobs lint, docs-check, build-and-test), `modernization.yml` (the `modernization/` make targets; jobs whose targets are stubs are skipped), `release.yml` (`v*` tags), `label-sync.yml`, `agents-md.yml`. |
 | `.factory/skills/` | Step-by-step procedures for common tasks (listed below). |
 | `modernization/` | The modernized stack, in progress: local infrastructure (Docker Compose) and its own make targets. See [modernization/README.md](modernization/README.md). |
 
