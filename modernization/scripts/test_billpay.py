@@ -11,8 +11,9 @@ Steps, in order; the first failure ends the run:
   5. e2e-stack Playwright e2e/bill.spec.ts against the running slice
   6. trace     the traceability gate for the BILL unit
 
-Playwright empties web/test-results on every run, so its JUnit report is
-copied to build/test-results/billpay/ after each Playwright step. Run under
+Playwright empties web/test-results on every run, so Vitest writes its
+JUnit report straight to build/test-results/billpay/ and Playwright's is
+copied there after each Playwright step. Run under
 heavy.py and with_env.py, as make test-billpay does. The slice stays up.
 
 Ends with "test-billpay: OK" or "test-billpay: FAILED (<step>: <reason>)".
@@ -99,7 +100,8 @@ def main() -> int:
         run("maven", ["./mvnw", "-B", "verify", "-pl", "platform/ledger-core,services/billpay-service", "-am"])
         run("vitest", ["npm", "ci"], cwd=WEB)
         run("vitest", ["npx", "vitest", "run", "src/pages/BillPayPage.test.tsx", "--reporter=default",
-                       "--reporter=junit", "--outputFile.junit=test-results/vitest-billpay-junit.xml"], cwd=WEB)
+                       "--reporter=junit", "--outputFile.junit=" + os.path.join(RESULTS, "vitest-billpay-junit.xml")],
+            cwd=WEB)
         run("e2e-mock", ["npx", "playwright", "test", "e2e/bill.spec.ts", "--project=chromium"], cwd=WEB,
             extra={"CARDDEMO_WEB_PORT": MOCK_PORT})
         keep_playwright_junit("e2e-mock")
