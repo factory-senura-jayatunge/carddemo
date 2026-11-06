@@ -88,9 +88,9 @@ export function MenuPage({ variant }: MenuPageProps) {
     if (status === 'available' && option.to) {
       void navigate(option.to);
     } else if (status === 'not-installed') {
-      show(message('MENU_NOT_INSTALLED', { name: option.name }));
+      show(message('OPTION_NOT_INSTALLED', { name: option.name }));
     } else {
-      show(message('MENU_COMING_SOON', { name: option.name }));
+      show(message('OPTION_COMING_SOON', { name: option.name }));
     }
   };
 
@@ -99,7 +99,7 @@ export function MenuPage({ variant }: MenuPageProps) {
     const number = parseMenuOption(typed, options.length);
     const option = number === null ? undefined : options[number - 1];
     if (!option) {
-      show(message('MENU_INVALID_OPTION'));
+      show(message('INVALID_OPTION'));
       optionField.current?.focus();
       return;
     }

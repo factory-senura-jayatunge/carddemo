@@ -19,10 +19,11 @@ import {
 const userId = (page: Page) => page.getByLabel('User ID');
 const password = (page: Page) => page.getByLabel('Password', { exact: true });
 const NEUTRAL = 'Wrong User ID or Password. Try again ...';
+const SESSION_ENDED = 'Your session has ended. Please sign on again ...';
 
 test.beforeEach(async ({ mock }) => mock({ latency: 0 }));
 
-test('[FLOW-SGN-001] [FLOW-SGN-007] SGN-S1: the app opens on sign-on with focus on User ID', async ({ page }) => {
+test('@FLOW-SGN-001 @FLOW-SGN-007 SGN-S1: the app opens on sign-on with focus on User ID', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-on$/);
   await expect(userId(page)).toBeFocused();
@@ -31,7 +32,7 @@ test('[FLOW-SGN-001] [FLOW-SGN-007] SGN-S1: the app opens on sign-on with focus 
   await expectAccessible(page);
 });
 
-test('[VAL-SGN-001] SGN-S2: both fields blank', async ({ page }) => {
+test('@VAL-SGN-001 SGN-S2: both fields blank', async ({ page }) => {
   await page.goto('/sign-on');
   await page.getByRole('button', { name: 'Sign on', exact: true }).click();
   await expectMessage(page, 'Please enter User ID ...', 'error');
@@ -40,7 +41,7 @@ test('[VAL-SGN-001] SGN-S2: both fields blank', async ({ page }) => {
   await expectAccessible(page);
 });
 
-test('[VAL-SGN-002] SGN-S3: password blank', async ({ page }) => {
+test('@VAL-SGN-002 SGN-S3: password blank', async ({ page }) => {
   await page.goto('/sign-on');
   await userId(page).fill('ADMIN001');
   await userId(page).press('Enter');
@@ -48,7 +49,7 @@ test('[VAL-SGN-002] SGN-S3: password blank', async ({ page }) => {
   await expect(password(page)).toBeFocused();
 });
 
-test('[BR-SGN-004] SGN-S4: an admin lands on the admin menu', async ({ page }) => {
+test('@BR-SGN-004 @BR-SGN-005 SGN-S4: an admin lands on the admin menu, signed on as an admin', async ({ page }) => {
   await signOn(page, 'ADMIN001');
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Admin menu' })).toBeVisible();
@@ -57,7 +58,7 @@ test('[BR-SGN-004] SGN-S4: an admin lands on the admin menu', async ({ page }) =
   expect(me.body).toMatchObject({ userId: 'ADMIN001', userType: 'A', role: 'ADMIN', home: '/admin' });
 });
 
-test(`[DEF-SGN-011] SGN-S5 ${mode}: a lower-case user ID and password`, async ({ page }) => {
+test(`@DEF-SGN-011 SGN-S5 @${mode}: a lower-case user ID and password`, async ({ page }) => {
   await signOn(page, 'user0001', PASSWORD.toLowerCase());
   if (mode === 'fixed') {
     await expectMessage(page, NEUTRAL, 'error');
@@ -67,7 +68,7 @@ test(`[DEF-SGN-011] SGN-S5 ${mode}: a lower-case user ID and password`, async ({
   }
 });
 
-test('[BR-SGN-001] [NUM-SGN-002] SGN-S5b: user IDs are not case-sensitive', async ({ page }) => {
+test('@BR-SGN-001 @NUM-SGN-002 SGN-S5b: user IDs are not case-sensitive', async ({ page }) => {
   await signOn(page, 'user0001');
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
@@ -75,7 +76,7 @@ test('[BR-SGN-001] [NUM-SGN-002] SGN-S5b: user IDs are not case-sensitive', asyn
   expect(me.body).toMatchObject({ userId: 'USER0001', userType: 'U', role: 'USER', home: '/' });
 });
 
-test(`[VAL-SGN-003] [DEF-SGN-003] SGN-S6 ${mode}: an unknown user`, async ({ page }) => {
+test(`@BR-SGN-002 @VAL-SGN-003 @DEF-SGN-003 SGN-S6 @${mode}: an unknown user`, async ({ page }) => {
   await signOn(page, 'NOUSER01');
   if (mode === 'fixed') {
     await expectMessage(page, NEUTRAL, 'error');
@@ -86,14 +87,14 @@ test(`[VAL-SGN-003] [DEF-SGN-003] SGN-S6 ${mode}: an unknown user`, async ({ pag
   }
 });
 
-test(`[VAL-SGN-004] [DEF-SGN-003] SGN-S7 ${mode}: a wrong password`, async ({ page }) => {
+test(`@VAL-SGN-004 @DEF-SGN-003 SGN-S7 @${mode}: a wrong password`, async ({ page }) => {
   await signOn(page, 'ADMIN001', 'WRONGPWD');
   await expectMessage(page, mode === 'fixed' ? NEUTRAL : 'Wrong Password. Try again ...', 'error');
   await expect(password(page)).toBeFocused();
   await expectAccessible(page);
 });
 
-test('[FLOW-SGN-003] SGN-S8: Exit shows the thank-you page; Back on a menu ends the session', async ({ page }) => {
+test('@FLOW-SGN-003 SGN-S8: Exit shows the thank-you page; Back on a menu ends the session', async ({ page }) => {
   await page.goto('/sign-on');
   await page.getByRole('button', { name: /^Exit/ }).click();
   await expect(page).toHaveURL(/\/signed-off$/);
@@ -111,7 +112,7 @@ test('[FLOW-SGN-003] SGN-S8: Exit shows the thank-you page; Back on a menu ends 
   expect((await callApi(page, 'GET', '/api/auth/me')).status).toBe(401);
 });
 
-test('[VAL-SGN-005] [FLOW-SGN-004] SGN-S9: F5 with the function keys on is an invalid key; F3 exits', async ({ page }) => {
+test('@VAL-SGN-005 @FLOW-SGN-004 @DEF-SGN-010 SGN-S9: F5 with the function keys on is an invalid key and keeps the input; F3 exits', async ({ page }) => {
   await page.goto('/sign-on');
   await turnOnFunctionKeys(page);
   await userId(page).fill('USER0001');
@@ -128,12 +129,12 @@ test('SGN-S10: sign-on works while the batch window is open @mock-only', async (
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
 });
 
-test('[DEF-SGN-011] SGN-S11 fixed: a mixed-case password signs on as typed @mock-only', async ({ page }) => {
+test('@DEF-SGN-011 SGN-S11 @fixed: a mixed-case password signs on as typed @mock-only', async ({ page }) => {
   await signOn(page, 'TEST0001', 'Secret12');
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
 });
 
-test('[DEF-SGN-002] SGN-S12 fixed: five wrong passwords lock the user for 15 minutes @mock-only', async ({ page }) => {
+test('@DEF-SGN-002 SGN-S12 @fixed: five wrong passwords lock the user for 15 minutes @mock-only', async ({ page }) => {
   await page.clock.install();
   await page.goto('/sign-on');
   await userId(page).fill('USER0003');
@@ -151,13 +152,13 @@ test('[DEF-SGN-002] SGN-S12 fixed: five wrong passwords lock the user for 15 min
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
 });
 
-test('[DEF-SGN-005] SGN-S13 fixed: an unknown user type is refused @mock-only', async ({ page }) => {
+test('@DEF-SGN-005 SGN-S13 @fixed: an unknown user type is refused @mock-only', async ({ page }) => {
   await signOn(page, 'TYPEX001');
   await expectMessage(page, 'User not authorized. Contact your administrator ...', 'error');
   await expect(userId(page)).toBeFocused();
 });
 
-test('[D-SEC-07] SGN-S14 fixed: a forced password change checks each rule and lands on home @mock-only', async ({ page }) => {
+test('@D-SEC-07 SGN-S14 @fixed: a forced password change checks each rule and lands on home @mock-only', async ({ page }) => {
   await signOn(page, 'CHANGE01');
   await expect(page).toHaveURL(/\/sign-on\/change-password$/);
   await expect(page.getByRole('heading', { name: 'Change your password' })).toBeVisible();
@@ -187,7 +188,24 @@ test('[D-SEC-07] SGN-S14 fixed: a forced password change checks each rule and la
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
 });
 
-test('[D-05] SGN-S15: 15 idle minutes sign the user off after a warning', async ({ page }) => {
+test('@D-05 SGN-S15: a session idle for 16 minutes cannot be refreshed, and the next action shows the note @mock-only', async ({ page, mock }) => {
+  // The page's own idle sign-out is pushed back, so the server's timeout is what ends the session.
+  await mock({ latency: 0, idle: { timeoutMs: 60 * 60_000, warnBeforeMs: 120_000 } });
+  await page.clock.install();
+  await signOn(page, 'USER0001');
+  await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
+  await page.clock.fastForward('16:00');
+  const refresh = await callApi(page, 'POST', '/api/auth/refresh');
+  expect(refresh.status).toBe(401);
+  expect(refresh.body?.code).toBe('SESSION_EXPIRED');
+  await page.getByTestId('option-10').click();
+  await page.getByLabel('Account ID').fill('00000000001');
+  await page.getByTestId('submit').click();
+  await expect(page).toHaveURL(/\/sign-on$/);
+  await expectMessage(page, SESSION_ENDED, 'info');
+});
+
+test('@D-05 SGN-S20: 15 idle minutes sign the user off after a warning, with the session-ended note', async ({ page }) => {
   await page.clock.install();
   await signOn(page, 'USER0001');
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
@@ -202,10 +220,72 @@ test('[D-05] SGN-S15: 15 idle minutes sign the user off after a warning', async 
   await expectAccessible(page);
   await page.clock.fastForward('02:00');
   await expect(page).toHaveURL(/\/sign-on$/);
-  await expectMessage(page, 'You were signed out after 15 minutes without activity.', 'info');
+  await expectMessage(page, SESSION_ENDED, 'info');
+  await expectAccessible(page);
   expect((await callApi(page, 'GET', '/api/auth/me')).status).toBe(401);
 });
 
+test('@DEF-SGN-002 SGN-S19 @fixed: failed attempts over the per-address limit get 429, even with the right password @mock-only', async ({ page }) => {
+  // On the stack 30 failures would limit 127.0.0.1 for a minute and fail the tests after it;
+  // identity-service's own tests cover S19 there with a low limit.
+  await page.clock.install();
+  await page.goto('/sign-on');
+  await userId(page).fill('USER0003');
+  // identity-service's default: 30 failed attempts per client address per minute.
+  for (let attempt = 1; attempt <= 30; attempt += 1) {
+    await password(page).fill(`WRONG${String(attempt).padStart(3, '0')}`);
+    await password(page).press('Enter');
+    await expectMessage(page, NEUTRAL, 'error');
+  }
+  await password(page).fill(PASSWORD);
+  await password(page).press('Enter');
+  await expectMessage(page, 'Too many sign-on attempts. Try again later ...', 'error');
+  await expect(userId(page)).toBeFocused();
+  await expect(page.getByTestId('retry-at')).toHaveText(/^Try again after \d{2}:\d{2}\.$/);
+  await expectAccessible(page);
+  // The limit is per address, not per user.
+  await userId(page).fill('USER0001');
+  await password(page).press('Enter');
+  await expectMessage(page, 'Too many sign-on attempts. Try again later ...', 'error');
+  // A minute later the limit is lifted; the five failures have locked USER0003 meanwhile.
+  await page.clock.fastForward('01:01');
+  await userId(page).fill('USER0003');
+  await password(page).press('Enter');
+  await expectMessage(page, NEUTRAL, 'error');
+  await expect(page.getByTestId('retry-at')).toHaveCount(0);
+  await userId(page).fill('USER0001');
+  await password(page).press('Enter');
+  await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
+});
+
+test('@DEF-SGN-002 SGN-S19 @legacy: there is no limit on failed attempts', async ({ page }) => {
+  await page.goto('/sign-on');
+  await userId(page).fill('USER0003');
+  for (let attempt = 1; attempt <= 31; attempt += 1) {
+    await password(page).fill(`WRONG${String(attempt).padStart(3, '0')}`);
+    await password(page).press('Enter');
+    await expectMessage(page, 'Wrong Password. Try again ...', 'error');
+  }
+  await password(page).fill(PASSWORD);
+  await password(page).press('Enter');
+  await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
+});
+
+test('SGN-S21: a password change whose user ID is not the signed-on user is refused and counts nothing', async ({ page }) => {
+  await signOn(page, 'USER0001');
+  await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
+  const answer = await callApi(page, 'POST', '/api/auth/password', {
+    body: { userId: 'admin001', currentPassword: PASSWORD, newPassword: 'Another pass 21' },
+  });
+  expect(answer.status).toBe(400);
+  expect(answer.body).toMatchObject({ code: 'USER_ID_MISMATCH', field: 'userId', message: 'User ID does not match the signed-on user ...' });
+  const me = await callApi(page, 'GET', '/api/auth/me');
+  expect(me.body?.userId).toBe('USER0001');
+  // ADMIN001's password is unchanged.
+  await callApi(page, 'POST', '/api/auth/sign-off');
+  await signOn(page, 'ADMIN001');
+  await expect(page.getByRole('heading', { name: 'Admin menu' })).toBeVisible();
+});
 test('SGN-S16: after Sign out the old session cannot be refreshed', async ({ page, context }) => {
   await signOn(page, 'USER0001');
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();

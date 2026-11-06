@@ -6,6 +6,7 @@ import { KeyHint } from '@/components/KeyHint';
 import { MessageArea } from '@/components/MessageArea';
 import { PageTitle } from '@/components/PageTitle';
 import { usePageKeys } from '@/keys/KeyboardShortcuts';
+import { formatClockTime } from '@/lib/format';
 import { message, type ScreenMessage } from '@/lib/messages';
 import { useFieldFocus } from '@/lib/useFieldFocus';
 import { messages } from '@/messages';
@@ -56,13 +57,15 @@ export function SignOnPage() {
     routeState.note ? { text: routeState.note.text, tone: 'info' } : null,
   );
   const [errorField, setErrorField] = useState<Field | null>(null);
+  const [retryAt, setRetryAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState(false);
   const userIdRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const focus = useFieldFocus<Field>({ userId: userIdRef, password: passwordRef }, 'userId');
 
-  const show = (next: ScreenMessage, field: Field | null) => {
+  const show = (next: ScreenMessage, field: Field | null, retry: Date | null = null) => {
     setScreenMessage(next);
+    setRetryAt(retry);
     setErrorField(next.tone === 'error' ? field : null);
     if (field) focus(field);
   };
@@ -81,7 +84,7 @@ export function SignOnPage() {
     if (busy) return;
     const problem = checkSignOn(userId, password);
     if (problem) {
-      show(message(problem.code), problem.field);
+      show(message(problem.key), problem.field);
       return;
     }
     setBusy(true);
@@ -97,7 +100,9 @@ export function SignOnPage() {
         return;
       }
       if (error instanceof ApiError) {
-        show({ text: error.message, tone: error.severity }, error.field === 'password' ? 'password' : 'userId');
+        // The fixed-mode rate limit (TOO_MANY_ATTEMPTS) says when to try again.
+        const retry = error.status === 429 && error.retryAfterSeconds !== undefined ? new Date(Date.now() + error.retryAfterSeconds * 1000) : null;
+        show({ text: error.message, tone: error.severity }, error.field === 'password' ? 'password' : 'userId', retry);
       } else {
         show({ text: String(error), tone: 'error' }, 'userId');
       }
@@ -144,7 +149,13 @@ export function SignOnPage() {
                 aria-describedby={invalid('password') ? messageId : undefined}
                 data-testid="password"
               />
-              <MessageArea id={messageId} message={screenMessage} />
+              <MessageArea id={messageId} message={screenMessage}>
+                {retryAt && (
+                  <Text size="sm" mt={4} c="inherit" data-testid="retry-at">
+                    Try again after {formatClockTime(retryAt)}.
+                  </Text>
+                )}
+              </MessageArea>
               <Button type="submit" size="md" fullWidth loading={busy}>
                 Sign on
               </Button>

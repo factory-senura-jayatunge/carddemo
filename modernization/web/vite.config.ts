@@ -48,6 +48,10 @@ export default defineConfig(({ mode }) => ({
     include: ['src/**/*.test.{ts,tsx}'],
     css: false,
     restoreMocks: true,
+    // Room for a loaded machine (CI, Maven builds alongside): fewer workers, longer limits.
+    maxWorkers: 4,
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
     unstubGlobals: true,
     reporters: ['default', 'junit'],
     outputFile: { junit: './test-results/vitest-junit.xml' },

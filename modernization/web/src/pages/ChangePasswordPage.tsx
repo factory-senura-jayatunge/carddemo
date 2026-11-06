@@ -70,7 +70,7 @@ export function ChangePasswordPage() {
     if (busy) return;
     const problem = checkPasswordChange(userId, currentPassword, newPassword, confirmPassword);
     if (problem) {
-      show(message(problem.code), problem.field);
+      show(message(problem.key), problem.field);
       return;
     }
     setBusy(true);

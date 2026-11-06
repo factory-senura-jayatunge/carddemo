@@ -10,14 +10,16 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const target = process.env.CARDDEMO_E2E_TARGET === 'stack' ? 'stack' : 'mock';
 // The mock answers in fixed mode; a stack in the mode CARDDEMO_E2E_MODE names (fixed by default).
-// Tests whose title names the other mode, or that need a mock-only fixture, are skipped.
+// Tests tagged with the other mode (@fixed, @legacy), or that need a mock-only fixture, are skipped.
 const mode = target === 'stack' && process.env.CARDDEMO_E2E_MODE === 'legacy' ? 'legacy' : 'fixed';
-const skip = [mode === 'fixed' ? / legacy\b/ : / fixed\b/, target === 'stack' ? /@mock-only/ : null].filter((r): r is RegExp => r !== null);
+const skip = [mode === 'fixed' ? /@legacy\b/ : /@fixed\b/, target === 'stack' ? /@mock-only/ : null].filter((r): r is RegExp => r !== null);
 const port = Number(process.env.CARDDEMO_WEB_PORT ?? 25173);
 const baseURL = process.env.CARDDEMO_WEB_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: 'e2e',
+  // Playwright empties its output folder on every run; a subfolder keeps Vitest's report beside it.
+  outputDir: 'test-results/e2e',
   fullyParallel: target === 'mock',
   workers: target === 'mock' ? 4 : 1,
   forbidOnly: Boolean(process.env.CI),
@@ -25,7 +27,13 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   grepInvert: skip,
-  reporter: [['list'], ['junit', { outputFile: 'test-results/e2e-junit.xml' }], ['html', { open: 'never' }]],
+  // The JSON report is what make trace reads (@<item ID> and @fixed/@legacy tags). One file per
+  // target and mode, outside the html folder and test-results, which each run empties.
+  reporter: [
+    ['list'],
+    ['json', { outputFile: `playwright-report/e2e-${target}-${mode}.json` }],
+    ['html', { open: 'never', outputFolder: 'playwright-report/html' }],
+  ],
   use: {
     baseURL,
     trace: 'retain-on-failure',

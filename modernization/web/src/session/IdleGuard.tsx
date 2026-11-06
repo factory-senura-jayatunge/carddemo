@@ -1,6 +1,6 @@
 import { Button, Group, Modal, Text } from '@mantine/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uiText } from '@/lib/messages';
+import { sessionEndedNote } from '@/lib/messages';
 import { useSession, useUser } from './SessionProvider';
 
 export interface IdleTimings {
@@ -60,7 +60,7 @@ export function IdleGuard({ timings }: { timings?: IdleTimings }) {
         window.clearInterval(timer);
         warning.current = false;
         setRemaining(null);
-        void signOff({ to: 'sign-on', note: { text: uiText.idleSignedOut } });
+        void signOff({ to: 'sign-on', note: sessionEndedNote });
       } else if (left <= warnBeforeMs) {
         warning.current = true;
         setRemaining(left);
@@ -73,7 +73,7 @@ export function IdleGuard({ timings }: { timings?: IdleTimings }) {
     warning.current = false;
     lastInput.current = Date.now();
     setRemaining(null);
-    if (!(await extend())) void signOff({ to: 'sign-on', note: { text: uiText.sessionExpired } });
+    if (!(await extend())) void signOff({ to: 'sign-on', note: sessionEndedNote });
   };
 
   return (
