@@ -112,13 +112,13 @@ balances keep them.
    refresh instead.
 2. Resubmit INTCALC with the same `PARM` date.
 
-### Known defect: last account
+### Fixed defect: last account
 
-Open issue #64: the account that comes last in `TCATBALF` gets its interest transactions
-written to `SYSTRAN`, but its `ACCTDATA` record is never rewritten. The main loop exits on end
-of file before the final `1050-UPDATE-ACCOUNT` runs. After INTCALC, that account's balance
-does not include the interest and its cycle totals are not reset. Check it by hand until the
-program is fixed.
+Issue #64 reported that the account that comes last in `TCATBALF` got its interest
+transactions written to `SYSTRAN` but its `ACCTDATA` record was never rewritten. The
+`CBACT04C` in this repository performs `1050-UPDATE-ACCOUNT` once more after the main loop,
+so the last account is updated too. If your load module was built from an older source,
+check that account's balance and cycle totals by hand after INTCALC.
 
 ## TRANBKP (after INTCALC)
 
