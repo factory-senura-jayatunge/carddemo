@@ -27,7 +27,7 @@ class TypeScriptMirrorTest {
         assertThat(toolchain).isRegularFile();
         String nodeBin = run(List.of(toolchain.toString(), "node-bin"), module).strip();
         assertThat(nodeBin).as("Node 24 from scripts/toolchain.sh node-bin").isNotEmpty();
-        String out = run(List.of(Path.of(nodeBin, "node").toString(), "--test", "--test-reporter=tap",
+        String out = run(List.of(Path.of(nodeBin, "node").toString(), "--import", "./src/test/ts/resolve-ts.mjs", "--test", "--test-reporter=tap",
                 "src/test/ts/**/*.test.ts"), module);
         assertThat(out).contains("# fail 0").doesNotContain("# pass 0");
     }
