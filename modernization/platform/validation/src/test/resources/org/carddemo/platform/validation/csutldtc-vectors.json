@@ -1,0 +1,6989 @@
+{
+ "source": "app/cbl/CSUTLDTC.cbl with tools/shims/CEEDAYS.cbl, GnuCOBOL -std=ibm -fsign=EBCDIC -ftab-width=4",
+ "vectors": [
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-15",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-10-15 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2022-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2022-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2022-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-00-10",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2022-00-10 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-14",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-10-14 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "0022-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 0022-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "0000-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 0000-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1500-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1500-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-7-6",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-7-6   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-0A-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-0A-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022/07/06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022/07/06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2507,
+   "line": "0003Mesg Code: 2507 Insufficient    TstDate:            Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-XX-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYY-XX-DD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:              "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYYMMDD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 20220706   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "20230229",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 20230229   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "2024-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2024-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2024-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2024-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2024-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2023-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2023-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2023-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2023-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1900-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1900-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1900-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1900-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2000-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 2000-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2000-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 2000-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1600-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1600-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1600-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1600-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1582-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1582-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1582-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1582-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1582-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1582-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 1582-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 1582-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-00-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-00-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-01-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-01-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-01-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-01-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-01-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-01-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-01-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-02-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-02-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-02-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-02-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-02-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-02-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-02-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-03-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-03-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-03-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-03-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-03-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-03-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-03-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-03-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-04-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-04-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-04-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-04-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-04-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-04-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-04-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-04-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-05-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-05-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-05-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-05-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-05-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-05-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-05-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-05-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-06-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-06-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-06-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-06-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-06-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-06-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-06-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-06-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-07-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-07-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-07-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-07-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-07-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-07-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-07-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-07-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-08-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-08-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-08-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-08-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-08-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-08-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-08-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-08-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-09-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-09-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-09-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-09-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-09-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-09-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-09-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-09-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-10-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-10-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-10-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-10-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-10-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-10-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-10-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-10-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-11-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-11-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-11-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-11-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-11-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-11-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-11-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-11-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-12-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-12-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-12-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-12-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 9999-12-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-12-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2508,
+   "line": "0003Mesg Code: 2508 Datevalue error TstDate: 9999-12-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-00",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-00 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-28",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-28 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-29",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-29 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "9999-13-32",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 9999-13-32 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1582-10-16",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1582-10-16 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1581-12-31",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1581-12-31 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1583-01-01",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 1583-01-01 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "1581-02-30",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 1581-02-30 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-0 ",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-0  Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": " 2022-07-0",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:  2022-07-0 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-6 ",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-6  Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "202A-07-06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 202A-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-0A",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-0A Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "+022-07-06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: +022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "-022-07-06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: -022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022.07.06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022.07.06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022 07 06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022 07 06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "20220706  ",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-06X",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "    -  -  ",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:     -  -   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "abcd-ef-gh",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: abcd-ef-gh Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022--7-06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022--7-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-1-123",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-1-123 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "ÿ022-07-06",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: ÿ022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-06\u0000",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "20240229",
+   "picture": "YYYYMMDD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 20240229   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "20221301",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 20221301   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "15000101",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2513,
+   "line": "0003Mesg Code: 2513 Unsupp. Range   TstDate: 15000101   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "2022070",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022070    Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "2022-07-",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "20220706XX",
+   "picture": "YYYYMMDD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 20220706XX Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "        ",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2507,
+   "line": "0003Mesg Code: 2507 Insufficient    TstDate:            Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "2022 706",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022 706   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "00000000",
+   "picture": "YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 00000000   Mask used:YYYYMMDD      "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "20220706",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "20220607",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "yyyy-mm-dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:yyyy-mm-dd    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "20220706",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "20220607",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "Yyyy-Mm-Dd",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:Yyyy-Mm-Dd    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-06 Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 06-07-2022 Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 07/06/2022 Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "20220706",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "20220607",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "DD-MM-YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:DD-MM-YYYY    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-06 Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 06-07-2022 Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 07/06/2022 Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "20220706",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "20220607",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "MM/DD/YYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:MM/DD/YYYY    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY/MM/DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:YYYY/MM/DD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYYDDMM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-06 Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYYDDMM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYYDDMM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYYDDMM",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 20220706   Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYYDDMM",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 20220607   Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYYDDMM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYYDDMM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:YYYYDDMM      "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYY-MM       "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYY-MM       "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYY-MM       "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYY-MM       "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYY-MM       "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYY-MM       "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYY-MM       "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MM-D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYY-MM-D     "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MM-DDX",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:YYYY-MM-DD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYYYYMMDD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MM-MM",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYY-MM-MM    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "20220706",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "20220607",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YY-MM-DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YY-MM-DD      "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY MM DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY MM DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY MM DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY MM DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY MM DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY MM DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY MM DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:YYYY MM DD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "  YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-06 Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "  YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "  YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "  YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "  YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "  YYYYMMDD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate:   20220706 Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "  YYYYMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:  YYYYMMDD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 0,
+   "severity": 0,
+   "messageNumber": 0,
+   "line": "0000Mesg Code: 0000 Date is valid   TstDate: 2022-07-06 Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220706   Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 20220607   Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY.MM.DD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:YYYY.MM.DD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MM-1D",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYY-MM-1D    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07-06 Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 06-07-2022 Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 07/06/2022 Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "20220706",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 20220706   Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "20220607",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2517,
+   "line": "0003Mesg Code: 2517 Invalid month   TstDate: 20220607   Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "  20220706",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate:   20220706 Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "2022-07",
+   "picture": "MMDDYYYY",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2520,
+   "line": "0003Mesg Code: 2520 Nonnumeric data TstDate: 2022-07    Mask used:MMDDYYYY      "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYY-MMMDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYY-MMMDD    "
+  },
+  {
+   "date": "2022-07-06",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07-06 Mask used:YYYYMMDDDD    "
+  },
+  {
+   "date": "06-07-2022",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 06-07-2022 Mask used:YYYYMMDDDD    "
+  },
+  {
+   "date": "07/06/2022",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 07/06/2022 Mask used:YYYYMMDDDD    "
+  },
+  {
+   "date": "20220706",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220706   Mask used:YYYYMMDDDD    "
+  },
+  {
+   "date": "20220607",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 20220607   Mask used:YYYYMMDDDD    "
+  },
+  {
+   "date": "  20220706",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate:   20220706 Mask used:YYYYMMDDDD    "
+  },
+  {
+   "date": "2022-07",
+   "picture": "YYYYMMDDDD",
+   "returnCode": 3,
+   "severity": 3,
+   "messageNumber": 2518,
+   "line": "0003Mesg Code: 2518 Bad Pic String  TstDate: 2022-07    Mask used:YYYYMMDDDD    "
+  }
+ ]
+}

@@ -1,0 +1,1447 @@
+{
+ "note": "Expected results written from the account update spec (COACTUPC section 8) and the rule table semantics; run by FormRulesVectorsTest and rules.test.ts.",
+ "rules": {
+  "schema": 1,
+  "forms": {
+   "account": {
+    "fields": [
+     {
+      "name": "acctStatus",
+      "label": "Account Status",
+      "checks": [
+       {
+        "kind": "required",
+        "emptyValues": [
+         "0"
+        ]
+       },
+       {
+        "kind": "yesNo"
+       }
+      ]
+     },
+     {
+      "kind": "date",
+      "label": "Open Date",
+      "parts": {
+       "year": "openYear",
+       "month": "openMonth",
+       "day": "openDay"
+      }
+     },
+     {
+      "name": "creditLimit",
+      "label": "Credit Limit",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "amount",
+        "maxIntegerDigits": 10,
+        "maxScale": 2
+       },
+       {
+        "kind": "amountRange",
+        "min": "0",
+        "code": "CREDIT_LIMIT_NEGATIVE",
+        "message": "{label} must not be negative"
+       }
+      ]
+     },
+     {
+      "name": "ssn1",
+      "label": "SSN: First 3 chars",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "numeric",
+        "length": 3
+       },
+       {
+        "kind": "nonZero"
+       },
+       {
+        "kind": "notIn",
+        "values": [
+         0,
+         666
+        ],
+        "ranges": [
+         [
+          900,
+          999
+         ]
+        ],
+        "message": "SSN: First 3 chars: should not be 000, 666, or between 900 and 999"
+       }
+      ]
+     },
+     {
+      "name": "ssn2",
+      "label": "SSN 4th & 5th chars",
+      "requiresValid": [
+       "ssn1"
+      ],
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "numeric",
+        "length": 2
+       },
+       {
+        "kind": "nonZero"
+       }
+      ]
+     },
+     {
+      "name": "ficoScore",
+      "label": "FICO Score",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "numeric",
+        "length": 3
+       },
+       {
+        "kind": "nonZero"
+       },
+       {
+        "kind": "range",
+        "min": 300,
+        "max": 850,
+        "message": "FICO Score: should be between 300 and 850"
+       }
+      ]
+     },
+     {
+      "name": "firstName",
+      "label": "First Name",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "maxLength",
+        "length": 25
+       },
+       {
+        "kind": "alphabetic",
+        "extra": "-'."
+       }
+      ]
+     },
+     {
+      "name": "middleName",
+      "label": "Middle Name",
+      "checks": [
+       {
+        "kind": "alphabetic"
+       }
+      ]
+     },
+     {
+      "name": "state",
+      "label": "State",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "alphabetic"
+       },
+       {
+        "kind": "inList",
+        "list": "usStateCodes",
+        "ignoreCase": true,
+        "message": "State: is not a valid state code"
+       }
+      ]
+     },
+     {
+      "name": "zip",
+      "label": "Zip",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "numeric",
+        "length": 5
+       },
+       {
+        "kind": "nonZero"
+       }
+      ]
+     },
+     {
+      "kind": "phone",
+      "label": "Phone Number 1",
+      "parts": {
+       "area": "phone1Area",
+       "prefix": "phone1Prefix",
+       "line": "phone1Line"
+      }
+     },
+     {
+      "kind": "date",
+      "label": "Date of Birth",
+      "parts": {
+       "year": "dobYear",
+       "month": "dobMonth",
+       "day": "dobDay"
+      },
+      "notFuture": true
+     },
+     {
+      "name": "primaryHolder",
+      "label": "Primary Card Holder",
+      "checks": [
+       {
+        "kind": "required",
+        "emptyValues": [
+         "0"
+        ]
+       },
+       {
+        "kind": "yesNo",
+        "ignoreCase": true
+       }
+      ]
+     },
+     {
+      "kind": "stateZip",
+      "state": "state",
+      "zip": "zip",
+      "ignoreCase": true
+     }
+    ]
+   },
+   "dates": {
+    "fields": [
+     {
+      "kind": "date",
+      "label": "Reissue Date",
+      "parts": {
+       "year": "y",
+       "month": "m",
+       "day": "d"
+      },
+      "minYear": 1000,
+      "maxYear": 9999
+     },
+     {
+      "kind": "date",
+      "label": "Date of Birth",
+      "parts": {
+       "year": "by",
+       "month": "bm",
+       "day": "bd"
+      },
+      "notFuture": true,
+      "allowToday": true,
+      "messages": {
+       "DATE_FUTURE": "{label}: must not be after today"
+      }
+     }
+    ]
+   },
+   "amounts": {
+    "fields": [
+     {
+      "name": "amt",
+      "label": "Credit Limit",
+      "checks": [
+       {
+        "kind": "required"
+       },
+       {
+        "kind": "amount",
+        "maxIntegerDigits": 10,
+        "maxScale": 2
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "cases": [
+  {
+   "name": "every edit passes",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {
+    "acctStatus": "Y",
+    "openYear": "2020",
+    "openMonth": "1",
+    "openDay": "15",
+    "creditLimit": "1,000.50",
+    "ssn1": "123",
+    "ssn2": "45",
+    "ficoScore": "700",
+    "firstName": "O'Brien",
+    "middleName": "",
+    "state": "NC",
+    "zip": "27514",
+    "phone1Area": "919",
+    "phone1Prefix": "555",
+    "phone1Line": "1234",
+    "dobYear": "1980",
+    "dobMonth": "05",
+    "dobDay": "17",
+    "primaryHolder": "y"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "spaces and * count as empty",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {
+    "acctStatus": "0",
+    "openYear": "2020",
+    "openMonth": "1",
+    "openDay": "15",
+    "creditLimit": "1,000.50",
+    "ssn1": "123",
+    "ssn2": "45",
+    "ficoScore": "700",
+    "firstName": "*   ",
+    "middleName": "*",
+    "state": "NC",
+    "zip": "   ",
+    "phone1Area": "919",
+    "phone1Prefix": "555",
+    "phone1Line": "1234",
+    "dobYear": "1980",
+    "dobMonth": "05",
+    "dobDay": "17",
+    "primaryHolder": "y"
+   },
+   "problems": [
+    [
+     "acctStatus",
+     "REQUIRED",
+     "Account Status must be supplied."
+    ],
+    [
+     "firstName",
+     "REQUIRED",
+     "First Name must be supplied."
+    ],
+    [
+     "zip",
+     "REQUIRED",
+     "Zip must be supplied."
+    ]
+   ],
+   "wrongFields": [
+    "acctStatus",
+    "firstName",
+    "zip"
+   ]
+  },
+  {
+   "name": "nothing entered",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {},
+   "problems": [
+    [
+     "acctStatus",
+     "REQUIRED",
+     "Account Status must be supplied."
+    ],
+    [
+     "openYear",
+     "DATE_YEAR_REQUIRED",
+     "Open Date : Year must be supplied."
+    ],
+    [
+     "openMonth",
+     "DATE_MONTH_REQUIRED",
+     "Open Date : Month must be supplied."
+    ],
+    [
+     "openDay",
+     "DATE_DAY_REQUIRED",
+     "Open Date : Day must be supplied."
+    ],
+    [
+     "creditLimit",
+     "REQUIRED",
+     "Credit Limit must be supplied."
+    ],
+    [
+     "ssn1",
+     "REQUIRED",
+     "SSN: First 3 chars must be supplied."
+    ],
+    [
+     "ficoScore",
+     "REQUIRED",
+     "FICO Score must be supplied."
+    ],
+    [
+     "firstName",
+     "REQUIRED",
+     "First Name must be supplied."
+    ],
+    [
+     "state",
+     "REQUIRED",
+     "State must be supplied."
+    ],
+    [
+     "zip",
+     "REQUIRED",
+     "Zip must be supplied."
+    ],
+    [
+     "dobYear",
+     "DATE_YEAR_REQUIRED",
+     "Date of Birth : Year must be supplied."
+    ],
+    [
+     "dobMonth",
+     "DATE_MONTH_REQUIRED",
+     "Date of Birth : Month must be supplied."
+    ],
+    [
+     "dobDay",
+     "DATE_DAY_REQUIRED",
+     "Date of Birth : Day must be supplied."
+    ],
+    [
+     "primaryHolder",
+     "REQUIRED",
+     "Primary Card Holder must be supplied."
+    ]
+   ],
+   "wrongFields": [
+    "acctStatus",
+    "openYear",
+    "openMonth",
+    "openDay",
+    "creditLimit",
+    "ssn1",
+    "ficoScore",
+    "firstName",
+    "state",
+    "zip",
+    "dobYear",
+    "dobMonth",
+    "dobDay",
+    "primaryHolder"
+   ]
+  },
+  {
+   "name": "format edits, every field edited after a failure",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {
+    "acctStatus": "y",
+    "openYear": "199",
+    "openMonth": "13",
+    "openDay": "0",
+    "creditLimit": "1,00,0",
+    "ssn1": "666",
+    "ssn2": "",
+    "ficoScore": "95",
+    "firstName": "Smith2",
+    "middleName": "J.",
+    "state": "nc",
+    "zip": "00000",
+    "phone1Area": "12",
+    "phone1Prefix": "",
+    "phone1Line": "0000",
+    "dobYear": "2027",
+    "dobMonth": "01",
+    "dobDay": "01",
+    "primaryHolder": "x"
+   },
+   "problems": [
+    [
+     "acctStatus",
+     "YES_NO",
+     "Account Status must be Y or N."
+    ],
+    [
+     "openYear",
+     "DATE_YEAR_NOT_4_DIGITS",
+     "Open Date must be 4 digit number."
+    ],
+    [
+     "openMonth",
+     "DATE_MONTH_INVALID",
+     "Open Date: Month must be a number between 1 and 12."
+    ],
+    [
+     "openDay",
+     "DATE_DAY_INVALID",
+     "Open Date:day must be a number between 1 and 31."
+    ],
+    [
+     "creditLimit",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ],
+    [
+     "ssn1",
+     "NOT_ALLOWED",
+     "SSN: First 3 chars: should not be 000, 666, or between 900 and 999"
+    ],
+    [
+     "ficoScore",
+     "NUMERIC",
+     "FICO Score must be all numeric."
+    ],
+    [
+     "firstName",
+     "ALPHABETIC",
+     "First Name can have alphabets only."
+    ],
+    [
+     "middleName",
+     "ALPHABETIC",
+     "Middle Name can have alphabets only."
+    ],
+    [
+     "zip",
+     "NON_ZERO",
+     "Zip must not be zero."
+    ],
+    [
+     "phone1Area",
+     "PHONE_AREA_NOT_3_DIGITS",
+     "Phone Number 1: Area code must be A 3 digit number."
+    ],
+    [
+     "phone1Prefix",
+     "PHONE_PREFIX_REQUIRED",
+     "Phone Number 1: Prefix code must be supplied."
+    ],
+    [
+     "phone1Line",
+     "PHONE_LINE_ZERO",
+     "Phone Number 1: Line number code cannot be zero"
+    ],
+    [
+     "dobYear",
+     "DATE_FUTURE",
+     "Date of Birth:cannot be in the future "
+    ],
+    [
+     "primaryHolder",
+     "YES_NO",
+     "Primary Card Holder must be Y or N."
+    ]
+   ],
+   "wrongFields": [
+    "acctStatus",
+    "openYear",
+    "openMonth",
+    "openDay",
+    "creditLimit",
+    "ssn1",
+    "ficoScore",
+    "firstName",
+    "middleName",
+    "zip",
+    "phone1Area",
+    "phone1Prefix",
+    "phone1Line",
+    "dobYear",
+    "dobMonth",
+    "dobDay",
+    "primaryHolder"
+   ]
+  },
+  {
+   "name": "day combinations, ranges, lists and the state and ZIP pair",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {
+    "acctStatus": "Y",
+    "openYear": "2023",
+    "openMonth": "02",
+    "openDay": "29",
+    "creditLimit": "-5",
+    "ssn1": "000",
+    "ssn2": "45",
+    "ficoScore": "299",
+    "firstName": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "middleName": "",
+    "state": "NC",
+    "zip": "12546",
+    "phone1Area": "800",
+    "phone1Prefix": "12a",
+    "phone1Line": "123",
+    "dobYear": "1990",
+    "dobMonth": "4",
+    "dobDay": "31",
+    "primaryHolder": "y"
+   },
+   "problems": [
+    [
+     "openYear",
+     "DATE_LEAP_YEAR",
+     "Open Date:Not a leap year.Cannot have 29 days in this month."
+    ],
+    [
+     "creditLimit",
+     "CREDIT_LIMIT_NEGATIVE",
+     "Credit Limit must not be negative"
+    ],
+    [
+     "ssn1",
+     "NON_ZERO",
+     "SSN: First 3 chars must not be zero."
+    ],
+    [
+     "ficoScore",
+     "RANGE",
+     "FICO Score: should be between 300 and 850"
+    ],
+    [
+     "firstName",
+     "TOO_LONG",
+     "First Name must not be longer than 25 characters."
+    ],
+    [
+     "phone1Area",
+     "PHONE_AREA_NOT_GENERAL_PURPOSE",
+     "Phone Number 1: Not valid North America general purpose area code"
+    ],
+    [
+     "phone1Prefix",
+     "PHONE_PREFIX_NOT_3_DIGITS",
+     "Phone Number 1: Prefix code must be A 3 digit number."
+    ],
+    [
+     "phone1Line",
+     "PHONE_LINE_NOT_4_DIGITS",
+     "Phone Number 1: Line number code must be A 4 digit number."
+    ],
+    [
+     "dobMonth",
+     "DATE_31_DAYS",
+     "Date of Birth:Cannot have 31 days in this month."
+    ],
+    [
+     "state",
+     "STATE_ZIP_MISMATCH",
+     "Invalid zip code for state"
+    ]
+   ],
+   "wrongFields": [
+    "openYear",
+    "openMonth",
+    "openDay",
+    "creditLimit",
+    "ssn1",
+    "ficoScore",
+    "firstName",
+    "state",
+    "zip",
+    "phone1Area",
+    "phone1Prefix",
+    "phone1Line",
+    "dobMonth",
+    "dobDay"
+   ]
+  },
+  {
+   "name": "30 February, unknown state, area code zero, birth date today",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {
+    "acctStatus": "Y",
+    "openYear": "2020",
+    "openMonth": "2",
+    "openDay": "30",
+    "creditLimit": "1,000.50",
+    "ssn1": "901",
+    "ssn2": "00",
+    "ficoScore": "700",
+    "firstName": "O'Brien",
+    "middleName": "",
+    "state": "FM",
+    "zip": "27514",
+    "phone1Area": "000",
+    "phone1Prefix": "000",
+    "phone1Line": "1234",
+    "dobYear": "2026",
+    "dobMonth": "11",
+    "dobDay": "06",
+    "primaryHolder": "y"
+   },
+   "problems": [
+    [
+     "openMonth",
+     "DATE_30_DAYS",
+     "Open Date:Cannot have 30 days in this month."
+    ],
+    [
+     "ssn1",
+     "NOT_ALLOWED",
+     "SSN: First 3 chars: should not be 000, 666, or between 900 and 999"
+    ],
+    [
+     "state",
+     "NOT_IN_LIST",
+     "State: is not a valid state code"
+    ],
+    [
+     "phone1Area",
+     "PHONE_AREA_ZERO",
+     "Phone Number 1: Area code cannot be zero"
+    ],
+    [
+     "phone1Prefix",
+     "PHONE_PREFIX_ZERO",
+     "Phone Number 1: Prefix code cannot be zero"
+    ],
+    [
+     "dobYear",
+     "DATE_FUTURE",
+     "Date of Birth:cannot be in the future "
+    ]
+   ],
+   "wrongFields": [
+    "openMonth",
+    "openDay",
+    "ssn1",
+    "state",
+    "phone1Area",
+    "phone1Prefix",
+    "dobYear",
+    "dobMonth",
+    "dobDay"
+   ]
+  },
+  {
+   "name": "SSN part 2 is edited once part 1 passes; area code needed when another part is filled",
+   "form": "account",
+   "today": "2026-11-06",
+   "input": {
+    "acctStatus": "Y",
+    "openYear": "2020",
+    "openMonth": "1",
+    "openDay": "15",
+    "creditLimit": "1,000.50",
+    "ssn1": "123",
+    "ssn2": "00",
+    "ficoScore": "700",
+    "firstName": "O'Brien",
+    "middleName": "",
+    "state": "NC",
+    "zip": "27514",
+    "phone1Area": " ",
+    "phone1Prefix": "555",
+    "phone1Line": "",
+    "dobYear": "1980",
+    "dobMonth": "05",
+    "dobDay": "17",
+    "primaryHolder": "y"
+   },
+   "problems": [
+    [
+     "ssn2",
+     "NON_ZERO",
+     "SSN 4th & 5th chars must not be zero."
+    ],
+    [
+     "phone1Area",
+     "PHONE_AREA_REQUIRED",
+     "Phone Number 1: Area code must be supplied."
+    ],
+    [
+     "phone1Line",
+     "PHONE_LINE_REQUIRED",
+     "Phone Number 1: Line number code must be supplied."
+    ]
+   ],
+   "wrongFields": [
+    "ssn2",
+    "phone1Area",
+    "phone1Line"
+   ]
+  },
+  {
+   "name": "CSUTLDTC rejects a date before 1582-10-15",
+   "form": "dates",
+   "today": "2026-11-06",
+   "input": {
+    "y": "1500",
+    "m": "01",
+    "d": "01",
+    "by": "2026",
+    "bm": "11",
+    "bd": "06"
+   },
+   "problems": [
+    [
+     "y",
+     "DATE_CALENDAR",
+     "Reissue Date validation error Sev code: 0003 Message code: 2513"
+    ]
+   ],
+   "wrongFields": [
+    "y",
+    "m",
+    "d"
+   ]
+  },
+  {
+   "name": "a birth date of today is allowed when the rule says so; messages can be replaced",
+   "form": "dates",
+   "today": "2026-11-06",
+   "input": {
+    "y": "1582",
+    "m": "10",
+    "d": "15",
+    "by": "2026",
+    "bm": "11",
+    "bd": "07"
+   },
+   "problems": [
+    [
+     "by",
+     "DATE_FUTURE",
+     "Date of Birth: must not be after today"
+    ]
+   ],
+   "wrongFields": [
+    "by",
+    "bm",
+    "bd"
+   ]
+  },
+  {
+   "name": "year outside the window",
+   "form": "dates",
+   "today": "2026-11-06",
+   "input": {
+    "y": "0999",
+    "m": "1",
+    "d": "1",
+    "by": "1899",
+    "bm": "12",
+    "bd": "31"
+   },
+   "problems": [
+    [
+     "y",
+     "DATE_CENTURY",
+     "Reissue Date : Century is not valid."
+    ],
+    [
+     "by",
+     "DATE_CENTURY",
+     "Date of Birth : Century is not valid."
+    ]
+   ],
+   "wrongFields": [
+    "y",
+    "by"
+   ]
+  },
+  {
+   "name": "amount \"5\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "5"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"-5\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "-5"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"+5\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "+5"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"5.\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "5."
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \".5\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": ".5"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"$1,000.50\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "$1,000.50"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"-$1,000.50\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "-$1,000.50"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"$-1,000.50\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "$-1,000.50"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"1000.50CR\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1000.50CR"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"1000.50 db\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1000.50 db"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"1000.50-\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1000.50-"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"1000.50+\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1000.50+"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \" 12 \" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": " 12 "
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"+ 12\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "+ 12"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"12 -\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "12 -"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"12,345,678.90\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "12,345,678.90"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"9999999999.99\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "9999999999.99"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"0\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "0"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"-0\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "-0"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"$ 100\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "$ 100"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"0000000000012.5\" is valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "0000000000012.5"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "amount \"1,00,0\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1,00,0"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"100,\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "100,"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \",100\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": ",100"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"1.2.3\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1.2.3"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"12 34\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "12 34"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"abc\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "abc"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"CR\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "CR"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \".\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "."
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"-\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "-"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"+\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "+"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"$\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "$"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"1e5\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1e5"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"100$\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "100$"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"--5\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "--5"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"-5-\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "-5-"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"+5CR\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "+5CR"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"12345678901\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "12345678901"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"1.234\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1.234"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"$$5\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "$$5"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"1,0000\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "1,0000"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  },
+  {
+   "name": "amount \"five\" is not valid",
+   "form": "amounts",
+   "today": "2026-11-06",
+   "input": {
+    "amt": "five"
+   },
+   "problems": [
+    [
+     "amt",
+     "AMOUNT_INVALID",
+     "Credit Limit is not valid"
+    ]
+   ],
+   "wrongFields": [
+    "amt"
+   ]
+  }
+ ]
+}
