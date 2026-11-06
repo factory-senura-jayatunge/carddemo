@@ -50,7 +50,7 @@ Access tokens live 300 seconds and are checked with no clock skew; a session end
 | Item | Legacy | Fixed |
 | :-- | :-- | :-- |
 | `DEF-SGN-011` | Password upper-cased before the check | Case-sensitive; `must_change_password` forces a change |
-| `DEF-SGN-002` | No attempt counting | 5 failures lock the user for 15 minutes; failed attempts rate-limited per user and client |
+| `DEF-SGN-002` | No attempt counting | 5 failures lock the user for 15 minutes; a client address with 30 failed attempts in a minute gets `429 TOO_MANY_ATTEMPTS` on every sign-on and password change until the window passes (`carddemo.identity.rate-limit.failures` and `.window`) |
 | `DEF-SGN-003` | `User not found` / `Wrong Password` | One neutral message |
 | `DEF-SGN-005` | Any type other than `A` signs on as `USER` | Types other than `A` and `U` refused |
 | `DEF-BILL-014` | Reported by `/api/features` for the web app | |

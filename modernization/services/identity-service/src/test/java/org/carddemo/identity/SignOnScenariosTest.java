@@ -2,7 +2,10 @@ package org.carddemo.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -17,10 +20,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-/** COSGN00C section 15 scenarios S2 to S13 and S18, through the API; both modes where the table has two. */
+/** COSGN00C section 15 scenarios S2 to S13, S18 and S19, through the API; both modes where the table has two. */
 class SignOnScenariosTest extends IdentityTestBase {
 
     private static final String NEUTRAL = "Wrong User ID or Password. Try again ...";
+    private static final String TOO_MANY = "Too many sign-on attempts. Try again later ...";
 
     private static void assertProblem(Response r, int status, String code, String message, String field) {
         assertThat(r.status()).as("status of %s", r.body()).isEqualTo(status);
@@ -222,22 +226,85 @@ class SignOnScenariosTest extends IdentityTestBase {
 
     @Test
     @SpecItem({"DEF-SGN-002"})
-    void s12c_failedAttemptsAreRateLimitedPerClient() {
+    void s19_fixedRateLimitsFailedAttemptsPerClient() {
         switches.all(FidelityMode.FIXED);
         db.demoUsers();
         ApiClient c = client();
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 4; i++) {
+            assertThat(c.signOn("USER0001", "WRONGPWD").status()).isEqualTo(401);
+        }
+        clock.advance(Duration.ofSeconds(10));
+        for (int i = 0; i < 26; i++) {
             assertThat(c.signOn(String.format("NOUSR%03d", i), "PASSWORD").status()).isEqualTo(401);
         }
-        Response limited = c.signOn("USER0001", "PASSWORD");
-        assertProblem(limited, 429, "TOO_MANY_ATTEMPTS", NEUTRAL, "password");
-        assertThat(limited.raw().getHeader("Retry-After")).isEqualTo("60");
-        // Unknown user IDs count nothing in the database.
+        clock.advance(Duration.ofSeconds(20));
+        clearInvocations(userRepository);
+
+        Response limited = c.signOn("USER0001", "WRONGPWD");
+        assertProblem(limited, 429, "TOO_MANY_ATTEMPTS", TOO_MANY, "userId");
+        assertThat(limited.raw().getHeader("Retry-After")).isEqualTo("30");
+        assertProblem(c.signOn("USER0001", "PASSWORD"), 429, "TOO_MANY_ATTEMPTS", TOO_MANY, "userId");
+        // Nothing read and no counter changed: the user's count stays at 4, no lock.
+        verify(userRepository, never()).find(anyString());
+        assertThat(db.user("USER0001").failedAttempts()).isEqualTo(4);
+        assertThat(db.user("USER0001").lockedUntil()).isNull();
+        assertThat(db.audit()).last()
+                .isEqualTo(new AuditRow("SIGN_ON_FAILED", null, "USER0001", "TOO_MANY_ATTEMPTS", "127.0.0.1"));
+        // Another address is not limited.
+        assertThat(client().from("10.0.0.2").signOn("USER0002", "PASSWORD").status()).isEqualTo(200);
+
+        // The window slides from the oldest failure; the refused requests did not extend it.
+        clock.advance(Duration.ofSeconds(29));
+        assertProblem(c.signOn("USER0001", "PASSWORD"), 429, "TOO_MANY_ATTEMPTS", TOO_MANY, "userId");
+        clock.advance(Duration.ofSeconds(1));
+        assertSignedOn(c.signOn("USER0001", "PASSWORD"), "USER0001", "U", "USER", "/");
         assertThat(db.user("USER0001").failedAttempts()).isZero();
-        clock.advance(Duration.ofMinutes(1));
+    }
+
+    @Test
+    @SpecItem({"DEF-SGN-002"})
+    void s19_fixedRateLimitCoversThePasswordChange() {
+        switches.all(FidelityMode.FIXED);
+        db.demoUsers();
+        db.user("MUSTCHG1", "MUST", "CHANGE", 'U', "PASSWORD", true);
+        ApiClient c = client();
+        for (int i = 0; i < 30; i++) {
+            assertThat(c.changePassword(String.format("NOUSR%03d", i), "PASSWORD", "Correct horse 1").status())
+                    .isEqualTo(401);
+        }
+        assertProblem(c.changePassword("MUSTCHG1", "PASSWORD", "Correct horse 1"), 429, "TOO_MANY_ATTEMPTS",
+                TOO_MANY, "userId");
+        assertProblem(c.signOn("USER0001", "PASSWORD"), 429, "TOO_MANY_ATTEMPTS", TOO_MANY, "userId");
+        assertThat(db.user("MUSTCHG1").mustChange()).isTrue();
+        assertThat(db.sessions()).isEmpty();
+    }
+
+    @Test
+    @SpecItem({"DEF-SGN-002"})
+    void s19_fixedNeverLimitsSuccessesOrBlankFields() {
+        switches.all(FidelityMode.FIXED);
+        db.demoUsers();
+        ApiClient c = client();
+        for (int i = 0; i < 40; i++) {
+            assertThat(c.signOn("USER0001", "PASSWORD").status()).isEqualTo(200);
+            assertThat(c.signOn("", "").status()).isEqualTo(400);
+        }
         assertThat(c.signOn("USER0001", "PASSWORD").status()).isEqualTo(200);
     }
 
+    @Test
+    @SpecItem({"DEF-SGN-002"})
+    void s19_legacyHasNoLimit() {
+        switches.all(FidelityMode.LEGACY);
+        db.demoUsers();
+        ApiClient c = client();
+        for (int i = 0; i < 40; i++) {
+            assertThat(c.signOn(String.format("NOUSR%03d", i), "PASSWORD").status()).isEqualTo(401);
+            assertThat(c.signOn("USER0001", "WRONGPWD").status()).isEqualTo(401);
+        }
+        assertSignedOn(c.signOn("USER0001", "PASSWORD"), "USER0001", "U", "USER", "/");
+        assertThat(db.audit()).noneMatch(a -> "TOO_MANY_ATTEMPTS".equals(a.detail()));
+    }
     @ParameterizedTest
     @EnumSource(FidelityMode.class)
     @SpecItem({"BR-SGN-004", "DEF-SGN-005"})
@@ -264,8 +331,19 @@ class SignOnScenariosTest extends IdentityTestBase {
         assertThat(db.audit()).extracting(AuditRow::detail).containsExactly("UNABLE_TO_VERIFY");
     }
 
-    @ParameterizedTest
-    @EnumSource(FidelityMode.class)
+    @Test
+    void anUnexpectedFailureIsAnInternalErrorWithoutTheCause() {
+        db.demoUsers();
+        doThrow(new IllegalStateException("secret cause")).when(userRepository).find(anyString());
+        Response r = client().signOn("ADMIN001", "PASSWORD");
+        assertProblem(r, 500, "INTERNAL_ERROR", "An unexpected error occurred. Please try again later ...", null);
+        assertThat(r.body().toString()).doesNotContain("secret cause");
+        String correlationId = r.raw().getHeader("X-Correlation-Id");
+        assertThat(correlationId).isNotBlank();
+        assertThat(r.text("correlationId")).isEqualTo(correlationId);
+    }
+
+    @ParameterizedTest    @EnumSource(FidelityMode.class)
     @SpecItem({"DEF-SGN-002", "DEF-SGN-003"})
     void s18_everyOutcomeIsAuditedWithoutThePassword(FidelityMode mode) {
         switches.all(mode);

@@ -18,6 +18,8 @@ import org.carddemo.identity.user.AppUser;
 import org.carddemo.identity.user.PasswordHasher;
 import org.carddemo.identity.user.Roles;
 import org.carddemo.identity.user.UserRepository;
+import org.carddemo.platform.web.Message;
+import org.carddemo.platform.web.MessageCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -72,11 +74,10 @@ public class SignOnService {
     }
 
     public StartedSession signOn(String rawUserId, String rawPassword, String clientIp) {
-        Authenticated a = authenticate(rawUserId, rawPassword, "password", clientIp);
+        Authenticated a = authenticate(rawUserId, rawPassword, "password", null, clientIp);
         if (fidelity.caseSensitivePasswords() && a.user().mustChangePassword()) {
             throw failed(a.user().userId(), "PASSWORD_CHANGE_REQUIRED", clientIp,
-                    new AuthFailure(HttpStatus.FORBIDDEN, "PASSWORD_CHANGE_REQUIRED",
-                            Messages.PASSWORD_CHANGE_REQUIRED, "newPassword", "info", null, false));
+                    new AuthFailure(HttpStatus.FORBIDDEN, MessageCatalog.PASSWORD_CHANGE_REQUIRED, "newPassword", null, false));
         }
         return tx.execute(t -> sessions.start(a.user(), a.role(), clientIp));
     }
@@ -87,17 +88,9 @@ public class SignOnService {
      */
     public StartedSession changePassword(String rawUserId, String currentPassword, String newPassword,
             Optional<SignedOn> signedOn, String clientIp) {
-        String userIdInput = rawUserId;
-        if (signedOn.isPresent()) {
-            String subject = signedOn.get().userId();
-            if (!LegacyText.isBlank(rawUserId) && !normalizeUserId(rawUserId).equals(subject)) {
-                throw failed(LegacyText.rtrim(rawUserId), "USER_ID_MISMATCH", clientIp,
-                        AuthFailure.of(HttpStatus.BAD_REQUEST, "USER_ID_MISMATCH", Messages.USER_ID_MISMATCH,
-                                "userId"));
-            }
-            userIdInput = subject;
-        }
-        Authenticated a = authenticate(userIdInput, currentPassword, "currentPassword", clientIp);
+        String sessionUser = signedOn.map(SignedOn::userId).orElse(null);
+        String userIdInput = sessionUser != null && LegacyText.isBlank(rawUserId) ? sessionUser : rawUserId;
+        Authenticated a = authenticate(userIdInput, currentPassword, "currentPassword", sessionUser, clientIp);
         String prepared = checkNewPassword(a, newPassword);
         String hash = hasher.hash(prepared);
         String userId = a.user().userId();
@@ -111,39 +104,41 @@ public class SignOnService {
         });
     }
 
-    /** BR-SGN-001: upper-case a-z; trailing spaces are field padding. */
-    public static String normalizeUserId(String raw) {
-        return LegacyText.upper(LegacyText.rtrim(raw));
-    }
-
-    /** Sign-on rules 1 to 8. */
+    /**
+     * Sign-on rules 1 to 9. With {@code sessionUser} (a password change while signed on), a user
+     * ID naming someone else is refused after rule 3, before anything is limited, read or counted.
+     */
     private Authenticated authenticate(String rawUserId, String rawPassword, String passwordField,
-            String clientIp) {
+            String sessionUser, String clientIp) {
         if (LegacyText.isBlank(rawUserId)) {
             throw failed(null, "USER_ID_REQUIRED", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
-                    "USER_ID_REQUIRED", Messages.USER_ID_REQUIRED, "userId"));
+                    MessageCatalog.USER_ID_REQUIRED, "userId"));
         }
         String typedId = LegacyText.rtrim(rawUserId);
         if (LegacyText.isBlank(rawPassword)) {
             throw failed(typedId, "PASSWORD_REQUIRED", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
-                    "PASSWORD_REQUIRED", Messages.PASSWORD_REQUIRED, passwordField));
+                    MessageCatalog.PASSWORD_REQUIRED, passwordField));
         }
         if (length(typedId) > MAX_USER_ID) {
             throw failed(typedId, "INVALID_INPUT", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
-                    "INVALID_INPUT", Messages.USER_ID_REQUIRED, "userId"));
+                    MessageCatalog.INVALID_INPUT_USER_ID, "userId"));
         }
         if (length(LegacyText.rtrim(rawPassword)) > MAX_PASSWORD) {
             throw failed(typedId, "INVALID_INPUT", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
-                    "INVALID_INPUT", Messages.PASSWORD_REQUIRED, passwordField));
+                    MessageCatalog.INVALID_INPUT_PASSWORD, passwordField));
         }
         String userId = LegacyText.upper(typedId);
+        if (sessionUser != null && !userId.equals(sessionUser)) {
+            throw failed(userId, "USER_ID_MISMATCH", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
+                    MessageCatalog.USER_ID_MISMATCH, "userId"));
+        }
         boolean lockout = fidelity.lockout();
         boolean neutral = fidelity.neutralMessages();
         if (lockout) {
-            Optional<Duration> wait = throttle.check(clientIp, userId);
+            Optional<Duration> wait = throttle.check(clientIp);
             if (wait.isPresent()) {
-                throw failed(userId, "RATE_LIMITED", clientIp, new AuthFailure(HttpStatus.TOO_MANY_REQUESTS,
-                        "TOO_MANY_ATTEMPTS", Messages.NEUTRAL, passwordField, "error", wait.get(), false));
+                throw failed(userId, "TOO_MANY_ATTEMPTS", clientIp, new AuthFailure(HttpStatus.TOO_MANY_REQUESTS,
+                        MessageCatalog.TOO_MANY_ATTEMPTS, "userId", wait.get(), false));
             }
         }
         Optional<AppUser> found;
@@ -152,41 +147,41 @@ public class SignOnService {
         } catch (DataAccessException e) {
             log.warn("Cannot read iam.app_user: {}", e.getMostSpecificCause().getMessage());
             auditQuietly(userId, clientIp);
-            throw AuthFailure.of(HttpStatus.SERVICE_UNAVAILABLE, "UNABLE_TO_VERIFY", Messages.UNABLE_TO_VERIFY,
+            throw AuthFailure.of(HttpStatus.SERVICE_UNAVAILABLE, MessageCatalog.UNABLE_TO_VERIFY,
                     "userId");
         }
         if (found.isEmpty()) {
             hasher.burn();
             if (lockout) {
-                throttle.recordFailure(clientIp, userId);
+                throttle.recordFailure(clientIp);
             }
             throw failed(userId, "USER_NOT_FOUND", clientIp, neutral ? neutral(passwordField)
-                    : AuthFailure.of(HttpStatus.UNAUTHORIZED, "USER_NOT_FOUND", Messages.USER_NOT_FOUND, "userId"));
+                    : AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.USER_NOT_FOUND, "userId"));
         }
         AppUser user = found.get();
         LocalDateTime now = now();
         if (lockout && user.lockedAt(now)) {
             hasher.burn();
-            throttle.recordFailure(clientIp, userId);
+            throttle.recordFailure(clientIp);
             throw failed(userId, "USER_LOCKED", clientIp, neutral(passwordField));
         }
         String prepared = PasswordHasher.prepare(rawPassword, fidelity.caseSensitivePasswords());
         if (!hasher.matches(prepared, user.passwordHash())) {
             if (lockout) {
-                throttle.recordFailure(clientIp, userId);
+                throttle.recordFailure(clientIp);
                 if (users.recordFailure(userId, props.lockout().maxFailures(),
                         now.plus(props.lockout().lockDuration()))) {
                     audit.record(EventType.USER_LOCKED, null, userId, "MAX_FAILURES", clientIp);
                 }
             }
             throw failed(userId, "WRONG_PASSWORD", clientIp, neutral ? neutral(passwordField)
-                    : AuthFailure.of(HttpStatus.UNAUTHORIZED, "WRONG_PASSWORD", Messages.WRONG_PASSWORD,
+                    : AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.WRONG_PASSWORD,
                             passwordField));
         }
         Optional<String> role = Roles.forType(user.userType(), fidelity.onlyKnownUserTypes());
         if (role.isEmpty()) {
             throw failed(userId, "USER_TYPE_NOT_ALLOWED", clientIp, AuthFailure.of(HttpStatus.FORBIDDEN,
-                    "USER_TYPE_NOT_ALLOWED", Messages.USER_TYPE_NOT_ALLOWED, "userId"));
+                    MessageCatalog.USER_TYPE_NOT_ALLOWED, "userId"));
         }
         return new Authenticated(user, role.get(), prepared);
     }
@@ -194,7 +189,7 @@ public class SignOnService {
     /** The new-password rules of D-SEC-07; returns the value to hash. */
     private String checkNewPassword(Authenticated a, String raw) {
         if (LegacyText.isBlank(raw)) {
-            throw newPassword("NEW_PASSWORD_REQUIRED", Messages.NEW_PASSWORD_REQUIRED);
+            throw newPassword(MessageCatalog.NEW_PASSWORD_REQUIRED);
         }
         String trimmed = LegacyText.rtrim(raw);
         boolean caseSensitive = fidelity.caseSensitivePasswords();
@@ -202,17 +197,17 @@ public class SignOnService {
         if (caseSensitive) {
             boolean printable = trimmed.codePoints().noneMatch(Character::isISOControl);
             if (length < FIXED_MIN_NEW || length > MAX_PASSWORD || !printable || !PasswordHasher.fits(trimmed)) {
-                throw newPassword("NEW_PASSWORD_LENGTH", Messages.NEW_PASSWORD_LENGTH_FIXED);
+                throw newPassword(MessageCatalog.NEW_PASSWORD_LENGTH_FIXED);
             }
         } else if (length > LEGACY_MAX_NEW) {
-            throw newPassword("NEW_PASSWORD_LENGTH", Messages.NEW_PASSWORD_LENGTH_LEGACY);
+            throw newPassword(MessageCatalog.NEW_PASSWORD_LENGTH_LEGACY);
         }
         String prepared = PasswordHasher.prepare(trimmed, caseSensitive);
         if (prepared.equals(a.preparedPassword())) {
-            throw newPassword("NEW_PASSWORD_SAME", Messages.NEW_PASSWORD_SAME);
+            throw newPassword(MessageCatalog.NEW_PASSWORD_SAME);
         }
         if (caseSensitive && trimmed.equalsIgnoreCase(a.user().userId())) {
-            throw newPassword("NEW_PASSWORD_IS_USER_ID", Messages.NEW_PASSWORD_IS_USER_ID);
+            throw newPassword(MessageCatalog.NEW_PASSWORD_IS_USER_ID);
         }
         return prepared;
     }
@@ -231,11 +226,11 @@ public class SignOnService {
     }
 
     private static AuthFailure neutral(String field) {
-        return AuthFailure.of(HttpStatus.UNAUTHORIZED, "SIGN_ON_FAILED", Messages.NEUTRAL, field);
+        return AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.SIGN_ON_FAILED, field);
     }
 
-    private static AuthFailure newPassword(String code, String message) {
-        return AuthFailure.of(HttpStatus.BAD_REQUEST, code, message, "newPassword");
+    private static AuthFailure newPassword(Message message) {
+        return AuthFailure.of(HttpStatus.BAD_REQUEST, message, "newPassword");
     }
 
     private static int length(String s) {

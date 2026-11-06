@@ -2,7 +2,7 @@ package org.carddemo.identity.token;
 
 import java.time.Duration;
 
-import org.carddemo.identity.ApiSecurityProperties;
+import org.carddemo.platform.web.CarddemoSecurityProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -18,8 +18,8 @@ public class AuthCookies {
 
     private final boolean secure;
 
-    public AuthCookies(ApiSecurityProperties security) {
-        this.secure = security.cookieSecure();
+    public AuthCookies(CarddemoSecurityProperties security) {
+        this.secure = security.isCookieSecure();
     }
 
     public HttpHeaders session(String access, Duration accessMaxAge, String refresh, Duration refreshMaxAge) {

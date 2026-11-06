@@ -1,10 +1,10 @@
 package org.carddemo.identity.config;
 
-import org.carddemo.identity.ApiSecurityProperties;
-import org.carddemo.identity.signon.Messages;
 import org.carddemo.identity.token.AccessTokens;
 import org.carddemo.identity.token.SessionTokenResolver;
 import org.carddemo.identity.web.ProblemResponses;
+import org.carddemo.platform.web.CarddemoSecurityProperties;
+import org.carddemo.platform.web.MessageCatalog;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -31,10 +31,10 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 class SecurityConfig {
 
     @Bean
-    CookieCsrfTokenRepository csrfTokenRepository(ApiSecurityProperties security) {
+    CookieCsrfTokenRepository csrfTokenRepository(CarddemoSecurityProperties security) {
         CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repo.setCookiePath("/");
-        repo.setCookieCustomizer(c -> c.sameSite("Strict").secure(security.cookieSecure()));
+        repo.setCookieCustomizer(c -> c.sameSite("Strict").secure(security.isCookieSecure()));
         return repo;
     }
 
@@ -48,12 +48,12 @@ class SecurityConfig {
         converter.setJwtGrantedAuthoritiesConverter(roles);
 
         AuthenticationEntryPoint unauthenticated = (req, res, e) -> problems.write(res, HttpStatus.UNAUTHORIZED,
-                "UNAUTHENTICATED", Messages.SESSION_EXPIRED);
+                MessageCatalog.UNAUTHENTICATED);
         AccessDeniedHandler denied = (req, res, e) -> {
             if (e instanceof CsrfException) {
-                problems.write(res, HttpStatus.FORBIDDEN, "CSRF_INVALID", Messages.REQUEST_NOT_VERIFIED);
+                problems.write(res, HttpStatus.FORBIDDEN, MessageCatalog.CSRF_REJECTED);
             } else {
-                problems.write(res, HttpStatus.FORBIDDEN, "ACCESS_DENIED", Messages.ACCESS_DENIED);
+                problems.write(res, HttpStatus.FORBIDDEN, MessageCatalog.ACCESS_DENIED);
             }
         };
 

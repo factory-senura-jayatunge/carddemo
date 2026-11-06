@@ -127,6 +127,7 @@ class TokensAndCookiesTest extends IdentityTestBase {
         Response me = c.me();
         assertThat(me.status()).isEqualTo(401);
         assertThat(me.text("code")).isEqualTo("UNAUTHENTICATED");
+        assertThat(me.text("message")).isEqualTo("Please sign on to use this function ...");
     }
 
     @Test

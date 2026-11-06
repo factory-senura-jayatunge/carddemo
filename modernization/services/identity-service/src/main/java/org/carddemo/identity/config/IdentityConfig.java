@@ -11,7 +11,6 @@ import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.servers.Server;
-import org.carddemo.identity.ApiSecurityProperties;
 import org.carddemo.identity.IdentityProperties;
 import org.carddemo.identity.fidelity.IdentitySwitches;
 import org.carddemo.identity.token.AccessTokens;
@@ -19,6 +18,7 @@ import org.carddemo.identity.token.SigningKeys;
 import org.carddemo.identity.user.PasswordHasher;
 import org.carddemo.platform.fidelity.FidelitySwitch;
 import org.carddemo.platform.fidelity.FidelitySwitchCatalog;
+import org.carddemo.platform.web.CarddemoSecurityProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -63,7 +63,7 @@ class IdentityConfig {
 
     /** Checks this service's own access tokens with the public key, as the other services do with the JWKS. */
     @Bean
-    JwtDecoder jwtDecoder(SigningKeys keys, ApiSecurityProperties security, Clock clock) {
+    JwtDecoder jwtDecoder(SigningKeys keys, CarddemoSecurityProperties security, Clock clock) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(keys.publicKey())
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .jwtProcessorCustomizer(p -> p.setJWSTypeVerifier(
@@ -73,9 +73,9 @@ class IdentityConfig {
         JwtTimestampValidator timestamps = new JwtTimestampValidator(Duration.ZERO);
         timestamps.setClock(clock);
         JwtClaimValidator<List<String>> audience = new JwtClaimValidator<>(JwtClaimNames.AUD,
-                aud -> aud != null && aud.contains(security.audience()));
+                aud -> aud != null && aud.contains(security.getAudience()));
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                timestamps, new JwtIssuerValidator(security.issuer()), audience, new JwtTypeValidator(AccessTokens.TYPE)));
+                timestamps, new JwtIssuerValidator(security.getIssuer()), audience, new JwtTypeValidator(AccessTokens.TYPE)));
         return decoder;
     }
 

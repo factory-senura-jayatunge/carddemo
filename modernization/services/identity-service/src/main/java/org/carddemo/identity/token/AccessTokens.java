@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import org.carddemo.identity.ApiSecurityProperties;
 import org.carddemo.identity.IdentityProperties;
+import org.carddemo.platform.web.CarddemoSecurityProperties;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -28,10 +28,10 @@ public class AccessTokens {
 
     private final JwtEncoder encoder;
     private final SigningKeys keys;
-    private final ApiSecurityProperties security;
+    private final CarddemoSecurityProperties security;
     private final IdentityProperties props;
 
-    public AccessTokens(JwtEncoder encoder, SigningKeys keys, ApiSecurityProperties security,
+    public AccessTokens(JwtEncoder encoder, SigningKeys keys, CarddemoSecurityProperties security,
             IdentityProperties props) {
         this.encoder = encoder;
         this.keys = keys;
@@ -42,8 +42,8 @@ public class AccessTokens {
     public Issued issue(String userId, char userType, String role, UUID sessionId, Instant now) {
         Instant expires = now.plus(props.accessTokenTtl());
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer(security.issuer())
-                .audience(List.of(security.audience()))
+                .issuer(security.getIssuer())
+                .audience(List.of(security.getAudience()))
                 .subject(userId)
                 .issuedAt(now)
                 .notBefore(now)

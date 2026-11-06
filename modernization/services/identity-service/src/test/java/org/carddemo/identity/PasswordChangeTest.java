@@ -1,6 +1,10 @@
 package org.carddemo.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import org.carddemo.identity.ApiClient.Response;
 import org.carddemo.identity.IdentityFixtures.AuditRow;
@@ -10,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-/** SGN S14 and the new-password rules (D-SEC-07). */
+/** SGN S14, S21 and the new-password rules (D-SEC-07). */
 class PasswordChangeTest extends IdentityTestBase {
 
     private static void assertProblem(Response r, int status, String code, String message, String field) {
@@ -131,4 +135,31 @@ class PasswordChangeTest extends IdentityTestBase {
                 "Wrong User ID or Password. Try again ...", "currentPassword");
         assertThat(db.user("MUSTCHG1").lockedUntil()).isNotNull();
     }
-}
+
+    @ParameterizedTest
+    @EnumSource(FidelityMode.class)
+    @SpecItem({"DEF-SGN-002"})
+    void s21_userIdMismatchReadsAndCountsNothing(FidelityMode mode) {
+        switches.all(mode);
+        db.demoUsers();
+        ApiClient c = client();
+        assertThat(c.signOn("USER0001", "PASSWORD").status()).isEqualTo(200);
+        clearInvocations(userRepository);
+
+        // Steps 1 to 3 come first.
+        assertProblem(c.changePassword("USER0002", " ", "Another pass 9"), 400, "PASSWORD_REQUIRED",
+                "Please enter Password ...", "currentPassword");
+        assertProblem(c.changePassword("USER00021", "PASSWORD", "Another pass 9"), 400, "INVALID_INPUT",
+                "Please enter User ID ...", "userId");
+        for (int i = 0; i < 35; i++) {
+            assertProblem(c.changePassword("user0002", "WRONGPWD", "Another pass 9"), 400, "USER_ID_MISMATCH",
+                    "User ID does not match the signed-on user ...", "userId");
+        }
+        verify(userRepository, never()).find(anyString());
+        assertThat(db.user("USER0002").failedAttempts()).isZero();
+        assertThat(db.audit()).last()
+                .isEqualTo(new AuditRow("SIGN_ON_FAILED", null, "USER0002", "USER_ID_MISMATCH", "127.0.0.1"));
+        // Neither the lockout nor the rate limit moved: the user's own ID, in any case, still works.
+        Response changed = c.changePassword("user0001", "PASSWORD", "NEWPASS9");
+        assertThat(changed.status()).as("%s", changed.body()).isEqualTo(200);
+    }}

@@ -19,7 +19,7 @@ class FeaturesTest extends IdentityTestBase {
     @EnumSource(FidelityMode.class)
     @SpecItem({"DEF-BILL-014"})
     void aSignedOnUserSeesTheModulesAndTheBillPaySwitch(FidelityMode mode) {
-        switches.set(IdentitySwitches.DEF_BILL_014, mode);
+        switches.only(IdentitySwitches.DEF_BILL_014, mode);
         db.demoUsers();
         ApiClient c = client();
         c.signOn("USER0001", "PASSWORD");
@@ -36,6 +36,7 @@ class FeaturesTest extends IdentityTestBase {
         Response r = client().get("/api/features");
         assertThat(r.status()).isEqualTo(401);
         assertThat(r.text("code")).isEqualTo("UNAUTHENTICATED");
+        assertThat(r.text("message")).isEqualTo("Please sign on to use this function ...");
         assertThat(r.raw().getContentType()).startsWith("application/problem+json");
     }
 

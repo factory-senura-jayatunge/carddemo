@@ -14,6 +14,7 @@ public record IdentityProperties(
         @DefaultValue("8h") Duration sessionMaxAge,
         @DefaultValue("12") int bcryptStrength,
         @DefaultValue Lockout lockout,
+        @DefaultValue RateLimit rateLimit,
         @DefaultValue Seed seed,
         @DefaultValue Features features) {
 
@@ -21,12 +22,16 @@ public record IdentityProperties(
     public record Jwt(String privateKeyPath) {
     }
 
-    /** Fixed mode of DEF-SGN-002. The rate limits count failed attempts only. */
+    /** Fixed mode of DEF-SGN-002: failed passwords per user before the lock. */
     public record Lockout(
             @DefaultValue("5") int maxFailures,
-            @DefaultValue("15m") Duration lockDuration,
-            @DefaultValue("10") int failuresPerUserPerMinute,
-            @DefaultValue("30") int failuresPerClientPerMinute) {
+            @DefaultValue("15m") Duration lockDuration) {
+    }
+
+    /** Fixed mode of DEF-SGN-002: failed attempts per client address within {@code window}. */
+    public record RateLimit(
+            @DefaultValue("30") int failures,
+            @DefaultValue("1m") Duration window) {
     }
 
     /**

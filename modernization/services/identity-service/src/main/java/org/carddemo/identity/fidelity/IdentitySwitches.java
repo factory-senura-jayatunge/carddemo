@@ -15,7 +15,7 @@ public final class IdentitySwitches {
     /** D-05: attempt limit and lockout. */
     public static final FidelitySwitch DEF_SGN_002 = FidelitySwitch.of("DEF-SGN-002",
             "no attempt counting",
-            "5 failures lock the user for 15 minutes; failed attempts are rate limited per user and client");
+            "5 failures lock the user for 15 minutes; failed attempts are rate limited per client address");
 
     /** D-05: messages that reveal whether a user ID exists. */
     public static final FidelitySwitch DEF_SGN_003 = FidelitySwitch.of("DEF-SGN-003",

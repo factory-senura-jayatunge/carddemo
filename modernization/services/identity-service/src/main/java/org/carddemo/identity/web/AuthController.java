@@ -16,7 +16,6 @@ import org.carddemo.identity.IdentityProperties;
 import org.carddemo.identity.session.SessionService;
 import org.carddemo.identity.session.StartedSession;
 import org.carddemo.identity.signon.AuthFailure;
-import org.carddemo.identity.signon.Messages;
 import org.carddemo.identity.signon.SignOnService;
 import org.carddemo.identity.signon.SignOnService.SignedOn;
 import org.carddemo.identity.token.AccessTokens;
@@ -29,6 +28,7 @@ import org.carddemo.identity.web.Dtos.PasswordRequest;
 import org.carddemo.identity.web.Dtos.SessionView;
 import org.carddemo.identity.web.Dtos.SignOffResult;
 import org.carddemo.identity.web.Dtos.SignOnRequest;
+import org.carddemo.platform.web.MessageCatalog;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -113,7 +113,7 @@ class AuthController {
         Optional<UUID> sessionId = token(req).map(jwt -> UUID.fromString(jwt.getClaimAsString(AccessTokens.CLAIM_SESSION)));
         sessions.signOff(sessionId, refreshToken, req.getRemoteAddr());
         addHeaders(res, cookies.cleared());
-        return ResponseEntity.ok(new SignOffResult(Messages.SIGN_OFF, "info"));
+        return ResponseEntity.ok(new SignOffResult(MessageCatalog.SIGNED_OFF.text(), MessageCatalog.SIGNED_OFF.severity().key()));
     }
 
     @GetMapping("/me")
@@ -122,8 +122,7 @@ class AuthController {
     SessionView me(@AuthenticationPrincipal Jwt jwt) {
         UUID sessionId = UUID.fromString(jwt.getClaimAsString(AccessTokens.CLAIM_SESSION));
         if (sessions.active(sessionId).isEmpty()) {
-            throw new AuthFailure(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", Messages.SESSION_EXPIRED, null,
-                    "error", null, false);
+            throw AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.UNAUTHENTICATED, null);
         }
         AppUser user = users.find(jwt.getSubject()).orElseThrow(AuthFailure::sessionExpired);
         return view(user, jwt.getClaimAsString(AccessTokens.CLAIM_ROLE));

@@ -53,6 +53,7 @@ public final class ApiClient {
     private final MockMvc mvc;
     private final Map<String, Stored> jar = new LinkedHashMap<>();
     private boolean sendCsrfHeader = true;
+    private String remoteAddr;
 
     public ApiClient(MockMvc mvc) {
         this.mvc = mvc;
@@ -60,6 +61,12 @@ public final class ApiClient {
 
     public ApiClient withoutCsrfHeader() {
         sendCsrfHeader = false;
+        return this;
+    }
+
+    /** Sends every request from this client address (MockMvc's default is 127.0.0.1). */
+    public ApiClient from(String address) {
+        remoteAddr = address;
         return this;
     }
 
@@ -131,6 +138,12 @@ public final class ApiClient {
         });
         if (!cookies.isEmpty()) {
             req.cookie(cookies.toArray(Cookie[]::new));
+        }
+        if (remoteAddr != null) {
+            req.with(r -> {
+                r.setRemoteAddr(remoteAddr);
+                return r;
+            });
         }
         try {
             MockHttpServletResponse res = mvc.perform(req).andReturn().getResponse();

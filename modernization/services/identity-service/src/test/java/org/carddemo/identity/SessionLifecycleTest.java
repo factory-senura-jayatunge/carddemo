@@ -16,6 +16,7 @@ class SessionLifecycleTest extends IdentityTestBase {
     private static void assertExpired(Response r) {
         assertThat(r.status()).as("%s", r.body()).isEqualTo(401);
         assertThat(r.text("code")).isEqualTo("SESSION_EXPIRED");
+        assertThat(r.text("message")).isEqualTo("Your session has ended. Please sign on again ...");
         assertThat(r.cookie("cd_at").attr("Max-Age")).isEqualTo("0");
         assertThat(r.cookie("cd_rt").attr("Max-Age")).isEqualTo("0");
     }
@@ -151,7 +152,9 @@ class SessionLifecycleTest extends IdentityTestBase {
         c.signOn("USER0001", "PASSWORD");
         Response refresh = c.refresh();
         assertThat(refresh.status()).isEqualTo(403);
-        assertThat(refresh.text("code")).isEqualTo("CSRF_INVALID");
+        assertThat(refresh.text("code")).isEqualTo("CSRF_REJECTED");
+        assertThat(refresh.text("message"))
+                .isEqualTo("Your request could not be verified. Reload the page and try again ...");
         assertThat(c.signOff().status()).isEqualTo(403);
         assertThat(db.sessions()).extracting(SessionRow::endReason).containsOnlyNulls();
     }

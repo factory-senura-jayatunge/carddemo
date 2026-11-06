@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.carddemo.db.ServiceLogin;
@@ -13,8 +14,9 @@ import org.carddemo.identity.signon.AttemptThrottle;
 import org.carddemo.identity.user.UserRepository;
 import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.fidelity.FidelitySwitch;
-import org.carddemo.platform.fidelity.FidelitySwitches;
+import org.carddemo.platform.testsupport.FidelityOverrides;
 import org.carddemo.platform.testsupport.TestDatabase;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,14 +33,14 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * One application context for the API tests: the real service on its own migrated database,
  * connected as {@code carddemo_identity} so every test runs under the service's grants, with a
- * clock and fidelity switches the tests set.
+ * clock the tests move and switch modes they set through {@link FidelityOverrides}.
  */
 @SpringBootTest(properties = {
         // Strength 12 costs ~250 ms a hash; PasswordHasherTest checks the default.
         "carddemo.identity.bcrypt-strength=4",
         "carddemo.identity.seed.enabled=false"})
 @AutoConfigureMockMvc
-@Import({IdentityTestBase.TestClock.Config.class, IdentityTestBase.TestSwitches.Config.class})
+@Import(IdentityTestBase.TestClock.Config.class)
 public abstract class IdentityTestBase {
 
     public static final Instant START = Instant.parse("2026-03-02T09:00:00Z");
@@ -55,8 +57,7 @@ public abstract class IdentityTestBase {
     @Autowired
     protected TestClock clock;
 
-    @Autowired
-    protected TestSwitches switches;
+    protected final Switches switches = new Switches();
 
     @Autowired
     protected AttemptThrottle throttle;
@@ -72,6 +73,11 @@ public abstract class IdentityTestBase {
         clock.set(START);
         throttle.reset();
         switches.all(FidelityMode.LEGACY);
+    }
+
+    @AfterEach
+    protected void clearOverrides() {
+        FidelityOverrides.clear();
     }
 
     protected ApiClient client() {
@@ -116,51 +122,20 @@ public abstract class IdentityTestBase {
         }
     }
 
-    /** The service's switches, set per test. Replaces the platform bean, so ledger values do not apply. */
-    public static final class TestSwitches implements FidelitySwitches {
-
-        private volatile FidelitySwitches current = FidelitySwitches.allLegacy(IdentitySwitches.ALL);
+    /**
+     * Sets switch modes through test-support's overrides, over the ledger values the application
+     * loaded. Each call replaces the previous overrides.
+     */
+    public static final class Switches {
 
         /** Every switch of the service in one mode: the two columns of the scenario tables. */
         public void all(FidelityMode mode) {
-            FidelitySwitches s = FidelitySwitches.allLegacy(IdentitySwitches.ALL);
-            for (FidelitySwitch sw : IdentitySwitches.ALL) {
-                s = s.with(sw, mode);
-            }
-            current = s;
+            FidelityOverrides.set(IdentitySwitches.ALL.stream().map(FidelitySwitch::itemId).toList(), mode);
         }
 
-        public void set(FidelitySwitch sw, FidelityMode mode) {
-            current = current.with(sw, mode);
-        }
-
-        @Override
-        public FidelityMode mode(String itemId) {
-            return current.mode(itemId);
-        }
-
-        @Override
-        public java.util.Map<String, FidelityMode> effectiveModes() {
-            return current.effectiveModes();
-        }
-
-        @Override
-        public java.util.Collection<FidelitySwitch> declared() {
-            return current.declared();
-        }
-
-        @Override
-        public FidelitySwitches with(FidelitySwitch fidelitySwitch, FidelityMode mode) {
-            return current.with(fidelitySwitch, mode);
-        }
-
-        @TestConfiguration(proxyBeanMethods = false)
-        public static class Config {
-            @Bean
-            @Primary
-            TestSwitches testSwitches() {
-                return new TestSwitches();
-            }
+        /** Only this switch; the others keep their ledger value. */
+        public void only(FidelitySwitch sw, FidelityMode mode) {
+            FidelityOverrides.set(List.of(sw.itemId()), mode);
         }
     }
 }

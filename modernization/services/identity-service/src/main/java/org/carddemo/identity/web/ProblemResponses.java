@@ -5,6 +5,7 @@ import java.io.IOException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.carddemo.identity.signon.AuthFailure;
 import org.carddemo.identity.token.AuthCookies;
+import org.carddemo.platform.web.Message;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,15 +38,10 @@ public class ProblemResponses {
                         f.field(), f.severity()));
     }
 
-    public ResponseEntity<ApiProblem> entity(HttpStatus status, String code, String message, String field) {
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .body(ApiProblem.of(status.value(), status.getReasonPhrase(), code, message, field, "error"));
-    }
-
-    public void write(HttpServletResponse res, HttpStatus status, String code, String message) throws IOException {
+    public void write(HttpServletResponse res, HttpStatus status, Message message) throws IOException {
         res.setStatus(status.value());
         res.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        json.writeValue(res.getOutputStream(),
-                ApiProblem.of(status.value(), status.getReasonPhrase(), code, message, null, "error"));
+        json.writeValue(res.getOutputStream(), ApiProblem.of(status.value(), status.getReasonPhrase(), message.code(),
+                message.text(), null, message.severity().key()));
     }
 }
