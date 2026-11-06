@@ -2,8 +2,10 @@
 # of the decided questions of the converted units. Items with no legacy mode are in deviations.toml.
 #
 # value        legacy (the COBOL behaviour) or fixed (the fix the item describes)
-# code_switch  true when the code branches on the item through FidelitySwitches; false when the
-#              behaviour is decided but the code has no branch (yet)
+# code_switch  true when the code branches on the item through FidelitySwitches (exactly the items of
+#              docs/modernization/architecture/switches.md); false when the item is built and tested in
+#              its decided mode only. A note "Covered by the switch <ID>" names the switch whose
+#              both-mode tests also cite the item.
 # setting      the chosen variant when the fix has more than one (only with value = "fixed")
 # decision     the decision of docs/modernization/decisions/README.md, or "none"
 # approved_by, approved_on   who approved the value, and when (YYYY-MM-DD)
@@ -101,12 +103,13 @@ code_switch = false
 decision = "D-43"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-001: no switch of its own; the tests of DEF-STMT-001 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 # jobs/INTCALC.md
 
 [switch."DEF-JINTC-001"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-59"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -124,6 +127,7 @@ code_switch = false
 decision = "D-59"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-INTC-010: no switch of its own; the tests of DEF-INTC-010 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 # jobs/POSTTRAN.md
 
@@ -138,7 +142,7 @@ approved_on = "2026-11-06"
 
 [switch."DEF-JPCAT-001"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -240,14 +244,14 @@ note = "D-26: no fees until fee rules are specified."
 
 [switch."DEF-INTC-010"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-59"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-INTC-012"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-25"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -371,6 +375,7 @@ code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-002: no switch of its own; the tests of DEF-STMT-002 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 [switch."BR-STMT-006"]
 value = "fixed"
@@ -378,6 +383,7 @@ code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-002: no switch of its own; the tests of DEF-STMT-002 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 [switch."BR-STMT-008"]
 value = "fixed"
@@ -385,45 +391,46 @@ code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-003: no switch of its own; the tests of DEF-STMT-003 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 [switch."DEF-STMT-001"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-STMT-002"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-STMT-003"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-STMT-004"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-STMT-005"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-43"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-STMT-007"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-45"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -503,14 +510,14 @@ approved_on = "2026-11-06"
 
 [switch."DEF-TRPT-001"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-46"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-TRPT-004"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-47"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -521,6 +528,7 @@ code_switch = false
 decision = "D-46"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-TRPT-001: no switch of its own; the tests of DEF-TRPT-001 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 # programs/COACCT01.md
 
@@ -534,7 +542,7 @@ note = "D-72: the code's contract is implemented, not the README's."
 
 [switch."DEF-MQAC-002"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-73"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -593,7 +601,7 @@ note = "Access model C1: staff may open any account; sign-on and roles apply. Th
 
 [switch."DEF-ACUP-002"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-11"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -1364,14 +1372,14 @@ note = "D-72: the code's behaviour is implemented, not the README's."
 
 [switch."DEF-MQDT-002"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-73"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [switch."DEF-MQDT-003"]
 value = "fixed"
-code_switch = false
+code_switch = true
 decision = "D-73"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -1791,6 +1799,7 @@ code_switch = false
 decision = "D-27"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "D-27: an online add feeds the posting input (core.daily_tran), so the added transaction appears in the list, view and reports only after the cycle that posts it, and a rejected add only among the cycle's rejects (docs/modernization/architecture/batch.md, online writes between cycles)."
 
 [switch."DEF-TRNA-001"]
 value = "fixed"
@@ -2154,7 +2163,7 @@ approved_on = "2026-11-06"
 
 [switch."DEF-DTCK-004"]
 value = "fixed"
-code_switch = true
+code_switch = false
 decision = "D-52"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"

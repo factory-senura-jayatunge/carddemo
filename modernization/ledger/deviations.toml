@@ -45,6 +45,15 @@ source = "docs/modernization/architecture/decisions.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."PINV-c-05"]
+kind = "decision"
+decision = "D-27"
+legacy = "A transaction added online changes only the transaction master, never the account or the category balances."
+target = "One posting path: an online add is queued in core.daily_tran and reaches the transaction master, the account and the category balances only when the next cycle posts it"
+source = "docs/modernization/architecture/batch.md (online writes between cycles)"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
 # jobs/ACCTFILE.md
 
 [deviation."DEF-JACCT-001"]
@@ -2296,6 +2305,14 @@ source = "docs/modernization/architecture/billpay-slice.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."FLOW-MENU-006"]
+kind = "incidental-ui"
+decision = "none"
+target = "Replaced by routes"
+source = "docs/modernization/architecture/billpay-slice.md (resting on web.md, Session state)"
+approved_by = "architect (billpay-slice.md section 12)"
+approved_on = "2026-11-06"
+
 [deviation."Q-MENU-003"]
 kind = "decision"
 decision = "D-05"
@@ -2495,6 +2512,15 @@ target = "Access model C1: every screen and API needs a session; user ID and rol
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."DEF-SGN-007"]
+kind = "incidental-ui"
+decision = "none"
+target = "Commarea artefact, dropped: user and role come from the session token, and no other field exists to leave uninitialised"
+source = "docs/modernization/architecture/billpay-slice.md (resting on web.md, Session state)"
+note = "Q-SGN-006 needs no mainframe answer before conversion: its storage-initialisation half is moot for the target, and DEF-SGN-011 settles the UCTRAN half."
+approved_by = "architect (billpay-slice.md section 12)"
+approved_on = "2026-11-06"
+
 [deviation."DEF-SGN-008"]
 kind = "incidental-ui"
 decision = "none"
@@ -2520,6 +2546,14 @@ target = "Sign-on stays available during a batch window (mode WRITES_BLOCKED); E
 scenarios = ["COSGN00C S10"]
 source = "catalog D-18 (override), docs/modernization/architecture/billpay-slice.md"
 approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-SGN-005"]
+kind = "incidental-ui"
+decision = "none"
+target = "Replaced by routes"
+source = "docs/modernization/architecture/billpay-slice.md (resting on web.md, Session state)"
+approved_by = "architect (billpay-slice.md section 12)"
 approved_on = "2026-11-06"
 
 # programs/COTRN01C.md

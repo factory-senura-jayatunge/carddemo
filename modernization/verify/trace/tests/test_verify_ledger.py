@@ -164,6 +164,23 @@ class SwitchTest(LedgerCase):
         self.assertProblem("DEF-BILL-010: code_switch must be true or false", problems)
         self.assertProblem("DEF-BILL-010: unknown field 'switch'", problems)
 
+    def test_covered_by_must_name_a_code_switch(self):
+        self.files["fidelity.toml"] += textwrap.dedent('''
+            [switch."DEF-BILL-001"]
+            value = "fixed"
+            code_switch = true
+            decision = "D-29"
+            note = "Covered by the switch BR-BILL-002: its tests cite both."
+            approved_by = "user"
+            approved_on = "2026-11-06"
+            ''')
+        problems = self.problems()
+        self.assertProblem("DEF-BILL-001: covered by the switch BR-BILL-002, so code_switch must be false", problems)
+        self.assertProblem("DEF-BILL-001: covered by BR-BILL-002, but BR-BILL-002 has no entry with code_switch = true", problems)
+        self.files["fidelity.toml"] = self.files["fidelity.toml"].replace("code_switch = true\ndecision = \"D-29\"\nnote = \"Covered by the switch BR-BILL-002",
+                                                                          "code_switch = false\ndecision = \"D-29\"\nnote = \"Covered by the switch DEF-BILL-010")
+        self.assertFalse(any("covered" in p for p in self.problems()), self.problems())
+
     def test_decision_not_in_catalog(self):
         self.edit("fidelity.toml", 'decision = "D-28"', 'decision = "D-99"')
         self.assertProblem("DEF-BILL-010: decision D-99 is not in the decision catalog")
@@ -344,8 +361,23 @@ class RepositoryLedgerTest(unittest.TestCase):
     def test_bill_pay_slice_entries(self):
         led = ledger.load(REPO / "modernization/ledger")
         switches = {i for i, e in led.switches.items() if e.get("code_switch") is True}
+        # architecture/switches.md: the targeted policy's list, and nothing else.
         self.assertEqual(switches, {"DEF-BILL-010", "DEF-BILL-014", "BR-TRNA-003", "DEF-SGN-011",
-                                    "DEF-SGN-002", "DEF-SGN-003", "DEF-SGN-005", "DEF-DTCK-004"})
+                                    "DEF-SGN-002", "DEF-SGN-003", "DEF-SGN-005",
+                                    "DEF-ACUP-002", "DEF-JINTC-001", "DEF-INTC-010", "DEF-INTC-012", "DEF-TRPT-001",
+                                    "DEF-TRPT-004", "DEF-JPCAT-001", "DEF-STMT-001", "DEF-STMT-002", "DEF-STMT-003",
+                                    "DEF-STMT-004", "DEF-STMT-005", "DEF-STMT-007", "DEF-MQAC-002", "DEF-MQDT-002",
+                                    "DEF-MQDT-003"})
+        self.assertIs(led.switches["DEF-DTCK-004"]["code_switch"], False)
+        covered = {i: ledger.covering_switch(e) for i, e in led.switches.items() if ledger.covering_switch(e)}
+        self.assertEqual(covered, {"FLOW-TRPT-001": "DEF-TRPT-001", "NUM-JINTC-001": "DEF-INTC-010",
+                                   "BR-STMT-005": "DEF-STMT-002", "BR-STMT-006": "DEF-STMT-002",
+                                   "BR-STMT-008": "DEF-STMT-003", "DEF-JSTMT-005": "DEF-STMT-001"})
+        self.assertEqual(led.switches["BR-TRNA-007"]["value"], "fixed")
+        self.assertEqual(led.deviations["PINV-c-05"]["decision"], "D-27")
+        for ident in ("FLOW-SGN-005", "FLOW-MENU-006", "DEF-SGN-007"):
+            self.assertEqual((led.deviations[ident]["kind"], led.deviations[ident]["decision"]), ("incidental-ui", "none"))
+        self.assertIn("Q-SGN-006", led.deviations["DEF-SGN-007"]["note"])
         for ident in ("DEF-BILL-009", "Q-BILL-001", "Q-BILL-002", "Q-BILL-003", "Q-BILL-004", "Q-BILL-006",
                       "Q-MENU-003", "Q-SGN-001", "Q-SGN-002", "Q-SGN-003", "Q-SGN-004", "Q-SGN-005"):
             self.assertIn(ident, led.switches)
