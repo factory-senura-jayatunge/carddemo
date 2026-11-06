@@ -42,7 +42,7 @@ A pseudo-conversational CICS screen (transaction `CPVD`, map `COPAU1A`) that sho
 
 | ID | Rule |
 | :-- | :-- |
-| FLOW-AUDT-001 | Started without a commarea: transfer to COPAUS0C. |
+| FLOW-AUDT-001 | Started without a commarea: transfer to COPAUS0C, with no sign-on check (DEF-AUDT-009). |
 | FLOW-AUDT-002 | Arriving from COPAUS0C: show the selected authorization at once. |
 | FLOW-AUDT-003 | On each later interaction: Enter re-shows, PF3 goes back, PF5 toggles fraud, PF8 shows the next authorization, other keys are rejected. |
 | BR-AUDT-001 | The authorization is read by account ID (summary) and key (detail). |
@@ -59,7 +59,7 @@ A pseudo-conversational CICS screen (transaction `CPVD`, map `COPAU1A`) that sho
 
 ## 3. Actors and triggers
 
-- **Actor:** a signed-on CardDemo user who came through COPAUS0C. The program does not check the user (DEF-AUDT-006).
+- **Actor:** normally a signed-on CardDemo user who came through COPAUS0C. The program does not check that anyone has signed on (DEF-AUDT-009), nor the user (DEF-AUDT-006).
 - **Trigger:** COPAUS0C sets "to program" `COPAUS1C`, context 0 and the selected key, and transfers control (XCTL) (COPAUS0C BR-AUSM-007).
 - **Pseudo-conversation:** each interaction ends with `RETURN TRANSID('CPVD') COMMAREA(...)` (`:202-205`); transaction `CPVD` runs `COPAUS1C` (`CRDDEMO2.csd:25-31, 39-48`).
 - **Db2:** the transaction `CPVD` is bound to the Db2 entry `AWS01PLN` by `DB2TRAN CPVDTRAN` (`CRDDEMO2.csd:69-79`), so COPAUS2C, linked from this task, runs under plan `AWS01PLN`. The module README names the entry `DB201PLN` (`app/app-authorization-ims-db2-mq/README.md:177-178`) (Q-AUDT-004).
@@ -177,7 +177,7 @@ flowchart TD
 
 #### FLOW-AUDT-001 · Start without commarea
 - **When:** `EIBCALEN = 0` (the transaction typed directly).
-- **Then:** initialize the commarea, set "to program" `COPAUS0C` and transfer control to it (BR-AUDT-005 steps). COPAUS0C then shows account `00000000000` (COPAUS0C FLOW-AUSM-002).
+- **Then:** initialize the commarea, set "to program" `COPAUS0C` and transfer control to it (BR-AUDT-005 steps). COPAUS0C then shows account `00000000000` (COPAUS0C FLOW-AUSM-002). The user ID and the user type are blank, and nothing sends the user to sign-on (DEF-AUDT-009).
 - **Source:** `:165-169, 360-370`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -409,7 +409,7 @@ flowchart LR
 - **Source:** `:260-262` · **Status:** open · **Fidelity:** defect-decide (Q-AUDT-002) · **Confidence:** reviewed
 
 #### DEF-AUDT-006 · [security] No authorization check for fraud marking
-- Any user who reaches the screen can mark or unmark any authorization as fraud; neither the user ID nor the user type is checked or recorded with the change.
+- Any user who reaches the screen, signed on or not (DEF-AUDT-009), can mark or unmark any authorization as fraud; neither the user ID nor the user type is checked or recorded with the change.
 - **Source:** `:187-189, 230-266` · **Status:** open · **Fidelity:** defect-decide (Q-AUDT-003) · **Confidence:** reviewed
 
 #### DEF-AUDT-007 · Debug DISPLAY left in the program
@@ -420,6 +420,10 @@ flowchart LR
 - `CDEMO-CPVD-FRAUD-DATA` is cleared and passed around but never used. The commarea is 100 bytes longer than COPAUS0C's; COPAUS0C keeps only its own length when it copies the commarea, so nothing is lost that matters.
 - **Source:** `:120, 172` · **Status:** open (incidental) · **Confidence:** reviewed
 
+#### DEF-AUDT-009 · [security] Works without sign-on
+- Started with no commarea (typing `CPVD`), the program does not send the user to sign-on (`COSGN00C`); it initializes the commarea, so the user ID and the user type are blank, and transfers control to COPAUS0C (FLOW-AUDT-001), which shows account `00000000000` and accepts any other account. From there the user can select an authorization with `S`, come back to this screen and mark or remove fraud with PF5 (DEF-AUDT-006), or press PF3 for the main menu. The path continues as recorded in COPAUS0C DEF-AUSM-012 (INV-006).
+- **Source:** `:165-169, 360-370` · **Status:** open · **Fidelity:** defect-decide (Q-AUDT-005) · **Confidence:** reviewed
+
 ## 14. Open questions
 
 | ID | Question | For |
@@ -428,6 +432,7 @@ flowchart LR
 | Q-AUDT-002 | When the fraud change fails, should the screen keep the stored status and always show a message (DEF-AUDT-001, DEF-AUDT-003, DEF-AUDT-005)? | business |
 | Q-AUDT-003 | Who may mark or remove fraud, and should the user be recorded with the change (DEF-AUDT-006)? | business, security |
 | Q-AUDT-004 | Which Db2 entry name is installed for `CPVD`: `AWS01PLN` (CSD) or `DB201PLN` (module README)? | mainframe team |
+| Q-AUDT-005 | Should starting `CPVD` without a commarea send the user to sign-on (DEF-AUDT-009, INV-006)? | business, security |
 
 ## 15. Equivalence contract
 
@@ -447,12 +452,12 @@ Not runnable locally (CICS, IMS, Db2). Scenario check: a detail with blank fraud
 | :-- | :-- | :-- |
 | (data division) | 29-154 | §4.2, §4.3, BR-AUDT-003 |
 | (procedure division header) | 156 | §6 |
-| `MAIN-PARA` | 157-206 | FLOW-AUDT-001, FLOW-AUDT-002, FLOW-AUDT-003, VAL-AUDT-002, SE-AUDT-003 |
+| `MAIN-PARA` | 157-206 | FLOW-AUDT-001, FLOW-AUDT-002, FLOW-AUDT-003, VAL-AUDT-002, SE-AUDT-003, DEF-AUDT-009 |
 | `PROCESS-ENTER-KEY` | 208-228 | BR-AUDT-001, VAL-AUDT-001 |
 | `MARK-AUTH-FRAUD` | 230-266 | BR-AUDT-007, ERR-AUDT-004, ERR-AUDT-005, DEF-AUDT-001, DEF-AUDT-003 |
 | `PROCESS-PF8-KEY` | 268-289 | BR-AUDT-006, VAL-AUDT-003 |
 | `POPULATE-AUTH-DETAILS` | 291-358 | BR-AUDT-002, BR-AUDT-003, BR-AUDT-004, NUM-AUDT-001, NUM-AUDT-002, NUM-AUDT-003 |
-| `RETURN-TO-PREV-SCREEN` | 360-370 | BR-AUDT-005 |
+| `RETURN-TO-PREV-SCREEN` | 360-370 | BR-AUDT-005, DEF-AUDT-009 |
 | `SEND-AUTHVIEW-SCREEN` | 373-396 | VAL-AUDT-003 |
 | `RECEIVE-AUTHVIEW-SCREEN` | 398-406 | FLOW-AUDT-003 |
 | `POPULATE-HEADER-INFO` | 409-429 | NUM-AUDT-002 |

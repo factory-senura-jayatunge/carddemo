@@ -64,6 +64,7 @@ flowchart TB
 | COPAUA0C | `CCXREF`, `ACCTDAT`, `CUSTDAT` | file | READ by card number, account ID, customer ID | `COPAUA0C.cbl:477-485, 525-533, 573-581` | BR-AUTH-003, ERR-AUTH-005, ERR-AUTH-006 |
 | COPAUA0C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary by account; `REPL` or `ISRT` summary; `ISRT` detail; `TERM` | `COPAUA0C.cbl:293-303, 620, 825-830, 913, 943-944` | BR-AUTH-009, BR-AUTH-010, SE-AUTH-003, SE-AUTH-004 |
 | COPAUA0C | TD queue `CSSL` | TDQ | ENT-AUTH-ERROR-LOG record | `COPAUA0C.cbl:1001-1002` | SE-AUTH-006 |
+| terminal (no commarea, no sign-on) | COPAUS0C (`CPVS`), COPAUS1C (`CPVD`) | transaction start | none; each program initializes ENT-COMMAREA with a blank user ID and user type, and COPAUS1C passes it to COPAUS0C | `COPAUS0C.cbl:190-198`, `COPAUS1C.cbl:165-169, 360-370` | FLOW-AUSM-001, DEF-AUSM-012, FLOW-AUDT-001, DEF-AUDT-009 |
 | COMEN01C (option 11) | COPAUS0C | XCTL | ENT-COMMAREA (`CDEMO-ACCT-ID` when set) | `app/cpy/COMEN02Y.cpy:86-90`, `COPAUS0C.cbl:200-219` | FLOW-AUSM-002 |
 | COPAUS0C | COPAUS0C (`CPVS`) | RETURN TRANSID | ENT-COMMAREA with the `CDEMO-CPVS-*` paging keys | `COPAUS0C.cbl:254-257` | SE-AUSM-002 |
 | COPAUS0C | COPAUS1C | XCTL | ENT-COMMAREA: account ID and selected authorization key (`CDEMO-CPVS-PAU-SELECTED`) | `COPAUS0C.cbl:313-325` | BR-AUSM-007 |
@@ -90,7 +91,7 @@ flowchart TB
 | DBUNLDGS | `PAUTDB.ROOT.GSAM`, `PAUTDB.CHILD.GSAM` | IMS | GSAM `ISRT` of 100-byte summaries and 200-byte details | `DBUNLDGS.CBL:302, 321` | SE-DBUL-001, SE-DBUL-002 |
 | DBPAUTP0 (job) | `DBPAUTP0` (database) | JCL step | HD unload utility `DFSURGU0` in a `ULU` region; output `IMSDATA.DBPAUTP0` | `DBPAUTP0.jcl:15-32` | SE-JDBPA-002 |
 
-No edge leaves the module towards the base application except the menu return (COMEN01C), the fallback XCTL to the sign-on program COSGN00C when no return program is set (`COPAUS0C.cbl:668-669`), and the reads of the base VSAM files. Nothing in the base application calls into the module except menu option 11 of COMEN01C and the CA-7 chain CLOSEFIL → CBPAUP0J → POSTTRAN (CBPAUP0J §3).
+No edge leaves the module towards the base application except the menu return (COMEN01C), which also carries a session that never signed on when COPAUS0C or COPAUS1C was started from a terminal (COPAUS0C DEF-AUSM-012, COPAUS1C DEF-AUDT-009, INV-006), the fallback XCTL to the sign-on program COSGN00C when no return program is set (`COPAUS0C.cbl:668-669`), and the reads of the base VSAM files. Nothing in the base application calls into the module except menu option 11 of COMEN01C and the CA-7 chain CLOSEFIL → CBPAUP0J → POSTTRAN (CBPAUP0J §3).
 
 ## CRUD rows
 

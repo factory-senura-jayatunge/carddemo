@@ -48,7 +48,7 @@ A pseudo-conversational CICS screen (transaction `CPVS`, map `COPAU0A`) reached 
 
 | ID | Rule |
 | :-- | :-- |
-| FLOW-AUSM-001 | Started without a commarea: show an empty screen. |
+| FLOW-AUSM-001 | Started without a commarea: show an empty screen, with no sign-on check (DEF-AUSM-012). |
 | FLOW-AUSM-002 | Arriving from the menu or from COPAUS1C: show the account in the commarea at once, if it is numeric. |
 | FLOW-AUSM-003 | On each later interaction: Enter searches or selects, PF3 returns to the menu, PF7 and PF8 page, any other key is rejected. |
 | BR-AUSM-001 | Header: customer and first card come from the cross-reference by account; name, address and phone from the customer; limits from the account. |
@@ -67,7 +67,8 @@ A pseudo-conversational CICS screen (transaction `CPVS`, map `COPAU0A`) reached 
 
 ## 3. Actors and triggers
 
-- **Actor:** a signed-on CardDemo user. The menu option is for regular users (type `U`, `app/cpy/COMEN02Y.cpy:86-90`). The program does not check the user or whether the account belongs to them (DEF-AUSM-007).
+- **Actor:** normally a signed-on CardDemo user who comes from the menu. The menu option is for regular users (type `U`, `app/cpy/COMEN02Y.cpy:86-90`). The program does not check that anyone has signed on (DEF-AUSM-012), nor the user or whether the account belongs to them (DEF-AUSM-007).
+- **Trigger from a terminal:** typing `CPVS` with no commarea starts the program without sign-on (FLOW-AUSM-001); COPAUS1C started the same way transfers here (COPAUS1C FLOW-AUDT-001).
 - **Trigger from the menu:** COMEN01C checks that the program is installed (`INQUIRE PROGRAM`), sets `CDEMO-PGM-CONTEXT` = 0 and transfers control (XCTL) with the commarea (`app/cbl/COMEN01C.cbl:147-159`).
 - **Trigger from COPAUS1C:** PF3 on the detail screen transfers back with context 0 (COPAUS1C BR-AUDT-005).
 - **Pseudo-conversation:** every interaction ends with `RETURN TRANSID('CPVS') COMMAREA(...)` (`:254-257`); transaction `CPVS` runs program `COPAUS0C` (`CRDDEMO2.csd:18-24, 49-58`).
@@ -165,7 +166,7 @@ The account's status, the summary's limits and the card record (`CVACT02Y` is co
 ```mermaid
 flowchart TD
     S([CPVS task]) --> C{EIBCALEN = 0?}
-    C -- yes --> E[empty screen FLOW-AUSM-001]
+    C -- yes --> E[empty screen, no sign-on check<br/>FLOW-AUSM-001]
     C -- no --> R{reenter?}
     R -- no --> F[account from commarea<br/>gather details FLOW-AUSM-002]
     R -- yes --> K{key}
@@ -189,7 +190,7 @@ flowchart TD
 
 #### FLOW-AUSM-001 · Start without commarea
 - **When:** `EIBCALEN = 0` (the transaction typed directly).
-- **Then:** initialize the commarea, set "to program" to `COPAUS0C` and the context to reenter, clear the map and send it with `ERASE`, cursor on the account field. No account is shown.
+- **Then:** initialize the commarea, set "to program" to `COPAUS0C` and the context to reenter, clear the map and send it with `ERASE`, cursor on the account field. No account is shown. The user ID and the user type in the commarea are blank, and the program does not transfer to sign-on (`COSGN00C`): the next interaction proceeds as for any user, and PF3 opens the main menu with the blank identity (DEF-AUSM-012).
 - **Source:** `:190-198`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
@@ -358,7 +359,7 @@ flowchart LR
     P[CBPAUP0C] -- deletes --> DB
 ```
 
-- **Upstream:** COMEN01C (menu), COPAUS1C (back). The data comes from COPAUA0C (summaries and details) and the base files.
+- **Upstream:** COMEN01C (menu), COPAUS1C (back), and a terminal typing `CPVS` without sign-on (DEF-AUSM-012). The data comes from COPAUA0C (summaries and details) and the base files.
 - **Downstream:** COPAUS1C receives the account and selected key in the commarea.
 - **Shared data:** the purge (CBPAUP0C) can delete the details whose keys are saved in the commarea between two interactions (BR-AUSM-005).
 
@@ -403,7 +404,7 @@ flowchart LR
 - **Source:** `:184, 245-249, 694-701` · **Status:** open (incidental) · **Confidence:** platform-inferred
 
 #### DEF-AUSM-007 · [security] No authorization check
-- Any signed-on user can view the authorizations, name, address and phone of any account by typing its number. The user type in the commarea is not checked.
+- Any user who reaches the screen, signed on or not (DEF-AUSM-012), can view the authorizations, name, address and phone of any account by typing its number. The user type in the commarea is not checked.
 - **Source:** `:264-284` · **Status:** open · **Fidelity:** defect-decide (Q-AUSM-002)
 
 #### DEF-AUSM-008 · Map field out of screen order
@@ -422,6 +423,11 @@ flowchart LR
 - `CDEMO-CPVS-PAUKEY-PREV-PG` has 20 entries but the page number is never limited. From page 21 on, the key is stored past the table, over `CDEMO-CPVS-PAUKEY-LAST`, then over the page number and the next-page flag, corrupting the paging state (and, with a corrupted page number, storage beyond the commarea). Reached after about 100 authorizations, or sooner with DEF-AUSM-002.
 - **Source:** `:120-122, 437-440` · **Status:** open · **Confidence:** reviewed (overlay without subscript checking: platform-inferred)
 
+#### DEF-AUSM-012 · [security] Works without sign-on and leads into the main menu
+- Started with no commarea (typing `CPVS`), the program does not send the user to sign-on (`COSGN00C`) as the menu does (`app/cbl/COMEN01C.cbl:82-84`); it initializes the commarea, so the user ID and the user type are blank, and shows the empty search screen (FLOW-AUSM-001). The next Enter shows the authorizations, name, address and phone of any account typed (DEF-AUSM-007). PF3 then transfers to the main menu `COMEN01C` with that commarea (BR-AUSM-008); the program never sets the user type, so it stays blank. The menu accepts any commarea (`app/cbl/COMEN01C.cbl:85-90`) and applies its admin-only test only to type `U` (`app/cbl/COMEN01C.cbl:136-143`); every main-menu option is a type `U` option (`app/cpy/COMEN02Y.cpy:29-90`), so an unauthenticated terminal reaches all of them. Starting COPAUS1C the same way (`CPVD`) ends here too (COPAUS1C DEF-AUDT-009). Area A records the same kind of path for the account and card programs (DEF-SGN-012, DEF-MENU-003, INV-006), where PF3 sets the user type to `U`; area B records it for the account view (DEF-ACVW-009).
+- **Source:** `:190-198, 235-237, 665-677`; `app/cbl/COMEN01C.cbl:82-90, 136-143`; `app/cpy/COMEN02Y.cpy:29-90`
+- **Status:** open · **Fidelity:** defect-decide (Q-AUSM-005) · **Confidence:** reviewed
+
 ## 14. Open questions
 
 | ID | Question | For |
@@ -430,6 +436,7 @@ flowchart LR
 | Q-AUSM-002 | Should users be limited to accounts they own, or should the option be admin-only (DEF-AUSM-007)? | business, security |
 | Q-AUSM-003 | Does `COPAU00` assemble without warnings with `SEL0005` out of order, and does row 5's selection work on the real terminal (DEF-AUSM-008)? | mainframe team |
 | Q-AUSM-004 | Does `CXACAIX` return `DUPKEY` for accounts with several cards, and which card should the summary screen show for such an account (DEF-AUSM-010)? | mainframe team, business |
+| Q-AUSM-005 | Should starting `CPVS` without a commarea send the user to sign-on, as the menu does (DEF-AUSM-012, INV-006)? | business, security |
 
 ## 15. Equivalence contract
 
@@ -449,7 +456,7 @@ Not runnable locally (CICS, IMS). Scenario check on the sample data: account 1 (
 | :-- | :-- | :-- |
 | (data division) | 32-174 | §4.2, §5, NUM-AUSM-001 |
 | (procedure division header) | 176 | §6 |
-| `MAIN-PARA` | 178-257 | FLOW-AUSM-001, FLOW-AUSM-002, FLOW-AUSM-003, BR-AUSM-008, VAL-AUSM-004, SE-AUSM-002, DEF-AUSM-011 |
+| `MAIN-PARA` | 178-257 | FLOW-AUSM-001, FLOW-AUSM-002, FLOW-AUSM-003, BR-AUSM-008, VAL-AUSM-004, SE-AUSM-002, DEF-AUSM-011, DEF-AUSM-012 |
 | `PROCESS-ENTER-KEY` | 261-338 | VAL-AUSM-001, VAL-AUSM-002, VAL-AUSM-003, BR-AUSM-007 |
 | `GATHER-DETAILS` | 342-358 | FLOW-AUSM-003, BR-AUSM-003 |
 | `PROCESS-PF7-KEY` | 362-385 | BR-AUSM-006, VAL-AUSM-005, DEF-AUSM-002 |
@@ -459,7 +466,7 @@ Not runnable locally (CICS, IMS). Scenario check on the sample data: account 1 (
 | `REPOSITION-AUTHORIZATIONS` | 488-519 | BR-AUSM-005, BR-AUSM-006, ERR-AUSM-005 |
 | `POPULATE-AUTH-LIST` | 522-605 | BR-AUSM-003, NUM-AUSM-001, NUM-AUSM-003 |
 | `INITIALIZE-AUTH-DATA` | 608-662 | BR-AUSM-003 |
-| `RETURN-TO-PREV-SCREEN` | 665-677 | BR-AUSM-008 |
+| `RETURN-TO-PREV-SCREEN` | 665-677 | BR-AUSM-008, DEF-AUSM-012 |
 | `SEND-PAULST-SCREEN` | 681-709 | SE-AUSM-001, DEF-AUSM-006 |
 | `RECEIVE-PAULST-SCREEN` | 712-722 | FLOW-AUSM-003 |
 | `POPULATE-HEADER-INFO` | 726-747 | NUM-AUSM-003 |

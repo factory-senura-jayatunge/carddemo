@@ -118,6 +118,25 @@ WRONG findings, both fixed:
 | PINV-e-authorization-01 | Said COPAUA0C files a detail under the previous request's account for an unknown card or a missing account. An unknown card writes nothing to IMS (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:463-465`); for a missing account the detail goes under the card's own `XREF-ACCT-ID` (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:619-623, 911-919`). | Placement holds as-is; the exceptions (DEF-AUTH-002, DEF-AUTH-003) are in the decision and totals. |
 
 MINOR findings, all fixed: the purge's in-memory approved count (ENT-AUTH-SUMMARY header); the `PA-AUTH-STATUS` sample values (space in 18 roots, X'00' in 3, X'F0' in the all-spaces root, re-counted by the author); `AUTHFRDS.ACCT_ID`/`CUST_ID` come from COPAUS1C's commarea, the customer from the cross-reference; the request amount is split into a 13-character field; `ERR-APPLICATION` holds `CP00` and the event-key contents per error; request to response is 1 : 0..1 as-is; the COPAUS1C → COPAUS2C edge returns the updated detail image; the module's outward edges also include the XCTL to COSGN00C and the CA-7 chain; the UNLDPADB delete row names IEFBR14; PINV-e-authorization-02 says the reload merges; PINV-e-authorization-04 adds `CXACAIX`, closed by CLOSEFIL, so COPAUS0C also fails in the base batch window.
+## Sign-on bypass items
+
+After the lead's review, the author added the as-is sign-on bypass of COPAUS0C and COPAUS1C (INV-006): new items COPAUS0C DEF-AUSM-012 and Q-AUSM-005, COPAUS1C DEF-AUDT-009 and Q-AUDT-005, and changes to COPAUS0C §2 FLOW-AUSM-001, the §3 actor line, a new §3 terminal trigger, the §6 diagram, FLOW-AUSM-001, DEF-AUSM-007, the §11 upstream line and the §16 rows of `MAIN-PARA` and `RETURN-TO-PREV-SCREEN`; COPAUS1C §2 FLOW-AUDT-001, the §3 actor line, FLOW-AUDT-001, DEF-AUDT-006 and the same two §16 rows; and in `areas/e-authorization-interactions.md` a new terminal edge and the sentence after the edge table. The author first checked the path in the source: with no commarea both programs initialize the commarea (user ID and user type blank) and never transfer to `COSGN00C` (`COPAUS0C.cbl:190-198`, `COPAUS1C.cbl:165-169`); COPAUS0C's PF3 transfers to `COMEN01C` with that commarea (`COPAUS0C.cbl:235-237, 665-677`); the menu accepts any commarea and tests admin-only options only for type `U` (`app/cbl/COMEN01C.cbl:82-90, 136-143`), and all main-menu options are type `U` (`app/cpy/COMEN02Y.cpy:29-90`).
+
+A sixth reviewer agent, independent of the author and of the earlier reviewers, checked only these 19 new or changed units against the source, and searched both specs for any remaining statement that the user must be signed on (none).
+
+| Units | CORRECT | MINOR | WRONG |
+| --: | --: | --: | --: |
+| 19 | 16 | 3 | 0 |
+
+MINOR findings, all fixed:
+
+| Unit | Finding | Fix |
+| :-- | :-- | :-- |
+| COPAUS0C DEF-AUSM-012 | The Source line left out `app/cpy/COMEN02Y.cpy:29-90`, cited in the text; the item sat between DEF-AUSM-011 and DEF-AUSM-009 without a blank line; "Area A records the same path" overstated, since DEF-SGN-012, DEF-MENU-003 and INV-006 name the account and card programs, which set the user type to `U`, not COPAUS0C, where it stays blank. | Citation added; item moved to the end of §13; wording now "the same kind of path for the account and card programs ..., where PF3 sets the user type to `U`". |
+| COPAUS1C DEF-AUDT-009 | No blank line before `## 14`. | Blank line added. |
+| Area file, sentence after the edge table | Named only COPAUS0C as the start of a session that never signed on. | Now names COPAUS0C or COPAUS1C and cites DEF-AUDT-009; the terminal edge also cites `COPAUS1C.cbl:360-370`. |
+
+Not changed here: the reviewer noted that INV-006 (`components.md`), DEF-SGN-012 and DEF-MENU-003 do not list COPAUS0C and COPAUS1C. Those files belong to the system artifacts and area A; the gap is reported to the lead.
 ## Sample data checks
 
 The batch and job reviewers parsed `app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat` independently of the author: 51,736 bytes, 226 variable-length records (2 × 88-byte header and trailer, 22 × 140-byte summaries, 202 × 240-byte details), in the order header, summary, its details, ..., trailer. One summary has an all-spaces key (`X'404040404040'`, counts `X'4040'` = 16448) and no details. All 202 details have response code `00`; for every other summary the stored approved count equals its number of details and the declined count is 0. Detail dates run from 23292 to 24096 (`YYDDD`). This confirms the sample-data statements in CBPAUP0C section 15, DBUNLDGS section 15, PAUDBUNL section 15 and DBPAUTP0 SE-JDBPA-002.
