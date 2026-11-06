@@ -18,7 +18,7 @@ describe('apiFetch', () => {
     expect(seen[1]?.headers.get('X-XSRF-TOKEN')).toBeNull();
   });
 
-  it('[FLOW-BILL-001] on 401 refreshes once and retries the call', async () => {
+  it('@FLOW-BILL-001 on 401 refreshes once and retries the call', async () => {
     const paths: string[] = [];
     let calls = 0;
     vi.stubGlobal('fetch', (r: Request) => {
@@ -31,7 +31,7 @@ describe('apiFetch', () => {
     expect(paths).toEqual(['GET /api/billpay/accounts/00000000001', 'POST /api/auth/refresh', 'GET /api/billpay/accounts/00000000001']);
   });
 
-  it('[FLOW-BILL-001] reports an ended session when the refresh fails', async () => {
+  it('@FLOW-BILL-001 reports an ended session when the refresh fails', async () => {
     const expired = vi.fn();
     onSessionExpired(expired);
     vi.stubGlobal('fetch', () => Promise.resolve(status(401)));

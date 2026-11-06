@@ -3,7 +3,7 @@ import { formatClockTime, formatCurrency, formatHeaderDate, formatHeaderTime, le
 import { displayName } from './names';
 
 describe('balance display', () => {
-  it('[NUM-BILL-001] uses the edit +9999999999.99 for positive, zero and negative balances', () => {
+  it('@NUM-BILL-001 uses the edit +9999999999.99 for positive, zero and negative balances', () => {
     expect(legacyBalanceEdit('194.00')).toBe('+0000000194.00');
     expect(legacyBalanceEdit('0.00')).toBe('+0000000000.00');
     expect(legacyBalanceEdit('-25.50')).toBe('-0000000025.50');
@@ -20,7 +20,7 @@ describe('balance display', () => {
 
 describe('header date and time', () => {
   const date = new Date(2026, 10, 6, 9, 5, 7);
-  it('[NUM-BILL-004] [NUM-SGN-001] [NUM-MENU-002] date mm/dd/yy and time hh:mm:ss', () => {
+  it('@NUM-BILL-004 @NUM-SGN-001 @NUM-MENU-002 date mm/dd/yy and time hh:mm:ss', () => {
     expect(formatHeaderDate(date)).toBe('11/06/26');
     expect(formatHeaderTime(date)).toBe('09:05:07');
     expect(formatHeaderDate(new Date(2000, 0, 31, 23, 59, 59))).toBe('01/31/00');

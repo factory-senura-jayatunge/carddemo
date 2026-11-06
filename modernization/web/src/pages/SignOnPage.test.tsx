@@ -19,14 +19,14 @@ async function signOn(app: Awaited<ReturnType<typeof openSignOn>>, id: string, p
 }
 
 describe('Sign-on page (COSGN00C)', () => {
-  it('[FLOW-SGN-001] SGN-S1: opens with focus on User ID; the first call is GET /api/auth/me', async () => {
+  it('@FLOW-SGN-001 SGN-S1: opens with focus on User ID; the first call is GET /api/auth/me', async () => {
     const app = await openSignOn();
     await waitFor(() => expect(userId()).toHaveFocus());
     expect(new URL(app.requests[0]?.url ?? '').pathname).toBe('/api/auth/me');
     expect(screen.getByTestId('screen-id')).toHaveTextContent('CC00 · COSGN00C');
   });
 
-  it('[VAL-SGN-001] SGN-S2: both blank', async () => {
+  it('@VAL-SGN-001 SGN-S2: both blank', async () => {
     const app = await openSignOn();
     await signOn(app, '', '');
     expect(messageText()).toBe('Please enter User ID ...');
@@ -34,21 +34,21 @@ describe('Sign-on page (COSGN00C)', () => {
     expect(userId()).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('[VAL-SGN-002] SGN-S3: password blank', async () => {
+  it('@VAL-SGN-002 SGN-S3: password blank', async () => {
     const app = await openSignOn();
     await signOn(app, 'ADMIN001', '');
     expect(messageText()).toBe('Please enter Password ...');
     expect(password()).toHaveFocus();
   });
 
-  it('[BR-SGN-004] SGN-S4: an admin lands on /admin', async () => {
+  it('@BR-SGN-004 SGN-S4: an admin lands on /admin', async () => {
     const app = await openSignOn();
     await signOn(app, 'ADMIN001', 'PASSWORD');
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/admin'));
     expect(await screen.findByRole('heading', { name: 'Admin menu' })).toBeInTheDocument();
   });
 
-  it('[DEF-SGN-011] SGN-S5 fixed: passwords are case-sensitive, user IDs are not', async () => {
+  it('@DEF-SGN-011 SGN-S5 @fixed: passwords are case-sensitive, user IDs are not', async () => {
     const app = await openSignOn();
     await signOn(app, 'user0001', 'password');
     await waitFor(() => expect(messageText()).toBe('Wrong User ID or Password. Try again ...'));
@@ -59,22 +59,23 @@ describe('Sign-on page (COSGN00C)', () => {
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/'));
   });
 
-  it('[DEF-SGN-003] SGN-S6 fixed: an unknown user gets the neutral message on Password', async () => {
+  it('@BR-SGN-002 @DEF-SGN-003 SGN-S6 @fixed: an unknown user gets the neutral message on Password', async () => {
     const app = await openSignOn();
     await signOn(app, 'NOUSER01', 'PASSWORD');
     await waitFor(() => expect(messageText()).toBe('Wrong User ID or Password. Try again ...'));
     expect(password()).toHaveFocus();
   });
 
-  it('[FLOW-SGN-003] SGN-S8: Exit shows the thank-you page', async () => {
+  it('@FLOW-SGN-003 SGN-S8: Exit shows the thank-you page', async () => {
     const app = await openSignOn();
     await app.user.click(screen.getByRole('button', { name: /^Exit/ }));
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/signed-off'));
+    await screen.findByRole('heading', { name: 'You are signed out' });
     expect(messageText()).toBe('Thank you for using CardDemo application...');
     expect(screen.getByRole('link', { name: 'Sign on again' })).toHaveAttribute('href', '/sign-on');
   });
 
-  it('[VAL-SGN-005] [FLOW-SGN-004] SGN-S9: F5 with the function keys on is an invalid key; F3 exits', async () => {
+  it('@VAL-SGN-005 @FLOW-SGN-004 @DEF-SGN-010 SGN-S9: F5 with the function keys on is an invalid key; F3 exits', async () => {
     const app = await openSignOn({ functionKeys: true });
     await app.user.type(userId(), 'USER0001');
     fireEvent.keyDown(window, { key: 'F5' });
@@ -86,20 +87,21 @@ describe('Sign-on page (COSGN00C)', () => {
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/signed-off'));
   });
 
-  it('SGN-S11 fixed: a mixed-case password signs on as typed', async () => {
+  it('@DEF-SGN-011 @FLOW-SGN-002 SGN-S11 @fixed: a mixed-case password and Enter sign on as typed', async () => {
     const app = await openSignOn();
-    await signOn(app, 'TEST0001', 'Secret12');
+    await app.user.type(userId(), 'TEST0001');
+    await app.user.type(password(), 'Secret12{Enter}');
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/'));
   });
 
-  it('[DEF-SGN-005] SGN-S13 fixed: an unknown user type is refused', async () => {
+  it('@DEF-SGN-005 SGN-S13 @fixed: an unknown user type is refused', async () => {
     const app = await openSignOn();
     await signOn(app, 'TYPEX001', 'PASSWORD');
     await waitFor(() => expect(messageText()).toBe('User not authorized. Contact your administrator ...'));
     expect(userId()).toHaveFocus();
   });
 
-  it('[DEF-SGN-002] SGN-S12 fixed: five wrong passwords lock the user', async () => {
+  it('@DEF-SGN-002 SGN-S12 @fixed: five wrong passwords lock the user', async () => {
     const app = await openSignOn();
     await app.user.type(userId(), 'USER0002');
     for (let i = 0; i < 5; i += 1) {
@@ -114,10 +116,28 @@ describe('Sign-on page (COSGN00C)', () => {
     expect(app.router.state.location.pathname).toBe('/sign-on');
   });
 
-  it('[D-SEC-07] SGN-S14: a forced change checks each rule and lands on home', async () => {
+  it('@DEF-SGN-002 SGN-S19 @fixed: the 31st failure from one address in a minute is refused with a retry time', async () => {
+    const app = await openSignOn();
+    await app.user.type(userId(), 'USER0003');
+    for (let i = 0; i < 30; i += 1) {
+      await app.user.clear(password());
+      await app.user.type(password(), 'WRONGPWD{Enter}');
+      await waitFor(() => expect(app.apiCalls('/api/auth/sign-on')).toHaveLength(i + 1));
+    }
+    await app.user.clear(password());
+    await app.user.type(password(), 'PASSWORD{Enter}');
+    await waitFor(() => expect(messageText()).toBe('Too many sign-on attempts. Try again later ...'));
+    expect(screen.getByTestId('retry-at')).toHaveTextContent(/^Try again after \d{2}:\d{2}\.$/);
+    expect(userId()).toHaveFocus();
+    expect(userId()).toHaveAttribute('aria-invalid', 'true');
+    expect(app.router.state.location.pathname).toBe('/sign-on');
+  });
+
+  it('@D-SEC-07 SGN-S14: a forced change checks each rule and lands on home', async () => {
     const app = await openSignOn();
     await signOn(app, 'CHANGE01', 'PASSWORD');
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/sign-on/change-password'));
+    await screen.findByRole('heading', { name: 'Change your password' });
     expect(messageText()).toBe('Password change required. Enter a new Password ...');
     expect(screen.getByTestId('current-password')).toHaveValue('PASSWORD');
     const next = screen.getByTestId('new-password');
@@ -145,7 +165,7 @@ describe('Sign-on page (COSGN00C)', () => {
     expect(app.apiCalls('/api/auth/password')).toHaveLength(1);
   });
 
-  it('[BR-SGN-004] a signed-on user who opens /sign-on goes home', async () => {
+  it('@BR-SGN-004 a signed-on user who opens /sign-on goes home', async () => {
     const { router } = await renderApp('/sign-on', { signedOnAs: 'ADMIN001' });
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin'));
   });

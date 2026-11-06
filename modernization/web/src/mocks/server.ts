@@ -1,13 +1,13 @@
 import { legacyBalanceEdit } from '@/lib/format';
 import { fillMessage } from '@/lib/messages';
-import { messages, type MessageCode } from '@/messages';
+import { messages, type MessageKey } from '@/messages';
 import { initialAccounts, initialUsers, type MockUser } from './data';
 
 /**
  * An in-browser stand-in for identity-service and billpay-service that
  * follows the slice contract, in fixed mode: neutral sign-on failures,
- * case-sensitive passwords, a 5-failure lockout, and the Bill Pay rules in
- * order. It runs only in `vite --mode mock` and in tests.
+ * case-sensitive passwords, a 5-failure lockout, the per-minute limit on
+ * failed attempts, a 15-minute idle session, and the Bill Pay rules in order. It runs only in `vite --mode mock` and in tests.
  */
 export interface MockSettings {
   latencyMs: number;
@@ -19,7 +19,9 @@ export interface MockSettings {
 interface MockState {
   accounts: Record<string, number>;
   users: Record<string, MockUser>;
-  session: { id: string; userId: string } | null;
+  session: { id: string; userId: string; lastSeen: number } | null;
+  /** Times of failed sign-on attempts in the last minute, per user ID and for this one client. */
+  failures: Record<string, number[]>;
   csrf: string;
   nextTranId: number;
   payments: Record<string, { acctId: string; userId: string; result: unknown }>;
@@ -38,6 +40,10 @@ export const memoryStore = (): MockStore => {
 const random = () => Math.random().toString(36).slice(2, 12);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LOCK_MS = 15 * 60_000;
+const IDLE_MS = 15 * 60_000;
+const WINDOW_MS = 60_000;
+// identity-service's default (carddemo.identity.rate-limit.*); there is no per-user limit.
+const FAILURES_PER_CLIENT = 30;
 
 const decimal = (cents: number) => {
   const sign = cents < 0 ? '-' : '';
@@ -51,14 +57,20 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
     headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json', ...headers },
   });
 
-const problem = (status: number, code: MessageCode, field: string | null, extra: Record<string, unknown> = {}, headers?: Record<string, string>) =>
-  json(status, { type: 'about:blank', status, code, message: fillMessage(code), field, severity: messages[code].severity, ...extra }, headers);
+/** A problem response with a catalogue message; the API code is the key's code. */
+const problem = (status: number, key: MessageKey, field: string | null, extra: Record<string, unknown> = {}, headers?: Record<string, string>) =>
+  json(
+    status,
+    { type: 'about:blank', status, code: messages[key].code, message: fillMessage(key), field, severity: messages[key].severity, ...extra },
+    headers,
+  );
 
 export function createMockServer(store: MockStore, settings: () => MockSettings) {
   const fresh = (): MockState => ({
     accounts: initialAccounts(),
     users: initialUsers(),
     session: null,
+    failures: {},
     csrf: random(),
     nextTranId: 1,
     payments: {},
@@ -74,23 +86,48 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     idleTimeoutSeconds: 900,
   });
 
-  /** Sign-on rules 1 to 9 of the contract; returns the user or an error response. */
-  const verify = (state: MockState, rawUserId: string, password: string, allowMustChange: boolean): [string, MockUser] | Response => {
+  const recent = (state: MockState, key: string) => (state.failures[key] ?? []).filter((t) => t > Date.now() - WINDOW_MS);
+
+  /** Milliseconds until this client is under the failure limit again; 0 when it is. */
+  const throttled = (state: MockState) => {
+    const times = recent(state, 'client');
+    return times.length >= FAILURES_PER_CLIENT ? (times[0] ?? 0) + WINDOW_MS - Date.now() : 0;
+  };
+
+  const failed = (state: MockState) => {
+    state.failures.client = [...recent(state, 'client'), Date.now()];
+    return problem(401, 'SIGN_ON_FAILED', 'password');
+  };
+
+  /**
+   * Sign-on rules 1 to 9 of the contract; returns the user or an error response. A password
+   * change with a session passes the session's user, which the body's user ID must name.
+   */
+  const verify = (
+    state: MockState,
+    rawUserId: string,
+    password: string,
+    allowMustChange: boolean,
+    sessionUserId?: string,
+  ): [string, MockUser] | Response => {
     if (rawUserId.trim() === '') return problem(400, 'USER_ID_REQUIRED', 'userId');
     if (password.trim() === '') return problem(400, 'PASSWORD_REQUIRED', 'password');
-    if (rawUserId.length > 8) return problem(400, 'INVALID_INPUT', 'userId');
-    if (password.length > 64) return json(400, { code: 'INVALID_INPUT', message: fillMessage('PASSWORD_REQUIRED'), field: 'password', severity: 'error' });
+    if (rawUserId.length > 8) return problem(400, 'INVALID_INPUT_USER_ID', 'userId');
+    if (password.length > 64) return problem(400, 'INVALID_INPUT_PASSWORD', 'password');
     const userId = rawUserId.trim().toUpperCase();
+    if (sessionUserId !== undefined && userId !== sessionUserId) return problem(400, 'USER_ID_MISMATCH', 'userId');
+    const wait = throttled(state);
+    if (wait > 0) return problem(429, 'TOO_MANY_ATTEMPTS', 'userId', {}, { 'Retry-After': String(Math.ceil(wait / 1000)) });
     const user = state.users[userId];
-    if (!user) return problem(401, 'SIGN_ON_FAILED', 'password');
-    if (user.lockedUntil > Date.now()) return problem(401, 'SIGN_ON_FAILED', 'password');
+    if (!user) return failed(state);
+    if (user.lockedUntil > Date.now()) return failed(state);
     if (user.password !== password.replace(/ +$/, '')) {
       user.failedAttempts += 1;
       if (user.failedAttempts >= 5) {
         user.lockedUntil = Date.now() + LOCK_MS;
         user.failedAttempts = 0;
       }
-      return problem(401, 'SIGN_ON_FAILED', 'password');
+      return failed(state);
     }
     if (user.type !== 'A' && user.type !== 'U') return problem(403, 'USER_TYPE_NOT_ALLOWED', 'userId');
     if (user.mustChange && !allowMustChange) return problem(403, 'PASSWORD_CHANGE_REQUIRED', 'newPassword');
@@ -99,7 +136,7 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
   };
 
   const startSession = (state: MockState, userId: string, user: MockUser) => {
-    state.session = { id: random(), userId };
+    state.session = { id: random(), userId, lastSeen: Date.now() };
     return json(200, sessionView(userId, user));
   };
 
@@ -116,12 +153,15 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method.toUpperCase();
+    state.failures ??= {};
+    if (state.session && Date.now() - state.session.lastSeen > IDLE_MS) state.session = null;
+    if (state.session) state.session.lastSeen = Date.now();
     const current = state.session ? state.users[state.session.userId] : undefined;
     const signedOn = state.session && current ? { userId: state.session.userId, user: current } : null;
     const csrfOk = request.headers.get('X-XSRF-TOKEN') === state.csrf;
 
     if (method === 'POST' && !['/api/auth/sign-on', '/api/auth/password'].includes(path) && !csrfOk) {
-      return json(403, { code: 'CSRF', message: 'Invalid CSRF token', field: null, severity: 'error' });
+      return problem(403, 'CSRF_REJECTED', null);
     }
 
     if (path === '/api/auth/sign-on' && method === 'POST') {
@@ -132,13 +172,13 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     if (path === '/api/auth/password' && method === 'POST') {
       const body = await readBody(request);
       const userId = text(body.userId) || signedOn?.userId || '';
-      const result = verify(state, userId, text(body.currentPassword), true);
+      const result = verify(state, userId, text(body.currentPassword), true, signedOn?.userId);
       if (result instanceof Response) return result;
       const [id, user] = result;
       const next = text(body.newPassword);
       const field = 'newPassword';
       if (next === '') return problem(400, 'NEW_PASSWORD_REQUIRED', field);
-      if ([...next].length < 8 || [...next].length > 64) return problem(400, 'NEW_PASSWORD_LENGTH', field);
+      if ([...next].length < 8 || [...next].length > 64) return problem(400, 'NEW_PASSWORD_LENGTH_FIXED', field);
       if (next === user.password) return problem(400, 'NEW_PASSWORD_SAME', field);
       if (next.toUpperCase() === id) return problem(400, 'NEW_PASSWORD_IS_USER_ID', field);
       user.password = next;
@@ -146,7 +186,7 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
       return startSession(state, id, user);
     }
     if (path === '/api/auth/refresh' && method === 'POST') {
-      if (!signedOn) return json(401, { code: 'SESSION_EXPIRED', message: 'Session expired', field: null, severity: 'info' });
+      if (!signedOn) return problem(401, 'SESSION_EXPIRED', null);
       return json(200, sessionView(signedOn.userId, signedOn.user));
     }
     if (path === '/api/auth/sign-off' && method === 'POST') {
@@ -179,13 +219,13 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
         if (blank) return problem(400, 'ACCT_ID_REQUIRED', 'acctId');
         if (cents === undefined) return problem(404, 'ACCOUNT_NOT_FOUND', 'acctId');
         const payable = cents > 0;
-        const code: MessageCode = payable ? 'CONFIRM_PAYMENT' : 'NOTHING_TO_PAY';
+        const key: MessageKey = payable ? 'CONFIRM_PAYMENT' : 'NOTHING_TO_PAY';
         return json(200, {
           acctId,
           ...balanceFields(cents),
           payable,
-          message: messages[code].text,
-          severity: messages[code].severity,
+          message: messages[key].text,
+          severity: messages[key].severity,
           field: payable ? 'confirm' : 'acctId',
         });
       }
@@ -219,7 +259,7 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
         return json(201, result);
       }
     }
-    return json(404, { code: 'NOT_FOUND', message: 'Not found', field: null, severity: 'error' });
+    return problem(404, 'NOT_FOUND', null);
   }
 
   return {

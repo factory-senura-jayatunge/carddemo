@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,7 +47,8 @@ STATUSES = {"draft", "reviewed", "verified"}
 ITEM_KINDS = ("BR", "VAL", "FLOW", "SE", "ERR", "NUM", "DEF")
 NEEDS_SOURCE = {"BR", "VAL", "FLOW", "SE", "ERR"}
 SECTIONS = 16
-SKIP_DIRS = {".git", "build", "dist", "__pycache__", "node_modules"}
+# Used only outside a git checkout; inside one, the files git does not ignore are the candidates.
+SKIP_DIRS = {".git", "build", "dist", "target", "__pycache__", "node_modules"}
 
 UNIT_RE = re.compile(r"^[A-Z][A-Z0-9]{2,5}$")
 HEAD_RE = re.compile(r"^####\s+([A-Z]+-[A-Z0-9]+-\d+)\b(.*)$")
@@ -266,13 +268,33 @@ class Checker:
         self.warnings.append(f"{where}: {msg}")
 
     # -- files ---------------------------------------------------------
+    def git_files(self) -> list[Path] | None:
+        """Tracked and untracked files under root that git does not ignore, or None outside a checkout."""
+        # A git hook exports GIT_DIR and GIT_INDEX_FILE; they would point git at the hook's repository.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        try:
+            proc = subprocess.run(["git", "-C", str(self.root), "ls-files", "-z", "--cached", "--others",
+                                   "--exclude-standard"], capture_output=True, env=env, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if proc.returncode != 0:
+            return None
+        names = proc.stdout.decode("utf-8", "surrogateescape").split("\0")
+        return [p for p in dict.fromkeys(self.root / n for n in names if n) if p.is_file()]
+
     def tree(self) -> dict[str, list[Path]]:
+        """Bare file names to their paths. Build output (Maven target/, web dist/) holds copies of
+        sources and data files, so ignored files must not make a bare name ambiguous."""
         if self._tree is None:
             self._tree = {}
-            for dirpath, dirnames, filenames in os.walk(self.root):
-                dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-                for name in filenames:
-                    self._tree.setdefault(name, []).append(Path(dirpath) / name)
+            files = self.git_files()
+            if files is None:
+                files = []
+                for dirpath, dirnames, filenames in os.walk(self.root):
+                    dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+                    files += [Path(dirpath) / name for name in filenames]
+            for path in files:
+                self._tree.setdefault(path.name, []).append(path)
         return self._tree
 
     def resolve(self, name: str) -> tuple[Path | None, str]:

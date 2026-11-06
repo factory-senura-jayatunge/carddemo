@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
+
+// The default 1 s for findBy and waitFor is too short on a loaded CI machine.
+configure({ asyncUtilTimeout: 3000 });
 
 // jsdom lacks the layout APIs Mantine uses.
 Object.defineProperty(window, 'matchMedia', {

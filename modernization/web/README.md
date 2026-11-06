@@ -23,6 +23,7 @@ npm run dev:mock     # the same with the in-browser contract mock, no services n
 npx playwright install chromium
 npx playwright test  # BILL, SGN and MENU scenarios plus axe checks, on the mock
 CARDDEMO_E2E_TARGET=stack CARDDEMO_ENV_FILE=../.env npx playwright test --project=chromium   # against a running slice
+npx playwright test --project=firefox --project=webkit   # other browsers, only when named (or E2E_BROWSERS)
 npm run screenshots  # review screens into test-results/screens (CARDDEMO_SCREENSHOT_DIR to change)
 ```
 
@@ -39,4 +40,4 @@ On a stack, `CARDDEMO_E2E_MODE=legacy` runs the legacy-mode expectations instead
 
 ## Tests
 
-Test names carry the scenario (`BILL-S5`) and the spec items they cover (`[DEF-BILL-014]`), for the trace matrix. Vitest writes `test-results/vitest-junit.xml`, Playwright `test-results/e2e-junit.xml`.
+Test names carry the scenario (`BILL-S5`), the spec items they cover as tags (`@DEF-BILL-014`) and, where the result depends on the fidelity mode, `@fixed` or `@legacy`. `make trace` reads them from `test-results/vitest-junit.xml` (Vitest) and `playwright-report/e2e-<target>-<mode>.json` (Playwright on Chromium; one file per target and mode, so a fixed and a legacy run on the stack both count). Runs of other projects get their own file, such as `e2e-mock-fixed-firefox+webkit.json`, so a browser that fails to launch never touches the Chromium results. The Playwright HTML report is in `playwright-report/html`.

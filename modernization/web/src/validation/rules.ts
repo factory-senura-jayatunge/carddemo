@@ -1,4 +1,4 @@
-import type { MessageCode } from '@/messages';
+import type { MessageKey } from '@/messages';
 
 /**
  * The checks the web app runs before calling a service, in the legacy edit
@@ -6,7 +6,8 @@ import type { MessageCode } from '@/messages';
  */
 export interface FieldProblem<F extends string = string> {
   field: F;
-  code: MessageCode;
+  /** The catalogue message to show. */
+  key: MessageKey;
 }
 
 /** Blank as COBOL sees it: spaces or nothing. */
@@ -14,8 +15,8 @@ export const isBlank = (value: string): boolean => value.trim() === '';
 
 /** VAL-SGN-001, VAL-SGN-002. */
 export function checkSignOn(userId: string, password: string): FieldProblem<'userId' | 'password'> | null {
-  if (isBlank(userId)) return { field: 'userId', code: 'USER_ID_REQUIRED' };
-  if (isBlank(password)) return { field: 'password', code: 'PASSWORD_REQUIRED' };
+  if (isBlank(userId)) return { field: 'userId', key: 'USER_ID_REQUIRED' };
+  if (isBlank(password)) return { field: 'password', key: 'PASSWORD_REQUIRED' };
   return null;
 }
 
@@ -29,14 +30,14 @@ export function checkPasswordChange(
   newPassword: string,
   confirmPassword: string,
 ): FieldProblem<'userId' | 'currentPassword' | 'newPassword' | 'confirmPassword'> | null {
-  if (isBlank(userId)) return { field: 'userId', code: 'USER_ID_REQUIRED' };
-  if (isBlank(currentPassword)) return { field: 'currentPassword', code: 'PASSWORD_REQUIRED' };
-  if (newPassword === '') return { field: 'newPassword', code: 'NEW_PASSWORD_REQUIRED' };
+  if (isBlank(userId)) return { field: 'userId', key: 'USER_ID_REQUIRED' };
+  if (isBlank(currentPassword)) return { field: 'currentPassword', key: 'PASSWORD_REQUIRED' };
+  if (newPassword === '') return { field: 'newPassword', key: 'NEW_PASSWORD_REQUIRED' };
   const length = [...newPassword].length;
-  if (length < 8 || length > 64) return { field: 'newPassword', code: 'NEW_PASSWORD_LENGTH' };
-  if (newPassword === currentPassword) return { field: 'newPassword', code: 'NEW_PASSWORD_SAME' };
-  if (newPassword.toUpperCase() === userId.trim().toUpperCase()) return { field: 'newPassword', code: 'NEW_PASSWORD_IS_USER_ID' };
-  if (newPassword !== confirmPassword) return { field: 'confirmPassword', code: 'NEW_PASSWORD_MISMATCH' };
+  if (length < 8 || length > 64) return { field: 'newPassword', key: 'NEW_PASSWORD_LENGTH_FIXED' };
+  if (newPassword === currentPassword) return { field: 'newPassword', key: 'NEW_PASSWORD_SAME' };
+  if (newPassword.toUpperCase() === userId.trim().toUpperCase()) return { field: 'newPassword', key: 'NEW_PASSWORD_IS_USER_ID' };
+  if (newPassword !== confirmPassword) return { field: 'confirmPassword', key: 'NEW_PASSWORD_MISMATCH' };
   return null;
 }
 
@@ -60,10 +61,10 @@ export type BillPayStep =
 
 /** What Enter does on the Bill Pay page, in COBIL00C's order (web contract, Bill Pay page). */
 export function billPayStep(acctId: string, confirm: string): BillPayStep {
-  if (isBlank(acctId)) return { kind: 'problem', problem: { field: 'acctId', code: 'ACCT_ID_REQUIRED' } };
+  if (isBlank(acctId)) return { kind: 'problem', problem: { field: 'acctId', key: 'ACCT_ID_REQUIRED' } };
   const value = confirm.trim();
   if (value === 'N' || value === 'n') return { kind: 'clear' };
   if (value === 'Y' || value === 'y') return { kind: 'pay' };
   if (value === '') return { kind: 'preview' };
-  return { kind: 'problem', problem: { field: 'confirm', code: 'INVALID_CONFIRM' } };
+  return { kind: 'problem', problem: { field: 'confirm', key: 'INVALID_CONFIRM' } };
 }
