@@ -8,7 +8,18 @@
 # for every recipe; nothing global is changed. See README.md.
 
 HERE := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-ENV_FILE := $(HERE)/.env
+
+# One compose project serves every checkout on the machine, so every checkout
+# must use the same secrets and the same compose file. Both default to the
+# main checkout (the worktree that owns .git), also from linked worktrees;
+# CARDDEMO_ENV_FILE and CARDDEMO_INFRA_DIR override them.
+GIT_COMMON_DIR := $(shell git -C '$(HERE)' rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+MAIN_CHECKOUT := $(if $(GIT_COMMON_DIR),$(patsubst %/,%,$(dir $(GIT_COMMON_DIR))))
+MAIN_MODERNIZATION := $(if $(wildcard $(MAIN_CHECKOUT)/modernization/docker-compose.yml),$(MAIN_CHECKOUT)/modernization,$(HERE))
+CARDDEMO_ENV_FILE ?= $(MAIN_MODERNIZATION)/.env
+CARDDEMO_INFRA_DIR ?= $(MAIN_MODERNIZATION)
+export CARDDEMO_ENV_FILE CARDDEMO_INFRA_DIR
+ENV_FILE := $(CARDDEMO_ENV_FILE)
 TOOLCHAIN := $(HERE)/scripts/toolchain.sh
 PYTHON ?= python3
 UP_TIMEOUT ?= 300
@@ -45,7 +56,7 @@ endif
 endif
 endif
 
-COMPOSE = docker compose --project-directory '$(HERE)' -f '$(HERE)/docker-compose.yml' --env-file '$(ENV_FILE)'
+COMPOSE = docker compose --project-directory '$(CARDDEMO_INFRA_DIR)' -f '$(CARDDEMO_INFRA_DIR)/docker-compose.yml' --env-file '$(ENV_FILE)'
 
 .DEFAULT_GOAL := help
 
@@ -66,6 +77,8 @@ setup: ## Check JDK 21, Node 24, Docker/Colima and the Airflow venv; create .env
 	@rc=0; \
 	'$(TOOLCHAIN)' check || rc=1; \
 	$(PYTHON) '$(HERE)/scripts/init_env.py' '$(HERE)/.env.example' '$(ENV_FILE)' || rc=1; \
+	if [ '$(ENV_FILE)' != '$(HERE)/.env' ] && [ -f '$(HERE)/.env' ] && [ ! '$(HERE)/.env' -ef '$(ENV_FILE)' ]; then \
+		printf 'warn  %-16s %s\n' .env '$(HERE)/.env is ignored; this checkout uses $(ENV_FILE)'; fi; \
 	if $(COMPOSE) config --quiet; then \
 		printf 'ok    %-16s %s\n' compose 'docker-compose.yml is valid with .env'; \
 	else rc=1; fi; \
@@ -78,9 +91,11 @@ toolchain: ## Show the JDK, Node and Docker endpoint that the recipes use
 	@echo "java: $$(command -v java) $$(java -version 2>&1 | head -n 1)"
 	@echo "DOCKER_HOST=$${DOCKER_HOST:-<docker CLI default>}"
 	@echo "AIRFLOW_VENV=$(AIRFLOW_VENV)"
+	@echo "CARDDEMO_ENV_FILE=$(ENV_FILE)"
+	@echo "CARDDEMO_INFRA_DIR=$(CARDDEMO_INFRA_DIR)"
 
 require-env:
-	@[ -f '$(ENV_FILE)' ] || { echo 'modernization/.env is missing; run make setup first' >&2; exit 1; }
+	@[ -f '$(ENV_FILE)' ] || { echo '$(ENV_FILE) is missing; run make setup (in the main checkout) first' >&2; exit 1; }
 
 up: infra-up ## Start the stack: infrastructure now, application services once they exist
 	@echo 'up: no application services yet; they arrive with Phase 3 (Bill Pay pilot)'
