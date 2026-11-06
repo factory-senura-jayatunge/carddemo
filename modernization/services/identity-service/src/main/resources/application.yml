@@ -1,0 +1,40 @@
+server:
+  address: 127.0.0.1
+  port: 28081
+
+spring:
+  application:
+    name: identity-service
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:sqlserver://127.0.0.1:${MSSQL_HOST_PORT:21433};databaseName=${CARDDEMO_DB_NAME:carddemo};encrypt=true;trustServerCertificate=true
+    username: ${CARDDEMO_DB_IDENTITY_USER:${CARDDEMO_DB_NAME:carddemo}_identity}
+    password: ${CARDDEMO_DB_IDENTITY_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  mvc:
+    problemdetails:
+      enabled: false
+
+carddemo:
+  identity:
+    jwt:
+      private-key-path: ${CARDDEMO_JWT_KEY_FILE:}
+    seed:
+      demo-password: ${CARDDEMO_SEED_USER_PASSWORD:}
+      bootstrap-admin-password: ${CARDDEMO_BOOTSTRAP_ADMIN_PASSWORD:}
+  security:
+    issuer: carddemo-identity
+    audience: carddemo-api
+    cookie-secure: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+springdoc:
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true
