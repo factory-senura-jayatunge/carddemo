@@ -1,0 +1,37 @@
+server:
+  address: 127.0.0.1
+  port: 28082
+
+spring:
+  application:
+    name: billpay-service
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:sqlserver://127.0.0.1:${MSSQL_HOST_PORT:21433};databaseName=${CARDDEMO_DB_NAME:carddemo};encrypt=true;trustServerCertificate=true
+    username: ${CARDDEMO_DB_BILLPAY_USER:${CARDDEMO_DB_NAME:carddemo}_billpay}
+    password: ${CARDDEMO_DB_BILLPAY_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  mvc:
+    problemdetails:
+      enabled: false
+
+carddemo:
+  security:
+    issuer: carddemo-identity
+    audience: carddemo-api
+    cookie-secure: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+springdoc:
+  api-docs:
+    version: openapi_3_1
+  override-with-generic-response: false
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true

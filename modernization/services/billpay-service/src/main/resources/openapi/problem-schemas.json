@@ -1,0 +1,30 @@
+{
+  "Problem": {
+    "type": "object",
+    "description": "RFC 9457 problem details with the CardDemo fields. message is the exact catalogue text.",
+    "required": ["code", "message", "severity"],
+    "properties": {
+      "type": {"type": "string"},
+      "title": {"type": "string"},
+      "status": {"type": "integer", "format": "int32"},
+      "detail": {"type": "string"},
+      "instance": {"type": "string"},
+      "code": {"type": "string", "examples": ["ACCT_ID_REQUIRED"]},
+      "message": {"type": "string"},
+      "field": {"type": ["string", "null"], "description": "Field to focus, or null."},
+      "severity": {"$ref": "#/components/schemas/Severity"}
+    }
+  },
+  "PaymentProblem": {
+    "allOf": [
+      {"$ref": "#/components/schemas/Problem"},
+      {
+        "type": "object",
+        "properties": {
+          "currentBalance": {"type": "string"},
+          "currentBalanceDisplay": {"type": "string"}
+        }
+      }
+    ]
+  }
+}
