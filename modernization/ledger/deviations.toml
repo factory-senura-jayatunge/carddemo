@@ -1,0 +1,2794 @@
+# Accepted deviations: items the target does not reproduce, so they have no legacy mode.
+#
+# kind         architecture-dependent (the mechanism is gone), security-c1 (access model C1),
+#              incidental-ui (screen or commarea artefact), decision (a catalog decision changes it)
+# decision     the decision of docs/modernization/decisions/README.md, or "none"
+# target       what the target does instead; legacy: what the COBOL does, when not obvious
+# group        the shared reason when several items deviate for it
+# scenarios    equivalence scenarios whose legacy result the target does not reproduce ("COSGN00C S10")
+# approved_by, approved_on   who accepted the deviation, and when (YYYY-MM-DD)
+#
+# make verify-ledger checks that every item exists in the spec and that every architecture-dependent
+# item of docs/modernization/architecture/decisions.md has an entry of that kind.
+# Fields: modernization/verify/trace/README.md.
+
+schema = 1
+
+# invariants
+
+[deviation."INV-002"]
+kind = "decision"
+decision = "D-18"
+legacy = "CLOSEFIL closes the online files for the cycle, so the online functions stop."
+target = "The batch window runs in mode WRITES_BLOCKED: sign-on and every read keep working, writes are refused while the cycle runs"
+scenarios = ["COSGN00C S10"]
+source = "catalog D-18 (override), docs/modernization/architecture/decisions.md D-BAT-05"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."INV-006"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."INV-052"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-12"
+legacy = "A report between TRANBKP and COMBTRAN loses the day."
+target = "Cannot occur: no generations; one table."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/ACCTFILE.md
+
+[deviation."DEF-JACCT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JACCT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CARDDEMO-CSD.md
+
+[deviation."DEF-JCSD-003"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCSD-004"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCSD-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "CICS trace with CONFDATA(NO) is a region setting; the target has no CICS trace, and its log masking is covered by decision D-10."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CARDFILE.md
+
+[deviation."DEF-JCARD-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCARD-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCARD-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "VSAM alternate-index record size limits a card index record to 8 cards; a SQL index has no such limit, and the business limit is decided under Q-JCARD-001."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JCARD-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JCARD-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JCARD-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CBEXPORT-JOB.md
+
+[deviation."DEF-JEXPT-001"]
+kind = "decision"
+decision = "D-62"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JEXPT-002"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JEXPT-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Unconditional IDCAMS return-code reset before the export define; the target batch framework writes its export output without VSAM delete/define."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JEXPT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Missing JCL COND and CEE3ABD abend after an I/O error in the export job; the target batch framework fails the step and marks the run failed, and partial-output handling is a framework setting."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CBIMPORT-JOB.md
+
+[deviation."DEF-JIMPT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Import JCL allocates its outputs as NEW without a pre-delete, so a rerun fails at allocation; the target has no dataset catalog."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JIMPT-002"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JIMPT-003"]
+kind = "decision"
+decision = "D-62"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CBPAUP0J.md
+
+[deviation."DEF-JAUPG-003"]
+kind = "architecture-dependent"
+decision = "D-57"
+group = "DEV-ARCH-14"
+legacy = "Purge RC 16 may count as normal completion."
+target = "`FAILED`: exit statuses replace return codes."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CLOSEFIL.md
+
+[deviation."ERR-JCLOSE-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The CICS close command result not reaching the job return code is a CICS/SDSF behaviour; the target replaces the CICS file close with its own batch-window control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/COMBTRAN.md
+
+[deviation."DEF-JCOMB-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Selecting inputs by newest GDG generation is a z/OS GDG behaviour; the target replaces GDGs and selects a cycle's data by cycle identifier."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCOMB-002"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JCOMB-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A SORT step without COND letting the load step run is a JCL defect in a utility step that the target replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."Q-JCOMB-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-12"
+legacy = "A report between TRANBKP and COMBTRAN loses the day."
+target = "Cannot occur: no generations; one table."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CRDDEMOD-CSD.md
+
+[deviation."DEF-JCSDD-001"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CRDDEMOM-CSD.md
+
+[deviation."DEF-JCSDM-003"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CREADB21.md
+
+[deviation."DEF-JCRDB-003"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCRDB-005"]
+kind = "decision"
+decision = "D-63"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CREASTMT.md
+
+[deviation."DEF-JSTMT-006"]
+kind = "architecture-dependent"
+decision = "D-38"
+group = "DEV-ARCH-13"
+legacy = "CA-7 runs statements in parallel with posting."
+target = "Statements see the posted day: the DAG orders statements after posting and interest."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JSTMT-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The undefined abend code from calling CEE3ABD without arguments is an LE behaviour; the target reports failures through its own job status."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/CUSTFILE.md
+
+[deviation."DEF-JCUST-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCUST-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JCUST-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JCUST-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/DALYREJS.md
+
+[deviation."DEF-JREJS-003"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/DBPAUTP0.md
+
+[deviation."DEF-JDBPA-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this unload data set deletion order does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/DEFCUST.md
+
+[deviation."DEF-JDCUST-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Obsolete DEFCUST job deletes and defines different VSAM cluster names; the target needs no equivalent of this job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JDCUST-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Obsolete DEFCUST cluster name and key do not match the customer master; the target defines its own customer table."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JDCUST-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete of a non-existent cluster returns 8 in an obsolete job; the target needs no equivalent."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JDCUST-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Obsolete define job fails on rerun because the cluster exists; the target needs no equivalent."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/DEFGDGB.md
+
+[deviation."DEF-JGDGB-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS LASTCC/MAXCC reset in the GDG base definition job; the target has no GDGs."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JGDGB-002"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JGDGB-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Two JCL jobs define the same GDG base with different attributes; the target has no GDGs, and report retention is decided under Q-JREPT-001."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/DISCGRP.md
+
+[deviation."DEF-JDISC-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JDISC-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/DUSRSECJ.md
+
+[deviation."DEF-JUSEC-001"]
+kind = "decision"
+decision = "D-04"
+group = "DEV-PASSWORDS"
+legacy = "Passwords are stored, compared, copied and displayed in clear text."
+target = "Passwords are stored as salted hashes and never shown; seed users get hashed passwords."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JUSEC-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The SYSAD unit name is a JCL typo in an allocation step; the target replaces the JCL reload with its own provisioning."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JUSEC-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The unconditional IDCAMS return code reset is a JCL utility defect; the target replaces the delete-define-load job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JUSEC-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Step sequencing without COND parameters is JES behaviour of the reload job; the target replaces the job with its own provisioning."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/ESDSRRDS.md
+
+[deviation."DEF-JESRR-001"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JESRR-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "UNIT=SYSAD typo in JCL dataset allocation; the target has no JCL unit allocation."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JESRR-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Unconditional IDCAMS return-code reset in an ESDS/RRDS sample job; the target has no VSAM ESDS or RRDS."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/FTPJCL.md
+
+[deviation."DEF-JFTP-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Misspelled high-level qualifier on a z/OS dataset name in a sample FTP job; the target has no dataset catalog."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JFTP-004"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JFTP-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "z/OS batch FTP client does not set a failing return code without the EXIT option; platform behaviour the target does not use."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/INTCALC.md
+
+[deviation."DEF-JINTC-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The mismatch between a non-unique VSAM alternate index and a program that expects unique keys is VSAM AIX DUPKEY semantics; the target reads cards by account with SQL, and the program-side item covers the business rule."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/INTRDRJ1.md
+
+[deviation."DEF-JIRD1-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Missing JCL COND before an internal-reader submit step in a sample job; the target has no JES internal reader."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JIRD1-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "JCL step and allocation failure behaviour of an internal-reader sample job; the target has no JES or IEBGENER."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/LOADPADB.md
+
+[deviation."DEF-JLDPA-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this merge-versus-restore behaviour of the IMS load job does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/OPENFIL.md
+
+[deviation."ERR-JOPEN-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "CICS open command failures not reaching the job return code are a CICS/SDSF behaviour; the target has no CICS files to reopen."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/POSTTRAN.md
+
+[deviation."DEF-JPOST-002"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/READACCT.md
+
+[deviation."DEF-JRACCT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "UNIT=SYSAD typo in JCL dataset allocation; the target has no JCL unit allocation."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JRACCT-002"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JRACCT-005"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/READCARD.md
+
+[deviation."DEF-JRCARD-001"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/READCUST.md
+
+[deviation."DEF-JRCUST-001"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JRCUST-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "NOTIFY=&SYUID typo on the JCL job card; a JCL typo the target does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/READXREF.md
+
+[deviation."DEF-JRXREF-001"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/REPTFILE.md
+
+[deviation."DEF-JREPT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Conflicting GDG base definitions between REPTFILE and DEFGDGB; the target has no GDGs, and report retention is decided under Q-JREPT-001."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."NUM-JREPT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "GDG LIMIT and NOSCRATCH space behaviour for report generations; the target has no GDGs, and report retention is decided under Q-JREPT-001."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."SE-JREPT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS definition of the report GDG base; the target has no GDGs."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/SCHED-CA7.md
+
+[deviation."DEF-JCA7-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "What starts the CA-7 chains (schedule member 000652) is CA-7 configuration; the target defines its own Airflow schedules."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCA7-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Endless CA-7 trigger loops under schedule ID 030 are CA-7 trigger semantics; the Airflow DAGs are written fresh."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCA7-005"]
+kind = "architecture-dependent"
+decision = "D-37"
+group = "DEV-ARCH-15"
+legacy = "CA-7 triggers loop."
+target = "One run per cycle: dAGs are acyclic."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCA7-006"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Parallel CA-7 paths started from one CLOSEFIL are CA-7 trigger semantics; the Airflow DAG orders its tasks explicitly."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCA7-007"]
+kind = "decision"
+decision = "D-39"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCA7-008"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Endless loops under schedule IDs 031 and 032 are CA-7 trigger semantics; the Airflow DAGs are written fresh."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCA7-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The CA-7 default schedule ID on DEMAND is a CA-7 behaviour; the target starts DAGs through Airflow."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCA7-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes CA-7 trigger chain 1 as listed; the business content is decided under decision D-37 and the Airflow DAG is written fresh."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCA7-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes CA-7 trigger chain 2 as listed; the business content is decided under decision D-37 and decision D-63."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCA7-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes CA-7 trigger chain 3 as listed; statement placement is decided under decision D-38."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCA7-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes the CA-7 schedule ID 031 loop; CA-7 trigger semantics the target does not reproduce."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCA7-006"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes CA-7 schedule ID inheritance across the listing; CA-7 trigger semantics the target does not reproduce."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/SCHED-CONTROLM.md
+
+[deviation."DEF-JCTLM-001"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCTLM-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Two smart folders deleting the same condition is Control-M condition semantics; the Airflow DAGs are written fresh."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCTLM-005"]
+kind = "decision"
+decision = "D-63"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCTLM-006"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCTLM-008"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Daily and monthly Control-M folders running concurrently without a linking condition is Control-M configuration; Airflow serialises DAG runs explicitly."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JCTLM-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Order-date scoped Control-M conditions not serialising days is Control-M semantics; the Airflow DAG can limit itself to one active run."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCTLM-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes the Control-M daily folder as defined; its business content is decided under decision D-37."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCTLM-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes the Control-M Saturday disclosure group folder; its business content is decided under decision D-63."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCTLM-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes the Control-M Saturday Db2 extract folder; its business content is decided under decision D-63."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCTLM-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes the forced-only Control-M monthly folder; its business content is decided under decision D-24."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TCATBALF.md
+
+[deviation."DEF-JTCAT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTCAT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANBKP.md
+
+[deviation."DEF-JTBKP-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "An IDCAMS MAXCC reset hiding a failed delete is a defect in a utility step the target replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTBKP-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A never-loaded VSAM cluster failing to open for REPRO is VSAM/IDCAMS behaviour the target does not have."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTBKP-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "An IDCAMS delete step without COND is a JCL defect in a utility step the target replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANCATG.md
+
+[deviation."DEF-JTCATG-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTCATG-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANEXTR.md
+
+[deviation."DEF-JTREX-001"]
+kind = "decision"
+decision = "D-63"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANFILE.md
+
+[deviation."DEF-JTRAN-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRAN-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRAN-006"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "VSAM alternate-index record size limits one processed timestamp to 19 transactions; a SQL index has no such limit."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRAN-007"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "An unused VSAM alternate index on the transaction file; the target defines its own SQL indexes as its queries need."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTRAN-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTRAN-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTRAN-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."SE-JTRAN-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Describes the VSAM REPRO load of the seed file into the new cluster; the target does not load VSAM, and whether a seed record is needed at all is decided under Q-JTRAN-001."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANIDX.md
+
+[deviation."DEF-JTIDX-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "An IDCAMS index job that does not delete the old index first is a defect in a utility step the target replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTIDX-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The limit on transaction IDs per alternate key record is VSAM AIX behaviour; a SQL index has no such limit."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTIDX-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "An alternate index missing from the CICS upgrade set is CICS/VSAM behaviour; the target maintains SQL indexes automatically."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTIDX-004"]
+kind = "decision"
+decision = "D-42"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTIDX-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS index steps without COND failing on an existing index is a defect in utility steps the target replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANREPT-PROC.md
+
+[deviation."DEF-JTRPTP-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Online report requests consuming backup generations is a GDG behaviour; the target report reads the store directly and does not write backups."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRPTP-004"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRPTP-005"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRPTP-006"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Interleaved job lines in a CICS transient data queue and JES duplicate job names are platform behaviour; the target submits a report as one API call."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANREPT.md
+
+[deviation."DEF-JTRPT-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A report job writing into the backup generation that COMBTRAN reads is GDG relative-generation behaviour; the target report does not write backups."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JTRPT-004"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTRPT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Steps without COND running after a failed unload is a JCL defect in utility steps the target replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TRANTYPE.md
+
+[deviation."DEF-JTTYP-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JTTYP-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/TXT2PDF1.md
+
+[deviation."DEF-JPDF-001"]
+kind = "decision"
+decision = "D-45"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JPDF-003"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JPDF-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A COND test that can never fire and the CA-7 trigger guard are JCL and CA-7 behaviour; the target orders the PDF task after a successful statement task."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/UNLDGSAM.md
+
+[deviation."DEF-JULGS-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "GSAM data set allocation is z/OS-specific and no job reads these files; the target does not use GSAM."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JULGS-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "DBRC and batch-region DISP=SHR access are IMS mechanics; the target reads SQL Server with normal transaction isolation."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JULGS-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this kept partial GSAM files do not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/UNLDPADB.md
+
+[deviation."DEF-JULPA-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A JCL disposition defect in a delete step that the target does not have."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JULPA-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "DBRC-off batch reads are IMS mechanics; the target reads SQL Server with normal transaction isolation."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/WAITSTEP.md
+
+[deviation."DEF-JWAIT-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "How the pause length is converted on z/OS is compiler and platform behaviour; the target replaces WAITSTEP with completion checks."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JWAIT-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A fixed pause between jobs replaces no business rule; the target replaces WAITSTEP with explicit task dependencies."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# jobs/XREFFILE.md
+
+[deviation."DEF-JXREF-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JXREF-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "SDSF/CEMT close and open of CICS files around a VSAM reload; the target has no CICS region or VSAM files to hand over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-JXREF-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "VSAM alternate-index record size limits a cross-reference index record to 2 cards; a SQL index has no such limit, and the business limit is decided under Q-JXREF-001."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-JXREF-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBACT01C.md
+
+[deviation."BR-ACRD-005"]
+kind = "decision"
+decision = "D-42"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."BR-ACRD-006"]
+kind = "decision"
+decision = "D-42"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-ACRD-002"]
+kind = "decision"
+decision = "D-42"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBACT02C.md
+
+[deviation."DEF-CDRD-001"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBACT03C.md
+
+[deviation."DEF-XRRD-001"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBACT04C.md
+
+[deviation."DEF-INTC-005"]
+kind = "architecture-dependent"
+decision = "D-23"
+group = "DEV-ARCH-07"
+legacy = "A rerun charges interest twice."
+target = "Rerun refused (D-BAT-10): job instance identity."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-INTC-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-06"
+legacy = "Interest rows and the account update not atomic."
+target = "Committed together: chunk transaction with the reader position."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-INTC-011"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBCUS01C.md
+
+[deviation."DEF-CURD-001"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBEXPORT.md
+
+[deviation."DEF-EXPT-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The VSAM key offset in the IDCAMS define is a JCL utility step the target replaces; the target does not store the export in a VSAM cluster."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-EXPT-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The abend call without parameters is a z/OS Language Environment service quirk; the target job reports failure through its own exit status."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-EXPT-007"]
+kind = "decision"
+decision = "D-62"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-EXPT-009"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-EXPT-010"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-EXPT-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The abend code from calling the LE abend service without arguments is z/OS-specific; the target only needs the run to stop with a non-zero result, which is already must-preserve."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBIMPORT.md
+
+[deviation."DEF-IMPT-001"]
+kind = "decision"
+decision = "D-62"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-IMPT-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The abend call without arguments is a z/OS Language Environment quirk; the target job reports failure through its own exit status."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-IMPT-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The VSAM cluster key offset mismatch is a JCL/IDCAMS definition issue; the target does not store the export in a VSAM cluster."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-IMPT-008"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-IMPT-009"]
+kind = "decision"
+decision = "D-62"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."VAL-IMPT-001"]
+kind = "decision"
+decision = "D-62"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBPAUP0C.md
+
+[deviation."DEF-AUPG-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Checkpoint frequency of an IMS BMP; the target sets its own commit interval in Spring Batch with no business effect."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBSTM03A.md
+
+[deviation."DEF-STMT-008"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBSTM03B.md
+
+[deviation."DEF-STIO-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The unchecked key length is an artifact of the COBOL file-access subroutine interface; the target uses typed repository calls with no length parameter."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-STIO-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Uninitialised file status before the first I/O is a COBOL storage and compiler artifact; the target data access has no such status field."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-STIO-005"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBTRN01C.md
+
+[deviation."BR-TVAL-005"]
+kind = "decision"
+decision = "D-42"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-TVAL-002"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-TVAL-004"]
+kind = "decision"
+decision = "D-42"
+group = "DEV-JOBS"
+legacy = "READ* listings, TRANIDX, TRANVALD, CBEXPORT/CBIMPORT, the Db2 type extract and TXT2PDF are jobs with no business result or with a second copy of the data."
+target = "Dropped, or replaced by database export and load (when a receiver is named), one reference-data store and a PDF writer in the statement job."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBTRN02C.md
+
+[deviation."DEF-POST-008"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-05"
+legacy = "A record half applied after an abend."
+target = "Restart resumes cleanly: chunk transaction with the reader position."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-POST-011"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CBTRN03C.md
+
+[deviation."DEF-TRPT-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-11"
+legacy = "Selection and heading dates can differ."
+target = "Cannot occur: one date pair feeds both."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-TRPT-006"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COACCT01.md
+
+[deviation."DEF-MQAC-003"]
+kind = "architecture-dependent"
+decision = "D-73"
+group = "DEV-ARCH-10"
+legacy = "Reply inherits MQ descriptor fields."
+target = "Properties set explicitly: aMQP has no descriptor inheritance."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-MQAC-004"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Every program, job and requester can use every file, transaction and queue."
+target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-MQAC-008"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A loop when an IBM MQ close call fails is CICS/MQ API plumbing; RabbitMQ client connection handling in the target replaces it."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-MQAC-012"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-09"
+legacy = "A bad message blocks the queue."
+target = "Dead-lettered: a listener does not stop on one message."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-MQAC-008"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Error records and re-entry on MQ close failure are IBM MQ API handling the RabbitMQ client replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COACTUPC.md
+
+[deviation."DEF-ACUP-005"]
+kind = "architecture-dependent"
+decision = "D-16"
+group = "DEV-ARCH-03"
+legacy = "Account saved, customer not."
+target = "Both or neither: one database transaction."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-ACUP-009"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-ACUP-013"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-ACUP-105"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The CSUTLDTC/CEEDAYS parameter-length mismatch is an LE call detail; the target replaces it with standard date parsing."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COACTVWC.md
+
+[deviation."DEF-ACVW-009"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-ACVW-011"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COADM01C.md
+
+[deviation."DEF-ADMN-001"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COBDATFT.md
+
+[deviation."DEF-DTFT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The 20-byte separator compare in the COBDATFT assembler routine depends on the HLASM literal pool; no caller sends type 1 and the target formats dates natively."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-DTFT-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The garbage tail of the COBDATFT error message comes from assembler storage layout; no caller reads the message and the target does not reuse the routine."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-DTFT-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The missing content validation in the COBDATFT assembler routine has no business effect because its only caller strips dashes from a known-good date; the target does this natively."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-DTFT-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "This describes how the local GnuCOBOL shim differs from the assembler routine; it is a test stand-in, and the target replaces both."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."VAL-DTFT-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The COBDATFT invalid-request message and its undefined tail are internal to an assembler routine that no caller checks; the target replaces it with native date formatting."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COBIL00C.md
+
+[deviation."BR-BILL-004"]
+kind = "decision"
+decision = "D-59"
+target = "Fixed mode takes the next ID from the sequence core.tran_id_seq (switch BR-TRNA-003); legacy mode keeps highest + 1 under an application lock"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-001"]
+kind = "architecture-dependent"
+decision = "D-29"
+group = "DEV-ARCH-01"
+legacy = "Balance changed without a payment record when a write fails."
+target = "All or nothing: one database transaction."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-02"
+legacy = "Two concurrent adds get the same transaction ID."
+target = "Unique IDs: iD allocation under a lock in the inserting transaction."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-005"]
+kind = "architecture-dependent"
+decision = "none"
+target = "One response per request: the message of a failed rewrite cannot keep a stale colour"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-006"]
+kind = "incidental-ui"
+decision = "none"
+target = "The payment row stores legacy_filler as NULL; FILLER content is not inherited"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-007"]
+kind = "decision"
+decision = "D-60"
+target = "Timestamps are DATETIME2 columns; the two legacy text layouts are produced only by the exporter"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-008"]
+kind = "incidental-ui"
+decision = "none"
+target = "No commarea: the leftover list-screen fields are dropped"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-011"]
+kind = "architecture-dependent"
+decision = "none"
+target = "One response per request: several screens per interaction cannot occur"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-012"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No VSAM browse: the lowest card number comes from one query"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-013"]
+kind = "architecture-dependent"
+decision = "none"
+target = "One database transaction: the balance is never edited without a successful account read"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-BILL-015"]
+kind = "incidental-ui"
+decision = "none"
+target = "No commarea: Back is a route change"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-BILL-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No 3270 screen receive: the request body is validated"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-BILL-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No VSAM browse: a query either returns rows or fails"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-BILL-004"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error rolls back the transaction and returns a problem response"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-BILL-007"]
+kind = "incidental-ui"
+decision = "none"
+target = "Pseudo-conversational return replaced by a stateless request and the browser route"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-BILL-008"]
+kind = "incidental-ui"
+decision = "none"
+target = "XCTL replaced by a route change"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COBSWAIT.md
+
+[deviation."DEF-WAIT-001"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."NUM-WAIT-001"]
+kind = "decision"
+decision = "D-37"
+group = "DEV-CYCLE"
+legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, none complete; WAITSTEP pauses instead of checking."
+target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COBTUPDT.md
+
+[deviation."DEF-TTBU-009"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COCRDLIC.md
+
+[deviation."DEF-CRDL-003"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-CRDL-004"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-CRDL-005"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-CRDL-001"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-CRDL-008"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."SE-CRDL-003"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COCRDSLC.md
+
+[deviation."DEF-CRDV-003"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-CRDV-004"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COCRDUPC.md
+
+[deviation."DEF-CRDU-007"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CODATE01.md
+
+[deviation."DEF-MQDT-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-09"
+legacy = "A bad message blocks the queue."
+target = "Dead-lettered: a listener does not stop on one message."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-MQDT-007"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Error records and re-entry on MQ close failure are IBM MQ API handling the RabbitMQ client replaces."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COMEN01C.md
+
+[deviation."BR-MENU-003"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-MENU-002"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-MENU-003"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-MENU-004"]
+kind = "incidental-ui"
+decision = "none"
+target = "The coming-soon text is the target's own, well formed"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."Q-MENU-003"]
+kind = "decision"
+decision = "D-05"
+target = "Back on a menu signs off and shows an empty sign-on page"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COPAUA0C.md
+
+[deviation."DEF-AUTH-001"]
+kind = "architecture-dependent"
+decision = "D-31"
+group = "DEV-ARCH-08"
+legacy = "Later messages in one CICS task reuse the state of earlier ones."
+target = "Each decision uses its own request: a listener handles each message with fresh state."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUTH-002"]
+kind = "architecture-dependent"
+decision = "D-31"
+group = "DEV-ARCH-08"
+legacy = "Later messages in one CICS task reuse the state of earlier ones."
+target = "Each decision uses its own request: a listener handles each message with fresh state."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUTH-003"]
+kind = "architecture-dependent"
+decision = "D-31"
+group = "DEV-ARCH-08"
+legacy = "Later messages in one CICS task reuse the state of earlier ones."
+target = "Each decision uses its own request: a listener handles each message with fresh state."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUTH-004"]
+kind = "architecture-dependent"
+decision = "D-31"
+group = "DEV-ARCH-08"
+legacy = "Later messages in one CICS task reuse the state of earlier ones."
+target = "Each decision uses its own request: a listener handles each message with fresh state."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUTH-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-08"
+legacy = "Later messages in one CICS task reuse the state of earlier ones."
+target = "Each decision uses its own request: a listener handles each message with fresh state."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUTH-011"]
+kind = "decision"
+decision = "D-10"
+group = "DEV-PII"
+legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup, reject and statement files keep them in clear."
+target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUTH-013"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-08"
+legacy = "Later messages in one CICS task reuse the state of earlier ones."
+target = "Each decision uses its own request: a listener handles each message with fresh state."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-AUTH-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-09"
+legacy = "A bad message blocks the queue."
+target = "Dead-lettered: a listener does not stop on one message."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COPAUS0C.md
+
+[deviation."DEF-AUSM-012"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COPAUS1C.md
+
+[deviation."DEF-AUDT-006"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-AUDT-009"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CORPT00C.md
+
+[deviation."BR-RPTS-006"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The 17-record JCL job stream is a z/OS submission mechanism; the target keeps only the dates and selection, which need no decision."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-RPTS-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A partial job stream left in the JES internal reader after a write error is z/OS behaviour; the target starts the report job through its own scheduler, not by writing JCL."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-RPTS-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Interleaved writes to the CICS internal-reader queue and duplicate JES job names are platform behaviour; the target submits report runs through its own job API."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-RPTS-008"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The hard-coded job card, procedure library and DD names are JCL environment details; the target configures the report job outside the code."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COSGN00C.md
+
+[deviation."BR-SGN-003"]
+kind = "decision"
+decision = "D-04"
+group = "DEV-PASSWORDS"
+legacy = "Passwords are stored, compared, copied and displayed in clear text."
+target = "Passwords are stored as salted hashes and never shown; seed users get hashed passwords."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-SGN-001"]
+kind = "decision"
+decision = "D-04"
+group = "DEV-PASSWORDS"
+legacy = "Passwords are stored, compared, copied and displayed in clear text."
+target = "Passwords are stored as salted hashes and never shown; seed users get hashed passwords."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-SGN-004"]
+kind = "decision"
+decision = "D-04"
+target = "The password is never returned to the client"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-SGN-006"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-SGN-008"]
+kind = "incidental-ui"
+decision = "none"
+target = "The web password field starts empty, without underscores"
+source = "docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-SGN-012"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-SGN-001"]
+kind = "decision"
+decision = "D-18"
+legacy = "CLOSEFIL closes USRSEC for the cycle, so sign-on fails with Unable to verify the User ..."
+target = "Sign-on stays available during a batch window (mode WRITES_BLOCKED); ERR-SGN-001 stays for real database failures"
+scenarios = ["COSGN00C S10"]
+source = "catalog D-18 (override), docs/modernization/architecture/billpay-slice.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRN01C.md
+
+[deviation."DEF-TRNV-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The read-for-update lock on a display-only read is CICS/VSAM locking; the target reads the transaction without a lock."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRN02C.md
+
+[deviation."DEF-TRNA-003"]
+kind = "architecture-dependent"
+decision = "D-59"
+group = "DEV-ARCH-02"
+legacy = "Two concurrent adds get the same transaction ID."
+target = "Unique IDs: iD allocation under a lock in the inserting transaction."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-TRNA-012"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRTLIC.md
+
+[deviation."DEF-TTLS-009"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-TTLS-017"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COTRTUPC.md
+
+[deviation."DEF-TTUP-010"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-TTUP-017"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR00C.md
+
+[deviation."DEF-USRL-008"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-USRL-013"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR01C.md
+
+[deviation."DEF-USRA-003"]
+kind = "decision"
+decision = "D-04"
+group = "DEV-PASSWORDS"
+legacy = "Passwords are stored, compared, copied and displayed in clear text."
+target = "Passwords are stored as salted hashes and never shown; seed users get hashed passwords."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-USRA-005"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/COUSR02C.md
+
+[deviation."DEF-USRU-005"]
+kind = "decision"
+decision = "D-04"
+group = "DEV-PASSWORDS"
+legacy = "Passwords are stored, compared, copied and displayed in clear text."
+target = "Passwords are stored as salted hashes and never shown; seed users get hashed passwords."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-USRU-006"]
+kind = "security-c1"
+decision = "D-02"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-USRU-007"]
+kind = "architecture-dependent"
+decision = "D-17"
+group = "DEV-ARCH-04"
+legacy = "Lost update between two administrators."
+target = "`409` with the legacy \"Record changed\" text: stateless REST: the version the user saw travels as `If-Match`."
+source = "docs/modernization/architecture/decisions.md"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-USRU-010"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "A possible self-wait on the user file string after XCTL is CICS LSR string behaviour; the target has no CICS file strings."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/CSUTLDTC.md
+
+[deviation."DEF-DTCK-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "How LE CEEDAYS treats the two extra bytes passed by the account update is LE behaviour; the target validates the 8-digit date with its own date library."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/DBUNLDGS.md
+
+[deviation."DEF-DBUL-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this GSAM detail record layout does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-DBUL-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this unload skip reporting does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/PAUDBLOD.md
+
+[deviation."DEF-PDLD-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "IMS PCB list and link-edit entry point; the target has no PCBs."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-PDLD-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this missing-summary handling in the IMS load program does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-PDLD-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this IMS load checkpointing does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."ERR-PDLD-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this read-error loop in the IMS load program does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+# programs/PAUDBUNL.md
+
+[deviation."DEF-PDUL-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this unchecked write status in the IMS unload does not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-PDUL-002"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this unreported skipped summaries in the IMS unload do not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-PDUL-003"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "The target replaces the IMS unload and reload utilities with SQL Server tables and its own backup and migration, so this catalogued partial unload files do not carry over."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."DEF-PDUL-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "docs/modernization/decisions/README.md Appendix B"
+note = "Depends on z/OS QSAM record-area behaviour after WRITE in the IMS unload, which the target does not use."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"

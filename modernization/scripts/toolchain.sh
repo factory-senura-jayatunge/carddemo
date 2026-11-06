@@ -8,6 +8,8 @@
 #
 # Overrides: CARDDEMO_JAVA_HOME, CARDDEMO_NODE_BIN (used as given, never
 # second-guessed) and AIRFLOW_VENV (default ~/.venvs/carddemo-airflow).
+# CARDDEMO_SETUP_SKIP lists checks a job does not need (java node docker
+# airflow), e.g. in CI jobs that don't use that tool; they print "skip".
 set -u
 
 HERE=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
@@ -102,10 +104,22 @@ fail() {
     failures=$((failures + 1))
 }
 
+skip() {
+    case " ${CARDDEMO_SETUP_SKIP:-} " in
+        *" $1 "*)
+            printf 'skip  %-16s %s\n' "$2" 'not needed here (CARDDEMO_SETUP_SKIP)'
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 check() {
     os=$(uname -s)
 
-    if home=$(find_java_home); then
+    if skip java "JDK $JAVA_MAJOR"; then
+        :
+    elif home=$(find_java_home); then
         ok "JDK $JAVA_MAJOR" "$("$home/bin/java" -version 2>&1 | head -n 1) at $home"
     elif [ -n "${CARDDEMO_JAVA_HOME:-}" ]; then
         fail "JDK $JAVA_MAJOR" "CARDDEMO_JAVA_HOME=$CARDDEMO_JAVA_HOME is not a JDK $JAVA_MAJOR"
@@ -115,7 +129,9 @@ check() {
         fail "JDK $JAVA_MAJOR" "not found; apt-get install openjdk-$JAVA_MAJOR-jdk-headless, or actions/setup-java in CI"
     fi
 
-    if bin=$(find_node_bin); then
+    if skip node "Node $NODE_MAJOR"; then
+        :
+    elif bin=$(find_node_bin); then
         if [ -x "$bin/npm" ]; then
             ok "Node $NODE_MAJOR" "$("$bin/node" -v), npm $("$bin/npm" -v 2>/dev/null) in $bin"
         else
@@ -129,7 +145,9 @@ check() {
         fail "Node $NODE_MAJOR" "not found; nvm install $NODE_MAJOR, or actions/setup-node with node-version-file: modernization/.nvmrc in CI"
     fi
 
-    if ! command -v docker >/dev/null 2>&1; then
+    if skip docker docker; then
+        :
+    elif ! command -v docker >/dev/null 2>&1; then
         if [ "$os" = Darwin ]; then
             fail docker "CLI not found; brew install colima docker docker-compose"
         else
@@ -176,7 +194,9 @@ check() {
         fi
     fi
 
-    if [ -x "$AIRFLOW_VENV/bin/python" ]; then
+    if skip airflow "Airflow venv"; then
+        :
+    elif [ -x "$AIRFLOW_VENV/bin/python" ]; then
         af=$("$AIRFLOW_VENV/bin/python" -c 'import importlib.metadata as m; print(m.version("apache-airflow"))' 2>/dev/null)
         case $af in
             "$AIRFLOW_MAJOR".*) ok "Airflow venv" "apache-airflow $af in $AIRFLOW_VENV" ;;
