@@ -1018,6 +1018,7 @@ code_switch = true
 decision = "D-28"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Sign confirmed by the user on 2026-11-06 (same as batch posting): the payment is stored as a negative amount and posted like a daily transaction, into curr_cyc_debit and the 02/0002 category balance; the D-19 over-limit formula is kept."
 
 [switch."DEF-BILL-014"]
 value = "fixed"
