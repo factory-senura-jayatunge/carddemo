@@ -196,6 +196,25 @@ Never point the tests at `CARDDEMO_DB_NAME` (`carddemo`, the database of `make u
 
 Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
 
+## CI
+
+`.github/workflows/modernization.yml` runs on pushes to `main` and `modernization` and on pull requests that touch `modernization/`, `docs/modernization/spec/` or the workflow, plus nightly. Each job runs `make setup` (throwaway secrets, no repository secrets) and then the same make targets as a developer:
+
+| Job | Targets | Needs |
+|:--|:--|:--|
+| `spec` | `verify-spec` in the dev container image (GnuCOBOL 3.2) | |
+| `backend` | `test-backend` (Testcontainers) | |
+| `billpay` | `test-billpay` | |
+| `web` | `web-build` | `backend` (runs when it was skipped, not when it failed) |
+| `airflow` | `test-airflow` | |
+| `batch` | `verify-harness verify-batch` | `spec` |
+| `data` | `db-reset load verify-data` | |
+| `e2e` | `up test-e2e` (Chromium; nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |
+| `cycle` | `up verify-cycle` (nightly, on demand, or on pull requests labelled `batch`) | `batch` |
+| `ledger` | `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |
+
+The `plan` job reads `make -s stubs`: a job whose targets are still stubs is skipped, and the run summary says why. A stub never shows as a pass. Jobs set `CARDDEMO_SETUP_SKIP` (any of `java node docker airflow`) so `make setup` doesn't fail on a tool the job doesn't use. Every job uploads its JUnit results (and process logs) as `test-results-<job>`.
+
 ## Toolchain pinning
 
 Nothing is installed or switched globally. `scripts/toolchain.sh` finds the tools, and the `Makefile` puts them first on `PATH` for its recipes:
