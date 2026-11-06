@@ -12,7 +12,7 @@ sources:
   - {path: app/cbl/CBTRN03C.cbl, sha256: 2217d8278fe6, role: program, lines: "55-57, 122-125, 168-180"}
   - {path: app/cbl/CORPT00C.cbl, sha256: 0b06bd5d4f38, role: caller, lines: "81-127, 498-523"}
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: gdg-definition, lines: "24-41"}
-  - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "818-832, 1527-1535, 3021-3027"}
+  - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "818-832, 1527-1535, 1631-1637, 3021-3027"}
   - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "375"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "617-629, 664-671"}
 entry_points: [{type: manual, job: TRANREPT}]
@@ -88,7 +88,7 @@ Return code of the job: the highest step return code.
 
 - ENT-TRANSACTION, whole 350-byte records. The job interprets two fields: `TRAN-CARD-NUM` (bytes 263-278) and the date part of `TRAN-PROC-TS` (bytes 305-314, `YYYY-MM-DD`). The program also uses ENT-CARD-XREF, ENT-TRAN-TYPE and ENT-TRAN-CATEGORY for the report lines.
 - `AWS.M2.CARDDEMO.DATEPARM` is a cataloged sequential dataset (`app/catlg/LISTCAT.txt:818-832`); its content is not in the repository. `CBTRN03C` reads it as `WS-START-DATE X(10)`, one filler byte, `WS-END-DATE X(10)` (`app/cbl/CBTRN03C.cbl:122-125`).
-- GDGs: `TRANSACT.BKUP` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:1631-1637`); `TRANSACT.DALY` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:3021-3027`); `TRANREPT` `LIMIT 5`, `SCRATCH` (`app/catlg/LISTCAT.txt:1527-1535`).
+- GDGs in the 09/01/22 catalog: `TRANSACT.BKUP` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:1631-1637`); `TRANSACT.DALY` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:3021-3027`); `TRANREPT` `LIMIT 5`, `SCRATCH` (`app/catlg/LISTCAT.txt:1527-1535`). DEFGDGB defines `TRANSACT.BKUP` and `TRANSACT.DALY` with `SCRATCH` (`app/jcl/DEFGDGB.jcl:24-34`; DEF-JGDGB-002).
 
 ## 6. Processing flow
 

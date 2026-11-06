@@ -89,7 +89,7 @@ No data records. The file definitions map CICS file names to the stores of the e
 | `CUSTDAT` | `AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS` | ENT-CUSTOMER | `:50-62` |
 | `CXACAIX` | `AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH` | ENT-CARD-XREF (by account) | `:63-75` |
 | `TRANSACT` | `AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS` | ENT-TRANSACTION | `:76-87` |
-| `USRSEC` | `AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS` | user security records (no catalog entity yet) | `:88-99` |
+| `USRSEC` | `AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS` | ENT-USER-SECURITY | `:88-99` |
 
 ## 6. Processing flow
 

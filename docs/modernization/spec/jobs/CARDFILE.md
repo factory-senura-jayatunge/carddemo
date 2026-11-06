@@ -215,9 +215,9 @@ IF MAXCC LE 08 THEN SET MAXCC = 0
 - **Fidelity:** must-preserve (access by account) · **Confidence:** reviewed
 
 #### SE-JCARD-007 · Build the alternate index
-- **What:** `BLDINDEX INDATASET(AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) OUTDATASET(AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX)` reads every card record, takes the account ID from bytes 17-27, sorts the (account, card number) pairs and writes one AIX record per account. The job supplies no `IDCUT1`/`IDCUT2` work files, so the sort must fit in storage (enough for the sample's 50 records).
+- **What:** `BLDINDEX INDATASET(AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) OUTDATASET(AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX)` reads every card record, takes the account ID from bytes 17-27, sorts the (account, card number) pairs and writes one AIX record per account. The statement codes no `SORTCALL`, so the default `SORTCALL(YES)` applies: BLDINDEX sorts with DFSORT, which allocates its own work data sets when the sort does not fit in storage. The `IDCUT1`/`IDCUT2` work files, which the job does not supply, are needed only with `SORTCALL(NO)`.
 - **Source:** `:110-112`
-- **Fidelity:** must-preserve (the index must reflect every card) · **Confidence:** platform-inferred
+- **Fidelity:** must-preserve (the index must reflect every card) · **Confidence:** platform-inferred (medium for the sort defaults)
 
 #### SE-JCARD-008 · Open the card files in CICS again
 - **What:** SDSF issues `/F CICSAWSA,'CEMT SET FIL(CARDDAT ) OPE'` and `/F CICSAWSA,'CEMT SET FIL(CARDAIX ) OPE'`; online card functions work again once CICS has opened the files.

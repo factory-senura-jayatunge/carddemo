@@ -46,7 +46,7 @@ PRTCATBL produces a readable listing of the transaction category balance file. `
 
 ## 3. Actors and triggers
 
-- **Trigger:** in CA-7, PRTCATBL comes at the end of the CREASTMT chain: CREASTMT triggers TXT2PDF1, TXT2PDF1 triggers WAITSTEP, WAITSTEP triggers OPENFIL (all schedule ID 030), OPENFIL triggers `CLOSEFIL` with schedule ID 031, and that `CLOSEFIL` triggers PRTCATBL (`app/scheduler/CardDemo.ca7:495, 522, 527, 532, 537`). PRTCATBL then triggers WAITSTEP and OPENFIL with schedule ID 031 (`app/scheduler/CardDemo.ca7:564, 569`). The schedule also has a job `CLOSEFIL1` (member `CLOSEFIL`) triggered with schedule ID 031 (`app/scheduler/CardDemo.ca7:216, 225`); it triggers TRANCATG, not PRTCATBL (`app/scheduler/CardDemo.ca7:244`). Control-M, the README sequence and the full-batch script do not run it. The restart runbook suggests running it before POSTTRAN to get a restore point (`docs/runbooks/batch-cycle-restart.md:76-78`).
+- **Trigger:** in CA-7, PRTCATBL runs only in a run under schedule ID 031: `CLOSEFIL` completing under 031 triggers it (`app/scheduler/CardDemo.ca7:537`), and `CLOSEFIL` runs under 031 only when an operator demands it (or OPENFIL) with SCHID 31, or when OPENFIL completes under 031 (`app/scheduler/CardDemo.ca7:532`; FLOW-JCA7-004, FLOW-JCA7-006). A run under 030 never reaches it: the CREASTMT chain (CREASTMT, TXT2PDF1, WAITSTEP, OPENFIL, `app/scheduler/CardDemo.ca7:495, 522, 527`) ends at OPENFIL, whose trigger of `CLOSEFIL` is defined for 031 only (platform-inferred, schedule ID rule of FLOW-JCA7-005). PRTCATBL then triggers WAITSTEP and OPENFIL with schedule ID 031 (`app/scheduler/CardDemo.ca7:564, 569`). The schedule also has a job `CLOSEFIL1` (member `CLOSEFIL`) triggered with schedule ID 031 (`app/scheduler/CardDemo.ca7:216, 225`); it triggers TRANCATG, not PRTCATBL (`app/scheduler/CardDemo.ca7:244`). Control-M, the README sequence and the full-batch script do not run it. The restart runbook suggests running it before POSTTRAN to get a restore point (`docs/runbooks/batch-cycle-restart.md:76-78`).
 - **Preconditions:** the GDG base `TCATBALF.BKUP` exists (DEFGDGB, `app/jcl/DEFGDGB.jcl:42-47`); the procedure library holds REPROC. `TCATBALF` is not a CICS file, so closing CICS files is not needed for this job.
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). Procedure library `JCLLIB ORDER=('AWS.M2.CARDDEMO.PROC')` (`:19`). Symbolic parameter `CNTLLIB=AWS.M2.CARDDEMO.CNTL` on `STEP05R` (`:29-30`).
 
@@ -122,7 +122,7 @@ In execution order. No step undoes an earlier one.
 
 ## 11. Interactions
 
-- **Upstream:** TCATBALF (load), POSTTRAN (updates the balances). INTCALC is not upstream: it opens the category balance file for input only (`app/cbl/CBACT04C.cbl:237`) and changes no balance. In CA-7, `CLOSEFIL` with schedule ID 031 at the end of the CREASTMT chain (`app/scheduler/CardDemo.ca7:532-537`).
+- **Upstream:** TCATBALF (load), POSTTRAN (updates the balances). INTCALC is not upstream: it opens the category balance file for input only (`app/cbl/CBACT04C.cbl:237`) and changes no balance. In CA-7, `CLOSEFIL` completing under schedule ID 031 (`app/scheduler/CardDemo.ca7:537`); a 030 run, including the CREASTMT chain, does not reach it (FLOW-JCA7-004).
 - **Downstream:** none in the repository reads `TCATBALF.REPT`. `TCATBALF.BKUP` generations are the restore source in the runbook (`docs/runbooks/batch-cycle-restart.md:76-81`).
 - **Schedule:** in CA-7 it sits between a `CLOSEFIL` and an `OPENFIL` (`app/scheduler/CardDemo.ca7:532-569`), although it touches no CICS file.
 

@@ -124,9 +124,9 @@ In execution order. There is no rollback: each step's change is permanent.
 - **Fidelity:** incidental (DEF-JTIDX-004) · **Confidence:** reviewed
 
 #### SE-JTIDX-003 · Build the alternate index
-- **What:** `BLDINDEX INDATASET(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) OUTDATASET(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX)` reads every transaction, takes the processed timestamp from bytes 305-330, sorts the (timestamp, transaction ID) pairs and writes one AIX record per timestamp. The job supplies no `IDCUT1`/`IDCUT2` work files, so the sort must fit in storage (enough for the sample's few hundred transactions).
+- **What:** `BLDINDEX INDATASET(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) OUTDATASET(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX)` reads every transaction, takes the processed timestamp from bytes 305-330, sorts the (timestamp, transaction ID) pairs and writes one AIX record per timestamp. The statement codes no `SORTCALL`, so the default `SORTCALL(YES)` applies: BLDINDEX sorts with DFSORT, which allocates its own work data sets when the sort does not fit in storage. The `IDCUT1`/`IDCUT2` work files, which the job does not supply, are needed only with `SORTCALL(NO)`.
 - **Source:** `:52-54`
-- **Fidelity:** must-preserve if the index is kept · **Confidence:** platform-inferred
+- **Fidelity:** must-preserve if the index is kept · **Confidence:** platform-inferred (medium for the sort defaults)
 
 If a later step fails, the earlier ones have happened: an empty AIX may exist without a path, or with a path but not built. The transaction cluster itself is never changed, so POSTTRAN, CREASTMT and the online programs are not affected.
 

@@ -1,6 +1,6 @@
 # Area g-jobs-ops: interaction proposals
 
-Proposals from area `g-jobs-ops` for `../interactions.md` and `../components.md`: how jobs start each other (schedulers, internal reader, the online report request), which program each job step runs, which datasets pass data from one job to the next, what each job does to the data stores, and the cross-job invariants the batch window depends on. Job behaviour is in the job specs under `../jobs/`; `../jobs/README.md` compares the five batch cycle orders found in the repository.
+Proposals from area `g-jobs-ops` for `../interactions.md` and `../components.md`: how jobs start each other (schedulers, internal reader, the online report request), which program each job step runs, which datasets pass data from one job to the next, what each job does to the data stores, and the cross-job invariants the batch window depends on. Job behaviour is in the job specs under `../jobs/`; `../jobs/README.md` compares the seven batch cycle orders found in the repository (README table, restart runbook, three demo scripts, two schedules).
 
 Conventions: in the scheduler rows, "From" is the job whose successful end starts "To". CA-7 rows cite the `LJOB` entry whose "TRIGGERED JOBS" list names the successor. Control-M rows cite the predecessor's `OUTCOND` and the successor's `INCOND`.
 
@@ -8,7 +8,7 @@ Conventions: in the scheduler rows, "From" is the job whose successful end start
 
 ### Scheduler: CA-7 (`app/scheduler/CardDemo.ca7`)
 
-No job has a calendar; every chain starts when CLOSEFIL is demanded (DEF-JCA7-001). CA-7 keeps triggers per job name, so the separate `LJOB` entries for one job add up to one trigger list (DEF-JCA7-002), and every trigger carries a schedule ID (SCHID). Read with CA-7's trigger rules (platform-inferred, medium), a trigger fires only for a run of the triggering job under that SCHID, and because no trigger names a `TRGID`, the triggered job runs under the triggering job's SCHID (FLOW-JCA7-005). A CLOSEFIL run under SCHID 030 therefore starts the four 030 successors together: CBPAUP0J (then POSTTRAN), TRANTYPE, READACCT and CREASTMT (`app/scheduler/CardDemo.ca7:43, 162, 340, 468`, DEF-JCA7-006). The 031 and 032 triggers (WAITSTEP to CLOSEFIL1 and CLOSEFIL2, OPENFIL to CLOSEFIL, CLOSEFIL to PRTCATBL, and the TRANCATG, TCATBALF and PRTCATBL chains behind them) fire only in runs under 031 or 032, which no 030 run reaches; only a demand under 031 or 032 starts them (`app/scheduler/CardDemo.ca7:216-217, 532, 537`). The "Data passed" column gives the SCHID of each trigger.
+The listing shows no calendar, and whether a calendar schedule exists is unknown: every full listing names schedule member 000652, which may hold one (DEF-JCA7-001, Q-JCA7-002). Within the listing, a chain starts only when CLOSEFIL is started under a schedule ID, by that schedule member or by a `DEMAND` (DEF-JCA7-009). CA-7 keeps triggers per job name, so the separate `LJOB` entries for one job add up to one trigger list (DEF-JCA7-002), and every trigger carries a schedule ID (SCHID). Read with CA-7's trigger rules (platform-inferred, medium), a trigger fires only for a run of the triggering job under that SCHID, and because no trigger names a `TRGID`, the triggered job runs under the triggering job's SCHID (FLOW-JCA7-005). A CLOSEFIL run under SCHID 030 therefore starts the four 030 successors together: CBPAUP0J (then POSTTRAN), TRANTYPE, READACCT and CREASTMT (`app/scheduler/CardDemo.ca7:43, 162, 340, 468`, DEF-JCA7-006). The 031 and 032 triggers (WAITSTEP to CLOSEFIL1 and CLOSEFIL2, OPENFIL to CLOSEFIL, CLOSEFIL to PRTCATBL, and the TRANCATG, TCATBALF and PRTCATBL chains behind them) fire only in runs under 031 or 032, which no 030 run reaches; only a demand under 031 or 032 starts them (`app/scheduler/CardDemo.ca7:216-217, 532, 537`). The "Data passed" column gives the SCHID of each trigger.
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
 | :-- | :-- | :-- | :-- | :-- | :-- |
@@ -31,7 +31,7 @@ No job has a calendar; every chain starts when CLOSEFIL is demanded (DEF-JCA7-00
 | TXT2PDF1 | WAITSTEP, then OPENFIL | scheduler | completion triggers, SCHID 030 | `app/scheduler/CardDemo.ca7:497-527` | FLOW-JCA7-003 |
 | OPENFIL | CLOSEFIL | scheduler | completion trigger, SCHID 031: fires only for an OPENFIL run under 031 (the end of the PRTCATBL chain), never after a 030 chain. OPENFIL's own entry says it triggers no jobs (`N -- COMP TRIGGERS OTHER JOBS`), which contradicts this trigger list | `app/scheduler/CardDemo.ca7:529-532, 138` | FLOW-JCA7-004, DEF-JCA7-002 |
 | CLOSEFIL | PRTCATBL | scheduler | completion trigger, SCHID 031: only for a CLOSEFIL run under 031 | `app/scheduler/CardDemo.ca7:534-537` | FLOW-JCA7-004 |
-| PRTCATBL | WAITSTEP, then OPENFIL | scheduler | completion triggers, SCHID 031 | `app/scheduler/CardDemo.ca7:539-569` | FLOW-JCA7-004 |
+| PRTCATBL | WAITSTEP, then OPENFIL and CLOSEFIL1 | scheduler | completion triggers, SCHID 031: a WAITSTEP run under 031 triggers both OPENFIL and CLOSEFIL1 | `app/scheduler/CardDemo.ca7:216, 539-569` | FLOW-JCA7-004 |
 
 ### Scheduler: Control-M (`app/scheduler/CardDemo.controlm`)
 
@@ -120,7 +120,7 @@ Access codes: R read, RU read for update, C create (records, or a new dataset or
 | TRANCATG | Transaction categories `TRANCATG.VSAM.KSDS`; `TRANCATG.PS` | D, C; R | SE-JTCATG-001..003 |
 | DISCGRP | Disclosure groups `DISCGRP.VSAM.KSDS`; `DISCGRP.PS` | D, C; R | SE-JDISC-001..003 |
 | TCATBALF | Category balances `TCATBALF.VSAM.KSDS`; `TCATBALF.PS` | D, C; R | SE-JTCAT-001..003 |
-| DUSRSECJ | User security `USRSEC.VSAM.KSDS`; `USRSEC.PS` | D, C | SE-JUSEC-001..005 |
+| DUSRSECJ | User security `USRSEC.VSAM.KSDS`; `USRSEC.PS` | D, C; D, C, R | SE-JUSEC-001..005 |
 | TRANBKP | Transactions `TRANSACT.VSAM.KSDS` and its AIX | R, D, C (empty cluster) | SE-JTBKP-001..004 |
 | TRANBKP | `TRANSACT.BKUP` (ENT-TRAN-BACKUP) | C | SE-JTBKP-001 |
 | COMBTRAN | `TRANSACT.BKUP(0)`, `SYSTRAN(0)` | R | SE-JCOMB-001 |

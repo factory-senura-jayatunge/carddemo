@@ -127,7 +127,7 @@ None at job level. Validations are VAL-POST-001 and VAL-POST-002 and the console
 ## 11. Interactions
 
 - **Upstream:** CLOSEFIL (CICS files closed), TRANBKP (empty `TRANSACT`), DALYREJS (GDG base), the data refresh jobs in the demo (`./README.md:215-226`). In CA-7, CBPAUP0J of the optional authorization module (`app/scheduler/CardDemo.ca7:43-70`).
-- **Downstream:** INTCALC (reads `TCATBALF` and updates `ACCTDATA`), TRANBKP (backs up `TRANSACT`), TRANREPT (reports on `TRANSACT`), the daily rejects review (`docs/runbooks/daily-rejects.md`). In CA-7, WAITSTEP then OPENFIL (`app/scheduler/CardDemo.ca7:97, 124`).
+- **Downstream:** INTCALC (reads `TCATBALF` and updates `ACCTDATA`), TRANBKP (backs up `TRANSACT`), TRANREPT (reports on `TRANSACT`), the daily rejects review (`docs/runbooks/daily-rejects.md`). In CA-7, WAITSTEP, whose completion under SCHID 030 triggers both OPENFIL and CLOSEFIL (`app/scheduler/CardDemo.ca7:97, 124, 303, 335`).
 
 ## 12. Numeric, date and format details
 

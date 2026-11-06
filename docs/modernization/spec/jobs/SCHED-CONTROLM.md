@@ -170,7 +170,7 @@ None.
 
 - **Jobs:** each job in section 4 has its own spec (MNTTRDB2 and TRANEXTR in area f).
 - **CA-7:** `SCHED-CA7.md` describes the other schedule. Neither scheduler refers to the other. They share only CLOSEFIL, WAITSTEP and OPENFIL; only Control-M runs TRANBKP, INTCALC, COMBTRAN, DISCGRP, MNTTRDB2 and TRANEXTR, and only CA-7 runs CBPAUP0J, POSTTRAN, TRANTYPE, TRANCATG, TCATBALF, the READ jobs, CREASTMT, TXT2PDF1 and PRTCATBL (`app/scheduler/CardDemo.ca7:18-571`).
-- **README:** the README cycle runs POSTTRAN, INTCALC, TRANBKP and COMBTRAN in one sequence (`./README.md:227-230`); Control-M splits them over a daily and a monthly folder and drops POSTTRAN. `jobs/README.md` compares all five orders.
+- **README:** the README cycle runs POSTTRAN, INTCALC, TRANBKP and COMBTRAN in one sequence (`./README.md:227-230`); Control-M splits them over a daily and a monthly folder and drops POSTTRAN. `jobs/README.md` compares all seven orders.
 
 ## 12. Numeric, date and format details
 
@@ -230,7 +230,7 @@ None.
 
 | ID | Question | For |
 | :-- | :-- | :-- |
-| Q-JCTLM-001 | Which cycle should the Airflow DAGs implement: the README "Running Batch Jobs" sequence, the restart runbook order, the CA-7 chains, these Control-M folders, or `scripts/run_full_batch.sh`? The five disagree on which jobs run, in what order and how often (`jobs/README.md`). Same question as Q-JCA7-001. | business, operations, architecture |
+| Q-JCTLM-001 | Which cycle should the Airflow DAGs implement: the README "Running Batch Jobs" sequence, the restart runbook order, the CA-7 chains, these Control-M folders, or the demo scripts (`scripts/run_full_batch.sh`, the split `scripts/run_posting.sh` and `scripts/run_interest_calc.sh`)? The seven disagree on which jobs run, in what order and how often (`jobs/README.md`). Same question as Q-JCA7-001. | business, operations, architecture |
 | Q-JCTLM-002 | How often should interest be calculated and transaction types maintained: monthly and weekly as the folder names say (and on which day), or every cycle as the README runs them? | business |
 | Q-JCTLM-003 | Should a failed job be rerun automatically (the table sets `MAXRERUN="5"` but no rerun rule), or held for an operator with a notification? | operations |
 | Q-JCTLM-004 | Is the daily backup meant to empty the transaction master (DEF-JCTLM-001), or only to save it? | business, operations |

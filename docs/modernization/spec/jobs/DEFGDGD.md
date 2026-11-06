@@ -121,7 +121,7 @@ flowchart TD
 
 #### FLOW-JGDGD-001 · Where the job ends, and the restart comment
 - **When:** the reader reaches line 90.
-- **Then:** line 90 is a null statement (`//`), which marks the end of the job; `STEP60` (lines 82-89) is before it and runs. Line 91 is a second null statement and lines 92-94 are comments, so nothing after line 89 is executed. Line 2, `//*  RESTART=STEP30`, is a comment: it has no effect. It suggests that someone restarted, or meant to restart, the job at `STEP30`; to use it, `RESTART=STEP30` would have to be a parameter of the JOB statement.
+- **Then:** line 90 is a null statement (`//`), which marks the end of the job; `STEP60` (lines 82-89) is before it and runs only if every earlier step returned 0 (`COND=(0,NE)`, line 82). Line 91 is a second null statement and lines 92-94 are comments, so nothing after line 89 is executed. Line 2, `//*  RESTART=STEP30`, is a comment: it has no effect. It suggests that someone restarted, or meant to restart, the job at `STEP30`; to use it, `RESTART=STEP30` would have to be a parameter of the JOB statement.
 - **Source:** `:2, 82-91`
 - **Fidelity:** incidental · **Confidence:** reviewed (statements); platform-inferred (null-statement semantics)
 

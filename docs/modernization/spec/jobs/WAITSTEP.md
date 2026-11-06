@@ -39,7 +39,7 @@ The job has no business rules. Its items:
 | ERR-JWAIT-001 | There is no error handling; the step always ends with return code 0 unless it abends. |
 | NUM-JWAIT-001 | The value is eight characters taken as an unsigned whole number of centiseconds. |
 | DEF-JWAIT-001 | The comment says the time is in the `PARM`, but it is read from `SYSIN`. |
-| DEF-JWAIT-002 | A non-numeric or short `SYSIN` value gives a platform-dependent wait (`36` and blanks: 0.36 seconds locally, about 100 hours on z/OS). |
+| DEF-JWAIT-002 | A short or non-numeric `SYSIN` value would give a platform-dependent wait; the shipped `00003600` is well formed. |
 | DEF-JWAIT-003 | A fixed delay stands in for a real synchronisation with CICS. |
 
 ## 3. Actors and triggers
@@ -123,7 +123,7 @@ None. The job reads and writes no dataset; its only effect is the elapsed time.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JWAIT-002 · A bad `SYSIN` value gives an unpredictable wait
-- The program moves the eight characters to a binary field without checking them, and the result depends on the platform (NUM-WAIT-001 and DEF-WAIT-001 in `COBSWAIT.md`). Locally, GnuCOBOL turns `36` followed by blanks into 36, a wait of 0.36 seconds. On z/OS the conversion most likely ignores the zone bits and counts the blanks as zeros, giving 36,000,000 centiseconds, about 100 hours. A byte whose low-order half is not a digit, such as `.`, can abend the step with S0C7 on z/OS, and the scheduler then stops the chain (ERR-JWAIT-001). An empty or missing `SYSIN` waits 0 locally and is undetermined on z/OS (Q-WAIT-001).
+- The program moves the eight characters to a binary field without checking them, so the effect of a malformed value depends on the platform (NUM-WAIT-001 and DEF-WAIT-001 in `COBSWAIT.md`). The shipped card `00003600` (`app/jcl/WAITSTEP.jcl:26`) is eight digits and gives 36 seconds. A short value would not: if the card held only `36` followed by blanks, GnuCOBOL would take it as 36, a wait of 0.36 seconds, while on z/OS the conversion most likely ignores the zone bits and counts the blanks as zeros, giving 36,000,000 centiseconds, about 100 hours. A byte whose low-order half is not a digit, such as `.`, can abend the step with S0C7 on z/OS, and the scheduler then stops the chain (ERR-JWAIT-001). An empty or missing `SYSIN` waits 0 locally and is undetermined on z/OS (Q-WAIT-001).
 - **Source:** `app/cbl/COBSWAIT.cbl:36-37`
 - **Status:** open · **Fidelity:** defect-decide (Q-WAIT-001) · **Confidence:** runtime-verified (local conversion, NUM-WAIT-001); platform-inferred (z/OS)
 

@@ -211,7 +211,7 @@ Totals: 45 commands, 36 distinct resources, 6 of them in the CSD export (library
 
 - **Upstream:** the CardDemo load modules in `AWS.M2.CARDDEMO.LOADLIB` (compile and link, `./README.md:169-171`).
 - **Downstream:** a system programmer installs group `CARDDEMO` in the region (`./README.md:185-191`); the online programs then run under the transactions that the group defines.
-- **Shared data:** the CSD export `app/csd/CARDDEMO.CSD` describes the same group `CARDDEMO` and is the complete, current set: 8 files (`app/csd/CARDDEMO.CSD:1-98`), 17 mapsets (`app/csd/CARDDEMO.CSD:100-172`), 18 programs (`app/csd/CARDDEMO.CSD:173-305`), 18 transactions (`app/csd/CARDDEMO.CSD:306-488`), 2 libraries (`app/csd/CARDDEMO.CSD:489-498`) and the transient-data queue `JOBS` (`app/csd/CARDDEMO.CSD:499-505`). It is specified separately (`CARDDEMO-CSD.md`).
+- **Shared data:** the CSD export `app/csd/CARDDEMO.CSD` describes the same group `CARDDEMO` and is the complete, current set: 8 files (`app/csd/CARDDEMO.CSD:1-99`), 17 mapsets (`app/csd/CARDDEMO.CSD:100-172`), 18 programs (`app/csd/CARDDEMO.CSD:173-305`), 18 transactions (`app/csd/CARDDEMO.CSD:306-488`), 2 libraries (`app/csd/CARDDEMO.CSD:489-498`) and the transient-data queue `JOBS` (`app/csd/CARDDEMO.CSD:499-505`). It is specified separately (`CARDDEMO-CSD.md`).
 - **Dependencies not met by this job:** CORPT00C writes job JCL to queue `JOBS` to submit TRANREPT; the job's commented queue defines are `CSSD` and `IRDC`, not `JOBS` (`:47-48`).
 
 ## 12. Numeric, date and format details
