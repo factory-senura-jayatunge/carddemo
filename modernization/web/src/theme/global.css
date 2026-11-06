@@ -1,0 +1,62 @@
+:root {
+  --cd-header-height: 64px;
+  --cd-content-width: 1120px;
+}
+
+html,
+body {
+  background: var(--cd-surface-page);
+  color: var(--cd-text);
+}
+
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  text-rendering: optimizeLegibility;
+}
+
+.cd-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-mono {
+  font-family: var(--mantine-font-family-monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Legacy texts keep their exact spacing (for example the two spaces after
+   "Payment successful."). */
+.cd-legacy-text {
+  white-space: pre-wrap;
+}
+
+.cd-skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--mantine-color-brand-9);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cd-skip-link:focus {
+  top: 12px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--mantine-color-brand-6);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
