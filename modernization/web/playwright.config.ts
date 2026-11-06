@@ -16,6 +16,22 @@ const skip = [mode === 'fixed' ? /@legacy\b/ : /@fixed\b/, target === 'stack' ? 
 const port = Number(process.env.CARDDEMO_WEB_PORT ?? 25173);
 const baseURL = process.env.CARDDEMO_WEB_URL ?? `http://127.0.0.1:${port}`;
 
+// Firefox and WebKit exist only when asked for, by --project or E2E_BROWSERS, so that a plain
+// `playwright test` (make test-billpay, npm run e2e) stays on Chromium and needs no other browser.
+// Workers load this file again without the command line, so the main process hands the
+// answer down in CARDDEMO_E2E_PROJECTS.
+const asked = new Set(`${process.env.E2E_BROWSERS ?? ''} ${process.env.CARDDEMO_E2E_PROJECTS ?? ''}`.split(/[\s,]+/));
+process.argv.forEach((arg, i) => {
+  const value = arg.startsWith('--project=') ? arg.slice('--project='.length) : arg === '--project' ? process.argv[i + 1] : undefined;
+  value?.split(',').forEach((name) => asked.add(name));
+});
+process.env.CARDDEMO_E2E_PROJECTS = [...asked].filter(Boolean).join(' ');
+const desktop = { viewport: { width: 1280, height: 860 } };
+const others = [
+  { name: 'firefox', use: { ...devices['Desktop Firefox'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
+  { name: 'webkit', use: { ...devices['Desktop Safari'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
+].filter((project) => asked.has(project.name));
+
 export default defineConfig({
   testDir: 'e2e',
   // Playwright empties its output folder on every run; a subfolder keeps Vitest's report beside it.
@@ -41,8 +57,9 @@ export default defineConfig({
     timezoneId: 'America/Chicago',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 860 } }, testIgnore: /screenshots\.spec\.ts/ },
-    { name: 'screenshots', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 860 } }, testMatch: /screenshots\.spec\.ts/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
+    { name: 'screenshots', use: { ...devices['Desktop Chrome'], ...desktop }, testMatch: /screenshots\.spec\.ts/ },
+    ...others,
   ],
   webServer:
     target === 'mock'

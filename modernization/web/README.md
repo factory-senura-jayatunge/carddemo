@@ -23,6 +23,7 @@ npm run dev:mock     # the same with the in-browser contract mock, no services n
 npx playwright install chromium
 npx playwright test  # BILL, SGN and MENU scenarios plus axe checks, on the mock
 CARDDEMO_E2E_TARGET=stack CARDDEMO_ENV_FILE=../.env npx playwright test --project=chromium   # against a running slice
+npx playwright test --project=firefox --project=webkit   # other browsers, only when named (or E2E_BROWSERS)
 npm run screenshots  # review screens into test-results/screens (CARDDEMO_SCREENSHOT_DIR to change)
 ```
 
