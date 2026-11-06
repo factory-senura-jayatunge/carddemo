@@ -12,8 +12,9 @@ Steps, in order; the first failure ends the run:
   6. trace     the traceability gate for the BILL unit
 
 Playwright empties web/test-results on every run, so Vitest writes its
-JUnit report straight to build/test-results/billpay/ and Playwright's is
-copied there after each Playwright step. Run under
+JUnit report straight to build/test-results/billpay/. Playwright writes
+web/playwright-report/e2e-<target>-<mode>.json, which no run empties and
+make trace reads in place; each Playwright step checks that it wrote it. Run under
 heavy.py and with_env.py, as make test-billpay does. The slice stays up.
 
 Ends with "test-billpay: OK" or "test-billpay: FAILED (<step>: <reason>)".
@@ -21,7 +22,6 @@ Ends with "test-billpay: OK" or "test-billpay: FAILED (<step>: <reason>)".
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -32,7 +32,6 @@ import stack  # noqa: E402
 HERE = stack.HERE
 WEB = os.path.join(HERE, "web")
 RESULTS = os.path.join(HERE, "build", "test-results", "billpay")
-PLAYWRIGHT_JUNIT = os.path.join(WEB, "test-results", "e2e-junit.xml")
 TRACE = os.path.join(HERE, "verify", "trace", "trace_matrix.py")
 MOCK_PORT = "25174"
 SLICE = "identity-service,billpay-service,web"
@@ -58,11 +57,14 @@ def run(step, argv, cwd=HERE, extra=None) -> None:
         raise StepFailed(f"{step}: exited {rc}, see above")
 
 
-def keep_playwright_junit(name) -> None:
-    if not os.path.exists(PLAYWRIGHT_JUNIT):
-        raise StepFailed(f"{name}: Playwright wrote no {os.path.relpath(PLAYWRIGHT_JUNIT, HERE)}")
-    os.makedirs(RESULTS, exist_ok=True)
-    shutil.copyfile(PLAYWRIGHT_JUNIT, os.path.join(RESULTS, f"{name}-junit.xml"))
+def playwright(step, target, since) -> None:
+    extra = {"CARDDEMO_WEB_PORT": MOCK_PORT} if target == "mock" else {"CARDDEMO_E2E_TARGET": "stack"}
+    run(step, ["npx", "playwright", "test", "e2e/bill.spec.ts", "--project=chromium"], cwd=WEB, extra=extra)
+    # The mock answers in fixed mode; the stack in CARDDEMO_E2E_MODE (fixed by default).
+    mode = "legacy" if target == "stack" and os.environ.get("CARDDEMO_E2E_MODE") == "legacy" else "fixed"
+    report = os.path.join(WEB, "playwright-report", f"e2e-{target}-{mode}.json")
+    if not os.path.exists(report) or os.path.getmtime(report) < since:
+        raise StepFailed(f"{step}: Playwright wrote no {os.path.relpath(report, HERE)}")
 
 
 def trace_supports_unit() -> bool:
@@ -102,16 +104,12 @@ def main() -> int:
         run("vitest", ["npx", "vitest", "run", "src/pages/BillPayPage.test.tsx", "--reporter=default",
                        "--reporter=junit", "--outputFile.junit=" + os.path.join(RESULTS, "vitest-billpay-junit.xml")],
             cwd=WEB)
-        run("e2e-mock", ["npx", "playwright", "test", "e2e/bill.spec.ts", "--project=chromium"], cwd=WEB,
-            extra={"CARDDEMO_WEB_PORT": MOCK_PORT})
-        keep_playwright_junit("e2e-mock")
+        playwright("e2e-mock", "mock", time.time())
         run("stack", [make, "--no-print-directory", "db-reset", "load"])
         run("stack", ["./mvnw", "-q", "-B", "-pl", "services/identity-service,services/billpay-service", "-am",
                       "package", "-DskipTests"])
         run("stack", [sys.executable, os.path.join(HERE, "scripts", "stack.py"), "up", "--only", SLICE])
-        run("e2e-stack", ["npx", "playwright", "test", "e2e/bill.spec.ts", "--project=chromium"], cwd=WEB,
-            extra={"CARDDEMO_E2E_TARGET": "stack"})
-        keep_playwright_junit("e2e-stack")
+        playwright("e2e-stack", "stack", time.time())
         trace_bill()
     except StepFailed as e:
         print(f"test-billpay: FAILED ({e})")
