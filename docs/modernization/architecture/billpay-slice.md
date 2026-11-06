@@ -30,11 +30,11 @@ Maven `groupId` `com.carddemo.modern`, Java base package `com.carddemo`. Every m
 
 | Package | Modules and files | Provides to the others |
 | :-- | :-- | :-- |
-| P1 platform and database | `pom.xml` (parent, Spring Boot 4.1.x BOM, Java 21), `mvnw`; `platform/fidelity`, `platform/legacy-format`, `platform/web-support`, `platform/test-support`; `db/migrations` ranges 0001-0099 and 0700-0799 plus the repeatable grants; `db/db-migrate` | Switches, number edits, security and error model, Testcontainers fixtures, the empty schemas and logins |
-| P2 identity | `services/identity-service`; migrations 0300-0399 | Sign-on, sessions, tokens, JWKS, features, user seeding |
-| P3 Bill Pay and ledger | `platform/ledger-core`; `services/billpay-service`; migrations 0100-0199 and 0400-0499 | Core tables, ID allocation, posting primitive, window guard, the Bill Pay API |
+| P1 platform and database | `pom.xml` (parent, Spring Boot 4.1.x BOM, Java 21), `mvnw`; `platform/fidelity`, `platform/legacy-format`, `platform/web-support`, `platform/test-support`; `db/migrations` V001-V099 (schemas, users, core tables, `ops`, minimal `batch.cycle`) and `R__grants.sql`; `db/db-migrate` | Switches, number edits, security and error model, Testcontainers fixtures, the schemas, core tables and logins |
+| P2 identity | `services/identity-service`; migrations V200-V299 and `R__grants_iam.sql` | Sign-on, sessions, tokens, JWKS, features, user seeding |
+| P3 Bill Pay and ledger | `platform/ledger-core`; `services/billpay-service`; migrations V100-V199 and the `billpay_svc` part of `R__grants.sql` | ID allocation, posting primitive, window guard, the Bill Pay API |
 | P4 web | `web/` (shell, sign-on, password change, main menu, admin stub, Bill Pay page, Vitest, Playwright) | The screens |
-| P5 load, make and CI | `batch/batch-service` (only `dataLoadJob` for the core tables), the Makefile targets of section 11, `ledger/*.toml`, `verify/trace`, `.github/workflows/modernization.yml`, `.env.example` additions | `make` targets, ledger, trace gate, CI |
+| P5 load, make and CI | `batch/batch-service` (only `dataLoadJob` for the core tables), migrations V300-V499 and `R__grants_batch.sql` when needed, the Makefile targets of section 11, `ledger/*.toml`, `verify/trace`, `.github/workflows/modernization.yml`, `.env.example` additions | `make` targets, ledger, trace gate, CI |
 
 Dependencies: P2, P3 and P5 need P1's parent POM and `platform/*` interfaces first; P1 publishes the interfaces of section 5 as stubs on day one so the others compile. P4 works from the OpenAPI snapshots of section 8 and needs no running backend for Vitest.
 
@@ -70,20 +70,20 @@ Fidelity values: `platform/fidelity` loads `ledger/fidelity.toml` (path `CARDDEM
 
 ### Flyway version ranges
 
-Files in `modernization/db/migrations/`, named `V<4 digits>__<schema>_<change>.sql`. Each package writes only in its range, so parallel work cannot collide. Gaps are allowed.
+Files in `modernization/db/migrations/`, named `V<3 digits>__<schema>_<change>.sql`. Each owner writes only in its range, so parallel work cannot collide. Gaps are allowed. These are the ranges the build team already uses.
 
-| Range | Schema | Owner | Slice files |
-| :-- | :-- | :-- | :-- |
-| 0001-0099 | database-wide | P1 | `V0001__schemas.sql` (`core`, `ref`, `iam`, `billpay`, `pauth`, `batch`, `ops`), `V0002__database_users.sql` (users for the three logins, roles `app_identity`, `app_billpay`, `app_batch`) |
-| 0100-0199 | `core` | P3 | `V0100__core_account.sql`, `V0101__core_customer.sql`, `V0102__core_card.sql`, `V0103__core_card_xref.sql`, `V0104__core_transaction.sql`, `V0105__core_tran_id_seq.sql`, `V0106__core_tcat_bal.sql` |
-| 0200-0299 | `ref` | later (reference data) | none |
-| 0300-0399 | `iam` | P2 | `V0300__iam_app_user.sql`, `V0301__iam_session.sql`, `V0302__iam_audit_event.sql` |
-| 0400-0499 | `billpay` | P3 | `V0400__billpay_payment.sql` |
-| 0500-0599 | `pauth` | later | none |
-| 0600-0699 | `batch` | later (batch) | none |
-| 0700-0799 | `ops` | P1 | `V0700__ops_batch_window.sql` |
-| repeatable | grants | each owner | `R__grants_identity.sql` (P2), `R__grants_billpay.sql` (P3), `R__grants_batch.sql` (P5) |
+| Range | Content | Owner |
+| :-- | :-- | :-- |
+| V001-V099 | Foundation: schemas (`core`, `ref`, `iam`, `billpay`, `pauth`, `batch`, `ops`), database users and roles, the core tables and `core.tran_id_seq`, a minimal `batch.cycle`, `ops.batch_window`, `ops.audit` | P1 |
+| V100-V199 | `billpay` schema: `billpay.payment` | P3 |
+| V200-V299 | `iam` schema: `iam.app_user`, `iam.session`, `iam.audit_event` | P2 |
+| V300-V399 | `ref` schema | data (P5) |
+| V400-V499 | `batch` schema: Spring Batch metadata, `ALTER`s to `batch.cycle` | data (P5) |
+| V500-V599 | `pauth` schema | later |
+| V600 and up | later | - |
+| repeatable | `R__grants.sql` (foundation and `billpay_svc`, P1 with P3's grants), `R__grants_iam.sql` (`identity_svc`, P2), `R__grants_batch.sql` (`batch_svc`, P5) | per file |
 
+Database users are `<svc>_svc` (`identity_svc`, `billpay_svc`, `batch_svc`), each mapped to its login `carddemo_<svc>` (`carddemo_identity`, `carddemo_billpay`, `carddemo_batch`).
 ### Tables of the slice
 
 Types follow [data-model.md](data-model.md); changes from the decisions are marked. Key and code columns use `Latin1_General_100_BIN2`.
@@ -91,21 +91,22 @@ Types follow [data-model.md](data-model.md); changes from the decisions are mark
 - `core.account`: as in data-model.md (`acct_id CHAR(11)` PK with a digits check, the five `DECIMAL(12,2)` amounts, dates, `addr_zip`, `group_id`, `legacy_filler CHAR(178) NULL`, `row_version ROWVERSION`).
 - `core.customer`, `core.card`, `core.card_xref`: as in data-model.md, including `IX_xref_acct (acct_id, card_num)`.
 - `core.tcat_bal`: PK `(acct_id, type_cd, cat_cd)`, `balance DECIMAL(11,2)`, `legacy_filler CHAR(22) NULL`, `row_version`.
-- `core.transaction` (**changed by D-60**): `tran_pk BIGINT IDENTITY` PK; `tran_id CHAR(16)` BIN2 with filtered unique index `UX_tran_master (tran_id) WHERE in_master = 1`; `type_cd CHAR(2)`, `cat_cd CHAR(4)`; `source VARCHAR(10)`; `description VARCHAR(100)`; `amount DECIMAL(11,2)`; `merchant_id CHAR(9)`; `merchant_name`, `merchant_city VARCHAR(50)`; `merchant_zip VARCHAR(10)`; `card_num CHAR(16)`; `orig_ts`, `proc_ts DATETIME2(6)`; `proc_date AS CAST(proc_ts AS DATE) PERSISTED` with index `(proc_date, card_num)`; `legacy_filler CHAR(20) NULL`; `origin VARCHAR(12)` (`LOADED`, `POSTED`, `INTEREST`, `ONLINE_ADD`, `BILL_PAY`); `cycle_id INT NULL` (the slice writes `NULL`; the batch range adds the foreign key and the stamping rule); `in_master BIT NOT NULL DEFAULT 1`; `created_by CHAR(8) NULL`.
+- `core.transaction` (**changed by D-60**): `tran_pk BIGINT IDENTITY` PK; `tran_id CHAR(16)` BIN2 with filtered unique index `UX_tran_master (tran_id) WHERE in_master = 1`; `type_cd CHAR(2)`, `cat_cd CHAR(4)`; `source VARCHAR(10)`; `description VARCHAR(100)`; `amount DECIMAL(11,2)`; `merchant_id CHAR(9)`; `merchant_name`, `merchant_city VARCHAR(50)`; `merchant_zip VARCHAR(10)`; `card_num CHAR(16)`; `orig_ts`, `proc_ts DATETIME2(6)`; `proc_date AS CAST(proc_ts AS DATE) PERSISTED` with index `(proc_date, card_num)`; `legacy_filler CHAR(20) NULL`; `origin VARCHAR(12)` (`LOADED`, `POSTED`, `INTEREST`, `ONLINE_ADD`, `BILL_PAY`); `cycle_id INT NULL` with a foreign key to the minimal `batch.cycle` (the slice writes `NULL`; the batch slice sets the stamping rule); `in_master BIT NOT NULL DEFAULT 1`; `created_by CHAR(8) NULL`.
 - `core.tran_id_seq` (**D-59**): `CREATE SEQUENCE core.tran_id_seq AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9999999999999999 NO CYCLE CACHE 50`. `make load` restarts it above the highest loaded `tran_id`.
 - `iam.app_user`: `user_id CHAR(8)` BIN2 PK (stored upper case); `first_name`, `last_name VARCHAR(20)`; `password_hash VARCHAR(100)` (Spring `DelegatingPasswordEncoder` format, `{bcrypt}` with strength 12); `user_type CHAR(1)` (as loaded, no check constraint, because legacy mode accepts unknown types); `must_change_password BIT`; `failed_attempts SMALLINT`; `locked_until DATETIME2(3) NULL`; `last_sign_on_at DATETIME2(3) NULL`; `ebcdic_sort_key BINARY(8)`; `created_at`, `created_by`, `updated_at`, `updated_by`; `row_version`.
 - `iam.session`: `session_id UNIQUEIDENTIFIER` PK; `user_id`; `created_at`, `last_activity_at`, `absolute_expiry_at`, `ended_at NULL`, `end_reason VARCHAR(20) NULL` (`SIGN_OFF`, `IDLE`, `EXPIRED`, `REUSE_DETECTED`); `refresh_hash BINARY(32)` (SHA-256 of the current refresh token); `previous_refresh_hash BINARY(32) NULL`.
 - `iam.audit_event`: `event_id BIGINT IDENTITY` PK; `occurred_at DATETIME2(3)`; `actor_user_id CHAR(8) NULL`; `event_type VARCHAR(40)` (`SIGN_ON_OK`, `SIGN_ON_FAILED`, `USER_LOCKED`, `SIGN_OFF`, `SESSION_EXPIRED`, `PASSWORD_CHANGED`, `REFRESH_REUSE`); `subject_key VARCHAR(40) NULL`; `detail VARCHAR(200) NULL` (reason codes only, never a password or PII value); `client_ip VARCHAR(45) NULL`.
 - `billpay.payment`: `payment_id BIGINT IDENTITY` PK; `tran_pk BIGINT` unique (FK `core.transaction`); `tran_id CHAR(16)`; `acct_id CHAR(11)`; `paid_by CHAR(8)`; `idempotency_key UNIQUEIDENTIFIER` unique; `amount DECIMAL(11,2)` (as stored on the transaction); `balance_before DECIMAL(12,2)`; `created_at DATETIME2(6)`.
+- `ops.audit`: created by the foundation; not written by this slice.
 - `ops.batch_window`: `window_id INT IDENTITY` PK; `cycle_id INT NULL`; `mode VARCHAR(16)` (`WRITES_BLOCKED`); `opened_at DATETIME2(3)`; `closed_at DATETIME2(3) NULL`. At most one open row (filtered unique index on a constant `WHERE closed_at IS NULL`).
 
 ### Grants
 
-| Login | Grants |
+| Database user (login) | Grants |
 | :-- | :-- |
-| `carddemo_identity` | `SELECT, INSERT, UPDATE` on `iam.app_user`, `iam.session`; `INSERT` on `iam.audit_event`; nothing else. |
-| `carddemo_billpay` | `SELECT` on `core.account`, `core.card_xref`, `core.transaction`, `core.tcat_bal`, `ops.batch_window`; `UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` on `core.account`; `INSERT` on `core.transaction`; `INSERT, UPDATE (balance)` on `core.tcat_bal`; `UPDATE` on `core.tran_id_seq`; `SELECT, INSERT` on `billpay.payment`; `EXECUTE` on `sp_getapplock` (implicit). |
-| `carddemo_batch` | `SELECT, INSERT, DELETE` on the core tables; `ALTER` on `core.tran_id_seq` (restart after load). |
+| `identity_svc` (`carddemo_identity`) | `SELECT, INSERT, UPDATE` on `iam.app_user`, `iam.session`; `INSERT` on `iam.audit_event`; nothing else. |
+| `billpay_svc` (`carddemo_billpay`) | `SELECT` on `core.account`, `core.card_xref`, `core.transaction`, `core.tcat_bal`, `ops.batch_window`; `UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` on `core.account`; `INSERT` on `core.transaction`; `INSERT, UPDATE (balance)` on `core.tcat_bal`; `UPDATE` on `core.tran_id_seq`; `SELECT, INSERT` on `billpay.payment`; `EXECUTE` on `sp_getapplock` (implicit). |
+| `batch_svc` (`carddemo_batch`) | `SELECT, INSERT, DELETE` on the core tables; `ALTER` on `core.tran_id_seq` (restart after load). |
 
 `make db-reset` passes only when each login is refused one table outside its grants (for example `carddemo_billpay` reading `core.customer`).
 

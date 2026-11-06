@@ -7,8 +7,8 @@
 - **Amounts** travel as decimal strings (`"194.00"`), with the legacy display string next to them where the screen shows an edited value (`"+0000000194.00"`).
 - **Concurrency**: reads return an `ETag` from `row_version`; updates and deletes require `If-Match`. A mismatch returns `409` with the legacy text `Record changed by some one else. Please review` and the fresh values.
 - **Paging**: keyset cursors (`start`, `after`, `before`, `size`) with a look-ahead `hasNext`, matching the legacy read-one-more browse. Page numbers are display state.
-- **PANs** never appear in a URL. Card rows carry a surrogate `cardId`. Responses mask card numbers, SSN, DOB, government ID and EFT account unless the caller holds the unmask permission (choice C2) or the legacy screen shows them in full (choice C1, as today).
-- **Batch window**: when a call needs a table the open window covers, the service returns `503` with `Retry-After` and `code: BATCH_WINDOW`. In legacy mode the `message` is the text the screen shows for an unavailable file (for Bill Pay, `Unable to lookup Account...`).
+- **PANs** never appear in a URL. Card rows carry a surrogate `cardId`. Responses mask card numbers, SSN, DOB, government ID and EFT account to the last four characters; an `ADMIN` may ask for the unmasked value, and every unmasked view is audited (D-09 under C1, D-SEC-05).
+- **Batch window** (`WRITES_BLOCKED`, D-BAT-05): reads keep working while a window is open; a write to a covered table returns `503` with `Retry-After` and `code: BATCH_WINDOW`, with a message per screen (for Bill Pay, `Bill payment is not available while the batch cycle runs. Try again later...`).
 
 ## Endpoints per service
 
@@ -16,7 +16,8 @@
 
 | Method and path | Purpose | Spec |
 | :-- | :-- | :-- |
-| `POST /api/auth/sign-on` `{userId, password}` | Upper-case both, check the hash, start a session; returns `{userId, userType, home: "/" or "/admin"}` | COSGN00C BR-SGN-001 to 005, VAL-SGN-* |
+| `POST /api/auth/sign-on` `{userId, password}` | Upper-case the user ID, check the hash, apply lockout, start a session; returns the session view with `home: "/" or "/admin"` | COSGN00C BR-SGN-001 to 005, VAL-SGN-001 to 005 |
+| `POST /api/auth/password` `{userId?, currentPassword, newPassword}` | Change the password (forced at first sign-on for migrated users); success signs the user in | D-04, D-SEC-07 |
 | `POST /api/auth/sign-off` | End the session | PF3 on sign-on and the menus |
 | `POST /api/auth/refresh` | Rotate the access token | - |
 | `GET /api/auth/me` | User ID, type, roles, installed features | the commarea identity (ENT-COMMAREA) |
@@ -99,18 +100,22 @@ The user table replaces `USRSEC`. The legacy user type maps to roles:
 | Legacy type | Role | Can use |
 | :-- | :-- | :-- |
 | `A` | `ADMIN` | Admin menu functions: user administration, transaction types |
-| `U` and any other value (Q-SGN-005) | `USER` | Main menu functions 1 to 11 |
+| `U` | `USER` | Main menu functions 1 to 11 |
+| any other value (Q-SGN-005) | `USER` in legacy mode; refused in fixed mode (DEF-SGN-005, decided, D-02) | - |
 
 Under choice C2 three more roles are added: `OPERATOR` (reports, batch status), `FRAUD_ANALYST` (fraud marking) and `PII_VIEWER` (unmasked customer data).
 
 ### Authentication
 
-- `identity-service` checks the password against a bcrypt hash of the upper-cased password. Sign-on upper-cases what the user types, so the behaviour the user sees is unchanged (BR-SGN-001, INV-007); only the storage changes (DEF-SGN-001).
-- It issues a short-lived signed access token (15 minutes, RS256) and a rotating refresh token, both in `HttpOnly`, `Secure`, `SameSite=Strict` cookies. Unsafe methods also need a CSRF header. The other services validate the token offline against the JWKS endpoint.
-- Seed users come from the DUSRSECJ list; their demo password is taken from `.env`, never from a committed file.
-- Lockout, rate limiting and a neutral failure message are switches (Q-SGN-003, Q-SGN-004). Legacy mode keeps the two distinct messages that reveal whether a user ID exists.
-- An external identity provider (OIDC) can replace the local password check later without changing the other services, because they only validate tokens (D-SEC-02).
+The exact contract is in [billpay-slice.md](billpay-slice.md#7-identity-contract). In short:
 
+- `identity-service` upper-cases the user ID (BR-SGN-001) and checks the password against a salted bcrypt hash. Fixed mode of DEF-SGN-011 (decided, D-04) compares the password as typed; legacy mode upper-cases it first, as the COBOL does. Users migrated from `USRSEC` are hashed once and must change their password at first sign-on (`403 PASSWORD_CHANGE_REQUIRED`, then `POST /api/auth/password`, which signs the user in).
+- It issues an RS256 access token valid for 5 minutes and a rotating refresh token, in `HttpOnly`, `SameSite=Strict` cookies (`cd_at` for `/api`, `cd_rt` for `/api/auth`); `Secure` is a configuration switch, off only for plain http on 127.0.0.1. The SPA never reads tokens; the other services read the `cd_at` cookie (or an `Authorization: Bearer` header from scripts) and validate it offline against the JWKS endpoint. Unsafe methods need the `X-XSRF-TOKEN` header matching the `XSRF-TOKEN` cookie.
+- A refresh is refused after 15 idle minutes (D-05); the web app also signs off after 15 minutes without input. Back on a menu signs off.
+- Fixed mode of DEF-SGN-002 and DEF-SGN-003 (decided, D-05): 5 failures lock the user for 15 minutes, and unknown user, wrong password and locked user get one neutral message, `Wrong User ID or Password. Try again ...`. Legacy mode keeps the two COBOL messages. Every sign-on outcome is audited.
+- Seed users exist only in the `demo` profile, with the password from `.env` (`CARDDEMO_SEED_USER_PASSWORD`); other environments get one bootstrap admin with a forced change (D-06). `identity-service` seeds them, not the data load.
+- Sign-on, refresh and sign-off stay available during a batch window.
+- An external identity provider (OIDC) can replace the local password check later without changing the other services, because they only validate tokens (D-SEC-02).
 ### Authorization
 
 Every endpoint declares its role with Spring Security method security. No endpoint creates a session or accepts a user type from the client. Account and card endpoints never trust the account ID from a previous screen; they take it from the request and check it under the chosen rule.
@@ -135,7 +140,7 @@ Today the five account and card transactions, the two Db2 transaction-type trans
 | A `USER` views or changes any account, card or transaction (DEF-ACVW-009, DEF-CRDL-001, DEF-TRNL-007) | Works | Works, as for signed-on CICS users | Only accounts linked to the user in `iam.user_account` |
 | A `USER` pays any account (DEF-BILL-009) | Works | Works; the paying user is recorded | Only linked accounts |
 | A `USER` marks fraud on any authorization (DEF-AUDT-006) | Works | Works | Needs `FRAUD_ANALYST` |
-| Full SSN, DOB and PAN on screen (DEF-ACVW-010, DEF-CRDL-002) | Shown | Shown, every view audited | Masked unless `PII_VIEWER` |
+| Full SSN, DOB and PAN on screen (DEF-ACVW-010, DEF-CRDL-002) | Shown | Masked; `ADMIN` may unmask, every unmasked view audited (decided, D-09) | Masked unless `PII_VIEWER` |
 | Data needed | none | none | a user-to-account link, which no legacy file holds: the business must provide it |
 
-C0 is listed only to show the gap: a web API without authentication cannot be deployed. The equivalence scenarios that start a transaction without sign-on are recorded in the decision ledger as accepted deviations. C1 is the default because it changes only the paths INV-006 calls defects and needs no new data. C2 is recommended for production once the business supplies the user-to-account link (D-SEC-01).
+C0 is listed only to show the gap: a web API without authentication cannot be deployed. The equivalence scenarios that start a transaction without sign-on are recorded in the decision ledger as accepted deviations. C1 is the decided model (D-SEC-01) because it changes only the paths INV-006 calls defects and needs no new data. C2 is recommended for production once the business supplies the user-to-account link (D-SEC-01).

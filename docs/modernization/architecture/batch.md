@@ -23,8 +23,8 @@ CLOSEFIL closes five CICS files (`ACCTDAT`, `CCXREF`, `CXACAIX`, `TRANSACT`, `US
 
 | Window mode | Covered tables | Online effect | Default |
 | :-- | :-- | :-- | :-- |
-| `CLOSED_FILES` | account, card cross-reference, transaction, user | every read and write on them fails, including sign-on, as with closed CICS files | **default (legacy)** |
-| `WRITES_BLOCKED` | same | reads work (snapshot isolation), writes return 503 | recommended (D-BAT-05) |
+| `CLOSED_FILES` | account, card cross-reference, transaction, user | every read and write on them fails, including sign-on, as with closed CICS files | legacy behaviour, not built |
+| `WRITES_BLOCKED` | same | reads work (snapshot isolation), writes return 503; sign-on, refresh and sign-off stay available | **decided (D-BAT-05)** |
 | `NONE` | - | no window; row locks only | not recommended: posting reads running totals (BR-POST-007) |
 
 ## The transaction master and cycles
@@ -159,7 +159,7 @@ Posting stays single-threaded in input order, because each record's over-limit c
 
 | Output | How the content is reproduced | Checked by |
 | :-- | :-- | :-- |
-| TRANREPT (CBTRN03C) | Rows with `in_master = 1` and `proc_date_text` between the two dates (inclusive, text compare, INV-010), `ORDER BY card_num, tran_id` (the legacy sort input is the master in key order). Left joins to cross-reference, type and category; a missing code fails the job, as the program abends (INV-016). A custom writer reproduces the headers, the page break counter that also counts total lines (BR-TRPT-005), the card-break "account" totals (DEF-TRPT-004, legacy mode), page and grand totals and the edit masks (NUM-TRPT-002). One date pair feeds both selection and heading (DEF-TRPT-002 cannot occur). | `verify-batch` against the GnuCOBOL TRANREPT on sample and stress data |
+| TRANREPT (CBTRN03C) | Rows with `in_master = 1` and `proc_date` between the two dates (inclusive, INV-010), `ORDER BY card_num, tran_id` (the legacy sort input is the master in key order). Left joins to cross-reference, type and category; a missing code fails the job, as the program abends (INV-016). A custom writer reproduces the headers, the page break counter that also counts total lines (BR-TRPT-005), the card-break "account" totals (DEF-TRPT-004, legacy mode), page and grand totals and the edit masks (NUM-TRPT-002). One date pair feeds both selection and heading (DEF-TRPT-002 cannot occur). | `verify-batch` against the GnuCOBOL TRANREPT on sample and stress data |
 | PRTCATBL | `ORDER BY acct_id, type_cd, cat_cd`; 40-byte lines; balance edited `TTTTTTTTT.TT` without sign (Q-JPCAT-001, legacy). | An oracle test written from the PRTCATBL spec (the job is a SORT, with no program to run) |
 | CREASTMT (CBSTM03A) | One statement per cross-reference card in card order, with its customer and account and every master transaction of the card in ID order. The legacy renderer writes the 80-byte text and 100-byte HTML lines (NUM-STMT-001 to 003); the 51-card, 10-transaction table limit (DEF-STMT-001) and the unescaped HTML (DEF-STMT-007) are switches. | `verify-batch` against `checks/cbstm03a_harness` (CBSTM03A does not run off z/OS) |
 | POSTTRAN rejects, account and category balance after the run | 430-byte rejects file; exported 300- and 50-byte records with zoned signs and `legacy_filler` | `verify-batch` against the GnuCOBOL POSTTRAN |

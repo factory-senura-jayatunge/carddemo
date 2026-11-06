@@ -11,6 +11,7 @@ The screens are designed as modern web pages, not 24x80 copies: labelled fields,
 | Route | Screen (spec) | Role (choice C1) | Notes |
 | :-- | :-- | :-- | :-- |
 | `/sign-on` | COSGN00C | public | Redirects to `/` or `/admin` by user type. |
+| `/sign-on/change-password`, `/signed-off` | COSGN00C, D-04 | public | Forced password change at first sign-on; the goodbye page after Exit. |
 | `/` | COMEN01C main menu | USER | 11 options. |
 | `/admin` | COADM01C admin menu | ADMIN | 6 options. |
 | `/accounts/view` | COACTVWC | USER | Account ID field, then the account, customer and card panel. |
@@ -43,7 +44,7 @@ The screens are designed as modern web pages, not 24x80 copies: labelled fields,
 | 10 Bill Payment | `/bill-pay` | | |
 | 11 Pending Authorization View | `/authorizations` | | |
 
-The menu keeps the option numbers and texts, and the numeric option field: typing `10` and Enter still works (VAL-MENU-001, NUM-MENU-001), next to clickable entries. An option whose context is not converted yet shows `This option <name> is coming soon ...`; option 11 without the module shows `This option Pending Authorization View is not installed...` (BR-MENU-004).
+The menu keeps the option numbers and texts, and the numeric option field: typing `10` and Enter still works (VAL-MENU-001, NUM-MENU-001), next to clickable entries. An option whose context is not converted yet shows `This option <name> is coming soon ...`; option 11 without the module shows `This option Pending Authorization View is not installed...` (BR-MENU-004). Admin options 5 and 6 are hidden while the transaction type module is absent (D-70).
 
 ## Navigation
 
@@ -75,9 +76,9 @@ Back (PF3) returns to the screen that opened the current one, else to the menu; 
 | PF5 | Save, or Copy last on transaction add |
 | PF7 / PF8 | Previous / Next page buttons; Page Up / Page Down in tables |
 | PF10, PF12 | Confirm and Cancel in a confirmation dialog |
-| Other keys | Do nothing. The legacy "Invalid key pressed" message has no web cause and is not shown. |
+| Other keys | With the 3270 shortcuts on: `Invalid key pressed. Please see below...`, input kept. With them off: nothing. |
 
-Optional keyboard shortcuts for F3, F4, F5, F7 and F8 can be switched on per user for operators used to the 3270 (D-WEB-03).
+Optional keyboard shortcuts for F3, F4, F5, F7 and F8 can be switched on per user for operators used to the 3270 (D-WEB-03); with them on, any other function key shows the legacy invalid-key message, so VAL-BILL-006 and its siblings keep a test path.
 
 The message area under each form shows the server's `message`: red for errors, green for success, neutral for information, as on the 3270. Focus moves to the server's `field`. The texts come from one message catalogue shared with the services, so a test can compare the exact legacy text.
 

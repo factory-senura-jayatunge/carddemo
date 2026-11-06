@@ -113,7 +113,7 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 | TRANCATG · JTCATG | schema `ref.tran_category` with foreign key and seed | Reload dropped: one store. |
 | DISCGRP · JDISC | schema `ref.disclosure_group`; step `loadDisclosureGroups`; job `disclosureGroupReloadJob` on DAG `carddemo_reference_refresh` | Weekly reload kept, with a check that the `DEFAULT` group exists. |
 | TCATBALF · JTCAT | schema `core.tcat_bal`; step `loadCategoryBalances` for new environments only | Running balances, not reference data: no scheduled reload. |
-| DUSRSECJ · JUSEC | schema `iam.app_user`; demo seed from `.env` secrets via `make load` | Clear-text passwords dropped. |
+| DUSRSECJ · JUSEC | schema `iam.app_user`; demo seed users from `.env` (`CARDDEMO_SEED_USER_PASSWORD`), seeded by `identity-service` in the `demo` profile only (D-06) | Clear-text passwords dropped. |
 | ESDSRRDS · JESRR | dropped | ESDS and RRDS copies of the user file with no consumer in the repository (Q-JESRR-001). |
 | DEFGDGB · JGDGB | dropped | GDG bases; replaced by cycle tags and per-run output folders with retention 5. |
 | DEFGDGD · JGDGD | dropped | Reference-data backup GDGs; SQL Server backups (or temporal tables if required). |

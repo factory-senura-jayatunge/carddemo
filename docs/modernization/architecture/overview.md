@@ -153,20 +153,11 @@ Bill Pay goes first because it is small (one screen, three stores), touches the 
 
 The server re-reads the balance inside the transaction; it never trusts the balance the screen showed (BR-BILL-001). Errors return the exact legacy text and the field to focus, for example `404 {"code":"ACCOUNT_NOT_FOUND","message":"Account ID NOT found...","field":"acctId"}`.
 
-**Navigation fit.** Main menu option 10 opens `/bill-pay`. Back (PF3) returns to the menu, Clear (PF4) clears the form, and the confirmation is a Y/N field, so the legacy decision table (VAL-BILL-002) holds unchanged. Options 1 to 9 and 11 show `This option <name> is coming soon ...` until their context is converted, which reuses the menu's own message (BR-MENU-005).
+**Navigation fit.** Main menu option 10 opens `/bill-pay`. Back (PF3) returns to the menu, Clear (PF4) clears the form, and the confirmation is a Y/N field, so the legacy decision table (VAL-BILL-002) holds unchanged. Options 1 to 9 show `This option <name> is coming soon ...` until their context is converted, which reuses the menu's own message (BR-MENU-005); option 11 shows the "not installed" message while the authorization module is absent (BR-MENU-004).
 
 **What it shares and what it proves.** The core tables and their Flyway migrations, `ledger-core` (ID allocation shared with transaction add and the batch), the batch-window guard (Bill Pay is unavailable while posting runs, INV-002), identity and roles, the message catalogue, the fidelity switches, the traceability check and the CI pipeline. `make billpay` brings up only SQL Server, `identity-service`, `billpay-service` and the web app.
 
-**Bill Pay fidelity switches** (all default `legacy`):
-
-| Item | Legacy | Fixed |
-| :-- | :-- | :-- |
-| DEF-BILL-010 / Q-BILL-002 | positive amount; no change to cycle credit or debit or to the category balance | also posts to the cycle totals and category balance with the chosen sign |
-| NUM-BILL-002 | amount is the balance cut to 9 integer digits | reject balances above 999,999,999.99 |
-| DEF-BILL-014 / Q-BILL-001 | account ID stays editable on the confirmation step | account ID locked once the balance is shown |
-| DEF-BILL-002 | first card by card number; the payment completes | refuse multi-card accounts or let the user choose |
-| Q-BILL-006 | both timestamps `YYYY-MM-DD HH:MM:SS.000000` | one normalised timestamp layout for all writers |
-| DEF-BILL-009 / Q-BILL-004 | any signed-on user can pay any account | ownership check (security choice C2) |
+**Bill Pay fidelity switches.** The switches, their two modes and the decided values are in [billpay-slice.md](billpay-slice.md#6-fidelity-switches-touched): DEF-BILL-010 (payments posted like other transactions, D-28), DEF-BILL-014 (account locked on the confirmation step, D-30) and the shared transaction ID switch BR-TRNA-003 (D-59), all decided `fixed`. NUM-BILL-002 and DEF-BILL-002 keep the COBOL behaviour, and DEF-BILL-009 stays as it is under C1.
 
 DEF-BILL-001 (balance zeroed without a payment record) and DEF-BILL-003 (two payments get the same ID) cannot happen in one database transaction with a locked ID allocation. They are architecture-dependent items: the business confirms the fix (Q-BILL-003, expected yes).
 

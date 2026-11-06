@@ -9,6 +9,67 @@ This list has four parts:
 
 Until a default is answered, the build keeps the COBOL behaviour (legacy mode). Security is the exception described in D-SEC-01.
 
+## Decided values
+
+The user approved this proposal (D10) and answered the decision catalog (`docs/modernization/decisions/README.md`) on 2026-11-06: every catalog recommendation is accepted, including the bulk fix D-75 and the architecture-dependent fixes below, and every default here takes its recommended value, except D-SEC-01 (C1) and D-BAT-05 (`WRITES_BLOCKED`). Where the catalog and these answers differ, these answers win. The code still defaults each switch to `legacy`; `ledger/fidelity.toml` records the decided value, and both modes stay tested.
+
+| ID | Decided value |
+| :-- | :-- |
+| D-ARCH-01 to D-ARCH-16 | As proposed. |
+| D-SEC-01 | **C1**: sign-on for every screen and API, roles `ADMIN` and `USER`, staff model (D-01, D-02, D-03). Unknown user types are refused (DEF-SGN-005 fixed). Masking applies under C1 as in D-SEC-05. |
+| D-SEC-02 | Local password check in `identity-service`; OIDC later only changes that service. |
+| D-SEC-03 | Salted bcrypt hashes; case-sensitive passwords, case-insensitive user IDs; legacy passwords hashed once at migration and changed at first sign-on (D-04, DEF-SGN-011 fixed). |
+| D-SEC-04 | On: 5 failures lock the user for 15 minutes; one neutral failure message for unknown user, wrong password and locked user; 15-minute idle timeout; explicit sign-off; sign-on audit (D-05). |
+| D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. |
+| D-SEC-06 | As proposed (D-07). |
+| D-SEC-07 | New-password rule as in the security table above. |
+| D-DATA-01 | Group ID moved to `group_id` at migration; DEF-ACUP-002 fixed (D-11). |
+| D-DATA-02 | `card_xref` owns the card-to-account link; `card.acct_id` follows it (D-13, D-61). |
+| D-DATA-03 | `legacy_filler` kept until cut-over for the differential checks, then dropped. |
+| D-DATA-04 | CVV never returned; tokenised, or dropped if no converted function reads it (D-10, D-12); the accounts-and-cards slice settles which. |
+| D-DATA-05 | **Now**, not after cut-over: one SQL Server sequence `core.tran_id_seq`, 16 digits, no seed record (D-59), switch `BR-TRNA-003`. Legacy mode ("highest + 1" under a lock) stays for parity tests. |
+| D-DATA-06 | **Now**: `orig_ts` and `proc_ts` are `DATETIME2(6)`; legacy layouts are produced by the exporter (D-60). |
+| D-DATA-07 | `tran_pk` kept. |
+| D-BAT-01 | Interest monthly on a chosen day (D-24). |
+| D-BAT-02 | Statements once per statement period, on the interest day (D-38). |
+| D-BAT-03 | Purge after the cycle (D-39). |
+| D-BAT-04 | All history kept, retention per data class from the data-handling policy (D-40). |
+| D-BAT-05 | **`WRITES_BLOCKED`** (the user's answer, which overrides catalog D-18): reads work during the window, writes return 503. Sign-on, refresh and sign-off stay available. |
+| D-BAT-06 to D-BAT-10 | As proposed (D-57, D-66, D-41, D-62, D-23). |
+| D-MSG-01 | Structured JSON replies once no requester parses the text (D-72). |
+| D-MSG-02 | As proposed. |
+| D-MSG-03 | Outbox: commit, reply, acknowledge (D-35). |
+| D-MSG-04 | Replies to the request's `reply_to` (D-73). |
+| D-WEB-01 to D-WEB-03 | As proposed. |
+| D-WEB-04 | Hidden: admin options 5 and 6 when the transaction type module is absent (D-70). Main menu option 11 keeps its must-preserve "not installed" message (BR-MENU-004), because no catalog item makes it defect-decide. |
+| D-NFR-01 to D-NFR-10 | As proposed; D-NFR-10 audit follows D-56. |
+
+Answers to the open questions of the table further down:
+
+| Question | Answer |
+| :-- | :-- |
+| Q-BILL-002 | Yes. A payment is stored as a negative amount and applied by `ledger-core`'s posting primitive, the one POSTTRAN uses: balance, cycle total (`curr_cyc_debit`, where posting puts negative amounts) and category balance `02/0002` (D-28). |
+| Q-TRNA-001 | Online adds feed the posting input (D-27). |
+| Q-BILL-004 | No ownership check (C1, D-03); the paying user is recorded. |
+| Q-JINTC-002, Q-JCTLM-002 | Monthly (D-24). |
+| Q-JSTMT-001 | Once per statement period (D-38). |
+| Q-JCA7-003 | After the cycle (D-39). |
+| Q-JGDGB-001, Q-JREPT-001 | Keep all history, retention by data class (D-40). |
+| Q-JEXPT-001, Q-JIMPT-001 | Database export and load instead, unless a receiver is named (D-62). |
+| Q-JPDF-001 | One PDF per statement from a template (D-45). |
+| Q-AUTH-005 | Outbox (D-35). |
+| Q-AUTH-004 | Requests are validated and declined with the existing reason codes (D-32). |
+| Q-MQAC-002 | `reply_to` (D-73). |
+| Q-ENT-001 | Moved at migration (D-11). |
+| Q-ENT-002 | Surrogate key kept (D-59, D-DATA-07). |
+| Q-USRL-002 | Standard server-side paging and order (D-54): the `ebcdic_sort_key` column stays only for the legacy mode. |
+| Q-SGN-003, Q-SGN-004 | Lockout and neutral message (D-05). |
+| Q-JTTYP-001 | One reference store (D-63). |
+| Q-JCLOSE-001 | The window covers the same tables, with `WRITES_BLOCKED` (D-BAT-05). |
+| Q-RPTS-001 | Asynchronous run with status and download (D-48). |
+
+The Bill Pay slice applies these values in [billpay-slice.md](billpay-slice.md).
+
 ## Architecture decisions
 
 | ID | Decision | Choice | Not chosen, and why |
