@@ -92,8 +92,8 @@ jobs:
           job airflow test-airflow
           job batch verify-harness verify-batch
           job data db-reset load verify-data
-          job e2e up test-e2e
-          job cycle up verify-cycle
+          job e2e db-reset load up test-e2e
+          job cycle db-reset load up verify-cycle
           job ledger verify-ledger trace
 
   spec:
@@ -354,8 +354,8 @@ jobs:
           npm ci
           # shellcheck disable=SC2086 # one argument per browser
           npx playwright install --with-deps $E2E_BROWSERS
-      - name: make up test-e2e (fresh data, Playwright, axe)
-        run: make -C modernization up test-e2e
+      - name: make db-reset load up test-e2e (fresh data, Playwright, axe)
+        run: make -C modernization db-reset load up test-e2e
       - name: make status
         if: ${{ failure() }}
         run: make -C modernization status
@@ -409,8 +409,8 @@ jobs:
             --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.14.txt
       - name: make setup build
         run: make -C modernization setup build
-      - name: make up verify-cycle (daily cycle through Airflow for 2022-07-06)
-        run: make -C modernization up verify-cycle
+      - name: make db-reset load up verify-cycle (daily cycle through Airflow for 2022-07-06)
+        run: make -C modernization db-reset load up verify-cycle
       - name: Upload results and logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -439,6 +439,8 @@ jobs:
         with:
           pattern: test-results-*
           path: modernization/build/ci-results/
+      - name: Unit tests of the ledger and trace tools
+        run: python3 -m unittest discover -s modernization/verify/trace/tests
       - name: make verify-ledger trace (ledger evidence, traceability gate)
         run: make -C modernization verify-ledger trace
       - name: Upload the traceability matrix

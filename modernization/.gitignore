@@ -5,3 +5,6 @@
 
 # Runtime files: logs, PIDs, locks, generated keys, batch files and reports.
 var/
+
+# Build output (Maven).
+target/
