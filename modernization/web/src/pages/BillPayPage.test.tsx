@@ -13,14 +13,14 @@ async function openBillPay(options: Parameters<typeof renderApp>[1] = {}) {
 }
 
 describe('Bill Pay page (COBIL00C)', () => {
-  it('[FLOW-BILL-002] BILL-S2: opens empty with focus on Account ID', async () => {
+  it('@FLOW-BILL-002 BILL-S2: opens empty with focus on Account ID', async () => {
     await openBillPay();
     expect(acct()).toHaveValue('');
     await waitFor(() => expect(acct()).toHaveFocus());
     expect(messageText()).toBeNull();
   });
 
-  it('[VAL-BILL-001] [FLOW-BILL-003] BILL-S3: Enter with a blank account ID shows the message and calls nothing', async () => {
+  it('@VAL-BILL-001 @FLOW-BILL-003 BILL-S3: Enter with a blank account ID shows the message and calls nothing', async () => {
     const { user, apiCalls } = await openBillPay();
     await user.type(acct(), '{Enter}');
     expect(messageText()).toBe('Acct ID can NOT be empty...');
@@ -28,7 +28,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(apiCalls('/api/billpay')).toHaveLength(0);
   });
 
-  it('[VAL-BILL-003] BILL-S4: an unknown account', async () => {
+  it('@VAL-BILL-003 BILL-S4: an unknown account', async () => {
     const { user } = await openBillPay();
     await user.type(acct(), '99999999999{Enter}');
     await waitFor(() => expect(messageText()).toBe('Account ID NOT found...'));
@@ -36,7 +36,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(screen.queryByTestId('balance-panel')).toBeNull();
   });
 
-  it('[VAL-BILL-005] [NUM-BILL-001] [DEF-BILL-014] BILL-S5 fixed: shows the balance, asks to confirm and locks the account ID', async () => {
+  it('@VAL-BILL-005 @NUM-BILL-001 @DEF-BILL-014 BILL-S5 @fixed: shows the balance, asks to confirm and locks the account ID', async () => {
     const { user } = await openBillPay();
     await user.type(acct(), '00000000001{Enter}');
     await waitFor(() => expect(messageText()).toBe('Confirm to make a bill payment...'));
@@ -47,14 +47,14 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(screen.getByRole('radio', { name: 'Yes' })).toHaveFocus();
   });
 
-  it('[DEF-BILL-014] BILL-S5 legacy: the account ID stays editable', async () => {
+  it('@DEF-BILL-014 BILL-S5 @legacy: the account ID stays editable', async () => {
     const { user } = await openBillPay({ settings: { uiSwitches: { 'DEF-BILL-014': 'legacy' } } });
     await user.type(acct(), '00000000001{Enter}');
     await waitFor(() => expect(messageText()).toBe('Confirm to make a bill payment...'));
     expect(acct()).not.toHaveAttribute('readonly');
   });
 
-  it('[VAL-BILL-004] BILL-S6: zero and negative balances show the balance and nothing to pay', async () => {
+  it('@VAL-BILL-004 BILL-S6: zero and negative balances show the balance and nothing to pay', async () => {
     const { user } = await openBillPay();
     await user.type(acct(), '00000000098{Enter}');
     await waitFor(() => expect(messageText()).toBe('You have nothing to pay...'));
@@ -69,7 +69,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(screen.getByTestId('balance-display')).toHaveTextContent('-0000000025.50');
   });
 
-  it('[VAL-BILL-002] BILL-S7: No clears the fields and the message without a call', async () => {
+  it('@VAL-BILL-002 BILL-S7: No clears the fields and the message without a call', async () => {
     const { user, apiCalls } = await openBillPay();
     await user.type(acct(), '00000000001{Enter}');
     await waitFor(() => expect(messageText()).toBe('Confirm to make a bill payment...'));
@@ -85,7 +85,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(apiCalls('/api/billpay')).toHaveLength(before);
   });
 
-  it('[BR-BILL-001] [VAL-BILL-002] BILL-S9: Yes pays with a fresh Idempotency-Key, clears the form and unlocks', async () => {
+  it('@BR-BILL-001 @VAL-BILL-002 BILL-S9: Yes pays with a fresh Idempotency-Key, clears the form and unlocks', async () => {
     const { user, apiCalls } = await openBillPay();
     await user.type(acct(), '00000000001{Enter}');
     await waitFor(() => expect(acct()).toHaveAttribute('readonly'));
@@ -105,7 +105,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(await payment?.json()).toEqual({ confirm: 'Y' });
   });
 
-  it('[BR-BILL-007] BILL-S16: Yes on the empty form pays without a preview, each Enter with its own key', async () => {
+  it('@BR-BILL-007 BILL-S16: Yes on the empty form pays without a preview, each Enter with its own key', async () => {
     const { user, apiCalls } = await openBillPay();
     await user.type(acct(), '00000000002');
     await user.click(screen.getByRole('radio', { name: 'Yes' }));
@@ -136,7 +136,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(within(notice).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
-  it('[FLOW-BILL-005] BILL-S11: Clear empties the form and unlocks the account ID', async () => {
+  it('@FLOW-BILL-005 BILL-S11: Clear empties the form and unlocks the account ID', async () => {
     const { user } = await openBillPay();
     await user.type(acct(), '00000000001{Enter}');
     await waitFor(() => expect(acct()).toHaveAttribute('readonly'));
@@ -146,13 +146,13 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(messageText()).toBeNull();
   });
 
-  it('[FLOW-BILL-004] BILL-S10: Back returns to the main menu', async () => {
+  it('@FLOW-BILL-004 BILL-S10: Back returns to the main menu', async () => {
     const { user, router } = await openBillPay();
     await user.click(screen.getByRole('button', { name: /^Back to menu/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 
-  it('[VAL-BILL-006] [FLOW-BILL-006] BILL-S12: with the function keys on, F3 and F4 act and other keys are invalid', async () => {
+  it('@VAL-BILL-006 @FLOW-BILL-006 BILL-S12: with the function keys on, F3 and F4 act and other keys are invalid', async () => {
     const { user, router } = await openBillPay({ functionKeys: true });
     await user.type(acct(), '00000000001');
     fireEvent.keyDown(window, { key: 'F5' });
@@ -165,7 +165,7 @@ describe('Bill Pay page (COBIL00C)', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 
-  it('[VAL-BILL-006] with the function keys off, function keys do nothing', async () => {
+  it('@VAL-BILL-006 with the function keys off, function keys do nothing', async () => {
     const { user } = await openBillPay();
     await user.type(acct(), '00000000001');
     const event = new KeyboardEvent('keydown', { key: 'F5', cancelable: true });
@@ -175,13 +175,14 @@ describe('Bill Pay page (COBIL00C)', () => {
     expect(acct()).toHaveValue('00000000001');
   });
 
-  it('[FLOW-BILL-001] BILL-S1: without a session it goes to an empty sign-on page', async () => {
+  it('@FLOW-BILL-001 BILL-S1: without a session it goes to an empty sign-on page', async () => {
     const { router } = await renderApp('/bill-pay');
     await waitFor(() => expect(router.state.location.pathname).toBe('/sign-on'));
+    await screen.findByRole('heading', { name: 'Sign on' });
     expect(messageText()).toBeNull();
   });
 
-  it('[FLOW-BILL-009] shows the legacy titles, screen IDs, date and time in the header', async () => {
+  it('@FLOW-BILL-009 shows the legacy titles, screen IDs, date and time in the header', async () => {
     await openBillPay();
     expect(screen.getByTestId('header-titles')).toHaveTextContent('AWS Mainframe ModernizationCardDemo');
     expect(screen.getByTestId('screen-id')).toHaveTextContent('CB00 · COBIL00C');

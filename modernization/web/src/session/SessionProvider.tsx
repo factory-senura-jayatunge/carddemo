@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { identityApi, type SessionView } from '@/api/client';
 import { onSessionExpired, refreshSession, unwrap } from '@/api/http';
-import { uiText } from '@/lib/messages';
+import { sessionEndedNote } from '@/lib/messages';
 import { messages } from '@/messages';
 
 export type SessionState =
@@ -102,7 +102,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     onSessionExpired(() => {
-      const state: SignOnRouteState = { note: { text: uiText.sessionExpired }, from: here.current };
+      const state: SignOnRouteState = { note: sessionEndedNote, from: here.current };
       void endAndGo('/sign-on', state);
     });
     return () => onSessionExpired(undefined);

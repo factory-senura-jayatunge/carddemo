@@ -42,7 +42,7 @@ async function preview(page: Page, acctId: string) {
 
 test.beforeEach(async ({ mock }) => mock({ latency: 0 }));
 
-test('[FLOW-BILL-001] BILL-S1: without a session the page and both APIs refuse', async ({ page }) => {
+test('@FLOW-BILL-001 BILL-S1: without a session the page and both APIs refuse', async ({ page }) => {
   await page.goto('/bill-pay');
   await expect(page).toHaveURL(/\/sign-on$/);
   await expectNoMessage(page);
@@ -57,7 +57,7 @@ test('[FLOW-BILL-001] BILL-S1: without a session the page and both APIs refuse',
   expect(pay.body?.code).toBe('UNAUTHENTICATED');
 });
 
-test('[FLOW-BILL-002] [FLOW-BILL-009] BILL-S2: menu option 10 opens an empty form with focus on Account ID', async ({ page }) => {
+test('@FLOW-BILL-002 @FLOW-BILL-009 BILL-S2: menu option 10 opens an empty form with focus on Account ID', async ({ page }) => {
   await openBillPay(page);
   await expect(page).toHaveURL(/\/bill-pay$/);
   await expect(acct(page)).toBeFocused();
@@ -69,7 +69,7 @@ test('[FLOW-BILL-002] [FLOW-BILL-009] BILL-S2: menu option 10 opens an empty for
   await expectAccessible(page);
 });
 
-test('[VAL-BILL-001] [FLOW-BILL-003] BILL-S3: Enter with a blank account ID makes no call', async ({ page }) => {
+test('@VAL-BILL-001 @FLOW-BILL-003 BILL-S3: Enter with a blank account ID makes no call', async ({ page }) => {
   await openBillPay(page);
   const calls = trackApi(page);
   const made = await callsDuring(page, calls, () => acct(page).press('Enter'));
@@ -87,7 +87,7 @@ test('[VAL-BILL-001] [FLOW-BILL-003] BILL-S3: Enter with a blank account ID make
   }
 });
 
-test('[VAL-BILL-003] BILL-S4: an unknown account', async ({ page }) => {
+test('@VAL-BILL-003 BILL-S4: an unknown account', async ({ page }) => {
   await openBillPay(page);
   await preview(page, '99999999999');
   await expectMessage(page, 'Account ID NOT found...', 'error');
@@ -95,7 +95,7 @@ test('[VAL-BILL-003] BILL-S4: an unknown account', async ({ page }) => {
   await expect(page.getByTestId('balance-panel')).toHaveCount(0);
 });
 
-test(`[VAL-BILL-005] [NUM-BILL-001] [DEF-BILL-014] BILL-S5 ${mode}: the balance and the confirm prompt`, async ({ page }) => {
+test(`@VAL-BILL-005 @NUM-BILL-001 @DEF-BILL-014 BILL-S5 @${mode}: the balance and the confirm prompt`, async ({ page }) => {
   await openBillPay(page);
   await preview(page, '00000000001');
   await expect(display(page)).toHaveText('+0000000194.00');
@@ -110,7 +110,7 @@ test(`[VAL-BILL-005] [NUM-BILL-001] [DEF-BILL-014] BILL-S5 ${mode}: the balance 
   await expect(display(page)).toHaveText('+0000000194.00');
 });
 
-test('[VAL-BILL-004] BILL-S6: zero and negative balances have nothing to pay @mock-only', async ({ page }) => {
+test('@VAL-BILL-004 BILL-S6: zero and negative balances have nothing to pay @mock-only', async ({ page }) => {
   await openBillPay(page);
   for (const [acctId, shown] of [
     ['00000000098', '+0000000000.00'],
@@ -135,7 +135,7 @@ test('[VAL-BILL-004] BILL-S6: zero and negative balances have nothing to pay @mo
   }
 });
 
-test('[VAL-BILL-002] BILL-S7: No clears the fields and the message without a call', async ({ page }) => {
+test('@VAL-BILL-002 BILL-S7: No clears the fields and the message without a call', async ({ page }) => {
   await openBillPay(page);
   await preview(page, '00000000001');
   await expect(display(page)).toBeVisible();
@@ -153,7 +153,7 @@ test('[VAL-BILL-002] BILL-S7: No clears the fields and the message without a cal
   await expectNoMessage(page);
 });
 
-test('[VAL-BILL-002] BILL-S8: a confirm value other than Y or N is refused by the API', async ({ page }) => {
+test('@VAL-BILL-002 BILL-S8: a confirm value other than Y or N is refused by the API', async ({ page }) => {
   // The Yes/No choice cannot produce X, so the page never sends it; the
   // service still refuses it, and nothing is paid.
   await openBillPay(page);
@@ -168,7 +168,7 @@ test('[VAL-BILL-002] BILL-S8: a confirm value other than Y or N is refused by th
   await expect(display(page)).toHaveText('+0000000194.00');
 });
 
-test('[FLOW-BILL-004] BILL-S10: Back returns to the main menu, by button and by F3', async ({ page }) => {
+test('@FLOW-BILL-004 BILL-S10: Back returns to the main menu, by button and by F3', async ({ page }) => {
   await openBillPay(page);
   await page.getByRole('button', { name: /^Back to menu/ }).click();
   await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
@@ -180,7 +180,7 @@ test('[FLOW-BILL-004] BILL-S10: Back returns to the main menu, by button and by 
   await expect(page).toHaveURL(/\/$/);
 });
 
-test('[FLOW-BILL-005] BILL-S11: Clear empties the form and unlocks the account ID, by button and by F4', async ({ page }) => {
+test('@FLOW-BILL-005 BILL-S11: Clear empties the form and unlocks the account ID, by button and by F4', async ({ page }) => {
   await openBillPay(page);
   for (const clear of [() => page.getByRole('button', { name: /^Clear/ }).click(), () => page.keyboard.press('F4')]) {
     await preview(page, '00000000001');
@@ -196,7 +196,7 @@ test('[FLOW-BILL-005] BILL-S11: Clear empties the form and unlocks the account I
   }
 });
 
-test('[VAL-BILL-006] [FLOW-BILL-006] BILL-S12: F5 with the function keys on is an invalid key and keeps the input', async ({ page }) => {
+test('@VAL-BILL-006 @FLOW-BILL-006 BILL-S12: F5 with the function keys on is an invalid key and keeps the input', async ({ page }) => {
   await openBillPay(page);
   await turnOnFunctionKeys(page);
   await acct(page).fill('00000000001');
@@ -206,7 +206,7 @@ test('[VAL-BILL-006] [FLOW-BILL-006] BILL-S12: F5 with the function keys on is a
   await expect(page).toHaveURL(/\/bill-pay$/);
 });
 
-test('[VAL-BILL-006] with the function keys off, F3 and F5 do nothing on the page', async ({ page }) => {
+test('@VAL-BILL-006 with the function keys off, F3 and F5 do nothing on the page', async ({ page }) => {
   await openBillPay(page);
   await acct(page).fill('00000000001');
   await acct(page).press('F3');
@@ -229,7 +229,7 @@ test('BILL-S13: an open batch window allows the preview and refuses the payment 
   await expect(display(page)).toHaveText('+0000000194.00');
 });
 
-test('[BR-BILL-007] BILL-S16: Yes on the empty form pays without a preview', async ({ page }) => {
+test('@BR-BILL-007 BILL-S16: Yes on the empty form pays without a preview', async ({ page }) => {
   await openBillPay(page);
   const calls = trackApi(page);
   await acct(page).fill('00000000002');
@@ -243,7 +243,7 @@ test('[BR-BILL-007] BILL-S16: Yes on the empty form pays without a preview', asy
   await expect(acct(page)).toHaveValue('');
 });
 
-test('[BR-BILL-001] [BR-BILL-003] BILL-S9: Yes pays the full balance, clears the form and unlocks', async ({ page }) => {
+test('@BR-BILL-001 @BR-BILL-003 BILL-S9: Yes pays the full balance, clears the form and unlocks', async ({ page }) => {
   await openBillPay(page);
   await preview(page, '00000000001');
   await expect(display(page)).toHaveText('+0000000194.00');

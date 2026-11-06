@@ -180,7 +180,7 @@ export function BillPayPage() {
     setRetryAt(null);
     const step = billPayStep(acctId, confirm);
     if (step.kind === 'problem') {
-      show(message(step.problem.code), step.problem.field);
+      show(message(step.problem.key), step.problem.field);
       return;
     }
     if (step.kind === 'clear') {
