@@ -11,8 +11,8 @@ sources:
   - {path: app/ctl/REPROCT.ctl, sha256: 5c6b8f26aa53, role: control-card}
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: gdg-definition, lines: "24-29"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1631-1643, 3541-3610, 3645-3663"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "213-235, 368"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 30-36, 82-83, 123-150"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "213-235, 368"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21, 30-36, 82-83, 123-150"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "28-29, 54-55"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "3-25"}
 entry_points: [{type: manual, job: TRANBKP}, {type: script, file: scripts/run_full_batch.sh, lines: "28-29, 54-55"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "8-13"}]
@@ -24,7 +24,7 @@ data_stores:
   - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [delete, define]}
   - {dd: none (IDCAMS DELETE), dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, entity: ENT-TRANSACTION, access: [delete]}
 invoked_by: [operator, scripts/run_full_batch.sh, Control-M folder DAILY-TransactionBackup]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANBKP: Transaction master backup and reset
@@ -210,6 +210,8 @@ In execution order. There is no rollback: each step's change is permanent.
 ## 15. Equivalence contract
 
 After a successful run (return code 0): the new backup generation contains exactly the records the transaction store held before the run, in `TRAN-ID` order, byte for byte; the transaction store exists, is empty, and has key `TRAN-ID` (16 bytes) and 350-byte records; no transaction index remains. A reimplementation must not empty the store when the backup did not complete; the AS-IS job does (DEF-JTBKP-001), and the decision is open (Q-JTBKP-001). IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

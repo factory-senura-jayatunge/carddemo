@@ -25,7 +25,7 @@ data_stores:
   - {dd: DATEPARM, dataset: AWS.M2.CARDDEMO.DATEPARM (overridden in-stream by CORPT00C), entity: ENT-DATE-PARM, access: [read-sequential]}
   - {dd: TRANREPT, dataset: "AWS.M2.CARDDEMO.TRANREPT(+1)", entity: ENT-TRAN-REPORT, access: [create]}
 invoked_by: [CORPT00C (job TRNRPT00 through TDQ JOBS)]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANREPT-PROC: On-demand transaction report procedure
@@ -210,6 +210,8 @@ None beyond `TRANREPT.md` NUM-JTRPT-001, which applies unchanged: card number as
 ## 15. Equivalence contract
 
 For a request with start date S and end date E: one report job runs; its report covers exactly the transactions whose processing date is from S to E inclusive, in ascending card number order, and its heading shows S and E; the transaction store is unchanged. The user gets the "submitted" message as soon as the request is queued.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

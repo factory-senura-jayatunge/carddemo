@@ -9,15 +9,15 @@ sources:
   - {path: app/jcl/TXT2PDF1.JCL, sha256: a9e9a847c252, role: job}
   - {path: app/jcl/CREASTMT.JCL, sha256: d32627022d76, role: job, lines: "66-75, 87-91"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "465-527"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "57"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "96-99, 171"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "57"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "96-99, 171"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "494-495"}, {type: manual, job: TXT2PDF1}]
 programs: [IKJEFT1B, TXT2PDF]
 data_stores:
   - {dd: TXT2PDF.INDD, dataset: AWS.M2.CARDDEMO.STATEMNT.PS, access: [read-sequential]}
   - {dd: none (allocated by the TXT2PDF exec), dataset: AWS.M2.CARDDEMO.STATEMNT.PS.PDF, access: [create, write-sequential]}
 invoked_by: [CA-7, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TXT2PDF1: Convert the statement file to PDF
@@ -127,7 +127,7 @@ None. The job passes the statement lines to the exec without interpreting them.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
 
 #### DEF-JPDF-003 · [security] The PDF holds customer data and is never deleted
-- The statements contain customer names and full addresses (`docs/security/data-handling.md:98-99`). The data-handling guide's retention table says the text and HTML statements are deleted and re-created on every CREASTMT run (`docs/security/data-handling.md:171`), but it does not list the PDF, and no job deletes it, so the last PDF stays on the system indefinitely.
+- The statements contain customer names and full addresses (`docs/security/data-handling.md:98-99`). No job deletes the PDF, so the last PDF stays on the system indefinitely. The data-handling guide's retention table listed only the text and HTML statements until commit 4a03121, which added the PDF as written by TXT2PDF1 and never deleted by any job (`docs/security/data-handling.md:171`).
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 ## 14. Open questions
@@ -141,6 +141,8 @@ None. The job passes the statement lines to the exec without interpreting them.
 ## 15. Equivalence contract
 
 After a successful run (return code 0), a PDF exists that contains every line of `STATEMNT.PS`, in order, and `STATEMNT.PS` is unchanged. Fonts, page size and other layout details are not part of the contract until Q-JPDF-001 is answered.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

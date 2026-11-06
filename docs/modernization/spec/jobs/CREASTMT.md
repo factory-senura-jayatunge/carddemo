@@ -12,9 +12,9 @@ sources:
   - {path: app/cpy/CVTRA05Y.cpy, sha256: d7bde0e78ff6, role: copybook, lines: "4-18"}
   - {path: app/jcl/TXT2PDF1.JCL, sha256: a9e9a847c252, role: downstream-job, lines: "33"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "465-527"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "231, 262, 374"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 40-41, 152-157"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: policy, lines: "98-99, 171"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "231, 262, 374"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21, 40-41, 152-157"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: policy, lines: "98-99, 171"}
   - {path: tests/unit/test_cbstm03b.py, sha256: ec696cb1e2b0, role: test, lines: "13-17"}
 entry_points: [{type: manual, job: CREASTMT}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "465-468"}]
 programs: [IDCAMS, SORT, IEFBR14, CBSTM03A]
@@ -35,7 +35,7 @@ data_stores:
   - {dd: STEP040.STMTFILE, dataset: AWS.M2.CARDDEMO.STATEMNT.PS, entity: none, access: [create, write-sequential]}
   - {dd: STEP040.HTMLFILE, dataset: AWS.M2.CARDDEMO.STATEMNT.HTML, entity: none, access: [create, write-sequential]}
 invoked_by: [operator, CA-7 trigger from CLOSEFIL]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CREASTMT: Account statements
@@ -103,7 +103,7 @@ The program's own files are only `STMT-FILE` (DD `STMTFILE`, 80 bytes) and `HTML
 
 - ENT-TRANSACTION, whole records of `TRANSACT` (layout `app/cpy/CVTRA05Y.cpy:4-18`), re-keyed into the work layout `TRNX-RECORD` of ENT-STMT-TRAN (`app/cpy/COSTM01.CPY:20-36`, NUM-JSTMT-001). The statement uses the transaction ID, description and amount of each record (`app/cbl/CBSTM03A.CBL:675-679`).
 - ENT-CARD-XREF, read in key order (card number); ENT-CUSTOMER, read by `XREF-CUST-ID`; ENT-ACCOUNT, read by `XREF-ACCT-ID` (`app/cbl/CBSTM03A.CBL:345-414`).
-- `STATEMNT.PS` and `STATEMNT.HTML` hold customer name and full address (`docs/security/data-handling.md:98-99`); they are replaced on every run (`docs/security/data-handling.md:171`). Neither the statements nor `TRXFL` appear in the 09/01/22 catalog listing `app/catlg/LISTCAT.txt`.
+- `STATEMNT.PS` and `STATEMNT.HTML` hold customer name and full address (`docs/security/data-handling.md:98-99`); they are replaced on every run (`docs/security/data-handling.md:171`). Since commit 4a03121 the same retention row also lists the work files `TRXFL.SEQ` and `TRXFL.VSAM.KSDS`. Neither the statements nor `TRXFL` appear in the 09/01/22 catalog listing `app/catlg/LISTCAT.txt`.
 
 ## 6. Processing flow
 
@@ -255,6 +255,8 @@ In execution order. The job has no rollback; the work files are rebuilt on every
 ## 15. Equivalence contract
 
 After a successful run: `STATEMNT.PS` and `STATEMNT.HTML` hold one statement per cross-reference record, in card-number order, each listing that card's transactions from the transaction master in transaction-ID order with their total, as specified by the `CBSTM03A` program spec; previous statements are gone. The work KSDS is an implementation detail: a reimplementation may read the transactions grouped by card in any way that gives the same order. On any failure before the statement step, no new statements are written; the AS-IS job also leaves the old ones in place (DEF-JSTMT-001, Q-JSTMT-003). IDCAMS and sort messages may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

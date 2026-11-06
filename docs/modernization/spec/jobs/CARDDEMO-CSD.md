@@ -7,7 +7,7 @@ unit_code: JCSD
 source_rev: 8a8a80a
 sources:
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd-export}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "173-197"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "173-197"}
   - {path: app/jcl/CBADMCDJ.jcl, sha256: 364243e503e9, role: related-job, lines: "33-163"}
   - {path: app/cbl/CORPT00C.cbl, sha256: 0b06bd5d4f38, role: program, lines: "79-127, 515-535"}
   - {path: app/cbl/COACTUPC.cbl, sha256: b5bb7d6ccad0, role: program, lines: "572-583, 4085-4104"}
@@ -25,7 +25,7 @@ data_stores:
   - {cics_file: USRSEC, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [read, browse, add, update, delete]}
   - {tdqueue: JOBS, ddname: INREADER, access: [write]}
 invoked_by: [CICS region (group CARDDEMO installed)]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CARDDEMO-CSD: CICS resource definitions
@@ -263,6 +263,8 @@ Installing the group creates the resources in the region; the side effects below
 ## 15. Equivalence contract
 
 A target must provide one entry point per transaction code in FLOW-JCSD-001, starting the function of the named program, and give each function access to the stores of section 5 with the same keys (including the by-account access paths of `CARDAIX` and `CXACAIX`). The report request must still start the transaction report batch job (SE-JCSD-002). CICS-specific attributes (strings, buffers, LSR pools, open time, libraries, profiles, transaction classes) need not be reproduced. Recovery and security settings are decisions (Q-JCSD-001, Q-JCSD-002), not behaviour to copy.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

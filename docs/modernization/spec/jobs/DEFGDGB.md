@@ -8,10 +8,10 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: job}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1098-1112, 1202-1214, 1527-1541, 1631-2918, 2919-2931, 3021-3540, 3937-3944"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 351-379"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "30-31"}
-  - {path: docs/runbooks/README.md, sha256: 35349a149883, role: runbook, lines: "24-26"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "163-170"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "150-167, 351-379"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "30-31"}
+  - {path: docs/runbooks/README.md, sha256: 67e7e5cd569c, role: runbook, lines: "24-29"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "163-170"}
 entry_points: [{type: manual, job: DEFGDGB}]
 programs: [IDCAMS]
 data_stores:
@@ -22,7 +22,7 @@ data_stores:
   - {dataset: AWS.M2.CARDDEMO.SYSTRAN, entity: ENT-TRANSACTION, access: [define-gdg-base]}
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.COMBINED, entity: ENT-TRANSACTION, access: [define-gdg-base]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DEFGDGB: Define the core GDG bases
@@ -174,7 +174,7 @@ Who writes and reads each GDG (`(+1)` is the new generation of the running job, 
 
 - **Downstream:** every job in the table fails with a JCL error when its base is missing (`docs/runbooks/batch-cycle-restart.md:28-31`).
 - **Related:** DALYREJS defines the seventh core GDG base, `DALYREJS`, which POSTTRAN writes; REPTFILE defines `TRANREPT` a second time (DEF-JGDGB-003).
-- **Documentation:** the runbooks and the data-handling policy state the `LIMIT(5) SCRATCH` retention for these six bases (`docs/runbooks/README.md:24-26`, `docs/security/data-handling.md:169`).
+- **Documentation:** the runbooks and the data-handling policy state the `LIMIT(5) SCRATCH` retention that this job defines for the six bases and, since commit 4a03121, also the catalog's `NOSCRATCH` for `TRANSACT.BKUP` and `TRANSACT.DALY` and REPTFILE's `LIMIT(10)` for `TRANREPT` (`docs/runbooks/README.md:24-29`, `docs/security/data-handling.md:169`).
 
 ## 12. Numeric, date and format details
 
@@ -190,7 +190,7 @@ Who writes and reads each GDG (`(+1)` is the new generation of the running job, 
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JGDGB-002 · [security] Two bases are NOSCRATCH in the catalog and keep rolled-off generations
-- The JCL defines `TRANSACT.BKUP` and `TRANSACT.DALY` with `SCRATCH`, but the 09/01/22 catalog lists both as `NOSCRATCH` (`app/catlg/LISTCAT.txt:1637`, `app/catlg/LISTCAT.txt:3027`), with 71 and 25 rolled-off generations still cataloged next to the five active ones. Those generations hold full transaction records, card numbers included, so far more transaction history stays on disk than the five generations that the data-handling policy promises (`docs/security/data-handling.md:169`). The other four bases match the JCL.
+- The JCL defines `TRANSACT.BKUP` and `TRANSACT.DALY` with `SCRATCH`, but the 09/01/22 catalog lists both as `NOSCRATCH` (`app/catlg/LISTCAT.txt:1637`, `app/catlg/LISTCAT.txt:3027`), with 71 and 25 rolled-off generations still cataloged next to the five active ones. Those generations hold full transaction records, card numbers included, so far more transaction history stays on disk than the five generations that this job defines. The data-handling policy promised five generations until commit 4a03121; it now states the `NOSCRATCH` bases and the rolled-off generations (`docs/security/data-handling.md:169`). The other four bases match the JCL.
 - **Source:** `:24-35`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (catalog listing); platform-inferred (how the bases got `NOSCRATCH`)
 
@@ -213,6 +213,8 @@ Who writes and reads each GDG (`(+1)` is the new generation of the running job, 
 ## 15. Equivalence contract
 
 A reimplementation must provide the six stores before the first batch cycle, each keeping the output of the last five runs of its writer and deleting older output (or the retention decided for Q-JGDGB-001). Running the set-up twice must leave existing stores and their data unchanged and must not report a failure. IDCAMS messages, condition codes and generation numbering may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

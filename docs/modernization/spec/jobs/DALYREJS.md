@@ -9,15 +9,15 @@ sources:
   - {path: app/jcl/DALYREJS.jcl, sha256: 2ea635d82002, role: job}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "684-783, 3937-3944"}
   - {path: app/jcl/POSTTRAN.jcl, sha256: ecff62c691e6, role: consumer, lines: "34-38"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 351-379"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "30-33, 57"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "150-167, 351-379"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "30-33, 57"}
   - {path: docs/runbooks/daily-rejects.md, sha256: 723c06a7eedc, role: runbook, lines: "20-25, 62, 74"}
 entry_points: [{type: manual, job: DALYREJS}]
 programs: [IDCAMS]
 data_stores:
   - {dataset: AWS.M2.CARDDEMO.DALYREJS, entity: ENT-DAILY-REJECT, access: [define-gdg-base]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DALYREJS: GDG base for the daily rejects
@@ -122,7 +122,7 @@ DEFINE GENERATIONDATAGROUP -
 ## 13. Known defects and oddities
 
 #### DEF-JREJS-001 · The README does not list the job
-- POSTTRAN needs the base, but neither the README's initialisation sequence (`./README.md:150-167`) nor its batch table (`./README.md:351-379`) names DALYREJS. Someone who follows the README gets a JCL error on the first POSTTRAN run; only the restart runbook mentions the job (`docs/runbooks/batch-cycle-restart.md:32-33`).
+- POSTTRAN needs the base, but neither the README's initialisation sequence (`./README.md:150-167`) nor its batch table (`./README.md:351-379`) names DALYREJS. Someone who follows the README gets a JCL error on the first POSTTRAN run; only the runbooks mention the job: the restart runbook (`docs/runbooks/batch-cycle-restart.md:32-33`), the runbook index (`docs/runbooks/README.md:24`) and the daily rejects runbook (`docs/runbooks/daily-rejects.md:22-23`), none of them as an installation step.
 - **Source:** `./README.md:150-167`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
@@ -145,6 +145,8 @@ DEFINE GENERATIONDATAGROUP -
 ## 15. Equivalence contract
 
 A reimplementation must provide a store for rejected daily transactions that exists before the first posting run and keeps the rejects of the last five posting runs, deleting older ones (or the retention the business sets for Q-JREJS-001). Defining it twice must not change existing data. IDCAMS messages and condition codes may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

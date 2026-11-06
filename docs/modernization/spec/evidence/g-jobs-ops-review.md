@@ -23,7 +23,7 @@ Each reviewer checked **every** numbered item (BR, VAL, FLOW, SE, ERR, NUM, DEF 
 
 Verdicts, as in [nl-pilot-check.md](nl-pilot-check.md): CORRECT, MINOR (right in substance, with an imprecise detail or citation), WRONG (the behaviour stated is not what the source does), PLATFORM (depends on z/OS, JES, IDCAMS, DFSORT, CICS or scheduler behaviour that cannot be run locally; the reviewer agreed, partly disagreed or disagreed). For Q items, CORRECT means the question is legitimate and correctly framed; all Q items were judged legitimate.
 
-The reviews were made on `nl/G` at `7916431` (reviewers 1 to 5 and 7) and `4dc994f` (reviewer 6, after the merge of the other areas' program specs); the sources under `app/` are the same at both. After reporting, each reviewer was asked to apply its own findings to the files it had reviewed, re-verifying each finding first; the author spot-checked the edits and rewrote `jobs/README.md` from reviewer 6's findings. The fixes are in commit `d6e21d9` (all files except the eight master reload specs) and in the commit that adds this file (the master reload specs and the corrections made after the merge of `2deecf1`).
+The reviews were made on `nl/G` at `7916431` (reviewers 1 to 5 and 7) and `4dc994f` (reviewer 6, after the merge of the other areas' program specs); the sources under `app/` are the same at both. After reporting, each reviewer was asked to apply its own findings to the files it had reviewed, re-verifying each finding first; the author spot-checked the edits and rewrote `jobs/README.md` from reviewer 6's findings. The fixes of section 2 are in commit `d6e21d9` (all files except the eight master reload specs) and `a609e82` (the master reload specs, the corrections made after the merge of `2deecf1`, and this file); the fixes of sections 3 and 4 are in `6189bfd`, and those of section 5 with the status change of section 6.
 
 ## 1. Counts
 
@@ -170,8 +170,48 @@ Also answered: area C's Q-RPTS-005 (the `//REPROC PROC` label and nested `PROC=R
 
 `jobs/README.md` was rewritten from reviewer 6's findings: seven cycle orders instead of five (adding `scripts/run_posting.sh` and `scripts/run_interest_calc.sh`, with a note on `scripts/remote_refresh.sh` and on asynchronous FTP submission), the CA-7 column under the schedule ID reading, the Control-M weekly folders blocked on MNTTRDB2, and the open question on the target scheduler (Q-JCA7-001, Q-JCTLM-001) turned into a decision table: six options with their order and what each implies, the facts that hold for every option, and the decisions that go with the choice.
 
-## 3. Limits
+## 3. Re-check of the fixes by a fresh reviewer
 
-- No JCL, IDCAMS, DFSORT, CICS or scheduler behaviour was executed; 160 of 479 items depend on such behaviour and carry the reviewers' agreement and confidence, not a test.
-- The editors who applied the findings were the reviewer sessions themselves. The author checked the result of each group (the item rewrites named in section 2.1, the new items, the schedule ID rewrite of SCHED-CA7) and reran `check_spec.py`, but the applied fixes have not had a second independent review.
-- The counts in section 1 come from the reviewers' tables; where a reviewer's summary and table differed (reviewers 2 and 5), the per-spec table was used.
+After the fixes of section 2, a reviewer that had not seen area G re-checked every item changed or added since `7916431` (128 changed, 34 added; computed by comparing each item's text at `7916431` and `a609e82`), the changed non-item text of those specs, the diffs of `jobs/README.md` (decision table and cycle orders first) and of the two area files. The order was SCHED-CA7, SCHED-CONTROLM, the README decision table, the eight master reload specs, then the rest. Each item was checked against the cited sources, for consistency with the other specs (in particular the schedule ID reading of CA-7 across SCHED-CA7, CLOSEFIL, OPENFIL, WAITSTEP, the readers, TCATBALF, TRANCATG, PRTCATBL, the README and the interactions), and for valid cross-references and fidelity values.
+
+| Scope | Checked | CORRECT | MINOR | WRONG | PLATFORM (agree / partly / disagree) |
+| :-- | --: | --: | --: | --: | :-- |
+| Changed or added items, 41 specs | 162 | 90 | 2 | 0 | 70 (69 / 1 / 0) |
+| `jobs/README.md` decisions and rows | about 16 | 12 | 3 | 1 | 0 |
+| Area files (changed rows) | all changed rows | all but 3 | 3 | 0 | 0 |
+
+- **Items: WRONG / non-PLATFORM 0/92 = 0.0%; WRONG + MINOR / non-PLATFORM 2/92 = 2.2%.** Counting the README rows as items: about 1/108 = 0.9% and 6/108 = 5.6%.
+- **WRONG outside the numbered items:** `PRTCATBL.md` §3 and §11 said PRTCATBL ends the CREASTMT chain (OPENFIL under 030 triggering CLOSEFIL under 031). OPENFIL's trigger at `app/scheduler/CardDemo.ca7:532` is defined for 031 only, so a 030 run never reaches PRTCATBL. Rewritten: it runs only in a run under 031.
+- **README WRONG:** the WAITSTEP catalogue row gave the hypothetical malformed value of DEF-JWAIT-002 as the shipped one; the card is `00003600`, 36 seconds (`app/jcl/WAITSTEP.jcl:26`). Rewritten (also lead finding 1 below).
+- **MINOR, all fixed:** FLOW-JCA7-006 (a 032 run can also start from a TCATBALF demand or schedule member 000652); FLOW-JGDGD-001 (STEP60 runs only if every earlier step returned 0, `app/jcl/DEFGDGD.jcl:82`); README CA-7 row for the readers (only READACCT follows CLOSEFIL, the others are chained), option F (a cycle without INTCALC must skip COMBTRAN or give it an empty interest generation), the Control-M `MAXRERUN` bullet (aligned with ERR-JCTLM-001); area files: the calendar sentence, the TRANFILE alternate index citation (`app/jcl/TRANFILE.jcl:82-89`), and ENT-TRAN-COMBINED, whose output DCB reasoning now matches NUM-JCOMB-001 (one mechanism, about 65%).
+- **PLATFORM partly:** NUM-JCOMB-001 and the entity proposal used different mechanisms for the output DCB; aligned as above. FLOW-JCA7-005 now says the listing shows no `TRGID` rather than that none exists.
+
+## 4. Cross-area read by the NL lead
+
+The NL lead's read of area G raised nine points, each verified against the source before it was applied:
+
+| # | Finding | Change |
+| :-- | :-- | :-- |
+| 1 | `jobs/README.md` WAITSTEP speculation | Fixed 36-second pause; WAITSTEP DEF-JWAIT-002 keeps the malformed value only as a hypothetical. |
+| 2 | "No job has a calendar" | Unknown: schedule member 000652 may hold one (DEF-JCA7-001, Q-JCA7-002), in the interactions intro and the CBTRN02C proposal. |
+| 3 | Five or seven cycle orders | Seven (README table, restart runbook, three demo scripts, two schedules), in SCHED-CA7, SCHED-CONTROLM, the README and the interactions. |
+| 4 | Missing triggers | `CLOSEFIL1` under 031 in the interactions; CLOSEFIL after a 030 WAITSTEP in POSTTRAN §11 (`app/scheduler/CardDemo.ca7:303, 335`). |
+| 5 | Alternate index overflow | "Cannot be indexed (behaviour unverified)" for the cross-reference and the card alternate indexes. |
+| 6 | Sort storage | CARDFILE and TRANIDX now say, as XREFFILE does, that the default `SORTCALL(YES)` hands the sort to DFSORT (platform-inferred). |
+| 7 | USRSEC entity | ENT-USER-SECURITY in CARDDEMO-CSD. |
+| 8 | DUSRSECJ CRUD | `USRSEC.PS`: D, C, R. |
+| 9 | Small items | ERR-JCA7-001 and DEF-JCA7-007 cite CBPAUP0J DEF-JAUPG-003 (return code 16 may count as normal; cited by ID after the merge that added area E); TRANREPT NOSCRATCH cites `app/jcl/DEFGDGB.jcl:24-34` and `app/catlg/LISTCAT.txt:1631-1637`; `TRANSACT.COMBINED` row FB 350; CBADMCDJ cites `app/csd/CARDDEMO.CSD:1-99`; the leading-space note covers `app/scheduler/CardDemo.ca7:18`. |
+
+## 5. After the merge of the corrected documentation
+
+The docs agent corrected `README.md`, `docs/runbooks/README.md`, `docs/runbooks/batch-cycle-restart.md`, `docs/runbooks/cics-vsam-files.md` and `docs/security/data-handling.md` from this area's proposals in commit `4a03121`. After merging it, every line the area G specs cite in those five files was compared before and after: 16 cited lines changed content: 14 are the corrections themselves, and 2 (`docs/runbooks/README.md:25-26`) moved down 3 lines because the corrected bullet at line 24 grew. The `sha256` values were updated in 40 specs. The items that described a documentation error now record the correction with the commit (DEF-JCLOSE-002, DEF-JOPEN-002, DEF-JINTC-003: status "fixed in branch, commit 4a03121 (documentation)"); DEF-JGDGB-002, DEF-JPDF-003 and DEF-JREPT-003 stay open for their remaining defect, with the documentation part updated; the DUSRSECJ, DEFGDGB, REPTFILE, CREASTMT, DALYREJS and README notes and the applied rows of `areas/g-jobs-ops-entities.md` (marked "Applied in 4a03121") were updated. The proposals for `components.md`, `interactions.md` and `programs/CBTRN02C.md` remain open for the lead.
+
+## 6. Status
+
+Every one of the 43 specs had all its items checked by an independent reviewer (section 1), every WRONG and MINOR finding was fixed (section 2), and every changed or added item was re-checked by a fresh reviewer with no WRONG finding left unfixed (sections 3 and 4). As `format.md` requires, all 43 specs are now `spec_status: reviewed`, and each names this file in its equivalence contract (section 15). No job spec is `verified`: JCL, IDCAMS, DFSORT, CICS and the schedulers cannot run locally.
+
+## 7. Limits
+
+- No JCL, IDCAMS, DFSORT, CICS or scheduler behaviour was executed; 160 of 479 items depend on such behaviour and carry the reviewers' agreement and confidence, not a test. The re-check added its own confidence to the 70 platform items it saw.
+- The first round of fixes was applied by the reviewer sessions themselves; the fresh reviewer of section 3 re-checked them. The fixes from sections 3 to 5 were applied by the author and workers and checked with `check_spec.py`, but have not had a third review.
+- The counts in section 1 come from the reviewers' tables; where a reviewer's summary and table differed (reviewers 2 and 5), the per-spec table was used. A few verdicts in section 3 were grouped by the reviewer and split by item afterwards; moving them between CORRECT and PLATFORM changes the denominator by one or two, not the WRONG or MINOR counts.

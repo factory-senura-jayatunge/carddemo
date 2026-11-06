@@ -14,7 +14,7 @@ data_stores:
   - {dataset: AWS.CCDA.CUSTDATA.CLUSTER, access: [delete]}
   - {dataset: AWS.CUSTDATA.CLUSTER, access: [define]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DEFCUST: Obsolete customer cluster definition
@@ -170,6 +170,8 @@ If the define fails, the delete has already happened.
 ## 15. Equivalence contract
 
 None required. The job creates an empty cluster that nothing uses; a reimplementation needs no equivalent. If it is kept for any reason, the only observable results are the catalog entries in section 9 and the return codes in section 10.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

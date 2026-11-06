@@ -8,7 +8,7 @@ source_rev: 8a8a80a
 sources:
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "18-571"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "209-235"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "209-235"}
   - {path: app/app-transaction-type-db2/jcl/MNTTRDB2.jcl, sha256: 9e8a11746c47, role: related-job, lines: "21-30"}
   - {path: app/app-transaction-type-db2/jcl/TRANEXTR.jcl, sha256: 11649702d1a4, role: related-job, lines: "31-122"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "3-92"}]
@@ -16,7 +16,7 @@ programs: []
 procs: []
 data_stores: []
 invoked_by: [Control-M daily order (New Day), Control-M operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # SCHED-CONTROLM: Control-M folders
@@ -239,6 +239,8 @@ None.
 ## 15. Equivalence contract
 
 The table carries no behaviour that a target must copy as is: the posting job is missing (DEF-JCTLM-001), two folders are never ordered (DEF-JCTLM-002) and the weekly refresh is incomplete (DEF-JCTLM-005). A target orchestration must keep the rules every source agrees on: a job starts only after its predecessor ended successfully (FLOW-JCTLM-006); a failure stops the chain and is reported (ERR-JCTLM-001); online updates to the affected stores stop before a batch job that changes them and resume after it (Q-JCLOSE-001). The job list, order and frequency follow the answer to Q-JCTLM-001. Control-M attributes (user, priority, version metadata, wait and rerun limits) are not reproduced unless the operations team asks for them (Q-JCTLM-003).
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

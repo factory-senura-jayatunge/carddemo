@@ -9,7 +9,7 @@ sources:
   - {path: app/jcl/INTRDRJ1.JCL, sha256: f986f004a306, role: job}
   - {path: app/jcl/INTRDRJ2.JCL, sha256: aac63659b8c4, role: submitted-job}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "948-958"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "57"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "57"}
 entry_points: [{type: manual, job: INTRDRJ1}]
 programs: [IDCAMS, IEBGENER]
 data_stores:
@@ -19,7 +19,7 @@ data_stores:
   - {dd: SYSUT2, dataset: "SYSOUT=(A,INTRDR)", access: [submit-job]}
 transfers_to: [INTRDRJ2]
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # INTRDRJ1: Back up a data set and submit the next job
@@ -160,6 +160,8 @@ In execution order. There is no rollback.
 ## 15. Equivalence contract
 
 If the chain is kept, a reimplementation must, after a run, leave `FTP.TEST.BKUP` with exactly the records of `FTP.TEST` and then start the follow-on copy (INTRDRJ2). Whether the follow-on job should still start after a failed backup is DEF-JIRD1-002, a decision for the target. IDCAMS, IEBGENER and JES messages may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

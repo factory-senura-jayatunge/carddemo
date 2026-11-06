@@ -10,13 +10,14 @@ sources:
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: conflicting-define, lines: "36-41"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1527-1541"}
   - {path: app/jcl/TRANREPT.jcl, sha256: 7d8fc0777e6b, role: consumer, lines: "59, 76-80"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 213-235, 351-379"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "150-167, 213-235, 351-379"}
+  - {path: docs/runbooks/README.md, sha256: 67e7e5cd569c, role: runbook, lines: "24-25"}
 entry_points: [{type: manual, job: REPTFILE}]
 programs: [IDCAMS]
 data_stores:
   - {dataset: AWS.M2.CARDDEMO.TRANREPT, entity: ENT-TRAN-REPORT, access: [define-gdg-base]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # REPTFILE: GDG base for the transaction report
@@ -41,7 +42,7 @@ The job has no business rules. Its items:
 
 ## 3. Actors and triggers
 
-- **Trigger:** none documented. The README lists the job in none of its three job tables: initialisation (`./README.md:150-167`), "Running Batch Jobs" (`./README.md:213-235`) and batch components (`./README.md:351-379`); no runbook names it, neither the CA-7 nor the Control-M schedule runs it, and `scripts/run_full_batch.sh` does not submit it. It can only be submitted by hand. The local runner does not emulate it: TRANREPT's report DD is a plain new file there (`tools/carddemo.py:670`).
+- **Trigger:** none documented. The README lists the job in none of its three job tables: initialisation (`./README.md:150-167`), "Running Batch Jobs" (`./README.md:213-235`) and batch components (`./README.md:351-379`); the runbooks name it only as the alternative job that defines `TRANREPT` with `LIMIT(10)`, not when to run it (`docs/runbooks/README.md:24-25`); neither the CA-7 nor the Control-M schedule runs it, and `scripts/run_full_batch.sh` does not submit it. It can only be submitted by hand. The local runner does not emulate it: TRANREPT's report DD is a plain new file there (`tools/carddemo.py:670`).
 - **Preconditions:** the base `AWS.M2.CARDDEMO.TRANREPT` does not exist yet (otherwise ERR-JREPT-001).
 - **Job card:** `'DEF GDG FOR REPORT FILE',CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 
@@ -129,7 +130,7 @@ DEFINE GENERATIONDATAGROUP -
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JREPT-003 · No documented trigger
-- No README table, runbook or schedule names REPTFILE (section 3), so nothing tells an operator whether to run it, before or instead of DEFGDGB.
+- No README table or schedule names REPTFILE, and the runbooks mention it only as an alternative definition of `TRANREPT` (section 3), so nothing tells an operator whether to run it, before or instead of DEFGDGB.
 - **Source:** `:1-2`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
@@ -147,6 +148,8 @@ DEFINE GENERATIONDATAGROUP -
 ## 15. Equivalence contract
 
 None of the job's own behaviour needs reproducing beyond the report retention that the business chooses (Q-JREPT-001). A reimplementation must have one definition of report retention, not two that depend on job order. IDCAMS messages and condition codes may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

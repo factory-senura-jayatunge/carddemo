@@ -10,7 +10,7 @@ sources:
   - {path: app/cbl/CBACT01C.cbl, sha256: efa324059416, role: program, lines: "29-85, 290-318, 409-413"}
   - {path: app/cpy/CVACT01Y.cpy, sha256: 81a08bad15af, role: record-layout}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "43, 70, 334-367"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "83-94"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "83-94"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "632-637"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "339-340"}, {type: manual, job: READACCT}]
 programs: [IEFBR14, CBACT01C]
@@ -23,7 +23,7 @@ data_stores:
   - {dd: STEP05.ARRYFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.ARRYPS, entity: ENT-ACCT-EXTRACT, access: [create, write-sequential]}
   - {dd: STEP05.VBRCFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VBPS, entity: ENT-ACCT-EXTRACT, access: [create, write-sequential]}
 invoked_by: [CA-7, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # READACCT: Account master diagnostic read
@@ -171,6 +171,8 @@ None in the job. The program's messages go to `SYSOUT`: `START OF EXECUTION OF P
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the account master is unchanged, and the three outputs hold one fixed 107-byte record, one fixed 110-byte record and two variable records per account, in ascending account-ID order (50, 50 and 100 records for the sample data). An unreadable account master must make the run fail visibly. Printing records to the log is not part of the contract (DEF-JRACCT-002).
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

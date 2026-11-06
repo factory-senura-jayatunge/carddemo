@@ -10,18 +10,18 @@ sources:
   - {path: app/cpy/CVACT01Y.cpy, sha256: 81a08bad15af, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "7-110"}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "1-12"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "135, 150-167, 213-235, 351-379"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "135, 150-167, 213-235, 351-379"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "12-17"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "12-17"}
   - {path: scripts/run_posting.sh, sha256: a8e231c46316, role: script, lines: "12-17"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 73-81"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21, 73-81"}
 entry_points: [{type: manual, job: ACCTFILE}, {type: script, file: scripts/run_full_batch.sh, lines: "16-17"}, {type: script, file: scripts/remote_refresh.sh, lines: "16-17"}, {type: script, file: scripts/run_posting.sh, lines: "16-17"}]
 programs: [IDCAMS]
 data_stores:
   - {dd: ACCTDATA, dataset: AWS.M2.CARDDEMO.ACCTDATA.PS, entity: ENT-ACCOUNT, copybook: CVACT01Y, access: [read-sequential]}
   - {dd: ACCTVSAM, dataset: AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, entity: ENT-ACCOUNT, copybook: CVACT01Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, scripts/run_posting.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # ACCTFILE: Account master reload
@@ -186,6 +186,8 @@ None. The job copies bytes; it does not interpret any field.
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the account store contains exactly the records of `ACCTDATA.PS`: same count (50 for the sample data), same bytes, keyed by `ACCT-ID`, and nothing else. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JACCT-001). IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

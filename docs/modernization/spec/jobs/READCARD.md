@@ -11,14 +11,14 @@ sources:
   - {path: app/cpy/CVACT02Y.cpy, sha256: 9f1c62ef31b9, role: record-layout}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "202-207"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "366-394"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "83-94"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "83-94"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "638"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "366-367"}, {type: manual, job: READCARD}]
 programs: [CBACT02C]
 data_stores:
   - {dd: STEP05.CARDFILE, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, entity: ENT-CARD, access: [read-sequential]}
 invoked_by: [CA-7, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # READCARD: Card master diagnostic read
@@ -130,6 +130,8 @@ None. The job prints records as stored; it does not interpret any field.
 ## 15. Equivalence contract
 
 A successful run (return code 0) leaves the card master file unchanged and reads every record once, in ascending key order (50 for the sample data). A missing or unreadable file must make the run fail visibly. Printing the records to the log is not part of the contract (DEF-JRCARD-001).
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

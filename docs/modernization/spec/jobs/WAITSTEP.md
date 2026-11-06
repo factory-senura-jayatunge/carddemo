@@ -14,13 +14,13 @@ sources:
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "689-690"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "96-124, 188-217, 297-303, 329-335, 447-453, 521-527, 563-569"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "14-22, 44-52, 81-89"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "234, 379"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "23"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "234, 379"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "23"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "96-97, 188-189, 297-298, 329-330, 447-448, 521-522, 563-564"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "14-19, 44-49, 81-86"}, {type: manual, job: WAITSTEP}]
 programs: [COBSWAIT, MVSWAIT]
 data_stores: []
 invoked_by: [CA-7, Control-M, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # WAITSTEP: Fixed delay between batch jobs
@@ -140,6 +140,8 @@ None. The job reads and writes no dataset; its only effect is the elapsed time.
 ## 15. Equivalence contract
 
 A run ends with return code 0 after waiting the number of centiseconds given (36 seconds as shipped) and changes no data. If the target replaces the pause with a completion check (Q-JWAIT-001), the requirement becomes: the following job does not start until the condition the pause stood for holds.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

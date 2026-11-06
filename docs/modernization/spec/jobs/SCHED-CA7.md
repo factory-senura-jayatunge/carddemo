@@ -8,8 +8,8 @@ source_rev: 8a8a80a
 sources:
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "3-92"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "209-235"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "7-24"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "209-235"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "7-24"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: demo-script, lines: "9-70"}
   - {path: app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl, sha256: 99e84914708d, role: related-job}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd-export, lines: "97, 155"}
@@ -18,7 +18,7 @@ programs: []
 procs: []
 data_stores: []
 invoked_by: [CA-7 operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # SCHED-CA7: CA-7 job definitions and triggers
@@ -191,7 +191,7 @@ None.
 
 #### ERR-JCA7-001 · A failed job stops its path
 - **When:** a job abends or CA-7 judges its completion as abnormal.
-- **Then:** CA-7 does not trigger the job's successors; the job stays in the request queue for an operator to restart, cancel or force complete. The listing defines no condition-code tests, no alternate or recovery jobs and no notification ("ERRORS FOR RQMT NOT USED" and "ERRORS FOR DSN NOT FOUND" are `Y`, `:32-33`, but no requirements exist). A failure stops only the path it is on: under SCHID 030 another path of the same round can still reach WAITSTEP and OPENFIL (FLOW-JCA7-006), but when every path has stopped, or in a run under 032, which has no OPENFIL, the CICS files stay closed until someone intervenes. WAITSTEP is a fixed pause and checks nothing (see WAITSTEP, DEF-JWAIT-003); CLOSEFIL and OPENFIL end normally whether or not CICS acted (ERR-JCLOSE-001, ERR-JOPEN-001), so the chain can continue on files that are still open. Which completion codes CA-7 treats as normal is not in the listing, so a CBPAUP0J run that ends with return code 16 instead of an abend may count as a normal completion and trigger POSTTRAN (`app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:382`, `docs/runbooks/authorization-purge.md:96-97`); POSTTRAN's return code 4 means some transactions were rejected and must not stop the chain (ERR-JPOST-001).
+- **Then:** CA-7 does not trigger the job's successors; the job stays in the request queue for an operator to restart, cancel or force complete. The listing defines no condition-code tests, no alternate or recovery jobs and no notification ("ERRORS FOR RQMT NOT USED" and "ERRORS FOR DSN NOT FOUND" are `Y`, `:32-33`, but no requirements exist). A failure stops only the path it is on: under SCHID 030 another path of the same round can still reach WAITSTEP and OPENFIL (FLOW-JCA7-006), but when every path has stopped, or in a run under 032, which has no OPENFIL, the CICS files stay closed until someone intervenes. WAITSTEP is a fixed pause and checks nothing (see WAITSTEP, DEF-JWAIT-003); CLOSEFIL and OPENFIL end normally whether or not CICS acted (ERR-JCLOSE-001, ERR-JOPEN-001), so the chain can continue on files that are still open. Which completion codes CA-7 treats as normal is not in the listing, so a CBPAUP0J run that ends with return code 16 instead of an abend may count as a normal completion and trigger POSTTRAN (`app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:382`, `docs/runbooks/authorization-purge.md:96-97`; CBPAUP0J DEF-JAUPG-003, Q-JAUPG-001); POSTTRAN's return code 4 means some transactions were rejected and must not stop the chain (ERR-JPOST-001).
 - **Source:** `:32-33`
 - **Fidelity:** must-preserve (do not continue after a failure) · **Confidence:** platform-inferred
 
@@ -242,7 +242,7 @@ None.
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (triggers); platform-inferred (schedule ID inheritance, concurrency)
 
 #### DEF-JCA7-007 · An optional-module job gates the base posting job
-- POSTTRAN is triggered only by CBPAUP0J (`:70`), the purge job of the optional authorization module, which needs IMS (`app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl`). In a base installation without the module, nothing triggers POSTTRAN. The README lists CBPAUP0J last, as optional (`./README.md:235`), and the runbook places it after the cycle (`docs/runbooks/batch-cycle-restart.md:24`); CA-7 places it before posting. CBPAUP0C reports errors with return code 16 instead of an abend (`app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:382`), and the listing shows no condition-code test, so a failed purge may still count as a normal completion and trigger POSTTRAN (ERR-JCA7-001).
+- POSTTRAN is triggered only by CBPAUP0J (`:70`), the purge job of the optional authorization module, which needs IMS (`app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl`). In a base installation without the module, nothing triggers POSTTRAN. The README lists CBPAUP0J last, as optional (`./README.md:235`), and the runbook places it after the cycle (`docs/runbooks/batch-cycle-restart.md:24`); CA-7 places it before posting. CBPAUP0C reports errors with return code 16 instead of an abend (`app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:382`), and the listing shows no condition-code test, so a failed purge may still count as a normal completion and trigger POSTTRAN (ERR-JCA7-001, CBPAUP0J DEF-JAUPG-003).
 - **Source:** `:43, 70`, `app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:382`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (triggers, return code); platform-inferred (CA-7 treatment of return code 16)
 
@@ -270,6 +270,8 @@ None.
 ## 15. Equivalence contract
 
 The schedule itself carries no behaviour that a target must copy: its trigger graph loops under every schedule ID (DEF-JCA7-002, DEF-JCA7-008) and is incomplete (DEF-JCA7-005). A target orchestration must keep the dependencies that every source agrees on: online updates to the affected stores stop before a batch job that changes them and resume only after it ends (the CLOSEFIL and OPENFIL hand-over, Q-JCLOSE-001); a job runs only after its predecessor ended successfully (ERR-JCA7-001); and a failed job stops the chain and is reported. The job list, order and frequency follow the answer to Q-JCA7-001. CA-7 attributes (JCL ID, class, region, schedule IDs, queue time, statistics) are not reproduced.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

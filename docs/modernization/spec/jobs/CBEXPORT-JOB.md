@@ -11,7 +11,7 @@ sources:
   - {path: app/cpy/CVEXPORT.cpy, sha256: 49d07843c9bd, role: record-layout, lines: "9-19"}
   - {path: tools/batch-programs.toml, sha256: d5ae722d20fb, role: local-runner, lines: "255-258"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "672-679"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "52, 102-103, 175"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "52, 102-103, 175"}
 entry_points: [{type: manual, job: CBEXPORT}]
 programs: [IDCAMS, CBEXPORT]
 data_stores:
@@ -23,7 +23,7 @@ data_stores:
   - {dd: STEP02.CARDFILE, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, entity: ENT-CARD, access: [read-sequential]}
   - {dd: STEP02.EXPFILE, dataset: AWS.M2.CARDDEMO.EXPORT.DATA, entity: ENT-EXPORT-RECORD, access: [load]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBEXPORT: Export the masters to a migration file
@@ -192,6 +192,8 @@ In execution order. There is no rollback.
 ## 15. Equivalence contract
 
 After a successful run (return code 0, no abend), the export file contains exactly one record per customer, account, cross-reference, transaction and card record, in that order and in key order within each master, with ascending sequence numbers starting from the program's first value (462 records for the sample data after POSTTRAN), and nothing from earlier runs. The masters are unchanged. The key position must be the one the program uses (DEF-JEXPT-001). Message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

@@ -9,8 +9,8 @@ sources:
   - {path: app/jcl/POSTTRAN.jcl, sha256: ecff62c691e6, role: job}
   - {path: app/jcl/DALYREJS.jcl, sha256: 2ea635d82002, role: gdg-definition, lines: "21-29"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "684-690"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 213-235, 369"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 30-36, 53-85"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "150-167, 213-235, 369"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21, 30-36, 53-85"}
   - {path: docs/runbooks/daily-rejects.md, sha256: 723c06a7eedc, role: runbook, lines: "1-20"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "46-48"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "43-97"}
@@ -26,7 +26,7 @@ data_stores:
   - {dd: TCATBALF, dataset: AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS, entity: ENT-TCAT-BAL, access: [read-random, write, rewrite]}
 invoked_by: [operator, scripts/run_full_batch.sh, CA-7 trigger from CBPAUP0J]
 local_run: "make run-batch PROGRAM=POSTTRAN"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # POSTTRAN: Daily transaction posting job
@@ -162,6 +162,8 @@ None at job level. Validations are VAL-POST-001 and VAL-POST-002 and the console
 ## 15. Equivalence contract
 
 The program-level contract of `programs/CBTRN02C.md` §15 applies. In addition, each successful run (return code 0 or 4) produces exactly one new reject set holding the rejected records in input order (possibly empty), and an abend produces none. Return code 4 must not stop the cycle.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

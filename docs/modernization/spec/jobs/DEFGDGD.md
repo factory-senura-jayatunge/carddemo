@@ -12,7 +12,7 @@ sources:
   - {path: app/cpy/CVTRA02Y.cpy, sha256: 7828fae489c5, role: copybook}
   - {path: app/cpy/CVTRA03Y.cpy, sha256: fb15dbc4a692, role: copybook}
   - {path: app/cpy/CVTRA04Y.cpy, sha256: 89803bc13a06, role: copybook}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "142-144, 150-167, 351-379"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "142-144, 150-167, 351-379"}
 entry_points: [{type: manual, job: DEFGDGD}]
 programs: [IDCAMS, IEBGENER]
 data_stores:
@@ -23,7 +23,7 @@ data_stores:
   - {dd: SYSUT1, dataset: AWS.M2.CARDDEMO.DISCGRP.PS, entity: ENT-DISC-GROUP, access: [read-sequential]}
   - {dd: SYSUT2, dataset: "AWS.M2.CARDDEMO.DISCGRP.BKUP(+1)", entity: ENT-DISC-GROUP, access: [define-gdg-base, create]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DEFGDGD: Reference-data backup GDGs
@@ -246,6 +246,8 @@ DEFINE GENERATIONDATAGROUP -
 ## 15. Equivalence contract
 
 After a successful first run (return code 0), each of the three backup stores holds exactly one version, a byte-for-byte copy of its source file (same record count and record length: 60, 60, 50), and keeps at most five versions afterwards. A reimplementation should be safe to run twice (DEF-JGDGD-002 is a defect to decide). IDCAMS and IEBGENER messages and generation names may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

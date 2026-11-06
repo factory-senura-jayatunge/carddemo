@@ -8,14 +8,14 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/INTRDRJ2.JCL, sha256: aac63659b8c4, role: job}
   - {path: app/jcl/INTRDRJ1.JCL, sha256: f986f004a306, role: submitter, lines: "14-18"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "57"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "57"}
 entry_points: [{type: internal-reader, job: INTRDRJ1, step: STEP01}, {type: manual, job: INTRDRJ2}]
 programs: [IDCAMS]
 data_stores:
   - {dd: IN, dataset: AWS.M2.CARDEMO.FTP.TEST.BKUP, access: [read-sequential]}
   - {dd: OUT, dataset: AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR, access: [write-sequential]}
 invoked_by: [INTRDRJ1, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # INTRDRJ2: Copy the FTP test backup
@@ -121,6 +121,8 @@ None specific to this job; see Q-JIRD1-001 for whether the chain is needed at al
 ## 15. Equivalence contract
 
 If the chain is kept, a reimplementation must leave `FTP.TEST.BKUP.INTRDR` with exactly the records of `FTP.TEST.BKUP` after a run started by the INTRDRJ1 equivalent. IDCAMS messages may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

@@ -11,11 +11,11 @@ sources:
   - {path: app/cpy/CVTRA06Y.cpy, sha256: c5c69f1b86c5, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "801-814, 3541-3720"}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "63-87"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "139, 159, 220, 362"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "139, 159, 220, 362"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "28-29"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "28-29"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "15, 18, 57-58, 89-90"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "15, 17, 34-36, 58"}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "15, 18, 57-58, 89-90"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "15, 17, 34-36, 58"}
 entry_points: [{type: manual, job: TRANFILE}, {type: script, file: scripts/remote_refresh.sh, lines: "28-29"}]
 programs: [SDSF, IDCAMS]
 data_stores:
@@ -26,7 +26,7 @@ data_stores:
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, entity: ENT-TRANSACTION, access: [delete, define, build]}
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH, entity: ENT-TRANSACTION, access: [define]}
 invoked_by: [operator, scripts/remote_refresh.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANFILE: Transaction master initialisation
@@ -312,6 +312,8 @@ If a later step fails, everything before it has happened: the files are closed i
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the transaction store contains exactly the records of `DALYTRAN.PS.INIT` (for the shipped file, one record that is binary zeros except for bytes 343-350 of the filler, which hold EBCDIC `00000100`), keyed by `TRAN-ID`, and nothing else; all earlier transactions are gone. If the timestamp index is kept, a lookup by processed timestamp returns, for each timestamp, exactly the transaction IDs whose bytes 305-330 equal it, in ascending ID order. A reimplementation must fail (non-zero result, no silent partial load) on input keys out of order or duplicated (VAL-JTRAN-001), and the online system must not use the transaction data while the job runs. Whether the seed record and the index are reproduced is decided by DEF-JTRAN-005 and DEF-JTRAN-007. IDCAMS and CICS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

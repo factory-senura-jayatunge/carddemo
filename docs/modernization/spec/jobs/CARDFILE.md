@@ -10,10 +10,10 @@ sources:
   - {path: app/cpy/CVACT02Y.cpy, sha256: 9f1c62ef31b9, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "133-333"}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "13-36"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "136, 155, 217, 357"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "136, 155, 217, 357"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "19-20"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "19-20"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "13-22, 57-58, 72-73, 89-90"}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "13-22, 57-58, 72-73, 89-90"}
 entry_points: [{type: manual, job: CARDFILE}, {type: script, file: scripts/run_full_batch.sh, lines: "19-20"}, {type: script, file: scripts/remote_refresh.sh, lines: "19-20"}]
 programs: [SDSF, IDCAMS]
 data_stores:
@@ -24,7 +24,7 @@ data_stores:
   - {dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX, entity: ENT-CARD, access: [delete, define, build]}
   - {dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH, entity: ENT-CARD, access: [define]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CARDFILE: Card master reload
@@ -301,6 +301,8 @@ If a later step fails, everything before it has happened: the card files are clo
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the card store contains exactly the records of `CARDDATA.PS`: same count (50 for the sample data), same bytes, keyed by `CARD-NUM`, and nothing else; and a lookup by account ID returns, for each account, exactly the card numbers whose bytes 17-27 equal it, in ascending card-number order. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JCARD-001), and the online system must not use the card data while the reload runs. IDCAMS and CICS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

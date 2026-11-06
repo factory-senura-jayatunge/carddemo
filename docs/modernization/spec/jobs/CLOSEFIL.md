@@ -10,7 +10,7 @@ sources:
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "1-99"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "18-43, 159-162, 219-271, 300-303, 332-340, 465-468, 529-537"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "4-7, 33-37, 65-68"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "18-43"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "4-7"}, {type: manual, job: CLOSEFIL}]
 programs: [SDSF]
 data_stores:
@@ -20,7 +20,7 @@ data_stores:
   - {cics_file: CXACAIX, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, entity: ENT-CARD-XREF, access: [cics-close]}
   - {cics_file: USRSEC, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [cics-close]}
 invoked_by: [CA-7, Control-M, operator, scripts/run_full_batch.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CLOSEFIL: Close the CardDemo files in CICS
@@ -37,7 +37,7 @@ CLOSEFIL hands five VSAM files over from the online system to batch. Its only st
 | SE-JCLOSE-001 | CICS closes files `TRANSACT`, `CCXREF`, `ACCTDAT`, `CXACAIX` and `USRSEC`. |
 | ERR-JCLOSE-001 | The job's return code does not tell whether CICS actually closed the files. |
 | DEF-JCLOSE-001 | The CICS region name is hard-coded. |
-| DEF-JCLOSE-002 | The README lists the program as IEFBR14; the JCL runs SDSF. |
+| DEF-JCLOSE-002 | The README listed the program as IEFBR14; the JCL runs SDSF. Corrected in commit 4a03121. |
 | DEF-JCLOSE-003 | Files `CARDDAT`, `CARDAIX` and `CUSTDAT` are not closed. |
 
 ## 3. Actors and triggers
@@ -131,10 +131,10 @@ None. The job has no data fields.
 - **Source:** `:26-30`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
-#### DEF-JCLOSE-002 · README names the wrong program
-- The README batch table lists CLOSEFIL with program `IEFBR14` (`./README.md:366`); the JCL runs `PGM=SDSF`. The runbook notes the same discrepancy (`docs/runbooks/cics-vsam-files.md:10-11`).
+#### DEF-JCLOSE-002 · README named the wrong program
+- The README batch table listed CLOSEFIL with program `IEFBR14`, while the JCL runs `PGM=SDSF`, and the CICS file runbook noted the discrepancy. Commit 4a03121 changed the row to `SDSF` (`./README.md:366`) and replaced the runbook's note; the runbook states that both jobs run `PGM=SDSF` (`docs/runbooks/cics-vsam-files.md:10`).
 - **Source:** `:22`
-- **Status:** open (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
+- **Status:** fixed in branch, commit 4a03121 (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCLOSE-003 · Card and customer files stay open
 - The CSD defines eight files (`app/csd/CARDDEMO.CSD:1-99`); CLOSEFIL closes five. `CARDDAT`, `CARDAIX` and `CUSTDAT` stay open, so the reload jobs CARDFILE and CUSTFILE close and reopen them themselves (`docs/runbooks/cics-vsam-files.md:13-22, 72-73`). CREASTMT reads `CUSTDATA` while CICS may still hold `CUSTDAT` open (the cross-reference file it also reads is closed, as `CCXREF`, `:27`). Under `SHAREOPTIONS(2 3)` (`docs/runbooks/cics-vsam-files.md:3-6`) a batch reader may open a cluster that CICS has open for update, but VSAM does not guarantee read integrity to it: CREASTMT can read a customer record while an online update is changing it.
@@ -151,6 +151,8 @@ None. The job has no data fields.
 ## 15. Equivalence contract
 
 A target is equivalent when, after this step reports success, the five data sets it names are no longer updated by online transactions and the online functions that depend on them report the files as unavailable, until the OPENFIL equivalent runs. The command text, the SDSF output and the region name are not part of the contract.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

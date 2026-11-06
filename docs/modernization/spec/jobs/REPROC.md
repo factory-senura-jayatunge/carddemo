@@ -19,7 +19,7 @@ data_stores:
   - {dd: FILEOUT, dataset: NULLFILE (overridden by the caller), access: [write-sequential]}
   - {dd: SYSIN, dataset: "&CNTLLIB(REPROCT)", access: [read]}
 invoked_by: [TRANBKP, PRTCATBL, TRANREPT, TRANREPT-PROC]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # REPROC: Copy procedure
@@ -122,6 +122,8 @@ None. The procedure is a generic copy; the target replaces it with the copy or e
 ## 15. Equivalence contract
 
 For any caller, the output holds every input record, in input order, byte for byte. The procedure itself adds no condition, filter or transformation.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

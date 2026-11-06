@@ -8,14 +8,14 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/CBADMCDJ.jcl, sha256: 364243e503e9, role: job}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd-export, lines: "1-505"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 173-193, 213-235, 351-379"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "150-167, 173-193, 213-235, 351-379"}
 entry_points: [{type: manual, job: CBADMCDJ}]
 programs: [DFHCSDUP]
 data_stores:
   - {dd: DFHCSD, dataset: OEM.CICSTS.DFHCSD, access: [define, list]}
   - {dd: STEPLIB, dataset: OEM.CICSTS.V05R06M0.CICS.SDFHLOAD, access: [read]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBADMCDJ: CICS resource definitions with DFHCSDUP
@@ -275,6 +275,8 @@ None. The job holds no data fields; `PAGESIZE(60)` only paginates the listing.
 ## 15. Equivalence contract
 
 Nothing in this job needs reproducing in the target: it registers CICS resources, and the current resource set is the CSD export. A reimplementation of the online application must provide the transaction, program and screen mapping of `app/csd/CARDDEMO.CSD`, not of this job. DFHCSDUP messages and listings may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

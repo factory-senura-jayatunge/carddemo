@@ -10,11 +10,11 @@ sources:
   - {path: app/cpy/CSUSR01Y.cpy, sha256: 37c34094dc41, role: record-layout, lines: "17-23"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "3831-3934"}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "88-99"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 213-235, 351-379"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "150-167, 213-235, 351-379"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "12-13, 40-41"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "12-13, 43-44"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "19, 37, 69"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21"}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "19, 37, 69"}
   - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "18-54"}
 entry_points: [{type: manual, job: DUSRSECJ}, {type: script, file: scripts/run_full_batch.sh, lines: "40-41"}, {type: script, file: scripts/remote_refresh.sh, lines: "43-44"}]
 programs: [IEFBR14, IEBGENER, IDCAMS]
@@ -25,7 +25,7 @@ data_stores:
   - {dd: STEP03.IN, dataset: AWS.M2.CARDDEMO.USRSEC.PS, entity: ENT-USER-SECURITY, access: [read-sequential]}
   - {dd: STEP03.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DUSRSECJ: User security file reload
@@ -60,7 +60,7 @@ The job has no business rules. Its items:
 - **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:152`) and batch job list (`./README.md:226`), in the demo full-batch script as "Job 11: Refresh User Security  File" (`scripts/run_full_batch.sh:40-41`) and as "Job 11: Refresh User Security  File" in `scripts/remote_refresh.sh:43-44`. Both scripts submit CLOSEFIL first (`scripts/run_full_batch.sh:12-13`, `scripts/remote_refresh.sh:12-13`), and so does the README's batch job list (`./README.md:215`); its initialisation sequence does not (DEF-JUSEC-005). The restart runbook lists it in the data refresh (`docs/runbooks/batch-cycle-restart.md:14`). Neither the CA-7 nor the Control-M schedule runs it.
 - **Preconditions:** CICS has closed file `USRSEC` (CLOSEFIL; DEF-JUSEC-004, ERR-JUSEC-003). The unit name in `STEP01` must exist on the system (DEF-JUSEC-002). Neither define names a volume, and the catalog shows both `USRSEC.PS` and the cluster SMS-managed with storage class `SCTECH` (`app/catlg/LISTCAT.txt:3838, 3852`), the cluster's data component on volume `YYYYTC` (`app/catlg/LISTCAT.txt:3898`), so no particular volume is needed.
 - **Job card:** `REGION=8M,CLASS=A,MSGCLASS=H,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
-- The README's batch table names the job's program as IEBGENER (`./README.md:353`); IEBGENER only runs in `STEP01`, and IDCAMS does the define and load.
+- The README's batch table named the job's program as IEBGENER only, although IEBGENER runs only in `STEP01` and IDCAMS does the define and load; commit 4a03121 changed the row to the three programs the job runs, IEFBR14, IEBGENER and IDCAMS (`./README.md:353`).
 
 ## 4. Interfaces
 
@@ -229,6 +229,8 @@ None. The job copies bytes; it does not interpret any field.
 ## 15. Equivalence contract
 
 After a successful run (return code 0 in every step), the user store contains exactly the ten in-stream user records: same user IDs, names and types, keyed by user ID, and nothing else; `USRSEC.PS` holds the same ten records in the same order. A reimplementation must fail visibly when the seed data has duplicate or unordered user IDs (VAL-JUSEC-001). Password storage is not part of the equivalence: the target is expected to replace it (DEF-JUSEC-001). Utility message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

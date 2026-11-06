@@ -11,7 +11,7 @@ sources:
   - {path: app/cpy/CVEXPORT.cpy, sha256: 49d07843c9bd, role: record-layout, lines: "9-19"}
   - {path: app/jcl/CBEXPORT.jcl, sha256: 2af5ab38310c, role: job, lines: "30-38"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "680-688"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "52, 102-103, 147-150, 173-175"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "52, 102-103, 147-150, 173-175"}
 entry_points: [{type: manual, job: CBIMPORT}]
 programs: [CBIMPORT]
 data_stores:
@@ -23,7 +23,7 @@ data_stores:
   - {dd: STEP01.CARDOUT, dataset: AWS.M2.CARDDEMO.CARDDATA.IMPORT, entity: ENT-CARD, access: [create, write-sequential]}
   - {dd: STEP01.ERROUT, dataset: AWS.M2.CARDDEMO.IMPORT.ERRORS, entity: ENT-IMPORT-ERROR, access: [create, write-sequential]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CBIMPORT: Import the migration file
@@ -178,6 +178,8 @@ None in the job. The program's progress messages (for example `CBIMPORT: Startin
 ## 15. Equivalence contract
 
 After a successful run (return code 0), every export record appears in exactly one of the six outputs: each data file holds the records of its type, in export-file order, with the master record layout, and the error file holds one line per record of unknown type (none for a CBEXPORT file; 50, 50, 50, 262 and 50 records for the sample data after POSTTRAN). The export file is unchanged. A failed run leaves no output files behind. Message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

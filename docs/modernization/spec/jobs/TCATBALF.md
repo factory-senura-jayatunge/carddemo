@@ -9,19 +9,19 @@ sources:
   - {path: app/jcl/TCATBALF.jcl, sha256: fa89dbfa8c34, role: job}
   - {path: app/cpy/CVTRA01Y.cpy, sha256: 50637f13692c, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1202-1422"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "145, 162, 225, 367"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "145, 162, 225, 367"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "34-35"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "34-35"}
   - {path: scripts/run_posting.sh, sha256: a8e231c46316, role: script, lines: "19-20"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "216-217, 246-271, 305-330"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "15-16, 73-81, 89-91, 99"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "15-16, 73-81, 89-91, 99"}
 entry_points: [{type: manual, job: TCATBALF}, {type: script, file: scripts/run_full_batch.sh, lines: "34-35"}, {type: script, file: scripts/remote_refresh.sh, lines: "34-35"}, {type: script, file: scripts/run_posting.sh, lines: "19-20"}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "246-271"}]
 programs: [IDCAMS]
 data_stores:
   - {dd: TCATBAL, dataset: AWS.M2.CARDDEMO.TCATBALF.PS, entity: ENT-TCAT-BAL, copybook: CVTRA01Y, access: [read-sequential]}
   - {dd: TCATBALV, dataset: AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS, entity: ENT-TCAT-BAL, copybook: CVTRA01Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, scripts/run_posting.sh, CA-7 trigger from CLOSEFIL2]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TCATBALF: Transaction category balance reload
@@ -194,6 +194,8 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the category balance store contains exactly the records of `TCATBALF.PS`: same count (50 for the sample data), same bytes, keyed by `TRAN-CAT-KEY`, and nothing else. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JTCAT-001), and nothing may read or update the file while the reload runs (ERR-JTCAT-002). Because the file holds running balances, the target must keep a reload a separate, explicit action that cannot run as part of a normal cycle by accident (DEF-JTCAT-002). IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

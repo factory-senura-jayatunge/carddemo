@@ -11,14 +11,14 @@ sources:
   - {path: app/cpy/CVACT03Y.cpy, sha256: ffc6079e09b2, role: record-layout}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "403-408"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "420-448"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "83-94"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "83-94"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "639"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "420-421"}, {type: manual, job: READXREF}]
 programs: [CBACT03C]
 data_stores:
   - {dd: STEP05.XREFFILE, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, entity: ENT-CARD-XREF, access: [read-sequential]}
 invoked_by: [CA-7, operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # READXREF: Card cross-reference diagnostic read
@@ -130,6 +130,8 @@ None. The job prints records as stored; it does not interpret any field.
 ## 15. Equivalence contract
 
 A successful run (return code 0) leaves the card cross-reference file unchanged and reads every record once, in ascending key order (50 for the sample data). A missing or unreadable file must make the run fail visibly. Printing the records to the log is not part of the contract (DEF-JRXREF-001).
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

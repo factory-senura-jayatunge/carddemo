@@ -9,8 +9,8 @@ sources:
   - {path: app/jcl/COMBTRAN.jcl, sha256: ab60da6cfdc8, role: job}
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: gdg-definition, lines: "24-29, 48-59"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1098-1106, 1631-1643, 2919-2925"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "213-235, 373"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 139-150"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "213-235, 373"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21, 139-150"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "57-59"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "64-92"}
 entry_points: [{type: manual, job: COMBTRAN}, {type: script, file: scripts/run_full_batch.sh, lines: "57-58"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "75-80"}]
@@ -22,7 +22,7 @@ data_stores:
   - {dd: TRANSACT, dataset: "AWS.M2.CARDDEMO.TRANSACT.COMBINED(+1)", entity: ENT-TRANSACTION, access: [read-sequential]}
   - {dd: TRANVSAM, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [load]}
 invoked_by: [operator, scripts/run_full_batch.sh, Control-M folder MONTHLY-InterestCalculation]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # COMBTRAN: Combine posted and interest transactions
@@ -150,6 +150,8 @@ None beyond the merge order. The job decides nothing per record; it unites the c
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the transaction store holds exactly the union of the posted transactions saved by the preceding TRANBKP and the interest transactions of the preceding INTCALC, byte for byte, keyed by `TRAN-ID`; the combined set is also kept as a separate, ordered dataset. Duplicate IDs must fail visibly (VAL-JCOMB-001). Sort and IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

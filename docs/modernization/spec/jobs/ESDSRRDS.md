@@ -8,7 +8,7 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/ESDSRRDS.jcl, sha256: 9bec76602996, role: job}
   - {path: app/cpy/CSUSR01Y.cpy, sha256: 37c34094dc41, role: record-layout, lines: "17-23"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "351-379"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "351-379"}
   - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "18-38"}
 entry_points: [{type: manual, job: ESDSRRDS}]
 programs: [IEFBR14, IEBGENER, IDCAMS]
@@ -21,7 +21,7 @@ data_stores:
   - {dd: STEP05.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS, entity: ENT-USER-SECURITY, access: [load]}
   - {dd: STEP03.IN and STEP05.IN, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, entity: ENT-USER-SECURITY, access: [read-sequential]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # ESDSRRDS: Sample ESDS and RRDS user files
@@ -211,6 +211,8 @@ None. The job copies bytes; it does not interpret any field.
 ## 15. Equivalence contract
 
 After a successful run (return code 0 in every step), `ESDSRRDS.PS` holds the ten in-stream records in order, the entry-sequenced store holds the same ten records in the same order and nothing else, and the relative-record store holds them as records 1 to 10 and nothing else. If the target keeps the job at all (Q-JESRR-001), these are the observable results; password storage is not part of the equivalence (DEF-JESRR-001).
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

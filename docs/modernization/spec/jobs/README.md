@@ -110,7 +110,7 @@ Both schedules use WAITSTEP as a fixed pause instead of checking that CICS close
 ## Operations notes
 
 - **CICS hand-over.** CLOSEFIL closes five of the eight CICS files. CARDFILE, CUSTFILE and TRANFILE close and reopen their own files with in-job SDSF steps; CARDDAT, CARDAIX and CUSTDAT are never closed by CLOSEFIL, which matters for the jobs that only read them (DEF-JCLOSE-003). A file closed by command stays unavailable until OPENFIL opens it (SE-JOPEN-001). The CSD files are `RECOVERY(NONE)` (ERR-JCSD-001), so online updates are not backed out.
-- **Restart.** The runbook `docs/runbooks/batch-cycle-restart.md` gives the restart rules (restore from `TRANSACT.BKUP`, `TCATBALF.BKUP`); the job specs record where it is stale (for example DEF-JINTC-003, DEF-JTBKP-001) and the area entities file lists the corrections.
+- **Restart.** The runbook `docs/runbooks/batch-cycle-restart.md` gives the restart rules (restore from `TRANSACT.BKUP`, `TCATBALF.BKUP`); the job specs record where it was stale or leaves a gap (DEF-JINTC-003, corrected in commit 4a03121; DEF-JTBKP-001, where restoring `TRANSACT.BKUP(-1)` loses the day's postings) and the area entities file lists the corrections.
 - **Generations.** The cycle selects its inputs by relative generation (`BKUP(0)`, `SYSTRAN(0)`), so an extra backup between TRANBKP and COMBTRAN, such as a TRANREPT run, changes what is combined (DEF-JCOMB-001, PINV-g-jobs-ops-03).
 - **Business date.** INTCALC's `PARM='2022071800'` (DEF-JINTC-001) and the TRANREPT batch member's start and end dates (`app/jcl/TRANREPT.jcl:43-44`) are hard-coded; the local runner defaults the business date to 2022-07-06, which `CARDDEMO_BUSINESS_DATE` changes.
 

@@ -12,7 +12,7 @@ sources:
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: gdg-definition, lines: "42-47"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1202-1214, 1319-1333"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "216-244, 495-571"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "76-81"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "76-81"}
 entry_points: [{type: manual, job: PRTCATBL}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "532-545"}]
 programs: [IEFBR14, IDCAMS, SORT]
 procs: [REPROC]
@@ -22,7 +22,7 @@ data_stores:
   - {dd: PRC001.FILEOUT, dataset: "AWS.M2.CARDDEMO.TCATBALF.BKUP(+1)", entity: ENT-TCAT-BAL, access: [create]}
   - {dd: SORTOUT, dataset: AWS.M2.CARDDEMO.TCATBALF.REPT, access: [create]}
 invoked_by: [operator, CA-7 trigger from CLOSEFIL (SCHID 031)]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # PRTCATBL: Print the category balance file
@@ -159,6 +159,8 @@ In execution order. No step undoes an earlier one.
 ## 15. Equivalence contract
 
 After a successful run: a new backup generation holds every category balance record, byte for byte, in key order; the listing holds one line per record in the same order with account, type, category and balance value with two decimals. A reimplementation that prints signs (Q-JPCAT-001) differs only for negative balances. The category balance store is unchanged.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

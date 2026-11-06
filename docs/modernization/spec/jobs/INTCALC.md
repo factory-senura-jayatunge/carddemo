@@ -10,8 +10,8 @@ sources:
   - {path: app/cbl/CBACT04C.cbl, sha256: cc7ec04dee3d, role: program, lines: "28-55, 175-180, 221-223, 394-396, 474-482"}
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: gdg-definition, lines: "48-53"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1098-1106"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "213-235, 372"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 37-39, 87-121"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "213-235, 372"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21, 37-39, 87-121"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "50-52"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "64-92"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "657-663"}
@@ -26,7 +26,7 @@ data_stores:
   - {dd: TRANSACT, dataset: "AWS.M2.CARDDEMO.SYSTRAN(+1)", entity: ENT-TRANSACTION, access: [create, write-sequential]}
 invoked_by: [operator, scripts/run_full_batch.sh, Control-M folder MONTHLY-InterestCalculation]
 local_run: "make run-batch PROGRAM=INTCALC"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # INTCALC: Interest calculation job
@@ -46,7 +46,7 @@ INTCALC is the one-step job that runs the interest program `CBACT04C`. The progr
 | NUM-JINTC-001 | Interest transaction ID = the 10-character `PARM` + a 6-digit counter starting at 000001. |
 | DEF-JINTC-001 | The `PARM` date is hard-coded, so every run produces the same transaction IDs. |
 | DEF-JINTC-002 | The DD named `TRANSACT` is the interest output `SYSTRAN`, not the transaction master. |
-| DEF-JINTC-003 | The restart runbook still describes the "last account not updated" defect, which the program no longer has. |
+| DEF-JINTC-003 | The restart runbook described the "last account not updated" defect, which the program no longer has; corrected in commit 4a03121. |
 | DEF-JINTC-004 | The `XREFFIL1` path is non-unique while the program declares a unique alternate key, so the job may abend on z/OS. |
 
 ## 3. Actors and triggers
@@ -151,10 +151,10 @@ None at job level. The program's messages (`DISCLOSURE GROUP RECORD MISSING`, `A
 - **Source:** `:37-41`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
-#### DEF-JINTC-003 · The runbook describes a defect the program no longer has
-- The runbook says the last account in `TCATBALF` is never rewritten (open issue #64, `docs/runbooks/batch-cycle-restart.md:115-121`). The program now performs `1050-UPDATE-ACCOUNT` once more after the loop when at least one record was read (`app/cbl/CBACT04C.cbl:221-223`), so the last account is updated. The runbook section is out of date.
+#### DEF-JINTC-003 · The runbook described a defect the program no longer has
+- The runbook said, as a known defect (open issue #64), that the last account in `TCATBALF` is never rewritten. The program performs `1050-UPDATE-ACCOUNT` once more after the loop when at least one record was read (`app/cbl/CBACT04C.cbl:221-223`), so the last account is updated. Commit 4a03121 turned the section into "Fixed defect: last account", which says so and asks sites running a load module built from older source to check that account by hand (`docs/runbooks/batch-cycle-restart.md:115-121`).
 - **Source:** `app/cbl/CBACT04C.cbl:221-223`
-- **Status:** open (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
+- **Status:** fixed in branch, commit 4a03121 (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JINTC-004 · Non-unique alternate index behind a unique alternate key
 - `XREFFIL1` is bound to the path over `CARDXREF.VSAM.AIX`, which XREFFILE defines with `NONUNIQUEKEY` (`app/jcl/XREFFILE.jcl:72-76`). The program declares `ALTERNATE RECORD KEY IS FD-XREF-ACCT-ID` without `WITH DUPLICATES` (`app/cbl/CBACT04C.cbl:38`) and abends on any status other than `00` after the read by account ID (`app/cbl/CBACT04C.cbl:401-412`). On z/OS the mismatch can surface as open status `39` (alternate key attributes differ from the file) or, once an account has a second card, as read status `02`; either stops the job through ERR-JINTC-001. The sample data has one card per account, so the AS-IS cycle has not shown it. Program side: DEF-INTC-007, Q-INTC-002.
@@ -171,6 +171,8 @@ None at job level. The program's messages (`DISCLOSURE GROUP RECORD MISSING`, `A
 ## 15. Equivalence contract
 
 For the same input files and `PARM`, the program-level results of `CBACT04C` (interest transactions, account updates) must be identical. At job level: one new interest transaction set per successful run, whose IDs start with the 10-character prefix and continue with a 6-digit counter from 000001 in write order; no set at all after an abend.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

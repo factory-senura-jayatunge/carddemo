@@ -10,10 +10,10 @@ sources:
   - {path: app/cpy/CVACT03Y.cpy, sha256: ffc6079e09b2, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "334-531"}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "37-49, 63-75"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "138, 157, 218, 365"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "138, 157, 218, 365"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "22-23"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "22-23"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "16, 18, 37-38, 57-58, 89-90"}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "16, 18, 37-38, 57-58, 89-90"}
 entry_points: [{type: manual, job: XREFFILE}, {type: script, file: scripts/run_full_batch.sh, lines: "22-23"}, {type: script, file: scripts/remote_refresh.sh, lines: "22-23"}]
 programs: [IDCAMS]
 data_stores:
@@ -22,7 +22,7 @@ data_stores:
   - {dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX, entity: ENT-CARD-XREF, access: [delete, define, build]}
   - {dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, entity: ENT-CARD-XREF, access: [define]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # XREFFILE: Card cross-reference reload
@@ -261,6 +261,8 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the cross-reference store contains exactly the records of `CARDXREF.PS`: same count (50 for the sample data), same bytes, keyed by `XREF-CARD-NUM`, and nothing else; and a lookup by account ID returns, for each account, exactly the card numbers whose bytes 26-36 equal it, in ascending card-number order. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JXREF-001), and nothing may use the cross-reference while the reload runs. IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

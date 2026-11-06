@@ -9,12 +9,12 @@ sources:
   - {path: app/jcl/TRANIDX.jcl, sha256: 64a06b44c816, role: job}
   - {path: app/cpy/CVTRA05Y.cpy, sha256: d7bde0e78ff6, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "3541-3720"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "220, 227-233, 370"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "220, 227-233, 370"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "54-66"}
   - {path: scripts/run_posting.sh, sha256: a8e231c46316, role: script, lines: "22-34"}
   - {path: scripts/run_interest_calc.sh, sha256: 690fd69655a2, role: script, lines: "22-34"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "17-21, 159-164"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "15, 89-90"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "17-21, 159-164"}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "15, 89-90"}
 entry_points: [{type: manual, job: TRANIDX}, {type: script, file: scripts/run_full_batch.sh, lines: "61-63"}, {type: script, file: scripts/run_posting.sh, lines: "29-31"}, {type: script, file: scripts/run_interest_calc.sh, lines: "29-31"}]
 programs: [IDCAMS]
 data_stores:
@@ -22,7 +22,7 @@ data_stores:
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, entity: ENT-TRANSACTION, access: [define, build]}
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH, entity: ENT-TRANSACTION, access: [define]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/run_posting.sh, scripts/run_interest_calc.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANIDX: Transaction timestamp index build
@@ -186,6 +186,8 @@ If a later step fails, the earlier ones have happened: an empty AIX may exist wi
 ## 15. Equivalence contract
 
 After a successful run (return code 0), if the index is kept, a lookup by processed timestamp returns, for each timestamp present in the transaction store, exactly the transaction IDs whose bytes 305-330 equal it, in ascending ID order, and the index stays current as transactions are added. The transaction store itself is unchanged. IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

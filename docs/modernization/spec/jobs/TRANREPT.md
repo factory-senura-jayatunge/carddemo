@@ -13,7 +13,7 @@ sources:
   - {path: app/cbl/CORPT00C.cbl, sha256: 0b06bd5d4f38, role: caller, lines: "81-127, 498-523"}
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: gdg-definition, lines: "24-41"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "818-832, 1527-1535, 1631-1637, 3021-3027"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "375"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "375"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "617-629, 664-671"}
 entry_points: [{type: manual, job: TRANREPT}]
 programs: [IDCAMS, SORT, CBTRN03C]
@@ -29,7 +29,7 @@ data_stores:
   - {dd: TRANREPT, dataset: "AWS.M2.CARDDEMO.TRANREPT(+1)", entity: ENT-TRAN-REPORT, access: [create]}
 invoked_by: [operator]
 local_run: "make run-batch PROGRAM=TRANREPT"
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANREPT: Transaction report batch job
@@ -206,6 +206,8 @@ In execution order. No step undoes an earlier one.
 ## 15. Equivalence contract
 
 For the same transaction store and window, the report input holds exactly the transactions whose processing date is within the window, inclusive, in ascending card number order, and the report output equals `CBTRN03C`'s for that input (program-level contract). The transaction store must not change. A target that fixes DEF-JTRPT-001 must use a single window for both the selection and the report header.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

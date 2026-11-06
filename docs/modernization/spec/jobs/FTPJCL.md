@@ -8,15 +8,15 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/FTPJCL.JCL, sha256: f8460de177d9, role: job}
   - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "63-101"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "147-154"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "57"}
+  - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "147-154"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "57"}
 entry_points: [{type: manual, job: FTPJCLS}]
 programs: [FTP]
 data_stores:
   - {dd: NETRC, dataset: "&SYSUID..NETRC", access: [read]}
   - {dataset: AWS.M2.CARDEMO.FTP.TEST, access: [read-sequential]}
 invoked_by: [operator]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # FTPJCL: Send a test data set over FTP
@@ -179,6 +179,8 @@ None. The job checks nothing itself; every message comes from the FTP client and
 ## 15. Equivalence contract
 
 There is no data result to reproduce on the mainframe side: the job only reads one data set. If the target keeps an outbound transfer, it must take credentials from a protected store, never from the job definition (FLOW-JFTP-001), use encrypted transport (DEF-JFTP-004), and report a failed transfer as a failure (ERR-JFTP-001 is a defect to decide). FTP client messages may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

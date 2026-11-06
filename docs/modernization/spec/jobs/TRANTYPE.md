@@ -9,7 +9,7 @@ sources:
   - {path: app/jcl/TRANTYPE.jcl, sha256: 7a10aa43bd67, role: job}
   - {path: app/cpy/CVTRA03Y.cpy, sha256: fb15dbc4a692, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "284, 487, 3727-3828, 3885"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "144, 164, 221-223, 364"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "144, 164, 221-223, 364"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "37-38"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "40-41"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "159-189"}
@@ -19,7 +19,7 @@ data_stores:
   - {dd: TRANTYPE, dataset: AWS.M2.CARDDEMO.TRANTYPE.PS, entity: ENT-TRAN-TYPE, copybook: CVTRA03Y, access: [read-sequential]}
   - {dd: TTYPVSAM, dataset: AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS, entity: ENT-TRAN-TYPE, copybook: CVTRA03Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, CA-7 trigger from CLOSEFIL]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # TRANTYPE: Transaction type reload
@@ -197,6 +197,8 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the transaction type store contains exactly the records of `TRANTYPE.PS`: same count (7 for the sample data), same bytes, keyed by `TRAN-TYPE`, and nothing else. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JTTYP-001), and nothing may read or update the file while the reload runs (ERR-JTTYP-002). IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

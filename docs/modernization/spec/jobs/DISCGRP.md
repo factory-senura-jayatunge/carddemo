@@ -9,18 +9,18 @@ sources:
   - {path: app/jcl/DISCGRP.jcl, sha256: ef70df333b0a, role: job}
   - {path: app/cpy/CVTRA02Y.cpy, sha256: 7828fae489c5, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "844-945"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "142, 161, 224, 361"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "142, 161, 224, 361"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "31-32"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "31-32"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "26-63"}
-  - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "89-90, 97-98"}
+  - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "89-90, 97-98"}
 entry_points: [{type: manual, job: DISCGRP}, {type: script, file: scripts/run_full_batch.sh, lines: "31-32"}, {type: script, file: scripts/remote_refresh.sh, lines: "31-32"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "38-43"}]
 programs: [IDCAMS]
 data_stores:
   - {dd: DISCGRP, dataset: AWS.M2.CARDDEMO.DISCGRP.PS, entity: ENT-DISC-GROUP, copybook: CVTRA02Y, access: [read-sequential]}
   - {dd: DISCVSAM, dataset: AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, entity: ENT-DISC-GROUP, copybook: CVTRA02Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, Control-M folder WEEKLY-DisclosureGroupsRefresh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # DISCGRP: Disclosure group reload
@@ -186,6 +186,8 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the disclosure group store contains exactly the records of `DISCGRP.PS`: same count (51 for the sample data), same bytes, keyed by `DIS-GROUP-KEY`, and nothing else. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JDISC-001), and nothing may read or update the file while the reload runs (ERR-JDISC-002). For the sample data the store must contain the `DEFAULT` group, which INTCALC requires. IDCAMS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

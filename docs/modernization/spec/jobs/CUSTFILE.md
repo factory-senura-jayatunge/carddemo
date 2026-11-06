@@ -10,10 +10,10 @@ sources:
   - {path: app/cpy/CVCUS01Y.cpy, sha256: 944fd9a8eb10, role: copybook}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "580-676"}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "50-62"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "137, 156, 219, 358"}
+  - {path: README.md, sha256: 952958322286, role: runbook, lines: "137, 156, 219, 358"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "25-26"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "25-26"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "22, 54-58, 72-73, 89-90"}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "22, 54-58, 72-73, 89-90"}
 entry_points: [{type: manual, job: CUSTFILE}, {type: script, file: scripts/run_full_batch.sh, lines: "25-26"}, {type: script, file: scripts/remote_refresh.sh, lines: "25-26"}]
 programs: [SDSF, IDCAMS]
 data_stores:
@@ -21,7 +21,7 @@ data_stores:
   - {dd: CUSTDATA, dataset: AWS.M2.CARDDEMO.CUSTDATA.PS, entity: ENT-CUSTOMER, copybook: CVCUS01Y, access: [read-sequential]}
   - {dd: CUSTVSAM, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, entity: ENT-CUSTOMER, copybook: CVCUS01Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # CUSTFILE: Customer master reload
@@ -229,6 +229,8 @@ If a later step fails, everything before it has happened: the file is closed in 
 ## 15. Equivalence contract
 
 After a successful run (return code 0), the customer store contains exactly the records of `CUSTDATA.PS`: same count (50 for the sample data), same bytes, keyed by `CUST-ID`, and nothing else. A reimplementation must fail (non-zero result, no silent partial load) when the input has keys out of order or duplicated (VAL-JCUST-001), and the online system must not use the customer data while the reload runs. IDCAMS and CICS message text may differ.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 

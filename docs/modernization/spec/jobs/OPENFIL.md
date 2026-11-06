@@ -10,7 +10,7 @@ sources:
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "1-99"}
   - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "123-148, 452-455, 526-532, 568-571"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "20-24, 50-54, 87-91"}
-  - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook}
+  - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "124-148"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "20-24"}, {type: manual, job: OPENFIL}]
 programs: [SDSF]
 data_stores:
@@ -20,7 +20,7 @@ data_stores:
   - {cics_file: CXACAIX, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, entity: ENT-CARD-XREF, access: [cics-open]}
   - {cics_file: USRSEC, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [cics-open]}
 invoked_by: [CA-7, Control-M, operator, scripts/run_full_batch.sh]
-spec_status: draft
+spec_status: reviewed
 ---
 
 # OPENFIL: Open the CardDemo files in CICS
@@ -37,7 +37,7 @@ OPENFIL hands the five files that CLOSEFIL closed back to the online system. Its
 | SE-JOPEN-001 | CICS opens files `TRANSACT`, `CCXREF`, `ACCTDAT`, `CXACAIX` and `USRSEC`. |
 | ERR-JOPEN-001 | The job's return code does not tell whether CICS opened the files. |
 | DEF-JOPEN-001 | The CICS region name is hard-coded. |
-| DEF-JOPEN-002 | The README lists the program as IEFBR14; the JCL runs SDSF. |
+| DEF-JOPEN-002 | The README listed the program as IEFBR14; the JCL runs SDSF. Corrected in commit 4a03121. |
 
 ## 3. Actors and triggers
 
@@ -120,10 +120,10 @@ None. The job has no data fields.
 - **Source:** `:26-30`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
-#### DEF-JOPEN-002 · README names the wrong program
-- The README batch table lists OPENFIL with program `IEFBR14` (`./README.md:371`); the JCL runs `PGM=SDSF`.
+#### DEF-JOPEN-002 · README named the wrong program
+- The README batch table listed OPENFIL with program `IEFBR14`, while the JCL runs `PGM=SDSF`. Commit 4a03121 changed the row to `SDSF` (`./README.md:371`).
 - **Source:** `:22`
-- **Status:** open (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
+- **Status:** fixed in branch, commit 4a03121 (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -134,6 +134,8 @@ None. The job has no data fields.
 ## 15. Equivalence contract
 
 A target is equivalent when, after this step, online functions can read and update the five data sets again, and not before the batch steps that precede it in the chain have ended. Command text, SDSF output and the region name are not part of the contract.
+
+Review evidence (independent reviewers checked every item against the source, all WRONG and MINOR findings were fixed, and a fresh reviewer re-checked every changed or added item): [evidence/g-jobs-ops-review.md](../evidence/g-jobs-ops-review.md).
 
 ## 16. Paragraph coverage
 
