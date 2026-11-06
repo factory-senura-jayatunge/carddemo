@@ -5,3 +5,7 @@
 
 # Runtime files: logs, PIDs, locks, generated keys, batch files and reports.
 var/
+
+# Generated reports (make trace writes build/trace/).
+build/
+__pycache__/
