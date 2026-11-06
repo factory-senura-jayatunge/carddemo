@@ -1,6 +1,6 @@
 # CardDemo interaction view
 
-Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
+Who calls whom: online navigation (XCTL, LINK, CALL), the batch cycle and the data stores each step touches, and the flows of the optional modules. It holds the pilot slice around `COBIL00C` and `CBTRN02C` and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities), e (authorization module, IMS, Db2 and MQ) and f (transaction type Db2 module and VSAM-MQ module). Components and data stores are described in [components.md](components.md); record layouts in [entities.md](entities.md).
 
 ## Online navigation (core)
 
@@ -132,7 +132,7 @@ flowchart TB
 
 The diagram follows the runbook (`docs/runbooks/batch-cycle-restart.md:11-21`). The schedulers differ from it:
 
-- **CA-7** chains CLOSEFIL, CBPAUP0J, POSTTRAN, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:19-127`). It does not list INTCALC, and another CLOSEFIL listing triggers CREASTMT (`app/scheduler/CardDemo.ca7:465-470`), so CA-7 runs the statements right after the files close, not between COMBTRAN and TRANIDX; CREASTMT then triggers TXT2PDF1, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:494-495, 521-527`). The reader chain READACCT to WAITSTEP also starts from CLOSEFIL (`app/scheduler/CardDemo.ca7:335-455`).
+- **CA-7** chains CLOSEFIL, CBPAUP0J, POSTTRAN, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:19-127`); CBPAUP0J is the purge of the authorization module (see "Optional module: authorization"). It does not list INTCALC, and another CLOSEFIL listing triggers CREASTMT (`app/scheduler/CardDemo.ca7:465-470`), so CA-7 runs the statements right after the files close, not between COMBTRAN and TRANIDX; CREASTMT then triggers TXT2PDF1, WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:494-495, 521-527`). The reader chain READACCT to WAITSTEP also starts from CLOSEFIL (`app/scheduler/CardDemo.ca7:335-455`).
 - **Control-M** runs INTCALC monthly, after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:64-80`).
 
 Which order the target scheduler (Airflow) follows is an open question in area g's schedule specs; this view does not choose one. TRANVALD (CBTRN01C) has no JCL and no schedule entry (CBTRN01C DEF-TVAL-007).
@@ -200,9 +200,62 @@ flowchart LR
     DAT --> ER
 ```
 
+## Optional module: authorization (IMS, Db2, MQ)
+
+```mermaid
+flowchart TB
+    subgraph Ext["Outside the repository"]
+        REQ[POS / MQ client]
+    end
+    subgraph MQ["IBM MQ"]
+        RQ[(PAUTH.REQUEST)]
+        RP[(reply-to queue<br/>PAUTH.REPLY)]
+    end
+    subgraph Online["CICS region"]
+        MEN[COMEN01C<br/>option 11]
+        A[COPAUA0C<br/>CP00]
+        S0[COPAUS0C<br/>CPVS]
+        S1[COPAUS1C<br/>CPVD]
+        S2[COPAUS2C<br/>LINK only]
+        CSSL[(TD queue CSSL)]
+    end
+    subgraph Batch["Batch (IMS regions)"]
+        CLO[CLOSEFIL] --> PUR[CBPAUP0J<br/>CBPAUP0C BMP] --> PST[POSTTRAN]
+        UNL[UNLDPADB<br/>PAUDBUNL DLI]
+        LOD[LOADPADB<br/>PAUDBLOD BMP]
+        GSA[UNLDGSAM<br/>DBUNLDGS DLI]
+        HDU[DBPAUTP0<br/>DFSURGU0 ULU]
+    end
+    IMS[(IMS DBPAUTP0<br/>PAUTSUM0 / PAUTDTL1)]
+    DB2[(Db2 CARDDEMO.AUTHFRDS)]
+    VS[(VSAM CCXREF, CXACAIX,<br/>ACCTDAT, CUSTDAT)]
+    SEQ[(PAUTDB.ROOT/CHILD.FILEO)]
+    GS[(PAUTDB.ROOT/CHILD.GSAM)]
+    HD[(IMSDATA.DBPAUTP0)]
+    REQ -- put --> RQ -- trigger --> A
+    A -- MQPUT1 reply --> RP --> REQ
+    A -- READ --> VS
+    A -- GU / REPL / ISRT --> IMS
+    A -- WRITEQ TD --> CSSL
+    MEN -- XCTL --> S0
+    S0 -- "XCTL (S)" --> S1
+    S1 -- "XCTL (PF3)" --> S0
+    S0 -- "XCTL (PF3)" --> MEN
+    S0 -- READ --> VS
+    S0 -- GU / GNP --> IMS
+    S1 -- GU / GNP / REPL --> IMS
+    S1 -- "LINK (PF5)" --> S2 -- INSERT / UPDATE --> DB2
+    PUR -- GN / GNP / DLET --> IMS
+    IMS --> UNL --> SEQ --> LOD --> IMS
+    IMS --> GSA --> GS
+    IMS --> HDU --> HD
+```
+
+No edge leaves the module towards the base application except the menu return (COMEN01C), which also carries a session that never signed on when COPAUS0C or COPAUS1C was started from a terminal (COPAUS0C DEF-AUSM-012, COPAUS1C DEF-AUDT-009, INV-006), the fallback XCTL to the sign-on program COSGN00C when no return program is set (`app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:668-669`), and the reads of the base VSAM files. Nothing in the base application calls into the module except menu option 11 of COMEN01C and the CA-7 chain CLOSEFIL → CBPAUP0J → POSTTRAN (CBPAUP0J §3).
+
 ## Edges
 
-Merged from the area proposals. Where two areas proposed the same edge, the table keeps one row: the main menu's transfers to the transaction programs are in A's row for options 1-10, the admin menu's transfers to the transaction type programs are in A's row for options 5 and 6, the main menu's transfers to the account and card programs are in A's row for options 1-10, account update's call to the date check is in C's rows, the report request's job submission is in C's rows, and the CA-7 reader chain and the CBACT01C call to COBDATFT are in D1's rows.
+Merged from the area proposals. Where two areas proposed the same edge, the table keeps one row: the main menu's transfers to the transaction programs are in A's row for options 1-10, the admin menu's transfers to the transaction type programs are in A's row for options 5 and 6, the main menu's transfers to the account and card programs are in A's row for options 1-10, the main menu's transfer to the pending authorization summary (option 11) is in A's row, account update's call to the date check is in C's rows, the report request's job submission is in C's rows, and the CA-7 reader chain and the CBACT01C call to COBDATFT are in D1's rows.
 ### Sign-on and administration (area a)
 
 | From | To | Mechanism | Data passed | Source (file:line) | Spec item |
@@ -377,3 +430,40 @@ Merged from the area proposals. Where two areas proposed the same edge, the tabl
 | COBSWAIT | MVSWAIT | CALL | fullword binary interval, hundredths of a second | `app/cbl/COBSWAIT.cbl:38` | BR-WAIT-001, BR-MWAT-001 |
 | MVSWAIT | z/OS `STIMER` | SVC (macro `ASMWAIT`) | `WAIT,BINTVL=` the interval | `app/asm/MVSWAIT.asm:23`, `app/maclib/ASMWAIT.mac:17-20` | BR-MWAT-001 |
 | `READACCT` job STEP05 | CBACT01C (area d1) | JCL step | DDs ACCTFILE, OUTFILE, ARRYFILE, VBRCFILE | `app/jcl/READACCT.jcl:32-50` | - (area d1) |
+
+### Authorization module (area e)
+
+| From | To | Mechanism | Data passed | Source (file:line) | Spec item |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| MQ client (outside) | request queue `AWS.M2.CARDDEMO.PAUTH.REQUEST` | MQ | ENT-AUTH-REQUEST: comma-separated request, reply-to queue and correlation ID in the message descriptor | `app/app-authorization-ims-db2-mq/README.md:276-306` | COPAUA0C BR-AUTH-001 |
+| request queue (trigger monitor) | COPAUA0C (`CP00`) | START | trigger message `MQTM` with the queue name | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:233-240`, `app/app-authorization-ims-db2-mq/csd/CRDDEMO2.csd:59-68` | FLOW-AUTH-001, FLOW-JCSD2-001 |
+| COPAUA0C | request queue | MQ | `MQGET` of up to 501 requests per task, 500-byte buffer | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:262, 400-414` | FLOW-AUTH-002, SE-AUTH-001 |
+| COPAUA0C | reply-to queue (README: `AWS.M2.CARDDEMO.PAUTH.REPLY`) | MQ | ENT-AUTH-RESPONSE via `MQPUT1`, correlation ID of the request, not persistent, expiry 50 | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:741-760` | SE-AUTH-002, NUM-AUTH-003, DEF-AUTH-001, DEF-AUTH-015 |
+| COPAUA0C | `CCXREF`, `ACCTDAT`, `CUSTDAT` | file | READ by card number, account ID, customer ID | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:477-485, 525-533, 573-581` | BR-AUTH-003, ERR-AUTH-005, ERR-AUTH-006 |
+| COPAUA0C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary by account; `REPL` or `ISRT` summary; `ISRT` detail; `TERM` | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:293-303, 620, 825-830, 913, 943-944` | BR-AUTH-009, BR-AUTH-010, SE-AUTH-003, SE-AUTH-004 |
+| COPAUA0C | TD queue `CSSL` | TDQ | ENT-AUTH-ERROR-LOG record | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:1001-1002` | SE-AUTH-006 |
+| terminal (no commarea, no sign-on) | COPAUS0C (`CPVS`), COPAUS1C (`CPVD`) | transaction start | none; each program initializes ENT-COMMAREA with a blank user ID and user type, and COPAUS1C passes it to COPAUS0C | `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:190-198`, `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:165-169, 360-370` | FLOW-AUSM-001, DEF-AUSM-012, FLOW-AUDT-001, DEF-AUDT-009 |
+| COPAUS0C | COPAUS0C (`CPVS`) | RETURN TRANSID | ENT-COMMAREA with the `CDEMO-CPVS-*` paging keys | `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:254-257` | SE-AUSM-002 |
+| COPAUS0C | COPAUS1C | XCTL | ENT-COMMAREA: account ID and selected authorization key (`CDEMO-CPVS-PAU-SELECTED`) | `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:313-325` | BR-AUSM-007 |
+| COPAUS0C | COMEN01C (or COSGN00C when no target is set) | XCTL | ENT-COMMAREA | `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:235-237, 665-677` | BR-AUSM-008 |
+| COPAUS0C | `CXACAIX`, `ACCTDAT`, `CUSTDAT` | file | READ by account ID (AIX), account ID, customer ID | `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:817-826, 869-877, 920-928` | BR-AUSM-001, ERR-AUSM-001..003 |
+| COPAUS0C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary by account; `GNP` details | `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:461, 493, 973, 1002-1012` | BR-AUSM-002..006 |
+| COPAUS1C | COPAUS1C (`CPVD`) | RETURN TRANSID | ENT-COMMAREA | `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:202-205` | SE-AUDT-003 |
+| COPAUS1C | COPAUS0C | XCTL | ENT-COMMAREA (PF3, or no commarea) | `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:165-169, 184-186, 360-370` | FLOW-AUDT-001, BR-AUDT-005 |
+| COPAUS1C | COPAUS2C | LINK | `WS-FRAUD-DATA`: account ID, customer ID, ENT-AUTH-DETAIL image, action; back: status `S`/`F`, a 50-byte message and the detail image with `PA-FRAUD-RPT-DATE` set, which COPAUS1C writes back with `REPL` | `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:93-104, 244-252, 522-528` | BR-AUDT-007, SE-AUDT-002 |
+| COPAUS1C | `DBPAUTP0` | IMS | `SCHD PSBPAUTB`; `GU` summary; `GNP` details; `REPL` detail (fraud flag) | `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:439, 465, 495, 525, 575-585` | BR-AUDT-001, BR-AUDT-006, SE-AUDT-001 |
+| COPAUS2C | `CARDDEMO.AUTHFRDS` | DB2 | `INSERT`; on duplicate key `UPDATE` of the fraud flag and report date | `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl:141-145, 222-227` | SE-AUFR-001, SE-AUFR-002 |
+| CA-7 `CLOSEFIL` | `CBPAUP0J` | scheduler | CA-7 trigger | `app/scheduler/CardDemo.ca7:42-43` | FLOW-JAUPG-002 |
+| CA-7 `CBPAUP0J` | `POSTTRAN` | scheduler | CA-7 trigger (also after return code 16) | `app/scheduler/CardDemo.ca7:69-70` | FLOW-JAUPG-002, DEF-JAUPG-003 |
+| CBPAUP0J | CBPAUP0C | JCL step | `PARM='BMP,CBPAUP0C,PSBPAUTB'`, SYSIN card `00,00001,00001,Y` | `app/app-authorization-ims-db2-mq/jcl/CBPAUP0J.jcl:24-25, 36-37` | FLOW-JAUPG-001, BR-JAUPG-001 |
+| CBPAUP0C | `DBPAUTP0` | IMS | `GN` summaries, `GNP` details, `DLET` details and summaries, `CHKP` | `app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:223, 255, 310, 335, 355` | FLOW-AUPG-002, SE-AUPG-001..003 |
+| UNLDPADB | PAUDBUNL | JCL step | `PARM='DLI,PAUDBUNL,PAUTBUNL,,,,,,,,,,,N'` | `app/app-authorization-ims-db2-mq/jcl/UNLDPADB.JCL:38-39` | FLOW-JULPA-001 |
+| PAUDBUNL | `DBPAUTP0` | IMS | `GN` summaries, `GNP` details | `app/app-authorization-ims-db2-mq/cbl/PAUDBUNL.CBL:213, 257` | FLOW-PDUL-001 |
+| PAUDBUNL | `PAUTDB.ROOT.FILEO`, `PAUTDB.CHILD.FILEO` | file | 100-byte summary images; 206-byte key + detail images | `app/app-authorization-ims-db2-mq/cbl/PAUDBUNL.CBL:233, 271` | SE-PDUL-001, SE-PDUL-002 |
+| `PAUTDB.ROOT.FILEO`, `PAUTDB.CHILD.FILEO` | PAUDBLOD (LOADPADB) | file | the same records | `app/app-authorization-ims-db2-mq/jcl/LOADPADB.JCL:36-38`, `app/app-authorization-ims-db2-mq/cbl/PAUDBLOD.CBL:226, 272` | BR-PDLD-001, BR-PDLD-002 |
+| LOADPADB | PAUDBLOD | JCL step | `PARM='BMP,PAUDBLOD,PSBPAUTB'` | `app/app-authorization-ims-db2-mq/jcl/LOADPADB.JCL:26-27` | FLOW-JLDPA-001 |
+| PAUDBLOD | `DBPAUTP0` | IMS | `ISRT` summaries; `GU` summary by key and `ISRT` detail | `app/app-authorization-ims-db2-mq/cbl/PAUDBLOD.CBL:244, 296, 321` | SE-PDLD-001, SE-PDLD-002 |
+| UNLDGSAM | DBUNLDGS | JCL step | `PARM='DLI,DBUNLDGS,DLIGSAMP,,,,,,,,,,,N'` | `app/app-authorization-ims-db2-mq/jcl/UNLDGSAM.JCL:26-27` | FLOW-JULGS-001 |
+| DBUNLDGS | `DBPAUTP0` | IMS | `GN` summaries, `GNP` details | `app/app-authorization-ims-db2-mq/cbl/DBUNLDGS.CBL:222, 267` | FLOW-DBUL-001 |
+| DBUNLDGS | `PAUTDB.ROOT.GSAM`, `PAUTDB.CHILD.GSAM` | IMS | GSAM `ISRT` of 100-byte summaries and 200-byte details | `app/app-authorization-ims-db2-mq/cbl/DBUNLDGS.CBL:302, 321` | SE-DBUL-001, SE-DBUL-002 |
+| DBPAUTP0 (job) | `DBPAUTP0` (database) | JCL step | HD unload utility `DFSURGU0` in a `ULU` region; output `IMSDATA.DBPAUTP0` | `app/app-authorization-ims-db2-mq/jcl/DBPAUTP0.jcl:15-32` | SE-JDBPA-002 |

@@ -21,7 +21,10 @@ high-level qualifier `AWS.M2.CARDDEMO`; change it if you installed under another
   in place and take no checkpoints. A failure part way through leaves some records updated.
   Restart means restoring the files and running the job again, never resubmitting on top of
   partial updates.
-- **GDG generations.** `DEFGDGB` and `DALYREJS` define the GDG bases with `LIMIT(5) SCRATCH`.
+- **GDG generations.** `DEFGDGB` and `DALYREJS` define the GDG bases with `LIMIT(5) SCRATCH`
+  (the alternative job `REPTFILE` defines `TRANREPT` with `LIMIT(10)` and no `SCRATCH`). The
+  shipped catalog (`app/catlg/LISTCAT.txt`) shows `TRANSACT.BKUP` and `TRANSACT.DALY` as
+  `NOSCRATCH`, with rolled-off generations still cataloged; check each base with `LISTCAT`.
   A generation is cataloged when its step ends without an abend, even with a non-zero return
   code, so check return codes before trusting `(0)`.
 - **CICS region.** `CLOSEFIL`, `OPENFIL` and the file refresh jobs send CEMT commands to a

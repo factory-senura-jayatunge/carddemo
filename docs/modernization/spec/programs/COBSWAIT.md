@@ -9,7 +9,7 @@ sources:
   - {path: app/cbl/COBSWAIT.cbl, sha256: 38a8d28235e5, role: program}
   - {path: app/jcl/WAITSTEP.jcl, sha256: 36c98a55c770, role: job}
   - {path: tools/shims/MVSWAIT.cbl, sha256: d03c36d3a662, role: shim}
-entry_points: [{type: jcl-step, job: WAITSTEP, step: WAIT}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "97"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "14-19"}]
+entry_points: [{type: jcl-step, job: WAITSTEP, step: WAIT}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "96-97, 188-189, 297-298, 329-330, 447-448, 521-522, 563-564"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "14-19, 44-49, 81-86"}]
 mapsets: []
 copybooks: []
 data_stores:
@@ -38,7 +38,7 @@ There are no validations (section 8).
 
 ## 3. Actors and triggers
 
-- **Trigger:** JCL job `WAITSTEP`, step `WAIT`, `EXEC PGM=COBSWAIT` (`app/jcl/WAITSTEP.jcl:22-27`). In the CA-7 schedule `WAITSTEP` is a triggered job of POSTTRAN and of several other jobs (`app/scheduler/CardDemo.ca7:72`, `app/scheduler/CardDemo.ca7:97`, `app/scheduler/CardDemo.ca7:189`, `app/scheduler/CardDemo.ca7:298`). In Control-M it runs after TRANBKP and before OPENFIL (`app/scheduler/CardDemo.controlm:14-24`). The job and the schedules are specified by the jobs area; this spec covers the program.
+- **Trigger:** JCL job `WAITSTEP`, step `WAIT`, `EXEC PGM=COBSWAIT` (`app/jcl/WAITSTEP.jcl:22-27`). CA-7 triggers `WAITSTEP` after seven jobs: POSTTRAN (`app/scheduler/CardDemo.ca7:96-97`), TRANTYPE (`app/scheduler/CardDemo.ca7:188-189`), TRANCATG (`app/scheduler/CardDemo.ca7:297-298`), TCATBALF (`app/scheduler/CardDemo.ca7:329-330`), READXREF (`app/scheduler/CardDemo.ca7:447-448`), TXT2PDF1 (`app/scheduler/CardDemo.ca7:521-522`) and PRTCATBL (`app/scheduler/CardDemo.ca7:563-564`). Control-M runs it after TRANBKP (`app/scheduler/CardDemo.controlm:14-19`), after DISCGRP in the weekly folder (`app/scheduler/CardDemo.controlm:44-49`) and after COMBTRAN in the monthly folder (`app/scheduler/CardDemo.controlm:81-86`), each time followed by OPENFIL. What WAITSTEP triggers next in CA-7 depends on the schedule ID; the job and both schedules are specified in `jobs/WAITSTEP.md` §3 (area G). This spec covers the program.
 - **Input:** one in-stream SYSIN record. The JCL record is `00003600      VALUE IN CENTISECONDS` (`app/jcl/WAITSTEP.jcl:26`); only its first 8 characters are used.
 - **Not a PARM:** the program comment says "PARM IN CENTISECONDS" (`:5`) and the JCL comment says "IN THE PARM" (`app/jcl/WAITSTEP.jcl:20`), but the value is read from SYSIN; the EXEC statement has no `PARM=` (DEF-WAIT-002).
 - **Preconditions:** a SYSIN DD; the load module MVSWAIT in the STEPLIB (`app/jcl/WAITSTEP.jcl:23`).
