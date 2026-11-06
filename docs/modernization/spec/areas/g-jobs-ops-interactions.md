@@ -1,5 +1,7 @@
 # Area g-jobs-ops: interaction proposals
 
+Merged in 837f808 into `../interactions.md` (the batch cycle data hand-off diagram, the scheduler, submission, step and file edges, and corrections to the other areas' scheduler rows) and `../components.md` (job rows, data stores, CRUD rows; PINV-g-jobs-ops-01 and -02 as the AS-IS qualifications of INV-002 and INV-003, the other invariants as INV-052..INV-055, see the "Proposed as" column).
+
 Proposals from area `g-jobs-ops` for `../interactions.md` and `../components.md`: how jobs start each other (schedulers, internal reader, the online report request), which program each job step runs, which datasets pass data from one job to the next, what each job does to the data stores, and the cross-job invariants the batch window depends on. Job behaviour is in the job specs under `../jobs/`; `../jobs/README.md` compares the seven batch cycle orders found in the repository (README table, restart runbook, three demo scripts, two schedules).
 
 Conventions: in the scheduler rows, "From" is the job whose successful end starts "To". CA-7 rows cite the `LJOB` entry whose "TRIGGERED JOBS" list names the successor. Control-M rows cite the predecessor's `OUTCOND` and the successor's `INCOND`.

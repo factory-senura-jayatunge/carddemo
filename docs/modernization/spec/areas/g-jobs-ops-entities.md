@@ -1,5 +1,7 @@
 # Area g-jobs-ops: entity proposals
 
+Merged in 837f808 into `../entities.md` (the six entities under their proposed IDs, the relationship rows, two relational mapping hints, and the corrections to existing entities; the dataset inventory went into the data-store table of `../components.md`).
+
 Proposals from area `g-jobs-ops` (base JCL, procedures, CSD and schedules) for `../entities.md`. The new entities are the datasets that only the jobs create, the generation data groups and work files that pass data between jobs. Their record layouts are mostly existing entities, so most field tables refer to those entities and do not repeat them. Every fact is cited to the JCL, the CSD, the catalog listing `app/catlg/LISTCAT.txt` (taken on 09/01/22) or to an item of a job spec in `../jobs/`.
 
 Out of scope here: the user security record (area a), the disclosure group record (area d1), the export record and the statement outputs (area d2). The first three are now in the catalog as ENT-USER-SECURITY, ENT-DISC-GROUP and ENT-EXPORT-RECORD; the statement outputs have no entity. The jobs that create them are described in `../jobs/DUSRSECJ.md`, `../jobs/DISCGRP.md`, `../jobs/CBEXPORT-JOB.md` and `../jobs/CREASTMT.md`. Facts about those datasets that come only from the JCL are in the corrections and the dataset inventory below.
