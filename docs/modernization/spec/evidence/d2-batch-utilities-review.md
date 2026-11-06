@@ -118,6 +118,18 @@ The re-check confirmed that all 12 first-pass findings were fixed. All 15 MINOR 
 - a note on the local stand-ins.
 
 **Conflict left to the lead:** CA-7 runs CREASTMT after CLOSEFIL (`app/scheduler/CardDemo.ca7:465-468`). `interactions.md` follows the runbook (`docs/runbooks/batch-cycle-restart.md:18-20`) and places it between COMBTRAN and TRANIDX. The proposal states both orders.
+### 1.5 Follow-up from the lead's cross-area read (area G, batch schedules)
+
+The NL lead compared these specs with the area G job and schedule specs. All of the findings below were checked against `app/scheduler/CardDemo.ca7` and `app/scheduler/CardDemo.controlm` and fixed:
+
+| Finding | Check against the source | Change |
+| :-- | :-- | :-- |
+| COBSWAIT `entry_points` and §3 listed only part of the triggers. The citation `ca7:72` is the POSTTRAN listing header, not a trigger. | WAITSTEP is triggered at `ca7:97, 189, 298, 330, 448, 522, 564` and in the Control-M folders at `controlm:14-19, 44-49, 81-86`. | `entry_points` and §3 list all ten. §3 points to `jobs/WAITSTEP.md` §3 for what WAITSTEP triggers next. |
+| CBSTM03A §11 stated the upstream state without saying it depends on the README and runbook order. | CLOSEFIL triggers CBPAUP0J (`app/scheduler/CardDemo.ca7:43`, then POSTTRAN at `app/scheduler/CardDemo.ca7:70`) and CREASTMT (`app/scheduler/CardDemo.ca7:468`) at once. | §3 and §11 say that in CA-7, CREASTMT runs in parallel with posting. |
+| CBSTM03A cited the CA-7 trigger as `ca7:465-476`, while the CREASTMT job spec cites `465-468`. | `app/scheduler/CardDemo.ca7:465` is the CLOSEFIL entry and `app/scheduler/CardDemo.ca7:468` the trigger line; `app/scheduler/CardDemo.ca7:470-476` is CREASTMT's own listing. | `465-468` in §3 and `entry_points`. |
+| CBEXPORT and CBIMPORT stated file status `39` as certain, while the job spec says "file-status error". | The status is platform-inferred. | Both now say "a file-status error (most likely `39`)", and Q-EXPT-002 and Q-IMPT-003 ask which status. |
+
+The glossary entry for U0999 in `format.md` now names CBEXPORT, CBIMPORT and CBSTM03A as the programs whose abend code is not set. These specs already said so, so no change was needed for that point.
 ## 2. Spec-only reimplementations
 
 Each check lives in `docs/modernization/spec/checks/<program>_reimpl/`:
@@ -183,7 +195,7 @@ The full lists are in each `notes.md`. The points that matter for a modernizatio
 | CBIMPORT, entities | ENT-EXPORT-RECORD's `packed` type describes the writer (pad `0`, signs C/D/F), while NUM-IMPT-003 describes a more lenient reader. | A sentence in ENT-EXPORT-RECORD now points to NUM-IMPT-003. |
 | CBEXPORT, CBIMPORT, CBSTM03B | How the loader treats duplicate keys or a file length that is not a multiple of the record length. | Not specified: these files are fixed-length KSDS unloads, and such input is a data-preparation error. All three reimplementations keep the first record of a duplicate key. |
 | CBIMPORT | No status value is given for an output write failure. | It cannot happen locally. The spec keeps "status other than `00`" without inventing a value. |
-| CBEXPORT, CBIMPORT | `format.md` describes CEE3ABD abends as U0999, while these programs pass no code and the local shim prints U0000. | The program specs (DEF-EXPT-005, DEF-IMPT-003) are right for these programs. The glossary wording belongs to the format owner. |
+| CBEXPORT, CBIMPORT | `format.md` describes CEE3ABD abends as U0999, while these programs pass no code and the local shim prints U0000. | The program specs (DEF-EXPT-005, DEF-IMPT-003) are right for these programs. The lead has since qualified the glossary entry (section 1.5). |
 | CBEXPORT | `entities.md` gives TRANSACT's batch DD as `TRANFILE` (POSTTRAN); CBEXPORT uses `TRANSACT`. | Different jobs. Reported to the entity catalog owner. |
 | CBEXPORT, CBIMPORT | Key at offset 27 in the program vs `KEYS(4 28)` in IDCAMS. | Already open as DEF-EXPT-002 and DEF-IMPT-004. The reimplementations follow the program, as the local build does. |
 | CBSTM03B | Section 11 describes the repository's unit-test driver, which presets the RC and data area per call. The check's driver keeps them from the previous call, as CBSTM03A does. | Both statements are true for their driver. The equivalence contract is the persistent area (BR-STIO-002). |
