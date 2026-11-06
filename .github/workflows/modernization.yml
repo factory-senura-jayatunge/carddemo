@@ -1,0 +1,451 @@
+# CI for the modernized stack (modernization/): the NL spec checks, the
+# backend and Bill Pay tests, the web build, Airflow, the batch and data
+# verification, end-to-end tests, the nightly batch cycle and the ledger and
+# traceability gate. Each job runs the make target that a developer runs
+# locally (modernization/Makefile).
+#
+# Targets that are not implemented yet are listed by `make -s stubs`. The
+# plan job turns that list into job conditions, so such a job shows as
+# skipped, with the reason in the run summary; it never passes without
+# running its checks.
+#
+# No secrets: every job runs `make setup`, which generates throwaway
+# passwords and keys. The tests use Testcontainers (CARDDEMO_TEST_MSSQL_URL
+# stays empty, as in .env.example).
+name: Modernization
+
+on:
+  push:
+    branches: [main, modernization]
+    paths:
+      - "modernization/**"
+      - "docs/modernization/spec/**"
+      - ".github/workflows/modernization.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "modernization/**"
+      - "docs/modernization/spec/**"
+      - ".github/workflows/modernization.yml"
+  schedule:
+    # Nightly: adds the batch cycle and the Firefox and WebKit e2e runs.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modernization-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  # Maven: no transfer progress lines in the log.
+  MAVEN_ARGS: "-B -ntp"
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.plan.outputs.backend }}
+      billpay: ${{ steps.plan.outputs.billpay }}
+      web: ${{ steps.plan.outputs.web }}
+      airflow: ${{ steps.plan.outputs.airflow }}
+      batch: ${{ steps.plan.outputs.batch }}
+      data: ${{ steps.plan.outputs.data }}
+      e2e: ${{ steps.plan.outputs.e2e }}
+      cycle: ${{ steps.plan.outputs.cycle }}
+      ledger: ${{ steps.plan.outputs.ledger }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Decide which jobs have implemented targets
+        id: plan
+        run: |
+          stubs=" $(make -s -C modernization stubs) "
+          {
+            echo "### Modernization jobs"
+            echo
+            echo "| Job | Targets | Runs |"
+            echo "|:--|:--|:--|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          job() {
+            name=$1; shift
+            missing=""
+            for t in "$@"; do
+              case $stubs in *" $t "*) missing="$missing $t" ;; esac
+            done
+            if [ -z "$missing" ]; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+              echo "| \`$name\` | \`$*\` | yes |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+              echo "| \`$name\` | \`$*\` | skipped: not implemented yet:${missing} |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::notice title=$name skipped::make${missing} not implemented yet"
+            fi
+          }
+          job backend test-backend
+          job billpay test-billpay
+          job web web-build
+          job airflow test-airflow
+          job batch verify-harness verify-batch
+          job data db-reset load verify-data
+          job e2e up test-e2e
+          job cycle up verify-cycle
+          job ledger verify-ledger trace
+
+  spec:
+    name: spec
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the dev container image (GnuCOBOL 3.2)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          tags: carddemo-dev:ci
+          load: true
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+      - name: make verify-spec (NL spec checks, spec-only reimplementations against GnuCOBOL)
+        run: tools/ci-run.sh make -C modernization verify-spec
+
+  backend:
+    name: backend
+    needs: plan
+    if: ${{ needs.plan.outputs.backend == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARDDEMO_SETUP_SKIP: node airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - name: make setup
+        run: make -C modernization setup
+      - name: make test-backend (unit, Testcontainers integration, contract, ArchUnit; both fidelity modes)
+        run: make -C modernization test-backend
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-backend
+          path: modernization/build/test-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  billpay:
+    name: billpay
+    needs: plan
+    if: ${{ needs.plan.outputs.billpay == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARDDEMO_SETUP_SKIP: airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: modernization/.nvmrc
+          cache: npm
+          cache-dependency-path: modernization/web/package-lock.json
+      - name: make setup
+        run: make -C modernization setup
+      - name: Install Playwright Chromium
+        working-directory: modernization/web
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: make test-billpay (services, scenarios, Vitest, Playwright)
+        run: make -C modernization test-billpay
+      - name: Upload test results and service logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-billpay
+          path: |
+            modernization/build/test-results/
+            modernization/var/log/
+          if-no-files-found: error
+          retention-days: 14
+
+  web:
+    name: web
+    needs: [plan, backend]
+    # The client is generated from the committed OpenAPI snapshots, so the
+    # web build also runs while the backend job is skipped; it waits for the
+    # backend so a contract break shows up there first.
+    if: ${{ !cancelled() && needs.plan.outputs.web == 'true' && needs.backend.result != 'failure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARDDEMO_SETUP_SKIP: java airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: modernization/.nvmrc
+          cache: npm
+          cache-dependency-path: modernization/web/package-lock.json
+      - name: make setup
+        run: make -C modernization setup
+      - name: make web-build (npm ci, client generation, tsc, ESLint, Vitest, vite build, bundle budget)
+        run: make -C modernization web-build
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-web
+          path: modernization/web/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  airflow:
+    name: airflow
+    needs: plan
+    if: ${{ needs.plan.outputs.airflow == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARDDEMO_SETUP_SKIP: java node
+      AIRFLOW_VENV: ${{ github.workspace }}/.venvs/carddemo-airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Restore the Airflow venv
+        id: venv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .venvs/carddemo-airflow
+          key: airflow-venv-${{ runner.os }}-py3.14-${{ hashFiles('modernization/airflow/requirements*.txt', 'modernization/airflow/pyproject.toml') }}
+      - name: Create the Airflow venv (Airflow 3.3.2 with the official constraints)
+        if: ${{ steps.venv.outputs.cache-hit != 'true' }}
+        run: |
+          python -m venv "$AIRFLOW_VENV"
+          "$AIRFLOW_VENV/bin/pip" install "apache-airflow==3.3.2" apache-airflow-providers-postgres pytest \
+            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.14.txt
+      - name: make setup
+        run: make -C modernization setup
+      - name: make test-airflow (DagBag import, task order, parameters, operator against a stub)
+        run: make -C modernization test-airflow
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-airflow
+          path: modernization/build/test-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  batch:
+    name: batch
+    needs: [plan, spec]
+    if: ${{ needs.plan.outputs.batch == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARDDEMO_SETUP_SKIP: node airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the dev container image (GnuCOBOL 3.2)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          tags: carddemo-dev:ci
+          load: true
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - name: make setup
+        run: make -C modernization setup
+      - name: make verify-harness verify-batch (Spring Batch against GnuCOBOL, sample and stress data)
+        run: make -C modernization verify-harness verify-batch
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-batch
+          path: modernization/build/test-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  data:
+    name: data
+    needs: plan
+    if: ${{ needs.plan.outputs.data == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARDDEMO_SETUP_SKIP: node airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - name: make setup build
+        run: make -C modernization setup build
+      - name: make db-reset load verify-data (migrations, sample load, reconciliation)
+        run: make -C modernization db-reset load verify-data
+      - name: Upload results and logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-data
+          path: |
+            modernization/build/test-results/
+            modernization/var/log/
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e:
+    name: e2e
+    needs: [plan, web]
+    if: ${{ !cancelled() && needs.plan.outputs.e2e == 'true' && needs.web.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARDDEMO_SETUP_SKIP: airflow
+      # Chromium on pull requests and pushes; nightly adds Firefox and WebKit.
+      E2E_BROWSERS: ${{ github.event_name == 'schedule' && 'chromium firefox webkit' || 'chromium' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: modernization/.nvmrc
+          cache: npm
+          cache-dependency-path: modernization/web/package-lock.json
+      - name: make setup build
+        run: make -C modernization setup build
+      - name: Install Playwright browsers
+        working-directory: modernization/web
+        run: |
+          npm ci
+          # shellcheck disable=SC2086 # one argument per browser
+          npx playwright install --with-deps $E2E_BROWSERS
+      - name: make up test-e2e (fresh data, Playwright, axe)
+        run: make -C modernization up test-e2e
+      - name: make status
+        if: ${{ failure() }}
+        run: make -C modernization status
+      - name: Upload test results and logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-e2e
+          path: |
+            modernization/build/test-results/
+            modernization/web/playwright-report/
+            modernization/var/log/
+          if-no-files-found: error
+          retention-days: 14
+
+  cycle:
+    name: cycle
+    needs: [plan, batch]
+    # Nightly, on demand, and on pull requests labelled "batch".
+    if: >-
+      ${{ !cancelled() && needs.plan.outputs.cycle == 'true' && needs.batch.result == 'success' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'batch')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARDDEMO_SETUP_SKIP: node
+      AIRFLOW_VENV: ${{ github.workspace }}/.venvs/carddemo-airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Restore the Airflow venv
+        id: venv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .venvs/carddemo-airflow
+          key: airflow-venv-${{ runner.os }}-py3.14-${{ hashFiles('modernization/airflow/requirements*.txt', 'modernization/airflow/pyproject.toml') }}
+      - name: Create the Airflow venv (Airflow 3.3.2 with the official constraints)
+        if: ${{ steps.venv.outputs.cache-hit != 'true' }}
+        run: |
+          python -m venv "$AIRFLOW_VENV"
+          "$AIRFLOW_VENV/bin/pip" install "apache-airflow==3.3.2" apache-airflow-providers-postgres pytest \
+            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.14.txt
+      - name: make setup build
+        run: make -C modernization setup build
+      - name: make up verify-cycle (daily cycle through Airflow for 2022-07-06)
+        run: make -C modernization up verify-cycle
+      - name: Upload results and logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-cycle
+          path: |
+            modernization/build/test-results/
+            modernization/var/log/
+          if-no-files-found: error
+          retention-days: 14
+
+  ledger:
+    name: ledger
+    needs: [plan, spec, backend, billpay, web, airflow, batch, data, e2e]
+    # Runs after every other job that ran, also when one failed, so the
+    # matrix shows which items lost their passing test.
+    if: ${{ !cancelled() && needs.plan.outputs.ledger == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARDDEMO_SETUP_SKIP: java node docker airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the test results of the other jobs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-results-*
+          path: modernization/build/ci-results/
+      - name: make verify-ledger trace (ledger evidence, traceability gate)
+        run: make -C modernization verify-ledger trace
+      - name: Upload the traceability matrix
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trace
+          path: modernization/build/trace/
+          if-no-files-found: error
+          retention-days: 30
