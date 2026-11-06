@@ -8,19 +8,22 @@ public final class SpecItemIds {
 
     private static final Pattern UNIT_ITEM =
             Pattern.compile("^(BR|VAL|FLOW|SE|ERR|NUM|DEF|Q)-[A-Z][A-Z0-9]{2,5}-\\d{3}$");
-    private static final Pattern INVARIANT = Pattern.compile("^P?INV-\\d{3}$");
+    private static final Pattern INVARIANT = Pattern.compile("^INV-\\d{3}$");
+    /** A proposed invariant of one area proposal, for example {@code PINV-g-jobs-ops-03}. */
+    private static final Pattern PROPOSED_INVARIANT = Pattern.compile("^PINV-[A-Za-z0-9]+(-[A-Za-z0-9]+)*-\\d{2,3}$");
 
     private SpecItemIds() {
     }
 
     public static boolean isValid(String id) {
-        return id != null && (UNIT_ITEM.matcher(id).matches() || INVARIANT.matcher(id).matches());
+        return id != null && (UNIT_ITEM.matcher(id).matches() || INVARIANT.matcher(id).matches()
+                || PROPOSED_INVARIANT.matcher(id).matches());
     }
 
     public static String require(String id) {
         if (!isValid(id)) {
             throw new IllegalArgumentException("'" + id + "' is not a spec item ID"
-                    + " (KIND-UNIT-NNN with KIND in BR VAL FLOW SE ERR NUM DEF Q, or INV-NNN, PINV-NNN)");
+                    + " (KIND-UNIT-NNN with KIND in BR VAL FLOW SE ERR NUM DEF Q, INV-NNN, or PINV-<area>-NN)");
         }
         return id;
     }

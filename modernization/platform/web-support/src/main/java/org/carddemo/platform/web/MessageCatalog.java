@@ -16,11 +16,11 @@ public final class MessageCatalog {
     // Shared by every service.
     public static final Message UNAUTHENTICATED = target("UNAUTHENTICATED", "Please sign on to use this function ...");
     public static final Message ACCESS_DENIED = target("ACCESS_DENIED", "You are not authorized to use this function ...");
-    public static final Message CSRF_REJECTED = target("CSRF_REJECTED", "The request could not be verified. Please try again ...");
+    public static final Message CSRF_REJECTED = target("CSRF_REJECTED", "Your request could not be verified. Reload the page and try again ...");
     public static final Message INVALID_REQUEST = target("INVALID_REQUEST", "The request is not valid ...");
     public static final Message NOT_FOUND = target("NOT_FOUND", "The requested resource does not exist ...");
     public static final Message METHOD_NOT_ALLOWED = target("METHOD_NOT_ALLOWED", "The request method is not supported ...");
-    public static final Message INTERNAL_ERROR = target("INTERNAL_ERROR", "Unexpected error. Please try again later ...");
+    public static final Message INTERNAL_ERROR = target("INTERNAL_ERROR", "An unexpected error occurred. Please try again later ...");
     public static final Message INVALID_KEY = error("INVALID_KEY", "Invalid key pressed. Please see below...", "CSMSG01Y");
 
     // Bill Pay (COBIL00C).
@@ -65,6 +65,8 @@ public final class MessageCatalog {
     public static final Message NEW_PASSWORD_SAME = error("NEW_PASSWORD_SAME", "New Password must differ from the current one ...", "D-SEC-07");
     public static final Message NEW_PASSWORD_IS_USER_ID = error("NEW_PASSWORD_IS_USER_ID", "New Password must not be the User ID ...", "D-SEC-07");
     public static final Message NEW_PASSWORD_MISMATCH = error("NEW_PASSWORD_MISMATCH", "New Password and confirmation do not match ...", "D-SEC-07");
+    public static final Message USER_ID_MISMATCH = target("USER_ID_MISMATCH", "User ID does not match the signed-on user ...");
+    public static final Message TOO_MANY_ATTEMPTS = target("TOO_MANY_ATTEMPTS", "Too many sign-on attempts. Try again later ...");
     public static final Message SESSION_EXPIRED = target("SESSION_EXPIRED", "Your session has ended. Please sign on again ...");
     public static final Message SIGNED_OFF = new Message("SIGNED_OFF", "SIGNED_OFF",
             "Thank you for using CardDemo application...", Severity.INFO, "CSMSG01Y");
@@ -84,7 +86,7 @@ public final class MessageCatalog {
             USER_ID_REQUIRED, PASSWORD_REQUIRED, INVALID_INPUT_USER_ID, INVALID_INPUT_PASSWORD, UNABLE_TO_VERIFY,
             USER_NOT_FOUND, WRONG_PASSWORD, SIGN_ON_FAILED, USER_TYPE_NOT_ALLOWED, PASSWORD_CHANGE_REQUIRED,
             NEW_PASSWORD_REQUIRED, NEW_PASSWORD_LENGTH_LEGACY, NEW_PASSWORD_LENGTH_FIXED, NEW_PASSWORD_SAME,
-            NEW_PASSWORD_IS_USER_ID, NEW_PASSWORD_MISMATCH, SESSION_EXPIRED, SIGNED_OFF,
+            NEW_PASSWORD_IS_USER_ID, NEW_PASSWORD_MISMATCH, USER_ID_MISMATCH, TOO_MANY_ATTEMPTS, SESSION_EXPIRED, SIGNED_OFF,
             OPTION_COMING_SOON, OPTION_NOT_INSTALLED, INVALID_OPTION));
 
     private MessageCatalog() {
