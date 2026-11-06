@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-from .ledger import Ledger
+from .ledger import Ledger, covering_switch
 from .reports import Result, is_valid_id
 from .spec import Spec
 
@@ -55,7 +55,7 @@ class Matrix:
 
 
 def _requirement(row: Row) -> str:
-    if row.switch is not None and row.switch.get("code_switch") is True:
+    if row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch)):
         return "both-modes"
     if row.switch is None and "defect-decide" in row.classes:
         return "both-modes"
@@ -88,6 +88,9 @@ def _evaluate(row: Row) -> None:
         if missing:
             row.status = "gap"
             row.reason = "no passing test in " + " or ".join(m.lower() for m in missing) + " mode"
+            cover = covering_switch(row.switch)
+            if cover:
+                row.reason += f" (covered by the switch {cover}: its tests must cite this item too)"
             return
     elif row.requirement.startswith("ledger-mode:"):
         mode = row.requirement.split(":", 1)[1]
@@ -135,7 +138,8 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
     gaps: list[tuple[str, str]] = []
     ungated: list[tuple[str, str]] = []
     for ident, row in sorted(rows.items(), key=lambda kv: (kv[1].unit, kv[0])):
-        code_switch = row.switch is not None and row.switch.get("code_switch") is True
+        # An item covered by a switch is tested by that switch's tests, so it is gated wherever the switch is.
+        code_switch = row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch) is not None)
         if row.kind in ("Q", "INV", "PINV") and not code_switch:
             row.requirement, row.status = "none", ("deviation" if row.deviation else "not-required")
             continue

@@ -5,6 +5,7 @@ Fields of the three files: modernization/verify/trace/README.md.
 from __future__ import annotations
 
 import datetime as dt
+import re
 import tomllib
 from collections import Counter
 from dataclasses import dataclass, field
@@ -23,6 +24,15 @@ DEVIATION_REQUIRED = ("kind", "decision", "target", "approved_by", "approved_on"
 DEVIATION_KINDS = ("architecture-dependent", "security-c1", "incidental-ui", "decision")
 UNIT_FIELDS = {"spec", "excluded", "note"}
 FILES = {"fidelity.toml": "switch", "deviations.toml": "deviation", "scope.toml": "unit"}
+COVERED_RE = re.compile(r"\bCovered by the switch ((?:BR|VAL|FLOW|SE|ERR|NUM|DEF)-[A-Z0-9]+-\d{3})\b")
+
+
+def covering_switch(entry: dict | None) -> str | None:
+    """The switch named by a note "Covered by the switch <ID>": the item has no switch of its own, and
+    the tests of that switch cite it in both modes."""
+    note = (entry or {}).get("note")
+    m = COVERED_RE.search(note) if isinstance(note, str) else None
+    return m.group(1) if m else None
 
 
 @dataclass
@@ -113,6 +123,12 @@ def check_switches(ledger: Ledger, spec: Spec, decisions: set[str]) -> list[str]
             problems.append(f"{where}: code_switch must be true or false")
         if "setting" in e and e.get("value") != "fixed":
             problems.append(f"{where}: setting needs value = \"fixed\"")
+        cover = covering_switch(e)
+        if cover is not None:
+            if e.get("code_switch") is not False:
+                problems.append(f"{where}: covered by the switch {cover}, so code_switch must be false")
+            if ledger.switches.get(cover, {}).get("code_switch") is not True:
+                problems.append(f"{where}: covered by {cover}, but {cover} has no entry with code_switch = true")
         dev = ledger.deviations.get(ident)
         if e.get("code_switch") is True and dev is not None and dev.get("kind") == "architecture-dependent":
             problems.append(f"{where}: code_switch = true, but deviations.toml records it as architecture-dependent (no legacy mode)")
