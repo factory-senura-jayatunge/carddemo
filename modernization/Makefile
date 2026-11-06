@@ -18,7 +18,10 @@ MAIN_CHECKOUT := $(if $(GIT_COMMON_DIR),$(patsubst %/,%,$(dir $(GIT_COMMON_DIR))
 MAIN_MODERNIZATION := $(if $(wildcard $(MAIN_CHECKOUT)/modernization/docker-compose.yml),$(MAIN_CHECKOUT)/modernization,$(HERE))
 CARDDEMO_ENV_FILE ?= $(MAIN_MODERNIZATION)/.env
 CARDDEMO_INFRA_DIR ?= $(MAIN_MODERNIZATION)
-export CARDDEMO_ENV_FILE CARDDEMO_INFRA_DIR
+# Runtime files (logs, PIDs, locks, keys, batch files) are machine-wide too.
+CARDDEMO_VAR_DIR ?= $(MAIN_MODERNIZATION)/var
+CARDDEMO_JWT_KEY_FILE ?= $(CARDDEMO_VAR_DIR)/secrets/identity-jwt.pem
+export CARDDEMO_ENV_FILE CARDDEMO_INFRA_DIR CARDDEMO_VAR_DIR CARDDEMO_JWT_KEY_FILE
 ENV_FILE := $(CARDDEMO_ENV_FILE)
 TOOLCHAIN := $(HERE)/scripts/toolchain.sh
 PYTHON ?= python3
@@ -73,10 +76,11 @@ STUBS := db-reset load smoke billpay verify-ledger test-backend \
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-setup: ## Check JDK 21, Node 24, Docker/Colima and the Airflow venv; create .env with generated secrets
+setup: ## Check JDK 21, Node 24, Docker/Colima and the Airflow venv; create .env and the JWT key with generated secrets
 	@rc=0; \
 	'$(TOOLCHAIN)' check || rc=1; \
 	$(PYTHON) '$(HERE)/scripts/init_env.py' '$(HERE)/.env.example' '$(ENV_FILE)' || rc=1; \
+	'$(HERE)/scripts/init_jwt_key.sh' '$(CARDDEMO_JWT_KEY_FILE)' || rc=1; \
 	if [ '$(ENV_FILE)' != '$(HERE)/.env' ] && [ -f '$(HERE)/.env' ] && [ ! '$(HERE)/.env' -ef '$(ENV_FILE)' ]; then \
 		printf 'warn  %-16s %s\n' .env '$(HERE)/.env is ignored; this checkout uses $(ENV_FILE)'; fi; \
 	if $(COMPOSE) config --quiet; then \
@@ -93,6 +97,8 @@ toolchain: ## Show the JDK, Node and Docker endpoint that the recipes use
 	@echo "AIRFLOW_VENV=$(AIRFLOW_VENV)"
 	@echo "CARDDEMO_ENV_FILE=$(ENV_FILE)"
 	@echo "CARDDEMO_INFRA_DIR=$(CARDDEMO_INFRA_DIR)"
+	@echo "CARDDEMO_VAR_DIR=$(CARDDEMO_VAR_DIR)"
+	@echo "CARDDEMO_JWT_KEY_FILE=$(CARDDEMO_JWT_KEY_FILE)"
 
 require-env:
 	@[ -f '$(ENV_FILE)' ] || { echo '$(ENV_FILE) is missing; run make setup (in the main checkout) first' >&2; exit 1; }
