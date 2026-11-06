@@ -1,5 +1,7 @@
 # Area e-authorization: interaction proposals
 
+Merged in 3ec58c3 into `../interactions.md` (diagram and edges; the main menu option 11 edge is A's row) and `../components.md` (component rows, data stores, CRUD rows; the sign-on bypass into INV-006, invariants as INV-046..INV-051, see the "Proposed as" column).
+
 Proposals of area `e-authorization` for `../interactions.md` and `../components.md`: who calls whom in the optional authorization module `app/app-authorization-ims-db2-mq/` (CICS, IMS, Db2, MQ), which data stores each unit touches, and the invariants the units share. Program and job items are in `programs/` (COPAUA0C, COPAUS0C, COPAUS1C, COPAUS2C, CBPAUP0C, DBUNLDGS, PAUDBLOD, PAUDBUNL) and `jobs/` (CBPAUP0J, DBPAUTP0, LOADPADB, UNLDGSAM, UNLDPADB, CRDDEMO2-CSD); entity proposals are in `e-authorization-entities.md`. Short citations name files of the module; the module's programs are under `cbl/`, its jobs under `jcl/`.
 
 ## Diagram
