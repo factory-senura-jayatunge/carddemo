@@ -5,6 +5,7 @@ Tools behind `make -C modernization verify-ledger` and `make -C modernization tr
 ```sh
 python3 modernization/verify/trace/verify_ledger.py            # what make verify-ledger runs
 python3 modernization/verify/trace/verify_ledger.py --no-code  # the ledger against the spec only
+python3 modernization/verify/trace/trace_matrix.py             # what make trace runs
 python3 -m unittest discover -s modernization/verify/trace/tests
 ```
 
@@ -85,3 +86,37 @@ excluded = { "BR-MENU-002" = "options 1-9 and 11 not converted" }
 - **Approval.** Every entry and deviation has a `decision` that the catalog defines (or `none`), `approved_by` and a valid `approved_on`; no unknown fields.
 - **Architecture.** Every item of the architecture-dependent table in `docs/modernization/architecture/decisions.md` is defined and has a deviation of kind `architecture-dependent`.
 - **Code** (everything under `modernization/`, main sources only). Every switch the Java code declares (`FidelitySwitch.of("ID", ...)`, `new FidelitySwitch("ID", ...)`) or reads by literal ID (`.mode("ID")`, `.fixed("ID")`, `.isFixed("ID")`, `.isLegacy("ID")`) has a fidelity entry with `code_switch = true`. A `carddemo.fidelity.<ID>` key in the default profile of a main `application.yml`, `application.yaml` or `application.properties` must name an entry and equal its `value`, because an explicit property overrides the ledger. An entry with `code_switch = true` that no code declares yet is a warning, not a failure.
+
+## make trace
+
+`trace_matrix.py` (named so that it does not shadow Python's own `trace` module) reads the spec, the ledger and every test report under `modernization/`, writes `modernization/build/trace/matrix.md` and `matrix.json`, prints the gaps and ends with `trace: OK` (exit 0) or `trace: FAILED (<n> gaps)` (exit 1).
+
+```sh
+python3 modernization/verify/trace/trace_matrix.py                         # what make trace runs
+python3 modernization/verify/trace/trace_matrix.py --reports path/to/dir-or-file ... --out /tmp/trace
+```
+
+**Reports.** Files under any `spec-items`, `test-results`, `playwright-report`, `surefire-reports` or `failsafe-reports` directory (`node_modules`, `.git` and `var` are skipped):
+
+| Format | Items | Mode |
+| :-- | :-- | :-- |
+| `*.jsonl` from `platform/fidelity` (`<module>/target/spec-items/<TestClass>.jsonl`): `{"class", "method", "displayName", "items", "status", "mode"}` | `items` | `mode` (`LEGACY`, `FIXED` or null) |
+| JUnit XML: Maven Surefire, Vitest's `junit` reporter, `pytest --junitxml` | `@<ID>` tags in the test name, and `<property>` elements named `spec`, `spec_item`, `items`, `tag` or starting with `spec` (pytest `record_property("spec", "INV-052")`) | a `mode` property, an `@legacy`/`@fixed` tag, or `[LEGACY]`/`[FIXED]` in the name |
+| Playwright JSON reporter | `@<ID>` tags in the suite and test titles, and the test's `tags` | an `@legacy`/`@fixed` tag |
+
+A test counts as passed, failed or skipped; a skipped test proves nothing.
+
+**Gate.** For every unit in `scope.toml`:
+
+| Item | Needs |
+| :-- | :-- |
+| excluded in `scope.toml` | nothing |
+| has a deviation | nothing (tests are listed if any cite it) |
+| code switch (`code_switch = true`), or defect-decide with no fidelity entry | passing tests in legacy and in fixed mode |
+| defect-decide with a fidelity entry | a passing test in the entry's mode (a test without a mode counts) |
+| must-preserve, or no fidelity class in the spec | a passing test |
+| incidental only, question, invariant | nothing |
+
+In addition: a failing test that cites a required item is a gap; every item of the architecture-dependent table needs a deviation; every code switch needs both modes, whatever its unit; and any test that cites an ID the spec does not define is a gap, in or out of scope. An unreadable report is a gap too.
+
+**Matrix.** `matrix.json` has the gate result and gaps, the units in scope, the report files, a status count per unit, and one record per spec item (and per question or invariant that the ledger or a test names): unit, kind, title, fidelity text and classes, ledger entry, deviation, exclusion, requirement, status (`covered`, `gap`, `deviation`, `excluded`, `not-required`, `out-of-scope`) and the tests with their result and mode. `matrix.md` shows the gaps, a table per unit in scope, the code switches, and the cited items of other units.
