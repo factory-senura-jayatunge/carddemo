@@ -206,9 +206,16 @@ verify-cycle: ## Full batch cycle through Airflow and Spring Batch (heavy) [not 
 verify-cycle: PHASE = Phase 3, Airflow (end-to-end batch cycle run)
 test-airflow: ## Airflow DAG integrity and ordering tests [not implemented yet]
 test-airflow: PHASE = Phase 3, Airflow (DAG tests)
-web-build: ## npm ci, API client from the snapshots, tsc, ESLint, Vitest, vite build, bundle budget (heavy)
+# The message catalogue check compares web/src/messages.ts with the export
+# that MessageCatalogTest writes; without the file it would only be skipped.
+MESSAGES_JSON = $(HERE)/platform/web-support/target/messages.json
+web-build: ## Message catalogue export, npm ci, API client, tsc, ESLint, Vitest, vite build, bundle budget (heavy)
 	@$(call need,web/package.json,arrives with the web app)
-	@cd '$(HERE)/web' && npm ci && $(HEAVY) $@ npm run verify \
+	@cd '$(HERE)' && $(HEAVY) $@ sh -c '\
+		if [ -x ./mvnw ]; then ./mvnw -q -B -pl platform/web-support -am test -Dtest=MessageCatalogTest \
+			-Dsurefire.failIfNoSpecifiedTests=false || { echo "$@: FAILED (exporting the message catalogue)" >&2; exit 1; }; fi; \
+		if [ -f "$(MESSAGES_JSON)" ]; then export CARDDEMO_MESSAGES_JSON="$(MESSAGES_JSON)"; fi; \
+		cd web && npm ci && npm run verify' \
 	&& echo '$@: OK' || { echo '$@: FAILED (see above)' >&2; exit 1; }
 test-e2e: require-env ## Playwright against the running stack (make up first); E2E_BROWSERS="chromium firefox webkit" (heavy)
 	@$(call need,web/playwright.config.ts,arrives with the web app)

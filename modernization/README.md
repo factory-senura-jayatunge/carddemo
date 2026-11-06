@@ -96,13 +96,13 @@ A target whose work has not landed fails with the phase that delivers it. A targ
 | `verify-spec` | Natural-language spec format and paragraph coverage (`check_spec.py --require-all`, which also fails when an in-scope program or job has no spec), then every spec-only reimplementation in `docs/modernization/spec/checks/` against the GnuCOBOL build, on sample and stress data. Builds the batch programs first (needs GnuCOBOL 3.2, see the root `AGENTS.md`). | No | Done (Phase 1, NL spec) |
 | `verify-ledger` | Ledger evidence and links (`verify/trace/verify_ledger.py`, Python 3.11 or newer) | No | Done |
 | `test-backend` | `./mvnw -B verify`: unit, integration, contract and ArchUnit tests, against the per-agent test database or Testcontainers | Yes | Done |
-| `test-billpay` | `scripts/test_billpay.py`: Maven verify of ledger-core and billpay-service, the Bill Pay Vitest file, Playwright `e2e/bill.spec.ts` on the mocked API (Vite on 25174), then `db-reset load`, the slice up and the same spec against it, then the trace gate for BILL. Reports go to `build/test-results/billpay/`. The slice stays up. | Yes | Done; needs `load` |
+| `test-billpay` | `scripts/test_billpay.py`: Maven verify of ledger-core and billpay-service, the Bill Pay Vitest file, Playwright `e2e/bill.spec.ts` on the mocked API (Vite on 25174), then `db-reset load`, the slice up and the same spec against it, then the trace gate for BILL. The Vitest report goes to `build/test-results/billpay/`; Playwright's stay in `web/playwright-report/e2e-<target>-<mode>.json`, where `trace` reads them. The slice stays up. | Yes | Done; needs `load` |
 | `verify-batch` | Spring Batch against GnuCOBOL, field by field | Yes | Phase 3, batch |
 | `verify-harness` | Self-test of the differential harness | No | Phase 3, batch |
 | `verify-data` | Record counts and checksums after `load` | Yes | Phase 3, data migration |
 | `verify-cycle` | The full batch cycle through Airflow | Yes | Phase 3, Airflow |
 | `test-airflow` | DAG integrity and task order | No | Phase 3, Airflow |
-| `web-build` | `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | Yes (Vitest) | Done |
+| `web-build` | Exports the message catalogue (`MessageCatalogTest` writes `platform/web-support/target/messages.json`, passed as `CARDDEMO_MESSAGES_JSON` so the catalogue check runs instead of skipping), then `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | Yes (Maven test, Vitest) | Done |
 | `test-e2e` | Playwright against the running stack (`make up` first, `CARDDEMO_E2E_TARGET=stack`); Chromium, or the projects in `E2E_BROWSERS` | Yes | Done |
 | `trace` | Rule-to-test traceability matrix and its gate (`verify/trace/trace_matrix.py`, Python 3.11 or newer) | No | Done |
 
