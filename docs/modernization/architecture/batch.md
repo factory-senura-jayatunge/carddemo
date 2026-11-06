@@ -4,7 +4,7 @@
 
 - **Spring Batch holds the batch rules.** All jobs live in one Spring Boot application, `batch-service` (`modernization/batch/`), with its job repository in the `batch` schema.
 - **Airflow only orchestrates.** DAGs in `modernization/airflow/dags/` open and close the batch window, launch jobs through `batch-service`, wait for their exit status, branch and retry. They contain no business rule; `make test-airflow` fails if a DAG file imports anything but Airflow and the shared operator package.
-- **One cycle date.** Each cycle run has a `cycle_id` and a `businessDate` (Airflow's logical date, or a `conf` override). Every job takes them as identifying job parameters. INTCALC's `PARM` (`2022071800`) is derived as `yyyyMMdd` + `00`, and the timestamps the jobs write take their date from `businessDate` and their time from the clock, as `CARDDEMO_BUSINESS_DATE` does locally. This replaces the three date sources in use today (D1 cross-cutting finding 5).
+- **One cycle date.** Each cycle run has a `cycle_id` and a `businessDate` (Airflow's logical date, or a `conf` override). The DAG's first call, `POST /internal/cycles {businessDate, interest}`, creates the `batch.cycle` row, or returns the existing one for that date, and gives the `INT` `cycleId`. Every job takes them as identifying job parameters. INTCALC's `PARM` (`2022071800`) is derived as `yyyyMMdd` + `00`, and the timestamps the jobs write take their date from `businessDate` and their time from the clock, as `CARDDEMO_BUSINESS_DATE` does locally. This replaces the three date sources in use today (D1 cross-cutting finding 5).
 - **Exit statuses replace return codes and abends.**
 
 | Legacy | Spring Batch exit status | Airflow |
@@ -17,14 +17,14 @@
 
 CLOSEFIL closes five CICS files (`ACCTDAT`, `CCXREF`, `CXACAIX`, `TRANSACT`, `USRSEC`) before batch, OPENFIL reopens them, and a job that changes them must not overlap online updates (INV-002).
 
-- DAG task `open_batch_window` calls `POST /internal/batch-window/open {cycleId, mode}`. It records a row in `ops.batch_window` and then waits until no online transaction on the covered tables is still running (services hold a short shared lock on the window row for each write transaction; opening takes it exclusively). This replaces both SDSF `CEMT` and WAITSTEP's fixed 36-second sleep.
+- DAG task `open_batch_window` calls `POST /internal/batch-window/open {cycleId}` on `batch-service`, which owns the window ([api-security.md](api-security.md#batch-service-internal)). There is one global window in mode `WRITES_BLOCKED` (D-BAT-05), with one application lock. Each online write transaction holds the shared side of the lock; opening takes the exclusive side, waits until running writes have drained, records the row in `ops.batch_window` and returns. If they do not drain in time it answers `503 WINDOW_DRAIN_TIMEOUT` and leaves the window closed, and the DAG task retries. Opening again for the same cycle is a no-op. This replaces both SDSF `CEMT` and WAITSTEP's fixed 36-second sleep.
 - Services check the window before using a covered table ([api-security.md](api-security.md#api-conventions)).
 - `close_batch_window` clears it. It runs only when every task before it succeeded. After a failure the window stays open, as the files stay closed today (ERR-JCA7-001), until an operator closes it with `make -C modernization batch-window-close` after recovery.
 
 | Window mode | Covered tables | Online effect | Default |
 | :-- | :-- | :-- | :-- |
 | `CLOSED_FILES` | account, card cross-reference, transaction, user | every read and write on them fails, including sign-on, as with closed CICS files | legacy behaviour, not built |
-| `WRITES_BLOCKED` | same | reads work (snapshot isolation), writes return 503; sign-on, refresh and sign-off stay available | **decided (D-BAT-05)** |
+| `WRITES_BLOCKED` | every business table the cycle or a reload writes: `core.*` (including online adds to `core.daily_tran`), `ref.*`, user maintenance | reads work (snapshot isolation), writes return 503; sign-on, refresh and sign-off stay available | **decided (D-BAT-05)**; one global window for the daily cycle, the reference refresh and the data load |
 | `NONE` | - | no window; row locks only | not recommended: posting reads running totals (BR-POST-007) |
 
 ## The transaction master and cycles
@@ -51,7 +51,7 @@ D-27 (accepted: "feed the posting input; one posting path") fixes DEF-TRNA-001. 
 
 - **The add.** `transaction-service` validates as today, allocates the ID with `ledger-core` `TransactionIds.next()` (switch BR-TRNA-003), and inserts one `core.daily_tran` row: `origin = ONLINE_ADD`, `cycle_id` NULL (waiting), `created_by`, the parsed columns, and `raw_record` built in the 350-byte daily-file layout by `legacy-format`, so a reject reads like a file reject. The success message keeps its text, with the ID (BR-TRNA-005). The add is a write under the batch window: during the window it gets `503 BATCH_WINDOW`, which also keeps it from racing the claim below.
 - **IDs.** In fixed mode the sequence keeps IDs unique. In legacy mode "highest + 1" takes the highest ID among master rows **and** waiting `ONLINE_ADD` rows, under the same app lock, so it gives the value the legacy file would; the filtered unique index `UX_daily_waiting (tran_id) WHERE cycle_id IS NULL` backs it. "Copy latest" (BR-TRNA-006) reads the same union.
-- **The claim.** `ingest_daily_file` stages the file rows, then claims every waiting row: it sets `cycle_id` and gives them `seq` numbers after the file rows, in insert order (`daily_pk`). Posting is single-threaded in `seq` order (BR-POST-007), so a cycle with no online adds posts exactly as before, and the differential checks are unchanged.
+- **The claim.** `ingestDailyFileJob` stages the file rows (step `stage`), then claims every waiting row (step `claimOnlineAdds`): it sets `cycle_id` and gives them `seq` numbers after the file rows, in insert order (`daily_pk`). Posting is single-threaded in `seq` order (BR-POST-007), so a cycle with no online adds posts exactly as before, and the differential checks are unchanged.
 - **Posting.** Online-add rows go through the same `post` step as file rows. Accepted rows become `core.transaction` rows with `in_master = 1`, `origin = ONLINE_ADD`, the cycle's `cycle_id` and `created_by` carried over. Rejected rows go to `core.daily_reject` with reasons 100 to 103 and appear in the reject export and the operations view.
 - **What users see.** An added transaction appears in the transaction list, view and reports after the cycle that posts it, not at once as BR-TRNA-007 describes; a rejected add appears only among the cycle's rejects. Both follow from the accepted D-27 fix and get ledger entries (BR-TRNA-007, PINV-c-05). Bill payments still post at once (D-28), because the user must see the new balance on the confirmation screen.
 
@@ -109,7 +109,7 @@ Decisions that go with F, with the defaults this proposal uses:
 | CLOSEFIL (JCLOSE) | SDSF `CEMT SET FIL CLO` | none (REST call) | `carddemo_daily_cycle.open_batch_window` |
 | CBPAUP0J (JAUPG) | STEP01 CBPAUP0C (IMS BMP) | `purgePendingAuthorizationsJob`: `purge` chunk step over `pauth.auth_summary` | `purge_pending_authorizations` |
 | TRANBKP (JTBKP) | REPRO backup, IDCAMS delete, define | `archiveMasterJob`: `archive` tasklet | `archive_master` |
-| POSTTRAN (JPOST) | STEP15 CBTRN02C | `postDailyTransactionsJob`: `ingestDailyFile` (file to `core.daily_tran`), `post` (chunk, single thread, input order), `exportRejects` (430-byte file) | `ingest_daily_file`, `post_daily_transactions` |
+| POSTTRAN (JPOST) | STEP15 CBTRN02C | `ingestDailyFileJob`: `stage` (the configured inbound file to `core.daily_tran`, chunked), `claimOnlineAdds` (one statement: waiting `ONLINE_ADD` rows get the `cycleId` and `seq` after the file rows, [above](#online-writes-between-cycles)); `postDailyTransactionsJob`: `post` (chunk, single thread, `seq` order), `exportRejects` (430-byte file) | `ingest_daily_file`, `post_daily_transactions` |
 | INTCALC (JINTC) | STEP15 CBACT04C with PARM | `calculateInterestJob`: `interest` (item = account with its category balances) | `calculate_interest` |
 | COMBTRAN (JCOMB) | SORT, REPRO | none | none |
 | CREASTMT (JSTMT) | delete/define work file, SORT, REPRO, IEFBR14, STEP040 CBSTM03A | `statementJob`: `render` (text, HTML, optional PDF writers) | `generate_statements` |
@@ -132,7 +132,7 @@ Every other job in [mapping.md](mapping.md) is dropped.
 | `carddemo_daily_cycle` | daily, `catchup=False`, `max_active_runs=1`; params `interest` (`always`, `month_end`, `never`), `statements` (`every_cycle`, `with_interest`), `purge_position` (`after_cycle`, `before_posting`) | as in the diagram above |
 | `carddemo_transaction_report` | none; triggered by `transaction-service` through the Airflow REST API with `conf {runId, startDate, endDate, requestedBy}` | `run_report` |
 | `carddemo_category_balance_listing` | manual | `run_listing` |
-| `carddemo_reference_refresh` | weekly, Saturday | `open_batch_window` (mode for `ref` tables), `maintain_transaction_types` (skipped without input file), `reload_disclosure_groups`, `close_batch_window` |
+| `carddemo_reference_refresh` | weekly, Saturday | `open_batch_window` (the same global window), `maintain_transaction_types` (skipped without input file), `reload_disclosure_groups`, `close_batch_window` |
 | `carddemo_data_load` | manual | `open_batch_window`, `load`, `verify`, `close_batch_window` |
 | `carddemo_export_masters`, `carddemo_import_migration` | manual | one job each |
 
@@ -142,6 +142,7 @@ All DAGs that change data share the Airflow pool `carddemo_batch` with one slot,
 
 | Job | Restart after a failure | Second run of a completed cycle |
 | :-- | :-- | :-- |
+| `ingestDailyFileJob` | `stage` resumes after the last committed chunk; `claimOnlineAdds` claims only rows still waiting, so a rerun claims nothing twice. | Refused (`409 JOB_INSTANCE_COMPLETE`). |
 | `postDailyTransactionsJob` | Resumes after the last committed chunk. Each chunk commits the account, category balance, transaction and reject rows together with the reader position, so no record is half applied (fixes DEF-POST-008 by construction). | Refused: same `cycleId` is a completed job instance. A deliberate rerun restores the snapshot taken before the step (`batch.snapshot_account`, `batch.snapshot_tcat_bal`) through `make -C modernization cycle-rerun CYCLE=<id>`, which replaces the runbook restore. |
 | `calculateInterestJob` | Resumes at the next account; interest rows and the account update of one account commit together (DEF-INTC-009). | Refused; legacy reruns charge interest twice (DEF-INTC-005), an architecture-dependent item. |
 | `archiveMasterJob` | One statement; rerun is a no-op. | No-op. |

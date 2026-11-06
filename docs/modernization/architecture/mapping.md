@@ -33,7 +33,7 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 
 | Spec | Target | Notes |
 | :-- | :-- | :-- |
-| CBTRN02C · POST | job `postDailyTransactionsJob` steps `ingestDailyFile`, `post`; DAG `carddemo_daily_cycle` task `post_daily_transactions` | Single-threaded in input order (BR-POST-007); exit status `COMPLETED_WITH_REJECTS` for legacy RC 4. |
+| CBTRN02C · POST | jobs `ingestDailyFileJob` (steps `stage`, `claimOnlineAdds`) and `postDailyTransactionsJob` (steps `post`, `exportRejects`); DAG `carddemo_daily_cycle` tasks `ingest_daily_file`, `post_daily_transactions` | Single-threaded in input order (BR-POST-007); exit status `COMPLETED_WITH_REJECTS` for legacy RC 4. |
 | CBACT04C · INTC | job `calculateInterestJob` step `interest`; DAG task `calculate_interest` | Item = one account with its category balances; truncation toward zero (BR-INTC-001); ID prefix from the cycle date (BR-INTC-005). |
 | CBTRN03C · TRPT | job `transactionReportJob` steps `select`, `print`; DAG `carddemo_transaction_report` | 133-byte report writer with BR-TRPT-005 paging and NUM-TRPT-002 edits. |
 | CBTRN01C · TVAL | dropped | No job and no output; its card and account checks are part of posting (BR-POST-*). |
@@ -86,7 +86,7 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 | CLOSEFIL · JCLOSE | DAG `carddemo_daily_cycle` task `open_batch_window` | Batch-window row instead of `CEMT SET FIL CLO` (INV-002, Q-JCLOSE-001). |
 | OPENFIL · JOPEN | DAG task `close_batch_window` | Runs only after success; on failure the window stays open as legacy (ERR-JCA7-001). |
 | TRANBKP · JTBKP | DAG task `archive_master` (job `archiveMasterJob`) | The reset becomes "end the previous master window" on the rows; the backup copy is dropped because the rows stay in the table ([batch.md](batch.md#the-transaction-master-and-cycles)). |
-| POSTTRAN · JPOST | DAG tasks `ingest_daily_file`, `post_daily_transactions` | Job `postDailyTransactionsJob`; RC 4 maps to success with warnings. |
+| POSTTRAN · JPOST | DAG tasks `ingest_daily_file`, `post_daily_transactions` | Jobs `ingestDailyFileJob`, `postDailyTransactionsJob`; RC 4 maps to success with warnings. |
 | INTCALC · JINTC | DAG task `calculate_interest` behind branch `interest_due` | PARM `2022071800` derived from the cycle date (Q-INTC-006); frequency per Q-JINTC-002. |
 | COMBTRAN · JCOMB | dropped as a step | Posting and interest insert straight into the master tagged with the cycle; the sort is an `ORDER BY`. Removes the relative-generation hazard (INV-052, Q-JCOMB-001). |
 | CREASTMT · JSTMT | DAG task `generate_statements` (job `statementJob`) | Work KSDS and re-key sort replaced by an `ORDER BY card_num, tran_id`. Runs after interest (INV-054). |
