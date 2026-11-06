@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.carddemo.platform.fidelity.FidelitySwitches;
+import org.carddemo.platform.legacyformat.LegacyNumbers;
 import org.carddemo.platform.ledger.AccountNotFoundException;
 import org.carddemo.platform.ledger.BalancePosting;
 import org.carddemo.platform.ledger.BatchWindowException;
