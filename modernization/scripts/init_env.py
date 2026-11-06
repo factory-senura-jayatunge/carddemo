@@ -70,6 +70,8 @@ def main(argv: list) -> int:
         os.umask(old_umask)
 
     name = os.path.relpath(env_path)
+    if name.startswith(".."):
+        name = os.path.abspath(env_path)
     parts = ["created from " + os.path.basename(example_path)] if created else ["kept"]
     if added:
         parts.append("added " + ", ".join(added))
