@@ -45,7 +45,7 @@ These are the targets in the order you use them. Every target ends with one line
 | 1 | `setup` | Checks JDK 21, Node 24, Docker/Colima (with amd64 emulation on arm64) and the Airflow venv. Creates `.env` from `.env.example`, generates every empty password and the JWT signing key, and validates the compose file. Running it again keeps existing values and only adds keys that are new in the example. | Done |
 | 2 | `db-reset` | Builds `db/db-migrate`, starts the containers if needed, drops and recreates the application database `CARDDEMO_DB_NAME` (it warns first), runs every Flyway migration, creates the service logins and checks their grants (`--reset --check-logins`). | Done |
 | 3 | `load` | Loads the sample data into SQL Server (`dataLoadJob`). | Not yet (Bill Pay slice) |
-| 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). | Done; services join as they are converted |
+| 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). `ONLY=identity-service,web` starts only those components. | Done; services join as they are converted |
 | 5 | `smoke` | Read-only check of the running slice in under 60 s: health of every running service, sign-on as `USER0001` with the seed password, `me`, `features`, a Bill Pay preview for account `00000000001` (needs `load`), the JWKS, the web app when it runs, and sign-off. It counts the rows of every table in `CARDDEMO_DB_NAME` before and after; only `iam.session` and `iam.audit_event` may change. | Done |
 | 6 | `billpay` | Runs the Bill Pay slice end to end. | Not yet (Bill Pay slice) |
 | 7 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
@@ -60,6 +60,7 @@ Other targets:
 | `db-migrate` | Like `db-reset`, without dropping the database: applies new migrations and checks the logins. |
 | `status` | Containers and host processes with their health; fails when one is unhealthy or a recorded process is gone. |
 | `logs` | Follows the container logs; `SERVICE=mssql`, `rabbitmq` or `airflow-db` limits it to one service. Process logs are in `$CARDDEMO_VAR_DIR/log/<name>.log`. |
+| `stop` | Stops the web app and the services but leaves the shared containers running, so other checkouts and test runs keep their SQL Server. |
 | `infra-up`, `infra-down` | The infrastructure parts of `up` and `down`. |
 | `infra-wipe CONFIRM=1` | Removes this project's containers and volumes (all local data, for every checkout). It touches nothing outside the `carddemo-modern` compose project. |
 | `stubs` | Lists the targets that are not implemented yet. |

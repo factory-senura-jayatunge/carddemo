@@ -11,7 +11,7 @@ looks like a pass.
 PIDs go to $CARDDEMO_VAR_DIR/run/<name>.pid, logs to $CARDDEMO_VAR_DIR/log/.
 Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 
-Usage: stack.py infra-up | infra-down | up [--only NAME,...] | down | status
+Usage: stack.py infra-up | infra-down | up [--only NAME,...] | stop | down | status
        stack.py ensure-infra TARGET   (infra-up for another target; prints only on failure)
 """
 
@@ -379,11 +379,8 @@ def up(only) -> int:
     return 0
 
 
-def down() -> int:
-    holder = heavy_holder()
-    if holder and os.environ.get("FORCE") != "1":
-        print(f"down: FAILED (a heavy target is running: {holder}; rerun with FORCE=1 to stop anyway)")
-        return 1
+def stop_processes() -> list:
+    """Stops every recorded process; returns the names that kept running."""
     left = []
     for name, pid, marker in reversed(recorded()):
         if stop(name, pid, marker):
@@ -391,6 +388,24 @@ def down() -> int:
         else:
             say("FAIL", name, f"pid {pid} did not stop")
             left.append(name)
+    return left
+
+
+def stop_only() -> int:
+    left = stop_processes()
+    if left:
+        print(f"stop: FAILED (still running: {', '.join(left)})")
+        return 1
+    print("stop: OK (containers left running)")
+    return 0
+
+
+def down() -> int:
+    holder = heavy_holder()
+    if holder and os.environ.get("FORCE") != "1":
+        print(f"down: FAILED (a heavy target is running: {holder}; rerun with FORCE=1 to stop anyway)")
+        return 1
+    left = stop_processes()
     if infra_down("down", force=True) != 0:
         left.append("containers")
     if left:
@@ -456,6 +471,8 @@ def main(argv) -> int:
         return up(only)
     if cmd == "down":
         return down()
+    if cmd == "stop":
+        return stop_only()
     if cmd == "status":
         return status()
     print(__doc__.strip().splitlines()[-1], file=sys.stderr)
