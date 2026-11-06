@@ -27,12 +27,14 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from with_env import default_env_file, read_env  # noqa: E402
+from with_env import default_env_file, main_modernization, read_env  # noqa: E402
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INFRA_DIR = os.environ.get("CARDDEMO_INFRA_DIR") or HERE
+# The same defaults as the Makefile, so stack.py run on its own drives the
+# shared compose project instead of planning to recreate it from this checkout.
+INFRA_DIR = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
 ENV_FILE = os.environ.get("CARDDEMO_ENV_FILE") or default_env_file()
-VAR_DIR = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(HERE, "var")
+VAR_DIR = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(main_modernization(), "var")
 RUN_DIR = os.path.join(VAR_DIR, "run")
 LOG_DIR = os.path.join(VAR_DIR, "log")
 UP_TIMEOUT = int(os.environ.get("UP_TIMEOUT", "300"))
@@ -184,6 +186,7 @@ def child_env() -> dict:
     # Services run with their module as working directory, so a relative
     # default would not find the checkout's ledger.
     env.setdefault("CARDDEMO_LEDGER_DIR", os.path.join(HERE, "ledger"))
+    env.setdefault("CARDDEMO_JWT_KEY_FILE", os.path.join(VAR_DIR, "secrets", "identity-jwt.pem"))
     # npm and vite start "node" from PATH; web's engines field rejects
     # anything but Node 24, and Homebrew's default node can be newer.
     node = node_bin()

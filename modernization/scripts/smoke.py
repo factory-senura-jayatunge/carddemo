@@ -21,6 +21,9 @@ import time
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from with_env import main_modernization  # noqa: E402
+
 IDENTITY = "http://127.0.0.1:28081"
 BILLPAY = "http://127.0.0.1:28082"
 WEB = "http://127.0.0.1:25173"
@@ -83,8 +86,9 @@ def code(status):
 
 
 def row_counts(db):
-    cmd = ["docker", "compose", "--project-directory", os.environ.get("CARDDEMO_INFRA_DIR", HERE),
-           "-f", os.path.join(os.environ.get("CARDDEMO_INFRA_DIR", HERE), "docker-compose.yml"),
+    infra = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
+    cmd = ["docker", "compose", "--project-directory", infra,
+           "-f", os.path.join(infra, "docker-compose.yml"),
            "--env-file", os.environ["CARDDEMO_ENV_FILE"],
            "exec", "-T", "mssql", "sh", "-c",
            'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
