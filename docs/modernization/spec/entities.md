@@ -1,11 +1,11 @@
 # CardDemo entity catalog
 
-Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It holds the entities of the pilot programs `COBIL00C` and `CBTRN02C`, ENT-CUSTOMER and ENT-CARD, and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities) and f (transaction type Db2 module and VSAM-MQ module). Each `areas/<area>-entities.md` file records the commit that merged it. The entities of the other areas are added as they merge.
+Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It holds the entities of the pilot programs `COBIL00C` and `CBTRN02C`, ENT-CUSTOMER and ENT-CARD, and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities), e (authorization module, IMS, Db2 and MQ) and f (transaction type Db2 module and VSAM-MQ module). Each `areas/<area>-entities.md` file records the commit that merged it. The entities of the other areas are added as they merge.
 
 Conventions:
 
 - **Pos** is the 1-based byte position in the record; **Len** is the length in bytes.
-- **Type**: `text(n)` fixed-length characters, padded with spaces on the right; `digits(n)` unsigned numeric characters with leading zeros; `decimal(p,s)` signed zoned decimal with `p` digits of which `s` are decimals, sign folded into the last byte (see format.md glossary); `date-text` 10 characters `YYYY-MM-DD`; `ts-text` 26-character timestamp (layouts in ENT-TRANSACTION); `code(n)` text with a fixed set of values; `flag` one character, `Y` or `N`; `packed(p,s)` IBM packed decimal (`COMP-3`): two digits per byte, the last half-byte is the sign (`C` positive, `D` negative, `F` unsigned), a leading `0` half-byte pads an even `p`, length `floor(p/2)+1` bytes. Db2 columns give the SQL type, with the DCLGEN host variable in the PIC column. Message layouts say `zoned` for numeric characters with the sign folded into the last byte, and the export layouts write it `zoned(p,s)`, the same as `decimal(p,s)`. `bin-u(n)` is an unsigned binary integer of `n` bytes, big-endian (`PIC 9(1-4) COMP` is 2 bytes, `9(5-9)` 4 bytes, `9(10-18)` 8 bytes); `bin-s(n),s` a signed big-endian two's-complement integer of `n` bytes holding the value times 10^s (for `S9(10)V99 COMP`, the amount in cents).
+- **Type**: `text(n)` fixed-length characters, padded with spaces on the right; `digits(n)` unsigned numeric characters with leading zeros; `decimal(p,s)` signed zoned decimal with `p` digits of which `s` are decimals, sign folded into the last byte (see format.md glossary); `date-text` 10 characters `YYYY-MM-DD`; `ts-text` 26-character timestamp (layouts in ENT-TRANSACTION); `code(n)` text with a fixed set of values; `flag` one character, `Y` or `N`; `packed(p,s)` IBM packed decimal (`COMP-3`): two digits per byte, the last half-byte is the sign (`C` positive, `D` negative, `F` unsigned), a leading `0` half-byte pads an even `p`, length `floor(p/2)+1` bytes. Db2 columns give the SQL type, with the DCLGEN host variable in the PIC column. Message layouts say `zoned` for numeric characters with the sign folded into the last byte, and the export layouts write it `zoned(p,s)`, the same as `decimal(p,s)`. `bin-u(n)` is an unsigned binary integer of `n` bytes, big-endian (`PIC 9(1-4) COMP` is 2 bytes, `9(5-9)` 4 bytes, `9(10-18)` 8 bytes); `bin-s(n),s` a signed big-endian two's-complement integer of `n` bytes holding the value times 10^s (for `S9(10)V99 COMP`, the amount in cents; `S9(4) COMP` is `bin-s(2),0`). `edited(n)` is a numeric-edited text field of `n` characters (for example `+9(10).99`).
 - Where a table gives **Pos** as a range (`1-2`), it is the first and last byte.
 - Field names are the COBOL names, used verbatim in the specs (including the source's own spelling, `ACCT-EXPIRAION-DATE`).
 - The files enforce no referential integrity; "relationships" below are what the programs look up.
@@ -35,9 +35,17 @@ erDiagram
     DB2_TRAN_TYPE ||--o{ DB2_TRAN_TYPE_CAT : "FK, ON DELETE RESTRICT"
     DB2_TRAN_TYPE ||--o| TRAN_TYPE : "copied by TRANEXTR"
     DB2_TRAN_TYPE_CAT ||--o| TRAN_CATEGORY : "copied by TRANEXTR"
+    ACCOUNT ||--o| AUTH_SUMMARY : "ACCT-ID = PA-ACCT-ID"
+    CUSTOMER ||--o{ AUTH_SUMMARY : "CUST-ID = PA-CUST-ID"
+    AUTH_SUMMARY ||--o{ AUTH_DETAIL : "IMS parent/child"
+    AUTH_INDEX ||--|| AUTH_SUMMARY : "HIDAM primary index on ACCNTID"
+    CARD_XREF ||--o{ AUTH_DETAIL : "XREF-CARD-NUM = PA-CARD-NUM"
+    AUTH_REQUEST ||--o| AUTH_DETAIL : "one detail per request (card found)"
+    AUTH_REQUEST ||--o| AUTH_RESPONSE : "MQ correlation ID"
+    AUTH_DETAIL ||--o| AUTH_FRAUD : "CARD_NUM + AUTH_TS"
 ```
 
-Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_CAT` is ENT-DB2-TRAN-TYPE-CAT). The Db2 foreign key is the only relationship the data stores enforce.
+Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_CAT` is ENT-DB2-TRAN-TYPE-CAT). The data stores enforce two relationships: the Db2 foreign key of ENT-DB2-TRAN-TYPE-CAT and the IMS parent/child link from ENT-AUTH-SUMMARY to ENT-AUTH-DETAIL (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:28-37`). The authorization segments, the fraud table and the authorization messages are local to the module: no base-application program reads them.
 
 ### Relationships merged from the areas
 
@@ -72,6 +80,12 @@ Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_C
 | ENT-COMMAREA | ENT-CUSTOMER | `CDEMO-CUST-ID` = `CUST-ID` (account update also uses it as the key of the customer lock, SE-ACUP-005) | session to zero or one current customer | `app/cbl/COACTUPC.cbl:3806` |
 | ENT-CUSTOMER | US state code list in `CSLKPCDY` (not an entity) | `CUST-ADDR-STATE-CD` | many to one; enforced only by account update (VAL-ACUP-024) | `app/cpy/CSLKPCDY.cpy:1013-1069` |
 | ENT-CUSTOMER | State and ZIP prefix list in `CSLKPCDY` (not an entity) | `CUST-ADDR-STATE-CD` + first 2 characters of `CUST-ADDR-ZIP` | many to one; enforced only by account update (VAL-ACUP-034); the two lists disagree (INV-041) | `app/cpy/CSLKPCDY.cpy:1073-1313` |
+| ENT-AUTH-SUMMARY | ENT-AUTH-DETAIL | IMS physical parent/child | 1 : 0..n | `app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:28-37` |
+| ENT-ACCOUNT | ENT-AUTH-SUMMARY | `ACCT-ID` = `PA-ACCT-ID` (via `XREF-ACCT-ID`) | 1 : 0..1 | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:619-624, 801-806` |
+| ENT-CUSTOMER | ENT-AUTH-SUMMARY | `CUST-ID` = `PA-CUST-ID` (via `XREF-CUST-ID`) | 1 : 0..n | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:806` |
+| ENT-CARD-XREF | ENT-AUTH-DETAIL | `XREF-CARD-NUM` = `PA-CARD-NUM` | 1 : 0..n | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:475, 879` |
+| ENT-AUTH-DETAIL | ENT-AUTH-FRAUD | `PA-CARD-NUM` = `CARD_NUM`, timestamp from `PA-AUTH-ORIG-DATE` + `PA-AUTH-TIME-9C` = `AUTH_TS` | 1 : 0..1 | `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl:103-113, 141-145, 226-227` |
+| ENT-AUTH-REQUEST | ENT-AUTH-RESPONSE | MQ correlation ID | 1 : 1 intended, 1 : 0..1 as-is (a reply can be lost, COPAUA0C DEF-AUTH-008) | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:411-412, 745` |
 
 ## ENT-ACCOUNT · Credit card account
 
@@ -86,7 +100,7 @@ Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_C
 | `ACCT-ACTIVE-STATUS` | 12 | 1 | `X(01)` | text(1) | `Y` active, `N` inactive (all sample accounts are `Y`); not checked by the pilot programs. Account view shows it as stored; account update accepts only upper-case `Y` or `N` (VAL-ACUP-003, VAL-ACUP-004) |
 | `ACCT-CURR-BAL` | 13 | 12 | `S9(10)V99` | decimal(12,2) | Current balance owed; positive = the cardholder owes money |
 | `ACCT-CREDIT-LIMIT` | 25 | 12 | `S9(10)V99` | decimal(12,2) | Credit limit |
-| `ACCT-CASH-CREDIT-LIMIT` | 37 | 12 | `S9(10)V99` | decimal(12,2) | Cash advance limit (not used by the pilot programs) |
+| `ACCT-CASH-CREDIT-LIMIT` | 37 | 12 | `S9(10)V99` | decimal(12,2) | Cash advance limit; copied to `PA-CASH-LIMIT` of ENT-AUTH-SUMMARY by COPAUA0C (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:811`) |
 | `ACCT-OPEN-DATE` | 49 | 10 | `X(10)` | date-text | Date opened |
 | `ACCT-EXPIRAION-DATE` | 59 | 10 | `X(10)` | date-text | Expiration date; transactions dated after it are rejected (POSTTRAN 103) |
 | `ACCT-REISSUE-DATE` | 69 | 10 | `X(10)` | date-text | Reissue date |
@@ -113,7 +127,7 @@ Used by (copybook, `docs/inventory.md:301`): CBACT01C, CBACT04C, CBEXPORT, CBIMP
 - **Copybook:** `app/cpy/CVACT03Y.cpy:4-8` (`CARD-XREF-RECORD`, 50 bytes)
 - **Dataset:** `AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS`, `KEYS(16 0)`, `RECORDSIZE(50 50)` (`app/jcl/XREFFILE.jcl:39-51`)
 - **Alternate index:** `AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX`, `KEYS(11,25)` = `XREF-ACCT-ID`, **NONUNIQUEKEY**, path `...AIX.PATH` (`app/jcl/XREFFILE.jcl:72-92`)
-- **CICS files:** `CCXREF` (by card), `CXACAIX` (path, by account; `app/csd/CARDDEMO.CSD:63-75`).
+- **CICS files:** `CCXREF` (by card), `CXACAIX` (path, by account; `app/csd/CARDDEMO.CSD:63-75`). In the authorization module, COPAUA0C reads `CCXREF` by card (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:477-485`) and COPAUS0C reads `CXACAIX` by account (`app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:817-826`).
 - **Batch DD names by program:** `XREFFILE` in CBACT03C, CBACT04C, CBEXPORT, CBTRN01C and CBTRN02C; `CARDXREF` in CBTRN03C (`app/cbl/CBTRN03C.cbl:33`). CBACT04C reads by account through the path under DD `XREFFIL1` (`app/jcl/INTCALC.jcl:31-32`). CBIMPORT writes a new sequential copy under `XREFOUT`.
 - **Primary key:** `XREF-CARD-NUM`. **Alternate key:** `XREF-ACCT-ID` (several cards per account allowed). CBACT04C reads by `XREF-ACCT-ID` although its `SELECT` does not say `WITH DUPLICATES`; on z/OS a second card for an account is expected to make INTCALC abend (CBACT04C DEF-INTC-007, `app/cbl/CBACT04C.cbl:34-39, 394-414`).
 
@@ -128,7 +142,7 @@ Used by (copybook, `docs/inventory.md:301`): CBACT01C, CBACT04C, CBEXPORT, CBIMP
 
 Sample: 50 records, one card per account. `XREF-CUST-ID` equals `XREF-ACCT-ID` numerically in every record (customer n owns account n; `app/data/ASCII/cardxref.txt:1-50`).
 
-Online reads by account: account view reads `CXACAIX` with a keyed READ by account and takes that record's card and customer. For an account with several cards the READ through the non-unique path returns DUPKEY, which account view treats as an error (DEF-ACVW-003); an account with no card gives "not found" (DEF-ACVW-004). Account update reads it the same way and fails the same way, so such accounts cannot be updated online (SE-ACUP-001, DEF-ACUP-012, INV-031; DUPKEY behaviour platform-inferred, the sample has one card per account; `app/cbl/COACTVWC.cbl:727-768`, `app/cbl/COACTUPC.cbl:3654-3696`).
+Online reads by account: account view reads `CXACAIX` with a keyed READ by account and takes that record's card and customer. For an account with several cards the READ through the non-unique path returns DUPKEY, which account view treats as an error (DEF-ACVW-003); an account with no card gives "not found" (DEF-ACVW-004). Account update reads it the same way and fails the same way, so such accounts cannot be updated online (SE-ACUP-001, DEF-ACUP-012, INV-031). The pending authorization summary reads it the same way, so their authorizations cannot be listed online (COPAUS0C DEF-AUSM-010; DUPKEY behaviour platform-inferred, the sample has one card per account; `app/cbl/COACTVWC.cbl:727-768`, `app/cbl/COACTUPC.cbl:3654-3696`).
 
 ## ENT-CUSTOMER · Customer
 
@@ -169,6 +183,8 @@ Online account view and update (COACTVWC, COACTUPC):
 - **Sample against the edits.** None of the 50 sample customers passes every account update edit (state and ZIP prefix mismatch 44, phone 1 area code 26, phone 2 area code 25, FICO below 300 for 21, state code 5 (`FM`, `MH`, `PW`, `AP`), SSN 4 (one starting `666`, three starting `9`), last name `O'Connell` 1), so no sample account can be saved online (DEF-ACUP-112, INV-038; `app/data/ASCII/custdata.txt:1-50`, `app/cpy/CSLKPCDY.cpy:1073-1313`).
 
 Used by: CVCUS01Y (`docs/inventory.md:305`): CBCUS01C, CBEXPORT, CBIMPORT, CBTRN01C, COACTUPC, COACTVWC, COCRDSLC, COCRDUPC, COPAUA0C, COPAUS0C. CUSTREC (`docs/inventory.md:300`): CBSTM03A.
+
+Authorization module: COPAUS0C displays `CUST-FIRST-NAME`, `CUST-MIDDLE-NAME`, `CUST-LAST-NAME`, `CUST-ADDR-LINE-1` to `-3`, `CUST-ADDR-STATE-CD`, `CUST-ADDR-ZIP` and `CUST-PHONE-NUM-1`; COPAUA0C reads the record only to check that it exists. The module does not read ENT-CARD.
 
 Exposure: READCUST prints `CUST-SSN`, `CUST-GOVT-ISSUED-ID` and `CUST-DOB-YYYY-MM-DD` in full (CBCUS01C DEF-CURD-001, `app/cbl/CBCUS01C.cbl:78`). CBEXPORT copies every field in clear into ENT-EXPORT-RECORD, and CBSTM03A passes whole records through ENT-STMT-REQUEST.
 
@@ -960,6 +976,193 @@ Other bodies: not found (`COACCT01.cbl:429-434`) is `INVALID REQUEST PARAMETERS 
 | MQ-APPL-QUEUE-NAME | 66-113 | 48 | X(48) | alphanumeric | Queue concerned (input queue, `CARD.DEMO.REPLY.*`, `CARD.DEMO.ERROR`), or spaces on the RETRIEVE path |
 | (padding) | 114-1000 | 887 | - | spaces | |
 
+## ENT-AUTH-SUMMARY · Pending authorization summary (IMS root segment PAUTSUM0)
+
+- **Copybook:** `app/app-authorization-ims-db2-mq/cpy/CIPAUSMY.cpy:19-31` (included under `01 PENDING-AUTH-SUMMARY`), 100 bytes.
+- **Database:** IMS HIDAM `DBPAUTP0`, VSAM data set group DD `DDPAUTP0`, root segment `PAUTSUM0`, `BYTES=100`, `POINTER=(TWINBWD)`, `RULES=(,HERE)` (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:18-32`). The DBD names a data-capture exit `EXIT=(*,KEY,DATA,NOPATH,(NOCASCADE),LOG)` (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:19`).
+- **Key:** `ACCNTID`, unique sequence field, bytes 1-6, packed (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:30`) = `PA-ACCT-ID`. Primary index `PAUTINDX` in `DBPAUTX0` (ENT-AUTH-INDEX).
+- **PSBs:** `PSBPAUTB` (`PROCOPT=AP`, used by the CICS programs, CBPAUP0C and PAUDBLOD), `PAUTBUNL` and `DLIGSAMP` (`PROCOPT=GOTP`, unloads), `PSBPAUTL` (`PROCOPT=L`, load, not used by any program here). All use `KEYLEN=14` = 6 (root key) + 8 (detail key).
+- **One summary per account.** It is created by the first authorization request for a card of the account (COPAUA0C BR-AUTH-009) and is never deleted online; CBPAUP0C deletes it (with every detail under it) when its approved count, held in memory and reduced by the details purged in the same run, is zero or less; the reduced count is never written back (BR-AUPG-004, `app/app-authorization-ims-db2-mq/cbl/CBPAUP0C.cbl:156, 286-293`).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `PA-ACCT-ID` | 1 | 6 | `S9(11) COMP-3` | packed(11,0) | Account number (IMS key `ACCNTID`) |
+| `PA-CUST-ID` | 7 | 9 | `9(09)` | digits(9) | Customer number, from the card cross-reference |
+| `PA-AUTH-STATUS` | 16 | 1 | `X(01)` | text(1) | Not set or read by any program (in the sample: space in 18 roots, X'00' in 3, X'F0' in the all-spaces root) |
+| `PA-ACCOUNT-STATUS` (5 occurrences) | 17 | 10 | `X(02) OCCURS 5` | text(2) x 5 | Not set or read by any program |
+| `PA-CREDIT-LIMIT` | 27 | 6 | `S9(09)V99 COMP-3` | packed(11,2) | Copy of `ENT-ACCOUNT.ACCT-CREDIT-LIMIT`, refreshed on every authorization |
+| `PA-CASH-LIMIT` | 33 | 6 | `S9(09)V99 COMP-3` | packed(11,2) | Copy of `ENT-ACCOUNT.ACCT-CASH-CREDIT-LIMIT` |
+| `PA-CREDIT-BALANCE` | 39 | 6 | `S9(09)V99 COMP-3` | packed(11,2) | Sum of approved amounts held against the credit limit |
+| `PA-CASH-BALANCE` | 45 | 6 | `S9(09)V99 COMP-3` | packed(11,2) | Set to zero on every approval; never increased |
+| `PA-APPROVED-AUTH-CNT` | 51 | 2 | `S9(04) COMP` | bin-s(2),0 | Number of approved authorizations |
+| `PA-DECLINED-AUTH-CNT` | 53 | 2 | `S9(04) COMP` | bin-s(2),0 | Number of declined authorizations |
+| `PA-APPROVED-AUTH-AMT` | 55 | 6 | `S9(09)V99 COMP-3` | packed(11,2) | Sum of approved amounts |
+| `PA-DECLINED-AUTH-AMT` | 61 | 6 | `S9(09)V99 COMP-3` | packed(11,2) | Sum of declined amounts (see COPAUA0C DEF-AUTH-004) |
+| FILLER | 67 | 34 | `X(34)` | text | Unused |
+
+Sample data (`app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat`, an IMS HD unload of 51,736 bytes, decoded for this proposal): 22 root segments and 202 detail segments, plus two utility header records. In 21 roots `PA-CREDIT-BALANCE` equals `PA-APPROVED-AUTH-AMT`, the declined count and amount are zero, and the approved count equals the number of details under the root; account 1's summary holds limits 2,022.00 / 1,020.00 while ENT-ACCOUNT account 1 holds 2,020.00 / 1,020.00 (`app/data/ASCII/acctdata.txt` record 1): the summary's copy of the limits is refreshed only by the next authorization request (COPAUA0C BR-AUTH-009). One root has `X'40'` (spaces) in every byte of the key and of the counts, which is not valid packed decimal; the unload programs skip such a root (PAUDBUNL BR-PDUL-002).
+
+## ENT-AUTH-DETAIL · Pending authorization detail (IMS child segment PAUTDTL1)
+
+- **Copybook:** `app/app-authorization-ims-db2-mq/cpy/CIPAUDTY.cpy:19-54` (included under `01 PENDING-AUTH-DETAILS`), 200 bytes.
+- **Database:** `DBPAUTP0`, segment `PAUTDTL1`, parent `PAUTSUM0`, `BYTES=200` (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:36-37`).
+- **Key:** `PAUT9CTS`, unique sequence field, bytes 1-8, `TYPE=C` (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:37`) = `PA-AUTHORIZATION-KEY` (`PA-AUTH-DATE-9C` + `PA-AUTH-TIME-9C`). Both parts are stored as 9-complements of the creation date and time, so that ascending key order is newest first.
+- **One detail per authorization request** whose card was found in the cross-reference (COPAUA0C BR-AUTH-010).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `PA-AUTH-DATE-9C` | 1 | 3 | `S9(05) COMP-3` | packed(5,0) | 99999 - creation date as `YYDDD` (CICS clock) |
+| `PA-AUTH-TIME-9C` | 4 | 5 | `S9(09) COMP-3` | packed(9,0) | 999999999 - creation time as `HHMMSSmmm` |
+| `PA-AUTH-ORIG-DATE` | 9 | 6 | `X(06)` | text(6) | Request date as sent (`YYMMDD` in the sample) |
+| `PA-AUTH-ORIG-TIME` | 15 | 6 | `X(06)` | text(6) | Request time as sent (`HHMMSS`) |
+| `PA-CARD-NUM` | 21 | 16 | `X(16)` | text(16) | Card number (PAN); sensitive |
+| `PA-AUTH-TYPE` | 37 | 4 | `X(04)` | text(4) | Authorization type from the request |
+| `PA-CARD-EXPIRY-DATE` | 41 | 4 | `X(04)` | text(4) | Card expiry from the request; not validated |
+| `PA-MESSAGE-TYPE` | 45 | 6 | `X(06)` | text(6) | From the request |
+| `PA-MESSAGE-SOURCE` | 51 | 6 | `X(06)` | text(6) | From the request |
+| `PA-AUTH-ID-CODE` | 57 | 6 | `X(06)` | text(6) | Authorization ID code returned to the requester (= request time) |
+| `PA-AUTH-RESP-CODE` | 63 | 2 | `X(02)` | text(2) | `00` approved (88 `PA-AUTH-APPROVED`), `05` declined |
+| `PA-AUTH-RESP-REASON` | 65 | 4 | `X(04)` | text(4) | Decline reason code (`0000` approved; table in COPAUS1C BR-AUDT-003) |
+| `PA-PROCESSING-CODE` | 69 | 6 | `9(06)` | digits(6) | From the request |
+| `PA-TRANSACTION-AMT` | 75 | 7 | `S9(10)V99 COMP-3` | packed(12,2) | Requested amount |
+| `PA-APPROVED-AMT` | 82 | 7 | `S9(10)V99 COMP-3` | packed(12,2) | Approved amount (= requested when approved, 0 when declined) |
+| `PA-MERCHANT-CATAGORY-CODE` | 89 | 4 | `X(04)` | text(4) | Merchant category (source spelling) |
+| `PA-ACQR-COUNTRY-CODE` | 93 | 3 | `X(03)` | text(3) | Acquirer country |
+| `PA-POS-ENTRY-MODE` | 96 | 2 | `9(02)` | digits(2) | Point-of-sale entry mode |
+| `PA-MERCHANT-ID` | 98 | 15 | `X(15)` | text(15) | |
+| `PA-MERCHANT-NAME` | 113 | 22 | `X(22)` | text(22) | |
+| `PA-MERCHANT-CITY` | 135 | 13 | `X(13)` | text(13) | |
+| `PA-MERCHANT-STATE` | 148 | 2 | `X(02)` | text(2) | |
+| `PA-MERCHANT-ZIP` | 150 | 9 | `X(09)` | text(9) | |
+| `PA-TRANSACTION-ID` | 159 | 15 | `X(15)` | text(15) | Requester's transaction ID |
+| `PA-MATCH-STATUS` | 174 | 1 | `X(01)` | text(1) | `P` pending, `D` declined, `E` pending expired, `M` matched with a posted transaction; only `P` and `D` are ever set |
+| `PA-AUTH-FRAUD` | 175 | 1 | `X(01)` | text(1) | `F` fraud confirmed, `R` fraud removed, space never reported |
+| `PA-FRAUD-RPT-DATE` | 176 | 8 | `X(08)` | text(8) | Date the fraud flag was last changed, `mm/dd/yy` |
+| FILLER | 184 | 17 | `X(17)` | text | Unused |
+
+Sample data: 202 details, all approved (`00`, reason `0000`), match status `P`, fraud flag blank; request dates 231019 to 240405; `PA-AUTH-ID-CODE` equals `PA-AUTH-ORIG-TIME` in every detail.
+
+## ENT-AUTH-INDEX · HIDAM primary index (PAUTINDX)
+
+- **DBD:** `DBPAUTX0`, `ACCESS=(INDEX,VSAM,PROT)`, DD `DDPAUTX0`, segment `PAUTINDX`, 6 bytes, sequence field `INDXSEQ` packed, `LCHILD` pointing at `PAUTSUM0` with `INDEX=ACCNTID` (`app/app-authorization-ims-db2-mq/ims/DBPAUTX0.dbd:18-31`).
+- Maintained by IMS; no program reads it directly. It gives keyed access to a summary by account number (`GU ... WHERE ACCNTID =`).
+
+## ENT-AUTH-FRAUD · Reported authorization fraud (Db2 table AUTHFRDS)
+
+- **DDL:** `app/app-authorization-ims-db2-mq/ddl/AUTHFRDS.ddl:1-28`, table `CARDDEMO.AUTHFRDS`, 26 columns, primary key (`CARD_NUM`, `AUTH_TS`). Unique index `CARDDEMO.XAUTHFRD` on (`CARD_NUM` ASC, `AUTH_TS` DESC) (`app/app-authorization-ims-db2-mq/ddl/XAUTHFRD.ddl:1-4`). The README version of the DDL adds `IN <<db2-database>>.AWSTSFRD` and uses a placeholder schema (`app/app-authorization-ims-db2-mq/README.md:113-147`).
+- **Host structure:** `DCLAUTHFRDS` (`app/app-authorization-ims-db2-mq/dcl/AUTHFRDS.dcl:55-86`). The DCLGEN comment names table `AWSTSSC.AUTHFRDS` (`app/app-authorization-ims-db2-mq/dcl/AUTHFRDS.dcl:2, 53`) while the declaration and the DDL use `CARDDEMO.AUTHFRDS` (`app/app-authorization-ims-db2-mq/dcl/AUTHFRDS.dcl:24`).
+- **Writer:** COPAUS2C only (insert, or update on duplicate key). No program in the repository reads it.
+
+| Column | Type | Null | Host variable | Filled from |
+| :-- | :-- | :-- | :-- | :-- |
+| `CARD_NUM` | CHAR(16) | NOT NULL | `CARD-NUM X(16)` | `PA-CARD-NUM` |
+| `AUTH_TS` | TIMESTAMP | NOT NULL | `AUTH-TS X(26)` | built from `PA-AUTH-ORIG-DATE` and `PA-AUTH-TIME-9C` (COPAUS2C NUM-AUFR-002) |
+| `AUTH_TYPE` | CHAR(4) | | `X(4)` | `PA-AUTH-TYPE` |
+| `CARD_EXPIRY_DATE` | CHAR(4) | | `X(4)` | `PA-CARD-EXPIRY-DATE` |
+| `MESSAGE_TYPE` | CHAR(6) | | `X(6)` | `PA-MESSAGE-TYPE` |
+| `MESSAGE_SOURCE` | CHAR(6) | | `X(6)` | `PA-MESSAGE-SOURCE` |
+| `AUTH_ID_CODE` | CHAR(6) | | `X(6)` | `PA-AUTH-ID-CODE` |
+| `AUTH_RESP_CODE` | CHAR(2) | | `X(2)` | `PA-AUTH-RESP-CODE` |
+| `AUTH_RESP_REASON` | CHAR(4) | | `X(4)` | `PA-AUTH-RESP-REASON` |
+| `PROCESSING_CODE` | CHAR(6) | | `X(6)` | `PA-PROCESSING-CODE` (digits as text) |
+| `TRANSACTION_AMT` | DECIMAL(12,2) | | `S9(10)V9(2) COMP-3` | `PA-TRANSACTION-AMT` |
+| `APPROVED_AMT` | DECIMAL(12,2) | | `S9(10)V9(2) COMP-3` | `PA-APPROVED-AMT` |
+| `MERCHANT_CATAGORY_CODE` | CHAR(4) | | `X(4)` | `PA-MERCHANT-CATAGORY-CODE` |
+| `ACQR_COUNTRY_CODE` | CHAR(3) | | `X(3)` | `PA-ACQR-COUNTRY-CODE` |
+| `POS_ENTRY_MODE` | SMALLINT | | `S9(4) COMP` | `PA-POS-ENTRY-MODE` (2 digits) |
+| `MERCHANT_ID` | CHAR(15) | | `X(15)` | `PA-MERCHANT-ID` |
+| `MERCHANT_NAME` | VARCHAR(22) | | length + `X(22)` | `PA-MERCHANT-NAME`, length always 22 |
+| `MERCHANT_CITY` | CHAR(13) | | `X(13)` | `PA-MERCHANT-CITY` |
+| `MERCHANT_STATE` | CHAR(2) | | `X(2)` | `PA-MERCHANT-STATE` |
+| `MERCHANT_ZIP` | CHAR(9) | | `X(9)` | `PA-MERCHANT-ZIP` |
+| `TRANSACTION_ID` | CHAR(15) | | `X(15)` | `PA-TRANSACTION-ID` |
+| `MATCH_STATUS` | CHAR(1) | | `X(1)` | `PA-MATCH-STATUS` |
+| `AUTH_FRAUD` | CHAR(1) | | `X(1)` | `F` or `R` (the action requested) |
+| `FRAUD_RPT_DATE` | DATE | | `X(10)` | `CURRENT DATE` on insert and update |
+| `ACCT_ID` | DECIMAL(11) | | `S9(11)V COMP-3` | account from COPAUS1C's commarea (`CDEMO-ACCT-ID`, `app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:245`) |
+| `CUST_ID` | DECIMAL(9) | | `S9(9)V COMP-3` | customer from COPAUS1C's commarea (`CDEMO-CUST-ID`, set by COPAUS0C from the cross-reference, `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:830`), not `PA-CUST-ID` (`app/app-authorization-ims-db2-mq/cbl/COPAUS1C.cbl:246`, `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl:138-139`) |
+
+## ENT-AUTH-REQUEST · Authorization request message (MQ)
+
+- **Copybook:** `app/app-authorization-ims-db2-mq/cpy/CCPAURQY.cpy:19-36` (parsed form, 153 bytes); wire format described in `app/app-authorization-ims-db2-mq/README.md:284-306`.
+- **Queue:** the queue whose name arrives in the CICS trigger message (`MQTM-QNAME`); the README calls it `AWS.M2.CARDDEMO.PAUTH.REQUEST` (`app/app-authorization-ims-db2-mq/README.md:278`). Read by COPAUA0C with a 500-byte buffer.
+- **Wire format:** one text message of up to 500 bytes, 18 values separated by commas, in the order of the table. COPAUA0C splits it on `,` into the fields below; each value is truncated or padded with spaces to the field length, except the amount, which is split into the 13-character `WS-TRANSACTION-AMT-AN` and converted with `NUMVAL` by `COMPUTE` (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:63, 364, 376-377`, COPAUA0C BR-AUTH-002).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `PA-RQ-AUTH-DATE` | 1 | 6 | `X(06)` | text(6) | Request date (`YYMMDD` expected; copied, never validated) |
+| `PA-RQ-AUTH-TIME` | 7 | 6 | `X(06)` | text(6) | Request time (`HHMMSS`); becomes the authorization ID code |
+| `PA-RQ-CARD-NUM` | 13 | 16 | `X(16)` | text(16) | Card number; key into ENT-CARD-XREF |
+| `PA-RQ-AUTH-TYPE` | 29 | 4 | `X(04)` | text(4) | |
+| `PA-RQ-CARD-EXPIRY-DATE` | 33 | 4 | `X(04)` | text(4) | |
+| `PA-RQ-MESSAGE-TYPE` | 37 | 6 | `X(06)` | text(6) | |
+| `PA-RQ-MESSAGE-SOURCE` | 43 | 6 | `X(06)` | text(6) | |
+| `PA-RQ-PROCESSING-CODE` | 49 | 6 | `9(06)` | digits(6) | |
+| `PA-RQ-TRANSACTION-AMT` | 55 | 14 | `+9(10).99` | edited(14) | Amount; the parsed value is kept separately as `S9(10)V99` |
+| `PA-RQ-MERCHANT-CATAGORY-CODE` | 69 | 4 | `X(04)` | text(4) | |
+| `PA-RQ-ACQR-COUNTRY-CODE` | 73 | 3 | `X(03)` | text(3) | |
+| `PA-RQ-POS-ENTRY-MODE` | 76 | 2 | `9(02)` | digits(2) | |
+| `PA-RQ-MERCHANT-ID` | 78 | 15 | `X(15)` | text(15) | |
+| `PA-RQ-MERCHANT-NAME` | 93 | 22 | `X(22)` | text(22) | A comma inside the name shifts every later field |
+| `PA-RQ-MERCHANT-CITY` | 115 | 13 | `X(13)` | text(13) | |
+| `PA-RQ-MERCHANT-STATE` | 128 | 2 | `X(02)` | text(2) | |
+| `PA-RQ-MERCHANT-ZIP` | 130 | 9 | `X(09)` | text(9) | |
+| `PA-RQ-TRANSACTION-ID` | 139 | 15 | `X(15)` | text(15) | Requester's transaction ID, echoed in the reply |
+
+## ENT-AUTH-RESPONSE · Authorization reply message (MQ)
+
+- **Copybook:** `app/app-authorization-ims-db2-mq/cpy/CCPAURLY.cpy:19-24` (57 bytes before formatting).
+- **Queue:** the reply-to queue named in the request's message descriptor (README: `AWS.M2.CARDDEMO.PAUTH.REPLY`, `app/app-authorization-ims-db2-mq/README.md:279`); correlation ID = the request's correlation ID.
+- **Wire format:** text, the six values below joined by commas in this order with a trailing comma after the amount (COPAUA0C NUM-AUTH-003). Text values are sent at full field length (trailing spaces kept).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `PA-RL-CARD-NUM` | 1 | 16 | `X(16)` | text(16) | Card number from the request |
+| `PA-RL-TRANSACTION-ID` | 17 | 15 | `X(15)` | text(15) | Transaction ID from the request |
+| `PA-RL-AUTH-ID-CODE` | 32 | 6 | `X(06)` | text(6) | = request time |
+| `PA-RL-AUTH-RESP-CODE` | 38 | 2 | `X(02)` | text(2) | `00` approved, `05` declined |
+| `PA-RL-AUTH-RESP-REASON` | 40 | 4 | `X(04)` | text(4) | Reason code |
+| `PA-RL-APPROVED-AMT` | 44 | 14 | `+9(10).99` | edited(14) | Approved amount (in the message it is re-edited, NUM-AUTH-003) |
+
+## ENT-AUTH-ERROR-LOG · Authorization error log record (CICS TD queue CSSL)
+
+- **Copybook:** `app/app-authorization-ims-db2-mq/cpy/CCPAUERY.cpy:19-40` (`ERROR-LOG-RECORD`, 122 bytes). Written by COPAUA0C to the transient data queue `CSSL` (COPAUA0C SE-AUTH-006). Nothing in the repository reads it.
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `ERR-DATE` | 1 | 6 | `X(06)` | text(6) | `YYMMDD` |
+| `ERR-TIME` | 7 | 6 | `X(06)` | text(6) | `HHMMSS` |
+| `ERR-APPLICATION` | 13 | 8 | `X(08)` | text(8) | Transaction ID `CP00` (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:34, 996`) |
+| `ERR-PROGRAM` | 21 | 8 | `X(08)` | text(8) | Program name |
+| `ERR-LOCATION` | 29 | 4 | `X(04)` | text(4) | Error code such as `M001`, `A001`, `I002` |
+| `ERR-LEVEL` | 33 | 1 | `X(01)` | text(1) | `L` log, `I` info, `W` warning, `C` critical |
+| `ERR-SUBSYSTEM` | 34 | 1 | `X(01)` | text(1) | `A` application, `C` CICS, `I` IMS, `D` Db2, `M` MQ, `F` file |
+| `ERR-CODE-1` | 35 | 9 | `X(09)` | text(9) | First response or status code |
+| `ERR-CODE-2` | 44 | 9 | `X(09)` | text(9) | Second code (reason) |
+| `ERR-MESSAGE` | 53 | 50 | `X(50)` | text(50) | Message text |
+| `ERR-EVENT-KEY` | 103 | 20 | `X(20)` | text(20) | Key of the record involved: card number for most errors, account ID for A002, customer ID for A003, stale for M001, I001 and M005 (COPAUA0C DEF-AUTH-010); sensitive |
+
+## ENT-AUTH-ROOT-FILE · Unloaded summary segments (sequential or GSAM, 100 bytes)
+
+- **Layout:** one ENT-AUTH-SUMMARY segment image per record, 100 bytes, fixed.
+- **Sequential form:** DD `OUTFIL1` of PAUDBUNL (`app/app-authorization-ims-db2-mq/cbl/PAUDBUNL.CBL:26-29, 43-44`), DSN `AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO` in UNLDPADB; read back as DD `INFILE1` by PAUDBLOD (`app/app-authorization-ims-db2-mq/cbl/PAUDBLOD.CBL:26-29, 43-44`) in LOADPADB.
+- **GSAM form:** DBD `PASFLDBD`, `ACCESS=(GSAM,BSAM)`, `RECORD=(100)`, `RECFM=F`, input DD `PASFILIP`, output DD `PASFILOP` (`app/app-authorization-ims-db2-mq/ims/PASFLDBD.DBD:22-27`); written by DBUNLDGS.
+
+## ENT-AUTH-CHILD-FILE · Unloaded detail segments with parent key (sequential, 206 bytes)
+
+- **Layout:** `ROOT-SEG-KEY` `S9(11) COMP-3` (bytes 1-6, the parent's `PA-ACCT-ID`) + `CHILD-SEG-REC` `X(200)` (bytes 7-206, one ENT-AUTH-DETAIL image) (`app/app-authorization-ims-db2-mq/cbl/PAUDBUNL.CBL:45-48`, `app/app-authorization-ims-db2-mq/cbl/PAUDBLOD.CBL:45-48`).
+- DD `OUTFIL2` of PAUDBUNL, DSN `AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO`; DD `INFILE2` of PAUDBLOD.
+
+## ENT-AUTH-CHILD-GSAM · Unloaded detail segments without parent key (GSAM, 200 bytes)
+
+- **Layout:** one ENT-AUTH-DETAIL image per record, 200 bytes, **no parent key**; the parent is only implied by the record order relative to ENT-AUTH-ROOT-FILE (DBUNLDGS DEF-DBUL-001).
+- DBD `PADFLDBD`, `ACCESS=(GSAM,BSAM)`, `RECORD=(200)`, `RECFM=F`, DDs `PADFILIP` / `PADFILOP` (`app/app-authorization-ims-db2-mq/ims/PADFLDBD.DBD:22-27`); written by DBUNLDGS.
+
+## ENT-AUTH-HD-UNLOAD · HD unload of the pending authorization database (IMS utility format)
+
+- **Data set:** `AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0`, DD `DFSURGU1` of job DBPAUTP0, `RECFM=VB`, `LRECL=27990` (`app/app-authorization-ims-db2-mq/jcl/DBPAUTP0.jcl:25-29`); written by the IMS HD Reorganization Unload utility `DFSURGU0` (DBPAUTP0 SE-JDBPA-002). The record format belongs to IMS: a header record, one record per segment (IMS prefix followed by the segment data), and a trailer record. Only the IMS HD reload utility reads it; no CardDemo program does.
+- **Sample data:** `app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat`, 51,736 bytes, 226 variable-length records with 4-byte record descriptors: an 88-byte first and last record naming `PAUTSUM0` at offset 8, 22 records of 140 bytes (`PAUTSUM0`, 100 data bytes) and 202 records of 240 bytes (`PAUTDTL1`, 200 data bytes), each summary followed by its details. This is the source of the 22 summaries and 202 details used as sample data in the program specs.
+
 ## Relational mapping hints (input to the architecture step, not decisions)
 
 | Entity | Candidate table | Primary key | Notes |
@@ -978,6 +1181,13 @@ Other bodies: not found (`COACCT01.cbl:429-434`) is `INVALID REQUEST PARAMETERS 
 | ENT-EXPORT-RECORD, ENT-IMPORT-ERROR | migration file contract, not tables | - | binary and packed fields; carries every PAN, SSN and CVV in clear |
 | ENT-STMT-TRAN | none (a query on `transaction` by card) | - | work file rebuilt per run; another at-rest copy of every PAN |
 | ENT-MQ-ACCT-REQUEST, ENT-MQ-ACCT-REPLY, ENT-MQ-DATE-REPLY, ENT-MQ-ERROR-MSG | message contracts, not tables | - | fixed 1000-byte text bodies; the reply carries the request's MsgId and CorrelId |
+| ENT-AUTH-SUMMARY | `pending_auth_summary` | `acct_id` | FK to account; the limits are copies of ENT-ACCOUNT refreshed only by the next request, and the counts and totals can be derived from the details |
+| ENT-AUTH-DETAIL | `pending_auth` | surrogate, or (`acct_id`, `auth_ts`) | the IMS key is the 9-complement of the creation date and time: store a timestamp and index it descending; FK to `pending_auth_summary` with cascading delete (the purge deletes a summary with its details); PAN needs column protection |
+| ENT-AUTH-INDEX | none (the primary key of `pending_auth_summary`) | - | maintained by IMS |
+| ENT-AUTH-FRAUD | `auth_fraud` | (`card_num`, `auth_ts`) | already a Db2 table; a FK to `pending_auth` becomes possible once both are in one database; PAN in clear |
+| ENT-AUTH-REQUEST, ENT-AUTH-RESPONSE | message contracts, not tables | - | comma-separated text; the reply carries the request's correlation ID; both carry the PAN |
+| ENT-AUTH-ERROR-LOG | log sink, or an `auth_error_log` table | - | the event key holds the PAN for most errors |
+| ENT-AUTH-ROOT-FILE, ENT-AUTH-CHILD-FILE, ENT-AUTH-CHILD-GSAM, ENT-AUTH-HD-UNLOAD | migration file contracts, not tables | - | packed fields; the HD unload is the source of the sample summaries and details |
 
 ## Open questions
 
