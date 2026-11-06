@@ -71,7 +71,10 @@ class FidelitySwitchesTest {
         assertThatThrownBy(() -> FidelitySwitch.of("BILL-010", "a", "b")).isInstanceOf(IllegalArgumentException.class);
         assertThat(SpecItemIds.isValid("Q-BILL-002")).isTrue();
         assertThat(SpecItemIds.isValid("INV-006")).isTrue();
-        assertThat(SpecItemIds.isValid("PINV-001")).isTrue();
+        assertThat(SpecItemIds.isValid("PINV-g-jobs-ops-03")).isTrue();
+        assertThat(SpecItemIds.isValid("PINV-a-12")).isTrue();
+        assertThat(SpecItemIds.isValid("PINV-001")).isFalse();
+        assertThat(SpecItemIds.isValid("PINV-g-jobs-ops")).isFalse();
         assertThat(SpecItemIds.isValid("DEF-JCTLM-002")).isTrue();
         assertThat(SpecItemIds.isValid("DEF-BILL-10")).isFalse();
         assertThat(SpecItemIds.isValid("XYZ-BILL-001")).isFalse();

@@ -1,6 +1,6 @@
 # CardDemo modernization: local stack
 
-This directory holds the modernized CardDemo stack: Spring Boot services, Spring Batch jobs, Airflow DAGs and a React front end on SQL Server and RabbitMQ. It is being built in phases. Right now it contains the local infrastructure and the operator entry points. The other targets exist already but fail with the phase that delivers them, so a missing piece never looks like a pass.
+This directory holds the modernized CardDemo stack: Spring Boot services, Spring Batch jobs, Airflow DAGs and a React front end on SQL Server and RabbitMQ. It is being built in phases. Right now it contains the local infrastructure, the operator entry points and the lifecycle of the Bill Pay slice. The targets whose work has not landed exist already but fail with the phase that delivers them, so a missing piece never looks like a pass.
 
 Run every command from the repository root with `make -C modernization <target>`, or from this directory with `make <target>`.
 
@@ -43,12 +43,13 @@ These are the targets in the order you use them. Every target ends with one line
 | Order | Target | What it does | State |
 |:--|:--|:--|:--|
 | 1 | `setup` | Checks JDK 21, Node 24, Docker/Colima (with amd64 emulation on arm64) and the Airflow venv. Creates `.env` from `.env.example`, generates every empty password and the JWT signing key, and validates the compose file. Running it again keeps existing values and only adds keys that are new in the example. | Done |
-| 2 | `db-reset` | Drops and recreates the application database and runs the Flyway migrations through `db-migrate`. | Not yet (Bill Pay slice) |
-| 3 | `load` | Loads the sample data into SQL Server (`dataLoadJob`). | Not yet (Bill Pay slice) |
-| 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). | Done; services join as they are converted |
-| 5 | `smoke` | Read-only check of the running stack. | Not yet (Bill Pay slice) |
-| 6 | `billpay` | Runs the Bill Pay slice end to end. | Not yet (Bill Pay slice) |
-| 7 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
+| 2 | `db-reset` | Builds `db/db-migrate`, starts the containers if needed, drops and recreates the application database `CARDDEMO_DB_NAME` (it warns first), runs every Flyway migration, creates the service logins and checks their grants (`--reset --check-logins`). | Done |
+| 3 | `load` | Builds `batch/batch-service` and runs its `dataLoadJob` once (a one-shot JVM, profile `demo`) on `app/data/ASCII` (`CARDDEMO_LOAD_SOURCE_DIR`): the core tables of `CARDDEMO_DB_NAME`. A reload after payments exist fails on a foreign key; run `db-reset` first. `verify-data` comes after `up`, because identity-service seeds the sign-on users when it starts. | Done |
+| 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). `ONLY=identity-service,web` starts only those components. | Done; services join as they are converted |
+| 5 | `verify-data` | Reconciles the loaded tables and the sign-on users with the sample files (details under Verification targets). It needs identity-service to have started once on this database (`up`, or `up ONLY=identity-service`); otherwise the `iam.app_user` check fails and the target prints that hint. | Done |
+| 6 | `smoke` | Read-only check of the running slice in under 60 s: health of every running service, sign-on as `USER0001` with the seed password, `me`, `features`, a Bill Pay preview for account `00000000001` (needs `load`), the JWKS, the web app when it runs, and sign-off. It counts the rows of every table in `CARDDEMO_DB_NAME` before and after; only `iam.session` and `iam.audit_event` may change. | Done |
+| 7 | `billpay` | Builds identity-service and billpay-service, runs `db-reset` and `load` when `CARDDEMO_DB_NAME` has no accounts, starts the slice (`up` for identity-service, billpay-service and web), then makes one scripted payment through the API (`scripts/billpay_e2e.py`): sign-on, preview, pay with confirm `Y`, and checks the stored transaction and the zero balance. The slice stays up at `http://127.0.0.1:25173/bill-pay`. | Done; needs `load` |
+| 8 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
 
 Other targets:
 
@@ -57,8 +58,10 @@ Other targets:
 | `help` | Lists every target. |
 | `toolchain` | Shows the `JAVA_HOME`, `node`, `java`, `DOCKER_HOST` and shared paths that recipes use. |
 | `build` | Builds the jars of this checkout with the Maven wrapper, tests skipped. |
+| `db-migrate` | Like `db-reset`, without dropping the database: applies new migrations and checks the logins. |
 | `status` | Containers and host processes with their health; fails when one is unhealthy or a recorded process is gone. |
 | `logs` | Follows the container logs; `SERVICE=mssql`, `rabbitmq` or `airflow-db` limits it to one service. Process logs are in `$CARDDEMO_VAR_DIR/log/<name>.log`. |
+| `stop` | Stops the web app and the services but leaves the shared containers running, so other checkouts and test runs keep their SQL Server. |
 | `infra-up`, `infra-down` | The infrastructure parts of `up` and `down`. |
 | `infra-wipe CONFIRM=1` | Removes this project's containers and volumes (all local data, for every checkout). It touches nothing outside the `carddemo-modern` compose project. |
 | `stubs` | Lists the targets that are not implemented yet. |
@@ -69,11 +72,11 @@ Other targets:
 
 | Component | Port | Started when | Command |
 |:--|--:|:--|:--|
-| `identity-service` | 28081 | `services/identity-service/pom.xml` exists | `java -Xmx256m -XX:MaxMetaspaceSize=128m -Xss512k -jar target/identity-service-*-exec.jar --server.port=28081 --server.address=127.0.0.1 --spring.profiles.active=demo --carddemo.identity.jwt.private-key-path=$CARDDEMO_JWT_KEY_FILE` |
+| `identity-service` | 28081 | `services/identity-service/pom.xml` exists | `java -Xmx256m -XX:MaxMetaspaceSize=128m -Xss512k -jar target/identity-service-*-exec.jar --server.port=28081 --server.address=127.0.0.1 --spring.profiles.active=demo`; it reads its signing key from `CARDDEMO_JWT_KEY_FILE` |
 | `billpay-service` | 28082 | `services/billpay-service/pom.xml` exists | the same pattern, 256 MiB |
 | `account-service`, `transaction-service`, `reference-service`, `authorization-service`, `inquiry-service` | 28083 to 28087 | their module exists | the same pattern (384, 384, 256, 384, 256 MiB) |
 | `web` (Vite) | 25173 | `web/package.json` exists | `npm run dev` in `web/` |
-| `batch-service` | 28090 | not started by `up`; `load` runs its jobs one-shot | |
+| `batch-service` | 28090 | not started by `up`; `load` runs `dataLoadJob` one-shot (server mode comes with the cycle jobs) | |
 | Airflow API server | 28080 | arrives with the batch work | |
 
 A component whose module exists but has no jar (or no `node_modules`) fails `up` with the reason; one whose module does not exist yet is skipped. Health is `GET /actuator/health` for the services and `GET /` for Vite. Every process gets the values of the shared `.env` in its environment (the environment wins), and `CARDDEMO_LEDGER_DIR` set to this checkout's `ledger/`. PIDs are in `$CARDDEMO_VAR_DIR/run/<name>.pid`, logs in `$CARDDEMO_VAR_DIR/log/<name>.log`; both are machine-wide, so a second `up` from another worktree reports the running processes instead of starting copies. `CARDDEMO_SPRING_PROFILE` overrides `demo`.
@@ -87,22 +90,22 @@ The containers are shared by every checkout, so the targets that would interrupt
 - `infra-wipe` needs `CONFIRM=1`.
 ## Verification targets
 
-Only `verify-spec` is implemented so far; each of the others fails with the phase that delivers it. "Heavy" means it needs the running stack or Testcontainers, takes minutes, and should not run in parallel with other heavy targets on a laptop.
+A target whose work has not landed fails with the phase that delivers it. A target whose script or module is missing in the checkout (for example `web/` before the front end is merged) fails with `no modernization/<path> in this checkout`. "Heavy" means it runs Maven verify, Vitest or Playwright, or needs the running stack or Testcontainers; it takes the heavy lock (below), so two never run at the same time on one machine. Run these commands through the make targets, or through `scripts/heavy.py <name> <command>`, rather than directly.
 
 | Target | Checks | Heavy | Arrives with |
 |:--|:--|:--|:--|
 | `verify-spec` | Natural-language spec format and paragraph coverage (`check_spec.py --require-all`, which also fails when an in-scope program or job has no spec), then every spec-only reimplementation in `docs/modernization/spec/checks/` against the GnuCOBOL build, on sample and stress data. Builds the batch programs first (needs GnuCOBOL 3.2, see the root `AGENTS.md`). | No | Done (Phase 1, NL spec) |
-| `verify-ledger` | Ledger evidence and links | No | Phase 4, validation |
-| `test-backend` | Spring Boot service tests | Yes (Testcontainers) | Phase 3 |
-| `test-billpay` | Bill Pay service, API and UI tests | Yes | Phase 3, Bill Pay pilot |
+| `verify-ledger` | Ledger evidence and links (`verify/trace/verify_ledger.py`, Python 3.11 or newer) | No | Done |
+| `test-backend` | `./mvnw -B verify`: unit, integration, contract and ArchUnit tests, against the per-agent test database or Testcontainers | Yes | Done |
+| `test-billpay` | `scripts/test_billpay.py`: Maven verify of ledger-core and billpay-service, the Bill Pay Vitest file, Playwright `e2e/bill.spec.ts` on the mocked API (Vite on 25174), then `db-reset load`, the slice up and the same spec against it, then the trace gate for BILL. The Vitest report goes to `build/test-results/billpay/`; Playwright's stay in `web/playwright-report/e2e-<target>-<mode>.json`, where `trace` reads them. The slice stays up. | Yes | Done; needs `load` |
 | `verify-batch` | Spring Batch against GnuCOBOL, field by field | Yes | Phase 3, batch |
 | `verify-harness` | Self-test of the differential harness | No | Phase 3, batch |
-| `verify-data` | Record counts and checksums after `load` | Yes | Phase 3, data migration |
+| `verify-data` | Builds `verify/data` and compares each loaded core table with its file in `app/data/ASCII` (row count, keys, control totals, byte-exact re-export), then the relations and the `DUSRSECJ` users against `iam.app_user`. One line per check; it reads as the admin login and prints keys and field names only, never values. Run it after `db-reset load up`. | No (one JVM) | Done |
 | `verify-cycle` | The full batch cycle through Airflow | Yes | Phase 3, Airflow |
 | `test-airflow` | DAG integrity and task order | No | Phase 3, Airflow |
-| `web-build` | React and Vite production build | No | Phase 3, front end |
-| `test-e2e` | Playwright end-to-end tests | Yes | Phase 3, front end |
-| `trace` | Rule-to-test traceability matrix | No | Phase 4, validation |
+| `web-build` | Exports the message catalogue (`MessageCatalogTest` writes `platform/web-support/target/messages.json`, passed as `CARDDEMO_MESSAGES_JSON` so the catalogue check runs instead of skipping), then `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | Yes (Maven test, Vitest) | Done |
+| `test-e2e` | Playwright against the running stack (`make up` first, `CARDDEMO_E2E_TARGET=stack`); Chromium, or the projects in `E2E_BROWSERS` | Yes | Done |
+| `trace` | Rule-to-test traceability matrix and its gate (`verify/trace/trace_matrix.py`, Python 3.11 or newer) | No | Done |
 
 To implement a target, replace its stub: remove it from `STUBS` in the `Makefile`, delete its `PHASE` line and give it a real recipe. Keep the `## ` help comment.
 
@@ -194,7 +197,7 @@ CARDDEMO_TEST_MSSQL_DB=carddemo_test_backend modernization/scripts/with_env.py .
 
 Never point the tests at `CARDDEMO_DB_NAME` (`carddemo`, the database of `make up` and `load`). CI leaves the URL empty and uses Testcontainers.
 
-Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
+Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
 
 ## CI
 
@@ -204,14 +207,14 @@ Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `v
 |:--|:--|:--|
 | `spec` | `verify-spec` in the dev container image (GnuCOBOL 3.2) | |
 | `backend` | `test-backend` (Testcontainers) | |
-| `billpay` | `test-billpay` | |
+| `billpay` | `test-billpay` (skipped until `load` lands, because its stack step needs data) | |
 | `web` | `web-build` | `backend` (runs when it was skipped, not when it failed) |
 | `airflow` | `test-airflow` | |
 | `batch` | `verify-harness verify-batch` | `spec` |
-| `data` | `db-reset load verify-data` | |
-| `e2e` | `up test-e2e` (Chromium; nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |
-| `cycle` | `up verify-cycle` (nightly, on demand, or on pull requests labelled `batch`) | `batch` |
-| `ledger` | `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |
+| `data` | `db-reset load up verify-data ONLY=identity-service` (identity-service seeds the users that `verify-data` checks) | |
+| `e2e` | `db-reset load up test-e2e` (Chromium; nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |
+| `cycle` | `db-reset load up verify-cycle` (nightly, on demand, or on pull requests labelled `batch`) | `batch` |
+| `ledger` | the unit tests of `verify/trace/`, then `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |
 
 The `plan` job reads `make -s stubs`: a job whose targets are still stubs is skipped, and the run summary says why. A stub never shows as a pass. Jobs set `CARDDEMO_SETUP_SKIP` (any of `java node docker airflow`) so `make setup` doesn't fail on a tool the job doesn't use. Every job uploads its JUnit results (and process logs) as `test-results-<job>`.
 

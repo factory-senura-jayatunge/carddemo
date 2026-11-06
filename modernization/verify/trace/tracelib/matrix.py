@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-from .ledger import Ledger
+from .ledger import Ledger, covering_switch
 from .reports import Result, is_valid_id
 from .spec import Spec
 
@@ -45,6 +45,9 @@ class Matrix:
     unknown: dict[str, list[Result]]
     results: list[Result]
     scope: list[str]
+    gate_units: list[str] = field(default_factory=list)
+    ungated: list[tuple[str, str]] = field(default_factory=list)
+    selected: bool = False
 
     @property
     def ok(self) -> bool:
@@ -52,7 +55,7 @@ class Matrix:
 
 
 def _requirement(row: Row) -> str:
-    if row.switch is not None and row.switch.get("code_switch") is True:
+    if row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch)):
         return "both-modes"
     if row.switch is None and "defect-decide" in row.classes:
         return "both-modes"
@@ -85,6 +88,9 @@ def _evaluate(row: Row) -> None:
         if missing:
             row.status = "gap"
             row.reason = "no passing test in " + " or ".join(m.lower() for m in missing) + " mode"
+            cover = covering_switch(row.switch)
+            if cover:
+                row.reason += f" (covered by the switch {cover}: its tests must cite this item too)"
             return
     elif row.requirement.startswith("ledger-mode:"):
         mode = row.requirement.split(":", 1)[1]
@@ -97,8 +103,18 @@ def _evaluate(row: Row) -> None:
     row.status, row.reason = "covered", ""
 
 
-def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str]) -> Matrix:
+def _id_unit(ident: str) -> str:
+    parts = ident.split("-")
+    return parts[1] if len(parts) == 3 else ""
+
+
+def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str],
+          units: list[str] | None = None) -> Matrix:
+    """units: gate only the gaps of these units (a subset of scope.toml); None gates every unit in
+    scope plus the code switches of any unit. An undefined ID counts for a selected unit when it
+    looks like one of its IDs or when a test that cites it also cites an item of the unit."""
     scope = sorted(ledger.units)
+    selected = None if units is None else set(units)
     cited: dict[str, list[Result]] = defaultdict(list)
     unknown: dict[str, list[Result]] = defaultdict(list)
     for r in results:
@@ -120,8 +136,10 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
             rows[ident] = Row(ident, unit, ident.split("-")[0], "", "", (), unit in ledger.units,
                               ledger.switches.get(ident), ledger.deviations.get(ident), None, cited.get(ident, []))
     gaps: list[tuple[str, str]] = []
+    ungated: list[tuple[str, str]] = []
     for ident, row in sorted(rows.items(), key=lambda kv: (kv[1].unit, kv[0])):
-        code_switch = row.switch is not None and row.switch.get("code_switch") is True
+        # An item covered by a switch is tested by that switch's tests, so it is gated wherever the switch is.
+        code_switch = row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch) is not None)
         if row.kind in ("Q", "INV", "PINV") and not code_switch:
             row.requirement, row.status = "none", ("deviation" if row.deviation else "not-required")
             continue
@@ -132,10 +150,18 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
         if row.in_scope and ident in arch_items and row.deviation is None:
             row.status, row.reason = "gap", "architecture-dependent item without a deviation"
         if row.status == "gap":
-            gaps.append((ident, row.reason))
+            (gaps if selected is None or row.unit in selected else ungated).append((ident, row.reason))
+
+    def touches_selection(ident: str, rs: list[Result]) -> bool:
+        if _id_unit(ident) in selected:
+            return True
+        return any(i in rows and rows[i].unit in selected for r in rs for i in r.items)
+
     for ident, rs in sorted(unknown.items()):
-        gaps.append((ident, f"cited by {len(rs)} test{'s' if len(rs) > 1 else ''} but not defined by the spec ({rs[0].name})"))
-    return Matrix(rows, gaps, dict(unknown), results, scope)
+        gap = (ident, f"cited by {len(rs)} test{'s' if len(rs) > 1 else ''} but not defined by the spec ({rs[0].name})")
+        (gaps if selected is None or touches_selection(ident, rs) else ungated).append(gap)
+    return Matrix(rows, gaps, dict(unknown), results, scope, sorted(selected) if selected is not None else scope, ungated,
+                  selected is not None)
 
 
 def unit_summary(matrix: Matrix) -> dict[str, Counter]:

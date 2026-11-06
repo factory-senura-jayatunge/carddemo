@@ -1,0 +1,149 @@
+.shell {
+  display: grid;
+  grid-template-columns: minmax(340px, 1.05fr) 1fr;
+  min-height: 600px;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-xl);
+  overflow: hidden;
+  background: var(--cd-surface-card);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.brandPanel {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 56px 44px 40px;
+  color: #fff;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(120, 134, 241, 0.45) 0%, rgba(120, 134, 241, 0) 55%),
+    radial-gradient(90% 70% at 0% 100%, rgba(75, 189, 126, 0.22) 0%, rgba(75, 189, 126, 0) 60%),
+    linear-gradient(160deg, #232c78 0%, #1a2160 55%, #141a4a 100%);
+}
+
+.brandCopy {
+  max-width: 28rem;
+  position: relative;
+  z-index: 1;
+}
+
+.headline {
+  margin: 0;
+  font-size: clamp(1.625rem, 2.4vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.subline {
+  margin: 16px 0 0;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.cardArt {
+  position: relative;
+  height: 210px;
+  margin-top: 28px;
+}
+
+.card {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  height: 184px;
+  border-radius: 18px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 24px 48px -16px rgba(6, 9, 30, 0.6);
+  backdrop-filter: blur(6px);
+  transform: rotate(-6deg);
+  z-index: 2;
+}
+
+.cardBack {
+  left: 110px;
+  bottom: 22px;
+  transform: rotate(8deg);
+  background: linear-gradient(135deg, rgba(120, 134, 241, 0.65), rgba(58, 71, 196, 0.35));
+  z-index: 1;
+}
+
+.cardChip {
+  width: 40px;
+  height: 30px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #f9e3a4, #d8b25b);
+}
+
+.cardNumber {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 1.125rem;
+  letter-spacing: 0.12em;
+}
+
+.cardFoot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.formSide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 32px;
+}
+
+.formWrap {
+  width: 100%;
+  max-width: 380px;
+}
+
+.exit {
+  align-self: center;
+}
+
+.narrow {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 36px 36px 32px;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-xl);
+  background: var(--cd-surface-card);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+@media (max-width: 62em) {
+  .shell {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .brandPanel {
+    display: none;
+  }
+
+  .formSide {
+    padding: 32px 20px;
+  }
+}
+
+@media (max-width: 36em) {
+  .narrow {
+    padding: 28px 20px;
+  }
+}

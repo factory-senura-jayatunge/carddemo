@@ -11,7 +11,8 @@ looks like a pass.
 PIDs go to $CARDDEMO_VAR_DIR/run/<name>.pid, logs to $CARDDEMO_VAR_DIR/log/.
 Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 
-Usage: stack.py infra-up | infra-down | up [--only NAME,...] | down | status
+Usage: stack.py infra-up | infra-down | up [--only NAME,...] | stop | down | status
+       stack.py ensure-infra TARGET   (infra-up for another target; prints only on failure)
 """
 
 import fcntl
@@ -26,12 +27,14 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from with_env import default_env_file, read_env  # noqa: E402
+from with_env import default_env_file, main_modernization, read_env  # noqa: E402
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INFRA_DIR = os.environ.get("CARDDEMO_INFRA_DIR") or HERE
+# The same defaults as the Makefile, so stack.py run on its own drives the
+# shared compose project instead of planning to recreate it from this checkout.
+INFRA_DIR = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
 ENV_FILE = os.environ.get("CARDDEMO_ENV_FILE") or default_env_file()
-VAR_DIR = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(HERE, "var")
+VAR_DIR = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(main_modernization(), "var")
 RUN_DIR = os.path.join(VAR_DIR, "run")
 LOG_DIR = os.path.join(VAR_DIR, "log")
 UP_TIMEOUT = int(os.environ.get("UP_TIMEOUT", "300"))
@@ -52,11 +55,9 @@ SPRING_PROFILE = os.environ.get("CARDDEMO_SPRING_PROFILE", "demo")
 
 
 def service_args(name: str) -> list:
-    args = [f"--spring.profiles.active={SPRING_PROFILE}"]
-    if name == "identity-service":
-        key = os.environ.get("CARDDEMO_JWT_KEY_FILE") or os.path.join(VAR_DIR, "secrets", "identity-jwt.pem")
-        args.append(f"--carddemo.identity.jwt.private-key-path={key}")
-    return args
+    # identity-service reads its signing key from CARDDEMO_JWT_KEY_FILE,
+    # which the Makefile exports.
+    return [f"--spring.profiles.active={SPRING_PROFILE}"]
 WEB_PORT = 25173
 HEALTH_PATH = "/actuator/health"
 
@@ -81,9 +82,21 @@ class Component:
         return os.path.join(LOG_DIR, f"{self.name}.log")
 
 
+def toolchain(what: str) -> str:
+    """JDK 21 home or Node 24 bin directory from scripts/toolchain.sh, so the
+    stack also uses the pinned versions when stack.py runs outside make."""
+    out = subprocess.run([os.path.join(HERE, "scripts", "toolchain.sh"), what],
+                         capture_output=True, text=True)
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
 def java_bin() -> str:
-    home = os.environ.get("JAVA_HOME")
+    home = os.environ.get("JAVA_HOME") or toolchain("java-home")
     return os.path.join(home, "bin", "java") if home else "java"
+
+
+def node_bin() -> str:
+    return toolchain("node-bin")
 
 
 def find_jar(module_dir: str, artifact: str):
@@ -115,7 +128,9 @@ def components() -> list:
         if not os.path.isdir(os.path.join(web, "node_modules")):
             problem = "dependencies missing: run npm ci in modernization/web"
         # vite.config.ts pins 127.0.0.1:25173 with strictPort.
-        found.append(Component("web", WEB_PORT, web, ["npm", "run", "dev"],
+        node = node_bin()
+        npm = os.path.join(node, "npm") if node else "npm"
+        found.append(Component("web", WEB_PORT, web, [npm, "run", "dev"],
                                f"http://127.0.0.1:{WEB_PORT}/", "vite", problem))
     return found
 
@@ -171,6 +186,12 @@ def child_env() -> dict:
     # Services run with their module as working directory, so a relative
     # default would not find the checkout's ledger.
     env.setdefault("CARDDEMO_LEDGER_DIR", os.path.join(HERE, "ledger"))
+    env.setdefault("CARDDEMO_JWT_KEY_FILE", os.path.join(VAR_DIR, "secrets", "identity-jwt.pem"))
+    # npm and vite start "node" from PATH; web's engines field rejects
+    # anything but Node 24, and Homebrew's default node can be newer.
+    node = node_bin()
+    if node:
+        env["PATH"] = node + os.pathsep + env.get("PATH", "")
     return env
 
 
@@ -221,8 +242,14 @@ def infra_up(target: str) -> int:
             print(f"{target}: FAILED (would restart shared container(s) {names}; rerun with RECREATE=1 when nobody uses them)")
             return 1
         say("WARN", "compose", f"RECREATING (restarting) shared container(s) {names}; connections drop for every checkout")
-    rc = subprocess.run(compose("up", "--detach", "--wait", "--wait-timeout", str(UP_TIMEOUT))).returncode
-    subprocess.run(compose("ps", "--format", "table {{.Service}}\t{{.Status}}\t{{.Ports}}"))
+    quiet = target not in ("infra-up", "up")
+    res = subprocess.run(compose("up", "--detach", "--wait", "--wait-timeout", str(UP_TIMEOUT)),
+                         capture_output=quiet, text=True)
+    rc = res.returncode
+    if not quiet:
+        subprocess.run(compose("ps", "--format", "table {{.Service}}\t{{.Status}}\t{{.Ports}}"))
+    elif rc != 0:
+        print(res.stderr.strip())
     if rc != 0:
         print(f"{target}: FAILED (containers not healthy within {UP_TIMEOUT} s; see make logs)")
         return 1
@@ -374,11 +401,8 @@ def up(only) -> int:
     return 0
 
 
-def down() -> int:
-    holder = heavy_holder()
-    if holder and os.environ.get("FORCE") != "1":
-        print(f"down: FAILED (a heavy target is running: {holder}; rerun with FORCE=1 to stop anyway)")
-        return 1
+def stop_processes() -> list:
+    """Stops every recorded process; returns the names that kept running."""
     left = []
     for name, pid, marker in reversed(recorded()):
         if stop(name, pid, marker):
@@ -386,6 +410,24 @@ def down() -> int:
         else:
             say("FAIL", name, f"pid {pid} did not stop")
             left.append(name)
+    return left
+
+
+def stop_only() -> int:
+    left = stop_processes()
+    if left:
+        print(f"stop: FAILED (still running: {', '.join(left)})")
+        return 1
+    print("stop: OK (containers left running)")
+    return 0
+
+
+def down() -> int:
+    holder = heavy_holder()
+    if holder and os.environ.get("FORCE") != "1":
+        print(f"down: FAILED (a heavy target is running: {holder}; rerun with FORCE=1 to stop anyway)")
+        return 1
+    left = stop_processes()
     if infra_down("down", force=True) != 0:
         left.append("containers")
     if left:
@@ -440,6 +482,8 @@ def main(argv) -> int:
     cmd = argv[1] if len(argv) > 1 else ""
     if cmd == "infra-up":
         return infra_up("infra-up")
+    if cmd == "ensure-infra" and len(argv) == 3:
+        return infra_up(argv[2])
     if cmd == "infra-down":
         return infra_down("infra-down")
     if cmd == "up":
@@ -449,6 +493,8 @@ def main(argv) -> int:
         return up(only)
     if cmd == "down":
         return down()
+    if cmd == "stop":
+        return stop_only()
     if cmd == "status":
         return status()
     print(__doc__.strip().splitlines()[-1], file=sys.stderr)

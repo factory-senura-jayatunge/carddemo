@@ -1,6 +1,7 @@
 package org.carddemo.platform.web;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -32,7 +33,8 @@ public final class CarddemoJwt {
     }
 
     public static OAuth2TokenValidator<Jwt> validator(CarddemoSecurityProperties properties, Clock clock) {
-        JwtTimestampValidator timestamps = new JwtTimestampValidator();
+        // No clock skew: the 300-second token lifetime is the session's idle bound (D-SEC-03).
+        JwtTimestampValidator timestamps = new JwtTimestampValidator(Duration.ZERO);
         timestamps.setClock(clock);
         List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
         // A JwtTypeValidator in the list stops createDefaultWithValidators from adding the "JWT" one.

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -132,6 +134,50 @@ class CheckSpecTest(unittest.TestCase):
     def test_citation_of_missing_file(self) -> None:
         item = "#### BR-TEST-001 · A rule\n- **Source:** `app/cbl/NOPE.cbl:1-2`\n"
         self.assert_error(spec_text(self.sha, item=item), "file app/cbl/NOPE.cbl does not exist")
+
+    def write_data_citation(self) -> None:
+        (self.root / "app" / "data").mkdir()
+        (self.root / "app" / "data" / "acctdata.txt").write_text("a\nb\n")
+        copy = self.root / "modernization" / "batch-service" / "target" / "data-load-validation"
+        copy.mkdir(parents=True)
+        (copy / "acctdata.txt").write_text("a\nb\n")
+        item = "#### BR-TEST-001 · A rule\n- **Source:** `:7-8`; `acctdata.txt:1-2`\n"
+        self.write(spec_text(self.sha, item=item))
+
+    def git(self, *args: str) -> None:
+        env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True, env=env, timeout=60)
+
+    def test_bare_citation_ignores_build_output_outside_git(self) -> None:
+        self.write_data_citation()
+        rc, out = self.run_checker()
+        self.assertEqual(rc, 0, out)
+
+    @unittest.skipUnless(shutil.which("git"), "git not installed")
+    def test_bare_citation_ignores_git_ignored_copies(self) -> None:
+        self.write_data_citation()
+        self.git("init", "-q")
+        self.git("add", "app/data/acctdata.txt")
+        # A copy under a directory the fallback does not skip: only .gitignore keeps it out.
+        out_dir = self.root / "modernization" / "reports"
+        out_dir.mkdir()
+        (out_dir / "acctdata.txt").write_text("a\nb\n")
+        (self.root / ".gitignore").write_text("target/\nmodernization/reports/\n")
+        rc, out = self.run_checker()
+        self.assertEqual(rc, 0, out)
+        (self.root / ".gitignore").write_text("target/\n")
+        rc, out = self.run_checker()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("file name acctdata.txt is ambiguous (app/data/acctdata.txt, modernization/reports/acctdata.txt)", out)
+        self.assertNotIn("target", out)
+
+    @unittest.skipUnless(shutil.which("git"), "git not installed")
+    def test_untracked_source_is_found_in_git(self) -> None:
+        self.git("init", "-q")
+        item = "#### BR-TEST-001 · A rule\n- **Source:** `:7-8`; `TESTJOB.jcl:3`\n"
+        self.write(spec_text(self.sha, item=item))
+        rc, out = self.run_checker()
+        self.assertEqual(rc, 0, out)
 
     def test_dangling_references(self) -> None:
         self.assert_error(spec_text(self.sha, extra="See BR-TEST-001..003, ENT-NOPE and INV-002.\n"),

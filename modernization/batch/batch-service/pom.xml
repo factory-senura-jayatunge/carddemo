@@ -12,5 +12,45 @@
 
   <artifactId>batch-service</artifactId>
   <name>CardDemo batch service</name>
-  <description>Placeholder; owned by the data agent.</description>
+  <description>Spring Batch jobs of the modernized CardDemo; in this slice dataLoadJob, the sample-data load of the core tables.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>legacy-format</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-batch-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.microsoft.sqlserver</groupId>
+      <artifactId>mssql-jdbc</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-batch-jdbc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
 </project>

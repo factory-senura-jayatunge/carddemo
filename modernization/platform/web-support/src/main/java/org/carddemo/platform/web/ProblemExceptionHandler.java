@@ -1,7 +1,9 @@
 package org.carddemo.platform.web;
 
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -59,7 +61,13 @@ public class ProblemExceptionHandler {
             }
         }
         log.error("unexpected error", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, MessageCatalog.INTERNAL_ERROR);
+        // The ID lets support find the logged cause; the cause itself never reaches the client.
+        ApiProblem body = ApiProblem.of(HttpStatus.INTERNAL_SERVER_ERROR, MessageCatalog.INTERNAL_ERROR, null);
+        String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
+        if (correlationId != null) {
+            body.withAll(Map.of("correlationId", correlationId));
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).contentType(ApiProblem.MEDIA_TYPE).body(body);
     }
 
     private static Message catalogFor(HttpStatus status) {

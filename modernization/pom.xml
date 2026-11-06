@@ -29,6 +29,7 @@
     <module>services/identity-service</module>
     <module>services/billpay-service</module>
     <module>batch/batch-service</module>
+    <module>verify/data</module>
   </modules>
 
   <properties>

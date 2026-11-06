@@ -1,0 +1,86 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.card,
+.panel {
+  padding: 28px;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--cd-surface-card);
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+.panel[data-empty] {
+  background: var(--cd-surface-sunken);
+  box-shadow: none;
+  border-style: dashed;
+  border-color: var(--cd-border-strong);
+}
+
+.acctInput {
+  font-family: var(--mantine-font-family-monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.acctWrapper {
+  max-width: 260px;
+}
+
+.acctInput[readonly] {
+  background: var(--cd-surface-sunken);
+  color: var(--cd-text);
+  border-style: dashed;
+}
+
+.actions {
+  padding-top: 4px;
+}
+
+.amount {
+  margin: 6px 0 18px;
+  font-size: 2.5rem;
+  line-height: 1.1;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.facts {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cd-border);
+}
+
+.facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.facts dt {
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.facts dd {
+  margin: 0;
+  font-size: var(--mantine-font-size-sm);
+}
+
+@media (max-width: 48em) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .card,
+  .panel {
+    padding: 20px;
+  }
+}
