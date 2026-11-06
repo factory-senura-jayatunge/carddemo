@@ -206,7 +206,7 @@ Decided items with no code switch (ledger entry with `code_switch = false`): `DE
 | Method and path | Auth | Request | Success | Errors |
 | :-- | :-- | :-- | :-- | :-- |
 | `POST /api/auth/sign-on` | none | `{userId, password}` | `200 SessionView` + cookies | see the sign-on rules below |
-| `POST /api/auth/password` | none, or a session | `{userId?, currentPassword, newPassword}` | `200 SessionView` + cookies: the user is signed in | sign-on rules for the current password, then the new-password rules |
+| `POST /api/auth/password` | none, or a session | `{userId?, currentPassword, newPassword}` | `200 SessionView` + cookies: the user is signed in | `400 USER_ID_MISMATCH`, sign-on rules for the current password, then the new-password rules |
 | `POST /api/auth/refresh` | `cd_rt` + CSRF | - | `200 SessionView` + new cookies | `401 SESSION_EXPIRED` (cookies cleared) |
 | `POST /api/auth/sign-off` | session + CSRF | - | `200 {message: "Thank you for using CardDemo application...", severity: "info"}`, cookies cleared, session ended | - |
 | `GET /api/auth/me` | session | - | `200 SessionView` | 401 |
@@ -215,14 +215,14 @@ Decided items with no code switch (ledger entry with `code_switch = false`): `DE
 
 `SessionView` = `{userId, userType, role, firstName, lastName, home: "/" | "/admin", idleTimeoutSeconds: 900}`.
 
-`userId` in the password request is required without a session; with a session it may be omitted, and if present it must equal the session's user.
+`userId` in the password request is required without a session; with a session it may be omitted. With a session, a `userId` that, upper-cased, differs from the session's user gives `400 USER_ID_MISMATCH`, `User ID does not match the signed-on user ...`, field `userId`. It is checked after sign-on steps 1 to 3 and before step 4, reads no user, counts nothing toward the lockout or the rate limit, and is audited as `SIGN_ON_FAILED` with reason `USER_ID_MISMATCH`.
 
 ### Sign-on rules, in order
 
 1. `userId` blank (spaces or empty): `400 USER_ID_REQUIRED`, `Please enter User ID ...`, field `userId` (VAL-SGN-001).
 2. `password` blank: `400 PASSWORD_REQUIRED`, `Please enter Password ...`, field `password` (VAL-SGN-002).
 3. Longer than 8 (`userId`) or 64 (`password`) characters: `400 INVALID_INPUT`, `Please enter User ID ...` or `Please enter Password ...` on the field. The web form caps the fields, so only scripts see this.
-4. Fixed `DEF-SGN-002` only: an in-memory rate limit per client address on sign-on and password change (limits in `carddemo.identity.rate-limit.*`); over the limit: `429 TOO_MANY_ATTEMPTS` with `Retry-After`, `Too many sign-on attempts. Try again later ...`, field `userId`, nothing read or counted. The limit is per instance, which is enough for the single local instance; a deployment with two instances (D-NFR-03) needs a shared store.
+4. Fixed `DEF-SGN-002` only: an in-memory limit on failed attempts per client address, shared by sign-on and password change. Once an address has reached the limit (default 30 failed attempts per minute, configurable under `carddemo.identity.rate-limit.*`), every request from it gets `429 TOO_MANY_ATTEMPTS` with `Retry-After`, `Too many sign-on attempts. Try again later ...`, field `userId`, with nothing read or counted, even when the password is right: the check runs before the credentials are known, otherwise a 200 among the 429s would still reveal the password. A failed attempt is a `401` from steps 6 to 8 (unknown user, locked user, wrong password, including the current password of a password change). Successes, the `400` input errors, `USER_ID_MISMATCH`, the `403` from steps 9 and 10, `503` and `429` count nothing, so CI and Playwright can sign on from `127.0.0.1` as often as they need. There is no per-user limit; the 5-failure lockout in step 8 covers each user. The limit is per instance, which is enough for the single local instance; a deployment with two instances (D-NFR-03) needs a shared store.
 5. The user ID is upper-cased (BR-SGN-001) and read. A database failure: `503 UNABLE_TO_VERIFY`, `Unable to verify the User ...`, field `userId` (ERR-SGN-001).
 6. Not found: legacy `401 USER_NOT_FOUND`, `User not found. Try again ...`, field `userId` (VAL-SGN-003). Fixed (`DEF-SGN-003`): `401 SIGN_ON_FAILED`, `Wrong User ID or Password. Try again ...`, field `password`.
 7. Fixed `DEF-SGN-002` only: `locked_until > now` gives the same neutral `401 SIGN_ON_FAILED`, whatever the password; nothing else is checked.
@@ -387,7 +387,7 @@ Seed: the demo users with password `PASSWORD`; `TEST0001` stored with password `
 | S10 | sign-on during an open batch window | succeeds (deviation: the window does not cover sign-on) | same |
 | S11 | `TEST0001` / `Secret12` | `Wrong Password. Try again ...` (DEF-SGN-011) | `/` |
 
-Added: S12 five wrong passwords, then the right one: legacy signs on; fixed gives the neutral message until the clock passes 15 minutes, then signs on. S13 user type `X`: legacy `/` as `USER`; fixed `403 USER_TYPE_NOT_ALLOWED`. S14 `must_change_password = 1`: fixed sign-on `403 PASSWORD_CHANGE_REQUIRED`, the change screen, each new-password rule, success lands on `home`; legacy ignores the flag. S15 refresh after 16 idle minutes: `401 SESSION_EXPIRED`. S16 sign-off, then refresh with the old cookie: `401`. S17 an old refresh token reused: session ended, `REFRESH_REUSE` audited. S18 every sign-on outcome writes one audit row, never with a password. S19 fixed mode: requests over the rate limit get `429 TOO_MANY_ATTEMPTS` and change no counter; legacy mode has no limit. S20 idle sign-out shows the session-ended note on `/sign-on`.
+Added: S12 five wrong passwords, then the right one: legacy signs on; fixed gives the neutral message until the clock passes 15 minutes, then signs on. S13 user type `X`: legacy `/` as `USER`; fixed `403 USER_TYPE_NOT_ALLOWED`. S14 `must_change_password = 1`: fixed sign-on `403 PASSWORD_CHANGE_REQUIRED`, the change screen, each new-password rule, success lands on `home`; legacy ignores the flag. S15 refresh after 16 idle minutes: `401 SESSION_EXPIRED`. S16 sign-off, then refresh with the old cookie: `401`. S17 an old refresh token reused: session ended, `REFRESH_REUSE` audited. S18 every sign-on outcome writes one audit row, never with a password. S19 fixed mode, limit set low in the test: failed sign-ons from one address up to the limit, then the next request gets `429 TOO_MANY_ATTEMPTS` with `Retry-After` even with the right password, and changes no counter; after the window it signs on. Many successful sign-ons in a row are never limited. Legacy mode has no limit. S21 password change with a session whose body names another user: `400 USER_ID_MISMATCH`, nothing counted. S20 idle sign-out shows the session-ended note on `/sign-on`.
 
 ### MENU (COMEN01C section 15)
 
