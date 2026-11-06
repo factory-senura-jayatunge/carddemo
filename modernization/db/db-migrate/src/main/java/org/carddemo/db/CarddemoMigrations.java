@@ -18,6 +18,9 @@ public final class CarddemoMigrations {
                 .dataSource(databaseAdmin)
                 .locations(LOCATION)
                 .validateMigrationNaming(true)
+                // Each owner numbers within its own version range, so a new foundation
+                // migration (V004) can arrive after V202 is applied on an existing database.
+                .outOfOrder(true)
                 .placeholderReplacement(false)
                 .cleanDisabled(true)
                 .load();

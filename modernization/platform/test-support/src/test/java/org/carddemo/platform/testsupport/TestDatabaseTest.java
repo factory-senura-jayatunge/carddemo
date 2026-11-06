@@ -97,6 +97,15 @@ class TestDatabaseTest {
     }
 
     @Test
+    void aMigrationNumberedBelowTheAppliedVersionStillRuns() {
+        db.admin().sql("DROP TABLE ops.audit").update();
+        assertThat(db.admin().sql("DELETE FROM dbo.flyway_schema_history WHERE script = 'V004__ops_audit.sql'")
+                .update()).isEqualTo(1);
+        assertThat(CarddemoMigrations.migrate(db.adminDataSource()).migrationsExecuted).isEqualTo(1);
+        assertThat(db.admin().sql("SELECT COUNT(*) FROM ops.audit").query(Integer.class).single()).isZero();
+    }
+
+    @Test
     void databaseNameIsPerModule() {
         assertThat(TestDatabase.databaseName("carddemo_test", "billpay-service")).isEqualTo("carddemo_test_billpay_service");
         assertThat(db.databaseName()).endsWith("_test_support");
