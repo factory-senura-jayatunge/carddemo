@@ -69,4 +69,4 @@ Any request body gets `SYSTEM DATE : MM-DD-YYYYSYSTEM TIME : HH:MM:SS` padded to
 
 ## Contract tests
 
-Each contract has a golden-file test per body form (found, not found, invalid; approve, decline, unknown card) taken from the spec's examples, tagged with the item IDs, run against a Testcontainers RabbitMQ. The tests run in both fidelity modes.
+Each contract has a golden-file test per body form (found, not found, invalid; approve, decline, unknown card) taken from the spec's examples, tagged with the item IDs, run against a Testcontainers RabbitMQ. Under the targeted policy ([switches.md](switches.md)) only DEF-MQAC-002, DEF-MQDT-002 and DEF-MQDT-003 keep a legacy mode, and their tests run in both modes. Every other row in the mode tables above is built in its fixed form only. DEF-MQAC-005 is not a decision item and keeps today's reply.

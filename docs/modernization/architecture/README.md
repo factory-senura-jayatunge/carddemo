@@ -28,10 +28,11 @@ The proposal is derived **only** from these inputs. No COBOL, copybook, BMS, JCL
 | [repo-build-ci.md](repo-build-ci.md) | Layout under `modernization/`, build, the test strategy (differential, rule-ID, Testcontainers, Playwright), traceability, CI. |
 | [make-targets.md](make-targets.md) | Each `make -C modernization` target in one line: what it does and when it passes. |
 | [decisions.md](decisions.md) | Every decision this proposal needs, with the recommended default. |
+| [switches.md](switches.md) | The authoritative list of fidelity switches under the targeted policy, with the reason for each and the items that are fixed-only. |
 | [billpay-slice.md](billpay-slice.md) | The build contract for the first slice (sign-on, main menu, Bill Pay): modules, Flyway ranges, tables, endpoints, tokens, switches, scenarios in both modes, and when each make target is done. |
 
 ## Terms
 
-- **Legacy mode** and **fixed mode**: for each spec item marked defect-decide, the target implements the COBOL behaviour (legacy mode, the default) and, where the fix is known, the corrected behaviour (fixed mode), selected by one configuration switch per item. See [overview.md](overview.md#fidelity).
+- **Legacy mode** and **fixed mode**: for each spec item marked defect-decide, legacy mode is the COBOL behaviour and fixed mode the corrected one. Under the targeted policy only the items in [switches.md](switches.md) have both, selected by one configuration switch per item; every other decided item is built in its decided mode only. See [overview.md](overview.md#fidelity).
 - **Cycle**: one run of the daily batch (posting, optional interest, statements), identified by a `cycle_id` and a business date.
 - **Batch window**: the time during which the batch owns the core tables; it replaces closing and opening the CICS files.

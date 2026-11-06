@@ -93,7 +93,7 @@ The commarea becomes three things:
 | Selected account, customer and card (`CDEMO-ACCT-ID`, `CDEMO-CUST-ID`, `CDEMO-CARD-NUM`) | A "current account" store in session storage, holding IDs only, never a PAN in clear (the card is held by `cardId`) |
 | Paging state (first and last keys, page number) | Query parameters of the list route |
 
-The legacy carry-over of a previous customer after a failed lookup (DEF-ACVW-018) is a switch on the account view page.
+The account view page never carries over a previous customer after a failed lookup (DEF-ACVW-018 fixed-only).
 
 ## Availability
 

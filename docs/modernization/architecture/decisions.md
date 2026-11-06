@@ -7,11 +7,11 @@ This list has four parts:
 3. **Open questions that change the architecture.** Only the Q-items whose answer changes a table, a service, a DAG or a queue. Every other Q-item and defect-decide item is a fidelity switch or a ledger entry and leaves the architecture as it is.
 4. **Architecture-dependent fidelity items.** Defects that the new platform cannot reproduce, so they need an explicit "accept the fix".
 
-Until a default is answered, the build keeps the COBOL behaviour (legacy mode). Security is the exception described in D-SEC-01.
+Until a default is answered, the build keeps the COBOL behaviour (legacy mode). Security is the exception described in D-SEC-01. Which decided items keep a code switch is in [switches.md](switches.md).
 
 ## Decided values
 
-The user approved this proposal (D10) and answered the decision catalog (`docs/modernization/decisions/README.md`) on 2026-11-06: every catalog recommendation is accepted, including the bulk fix D-75 and the architecture-dependent fixes below, and every default here takes its recommended value, except D-SEC-01 (C1) and D-BAT-05 (`WRITES_BLOCKED`). Where the catalog and these answers differ, these answers win. The code still defaults each switch to `legacy`; `ledger/fidelity.toml` records the decided value, and both modes stay tested.
+The user approved this proposal (D10) and answered the decision catalog (`docs/modernization/decisions/README.md`) on 2026-11-06: every catalog recommendation is accepted, including the bulk fix D-75 and the architecture-dependent fixes below, and every default here takes its recommended value, except D-SEC-01 (C1) and D-BAT-05 (`WRITES_BLOCKED`). Where the catalog and these answers differ, these answers win. `ledger/fidelity.toml` records the decided value of every item. Under the targeted switch policy (user decision, 2026-11-06), only the items in [switches.md](switches.md) keep a legacy mode in code. They default to `legacy` and are tested in both modes; every other decided fix is built and tested in its decided mode only.
 
 | ID | Decided value |
 | :-- | :-- |

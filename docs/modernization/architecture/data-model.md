@@ -26,7 +26,7 @@ Each service connects with its own SQL login. The grants are the enforced versio
 | `core.customer` | account, authorization, batch | batch (load) | account-service | batch (reload) |
 | `core.card` | account, batch | batch (load) | account-service (name, status, expiry; account in legacy mode) | batch (reload) |
 | `core.card_xref` | all services, batch | batch (load) | none | batch (reload) |
-| `core.transaction` | transaction, billpay, inquiry, batch | billpay-service, batch; transaction-service only if DEF-TRNA-001's legacy mode is built | batch (`in_master` only) | batch (retention purge) |
+| `core.transaction` | transaction, billpay, inquiry, batch | billpay-service, batch (online adds arrive through `core.daily_tran`, D-27) | batch (`in_master` only) | batch (retention purge) |
 | `core.tcat_bal` | batch, billpay-service | batch, billpay-service | batch, billpay-service (`balance`; DEF-BILL-010 fixed, D-28) | batch (reload) |
 | `core.daily_tran` | batch, transaction-service (waiting `ONLINE_ADD` rows, for legacy IDs and "copy latest") | batch, transaction-service (`ONLINE_ADD`, D-27) | batch (the claim) | batch (retention) |
 | `core.daily_reject` | batch, operations view | batch | none | batch (retention) |
@@ -57,7 +57,7 @@ Masking (D-SEC-05): the masked columns (`core.customer` SSN, government ID, DOB,
 
 ### `core.card` (ENT-CARD, `CARDDATA`, 150 bytes)
 
-`card_num CHAR(16)` PK; `card_id BIGINT IDENTITY` unique (used in URLs instead of the PAN); `acct_id CHAR(11)` with index `IX_card_acct` (replaces `CARDAIX`, no 8-per-account cap); `cvv_cd CHAR(3)` masked, in no API, DTO, log or export, and no login unmasks it; dropped at cut-over (D-DATA-04 decided: drop); `embossed_name VARCHAR(50)`; `expiration_date CHAR(10)` with a pattern check (kept as text because card update keeps whatever day it read, DEF-CRDU-009); `active_status CHAR(1)`; `legacy_filler CHAR(59)` NULL; `row_version`. No foreign key on `acct_id`, because card update in legacy mode may move a card to any account (DEF-CRDU-001).
+`card_num CHAR(16)` PK; `card_id BIGINT IDENTITY` unique (used in URLs instead of the PAN); `acct_id CHAR(11)` with index `IX_card_acct` (replaces `CARDAIX`, no 8-per-account cap); `cvv_cd CHAR(3)` masked, in no API, DTO, log or export, and no login unmasks it; dropped at cut-over (D-DATA-04 decided: drop); `embossed_name VARCHAR(50)`; `expiration_date CHAR(10)` with a pattern check (kept as text because card update keeps whatever day it read, DEF-CRDU-009); `active_status CHAR(1)`; `legacy_filler CHAR(59)` NULL; `row_version`. No foreign key on `acct_id` yet. Card update never changes it (DEF-CRDU-001 fixed-only), so the accounts slice may add one once the loader confirms every card's account exists.
 
 ### `core.card_xref` (ENT-CARD-XREF, `CARDXREF`, 50 bytes)
 
@@ -152,9 +152,9 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, 
 
 - **FILLER** is not modelled, with one exception: `legacy_filler` on account, card, transaction and category balance. These are the records batch rewrites and the differential checks compare byte for byte (inherited FILLER, DEF-POST-010, DEF-BILL-006, DEF-CRDU-003). The columns are nullable and are dropped after cut-over (D-DATA-03).
 - **Group ID at the ZIP position (INV-039, Q-ENT-001, DEF-ACUP-002, DEF-ACUP-020).** Every sample account holds `A000000000` at positions 103-112 (`ACCT-ADDR-ZIP` in the main layout) and spaces at 113-122 (`ACCT-GROUP-ID`). The loader loads them as they are: `addr_zip = 'A000000000'`, `group_id` blank, so interest uses `DEFAULT`, as today. Switch `DEF-ACUP-002`: legacy writes the screen's group ID into `addr_zip` and blanks `group_id` (a fixed stand-in for the bytes the program never sets); fixed writes `group_id` and keeps `addr_zip`. Data decision D-DATA-01 chooses whether migration moves the value into `group_id`; on the sample this changes no interest amount, because the two groups differ only for 07/0001 (DEF-INTC-006).
-- **ZIP cut to 5 characters on save (INV-044, DEF-ACUP-003)**: switch on account update.
+- **ZIP cut to 5 characters on save (INV-044, DEF-ACUP-003)**: fixed-only, ZIP+4 kept (D-14).
 - **Card-to-account link held twice (INV-030)**: `card.acct_id` and `card_xref.acct_id` both stay, as the legacy programs read different copies. A `verify-data` check reports rows where they differ. Single ownership is decision D-DATA-02.
-- **Several cards per account**: the schema allows it; the behaviour of each program is a switch (DEF-BILL-002, DEF-ACVW-003, DEF-INTC-007, DEF-TRPT-004).
+- **Several cards per account**: the schema allows it; each program's behaviour is in [switches.md](switches.md): DEF-TRPT-004 is a switch, DEF-ACVW-003 is fixed-only (D-61), and DEF-BILL-002 and DEF-INTC-007 keep the COBOL behaviour.
 - **Two timestamp layouts in one column (DEF-BILL-007)**: gone with the typed column (D-60); processing-date order is now time order.
 - **User list order (NUM-USRL-002)**: `ebcdic_sort_key` reproduces EBCDIC order (lower case, upper case, digits); fixed mode orders by `user_id`.
 - **Sample-file quirks**: cross-reference lines are 36 bytes (padded to 50); `tcatbal.txt` mixes CRLF and LF; the loader accepts both.

@@ -22,7 +22,7 @@ Units in scope: **BILL** (COBIL00C), **SGN** (COSGN00C), **MENU** (COMEN01C). Th
 | Audit | D-56, D-NFR-10 | `iam.audit_event` for sign-on events; `billpay.payment` for payments. |
 | Batch window | D-BAT-05 = `WRITES_BLOCKED` | Bill Pay previews work during a window; payments return 503. Sign-on and refresh stay available. |
 | Options of modules not installed | D-70, D-WEB-04 | Admin options 5 and 6 are hidden. Main menu option 11 keeps its must-preserve "not installed" message (BR-MENU-004), because no catalog item makes it defect-decide. |
-| Ledger default | D-ARCH-13 | Code defaults to `legacy`; `ledger/fidelity.toml` sets each decided switch to `fixed`. Both modes are built and tested. |
+| Ledger default | D-ARCH-13 | Code defaults to `legacy`; `ledger/fidelity.toml` sets each decided switch to `fixed`. Both modes of the switches in section 6 are built and tested. Later units follow the targeted policy in [switches.md](switches.md). |
 
 ## 2. Modules and work packages
 

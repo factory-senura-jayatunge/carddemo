@@ -17,7 +17,7 @@
 
 ## Fidelity
 
-Each defect-decide item that has a known fix gets one switch:
+Under the targeted switch policy (user decision, 2026-11-06), a defect-decide item gets a switch only where the architecture needs a real alternative: batch output parity, a shared rule or data form such a job needs, or a wire contract external requesters observe. The authoritative list is in [switches.md](switches.md). Every other decided fix is built in its decided mode only. A switch looks like this:
 
 ```yaml
 carddemo:
@@ -27,8 +27,8 @@ carddemo:
 ```
 
 - The switch is read through one class, `FidelitySwitches`, in `platform/fidelity`. Code branches on the item ID, so a search for the ID finds every place that depends on the decision.
-- Defaults are `legacy`. The decision ledger (`modernization/ledger/fidelity.toml`) records the chosen value, who approved it and when. `make verify-ledger` fails when a switch in code has no ledger entry, or a ledger entry names an ID the spec does not have.
-- Tests for a switched item run in both modes and carry the item ID.
+- Switch defaults are `legacy`. The decision ledger (`modernization/ledger/fidelity.toml`) records the chosen value of every decided item, who approved it and when, and `code_switch = true` only for the items in [switches.md](switches.md). `make verify-ledger` fails when a switch in code has no ledger entry, or a ledger entry names an ID the spec does not have.
+- Tests for a switched item run in both modes. Tests for every other decided item run in the decided mode only. All tests carry the item ID.
 - Some defects cannot be kept on the new platform, because the mechanism that causes them is gone (no CICS task that carries state between messages, no non-recoverable files). These are listed as *architecture-dependent* in [decisions.md](decisions.md#architecture-dependent-fidelity-items). They need an explicit "accept the fix" from the business, because no legacy mode exists for them.
 - Security is the one place where the default departs from the COBOL behaviour: INV-006 says authorization "must be added, not preserved". The choices are in [api-security.md](api-security.md#the-no-sign-on-defect-inv-006-under-each-choice).
 
