@@ -175,6 +175,9 @@ class WebSupportSecurityTest {
             sign(KEY, "at+jwt", claims(now).issuer("someone-else").build()),
             sign(KEY, "at+jwt", claims(now).audience("other-api").build()),
             sign(KEY, "at+jwt", claims(now.minus(Duration.ofMinutes(10))).build()),
+            // Expired two seconds ago, or valid only from two seconds on: no clock skew is allowed.
+            sign(KEY, "at+jwt", claims(now.minusSeconds(302)).build()),
+            sign(KEY, "at+jwt", claims(now.plusSeconds(2)).build()),
             sign(UNTRUSTED, "at+jwt", claims(now).build()),
             "not-a-jwt",
         }) {
@@ -198,6 +201,22 @@ class WebSupportSecurityTest {
                 .andExpect(jsonPath("$.message").value("Payment successful.  Your Transaction ID is 0000000000000001."))
                 .andExpect(jsonPath("$.severity").value("success"))
                 .andExpect(jsonPath("$.field").value("acctId"));
+    }
+
+    /** Stateless sessions: nothing may rotate or clear the SPA's CSRF cookie between its requests. */
+    @Test
+    void authenticatedRequestsLeaveTheCsrfCookieAlone() throws Exception {
+        Cookie session = new Cookie("cd_at", token(b -> { }));
+        Cookie csrf = new Cookie("XSRF-TOKEN", "abc");
+        for (var request : java.util.List.of(
+                get("/api/test/me").cookie(session, csrf),
+                get("/api/test/me").header("Authorization", "Bearer " + token(b -> { })).cookie(csrf),
+                post("/api/test/echo").cookie(session, csrf).header("X-XSRF-TOKEN", "abc"),
+                post("/api/test/echo").cookie(session, csrf).header("X-XSRF-TOKEN", "abc"))) {
+            var response = mvc.perform(request).andExpect(status().isOk()).andReturn().getResponse();
+            assertThat(response.getHeaders("Set-Cookie")).noneMatch(c -> c.startsWith("XSRF-TOKEN"));
+            assertThat(response.getCookie("XSRF-TOKEN")).isNull();
+        }
     }
 
     @Test
@@ -228,9 +247,12 @@ class WebSupportSecurityTest {
 
     @Test
     void unexpectedErrorsHideTheirCause() throws Exception {
-        mvc.perform(get("/api/test/boom").header("Authorization", "Bearer " + token(b -> { })))
+        mvc.perform(get("/api/test/boom").header("Authorization", "Bearer " + token(b -> { }))
+                        .header("X-Correlation-Id", "corr-42"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred. Please try again later ..."))
+                .andExpect(jsonPath("$.correlationId").value("corr-42"))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("secret"))));
         mvc.perform(post("/api/test/body").header("Authorization", "Bearer " + token(b -> { }))
                         .contentType(MediaType.APPLICATION_JSON).content("{not json"))

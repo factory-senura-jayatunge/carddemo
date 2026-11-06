@@ -1,0 +1,4 @@
+# make up and CI: plain http on 127.0.0.1.
+carddemo:
+  security:
+    cookie-secure: false

@@ -43,6 +43,38 @@ class FidelityLedgerTest {
     }
 
     @Test
+    void readsTheLedgersFinalForm() {
+        Map<String, FidelityMode> modes = FidelityLedger.parse(List.of(
+                "# value        legacy (the COBOL behaviour) or fixed",
+                "schema = 1",
+                "",
+                "# jobs/CARDDEMO-CSD.md",
+                "",
+                "[switch.\"ERR-JCSD-001\"]",
+                "value = \"fixed\"",
+                "code_switch = false",
+                "decision = \"D-16\"",
+                "approved_by = \"user (decision catalog answers)\"",
+                "approved_on = \"2026-11-06\"",
+                "",
+                "[switch.\"DEF-BILL-010\"]",
+                "value = \"fixed\"",
+                "code_switch = true",
+                "setting = \"posted like POSTTRAN\"",
+                "decision = \"D-28\"",
+                "approved_by = \"user (decision catalog answers)\"",
+                "approved_on = \"2026-11-06\"",
+                "note = \"negative amount, # not a comment, curr_cyc_debit\"",
+                "",
+                "[switch.\"BR-TRNA-003\"]",
+                "code_switch = true",
+                "value = \"legacy\"",
+                "decision = \"none\""), "t");
+        assertThat(modes).containsExactly(
+                Map.entry("DEF-BILL-010", FidelityMode.FIXED), Map.entry("BR-TRNA-003", FidelityMode.LEGACY));
+    }
+
+    @Test
     void locatesTheNearestModernizationLedger(@TempDir Path root) throws Exception {
         Path ledger = Files.createDirectories(root.resolve("modernization/ledger"));
         Files.writeString(ledger.resolve("fidelity.toml"), "");
