@@ -1,6 +1,6 @@
 # CardDemo entity catalog
 
-Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It holds the entities of the pilot programs `COBIL00C` and `CBTRN02C`, ENT-CUSTOMER and ENT-CARD, and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities), e (authorization module, IMS, Db2 and MQ) and f (transaction type Db2 module and VSAM-MQ module). Each `areas/<area>-entities.md` file records the commit that merged it. The entities of the other areas are added as they merge.
+Built from the copybooks, the IDCAMS definitions in `app/jcl/` and the CICS file definitions in `app/csd/CARDDEMO.CSD`, at commit b5e0139. It holds the entities of the pilot programs `COBIL00C` and `CBTRN02C`, ENT-CUSTOMER and ENT-CARD, and the proposals merged from areas a (sign-on and administration), b (accounts and cards), c (transactions), d1 (core batch), d2 (batch utilities), e (authorization module, IMS, Db2 and MQ), f (transaction type Db2 module and VSAM-MQ module) and g (jobs, procedures, CSD and schedules). Each `areas/<area>-entities.md` file records the commit that merged it. The entities of the other areas are added as they merge.
 
 Conventions:
 
@@ -43,6 +43,13 @@ erDiagram
     AUTH_REQUEST ||--o| AUTH_DETAIL : "one detail per request (card found)"
     AUTH_REQUEST ||--o| AUTH_RESPONSE : "MQ correlation ID"
     AUTH_DETAIL ||--o| AUTH_FRAUD : "CARD_NUM + AUTH_TS"
+    TRANSACTION ||--o{ TRAN_BACKUP : "copied by TRANBKP, TRANREPT"
+    TRAN_BACKUP ||--o| TRAN_COMBINED : "BKUP(0), merged on TRAN-ID"
+    SYSTRAN ||--o| TRAN_COMBINED : "SYSTRAN(0), merged on TRAN-ID"
+    TRAN_COMBINED ||--o| TRANSACTION : "reloads the master (REPRO)"
+    TRAN_BACKUP ||--o| TRAN_REPORT_EXTRACT : "date window, sorted by card"
+    TCAT_BAL ||--o{ TCATBAL_BACKUP : "copied by PRTCATBL"
+    TCATBAL_BACKUP ||--o| TCATBAL_LISTING : "one line per record"
 ```
 
 Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_CAT` is ENT-DB2-TRAN-TYPE-CAT). The data stores enforce two relationships: the Db2 foreign key of ENT-DB2-TRAN-TYPE-CAT and the IMS parent/child link from ENT-AUTH-SUMMARY to ENT-AUTH-DETAIL (`app/app-authorization-ims-db2-mq/ims/DBPAUTP0.dbd:28-37`). The authorization segments, the fraud table and the authorization messages are local to the module: no base-application program reads them.
@@ -86,6 +93,13 @@ Each box is the entity of the same name with the prefix `ENT-` (`DB2_TRAN_TYPE_C
 | ENT-CARD-XREF | ENT-AUTH-DETAIL | `XREF-CARD-NUM` = `PA-CARD-NUM` | 1 : 0..n | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:475, 879` |
 | ENT-AUTH-DETAIL | ENT-AUTH-FRAUD | `PA-CARD-NUM` = `CARD_NUM`, timestamp from `PA-AUTH-ORIG-DATE` + `PA-AUTH-TIME-9C` = `AUTH_TS` | 1 : 0..1 | `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl:103-113, 141-145, 226-227` |
 | ENT-AUTH-REQUEST | ENT-AUTH-RESPONSE | MQ correlation ID | 1 : 1 intended, 1 : 0..1 as-is (a reply can be lost, COPAUA0C DEF-AUTH-008) | `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:411-412, 745` |
+| ENT-TRANSACTION | ENT-TRAN-BACKUP | whole record copied | one master state to one generation per TRANBKP, TRANREPT or report run | `app/jcl/TRANBKP.jcl:23-33`, `app/jcl/TRANREPT.jcl:23-33`, `app/proc/TRANREPT.prc:21-31` |
+| ENT-TRAN-BACKUP (generation 0) + ENT-SYSTRAN (generation 0) | ENT-TRAN-COMBINED | merged on `TRAN-ID` | 1 + 1 inputs to 1 generation | `app/jcl/COMBTRAN.jcl:22-37` |
+| ENT-TRAN-COMBINED | ENT-TRANSACTION | `TRAN-ID` (VSAM key) | one generation reloads the master | `app/jcl/COMBTRAN.jcl:41-48` |
+| ENT-TRAN-BACKUP (new generation) | ENT-TRAN-REPORT-EXTRACT | `TRAN-PROC-TS` date window; sorted by `TRAN-CARD-NUM` | 1 to 1 per report run, subset | `app/jcl/TRANREPT.jcl:37-55` |
+| ENT-TRANSACTION | ENT-STMT-TRAN | re-keyed: `TRAN-CARD-NUM` + `TRAN-ID` | 1 to 1 record, all records | `app/jcl/CREASTMT.JCL:44-61` |
+| ENT-TCAT-BAL | ENT-TCATBAL-BACKUP | whole record copied | one file state to one generation per PRTCATBL run | `app/jcl/PRTCATBL.jcl:29-39` |
+| ENT-TCATBAL-BACKUP | ENT-TCATBAL-LISTING | account + type + category order | 1 to 1 record | `app/jcl/PRTCATBL.jcl:43-63` |
 
 ## ENT-ACCOUNT · Credit card account
 
@@ -129,7 +143,7 @@ Used by (copybook, `docs/inventory.md:301`): CBACT01C, CBACT04C, CBEXPORT, CBIMP
 - **Alternate index:** `AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX`, `KEYS(11,25)` = `XREF-ACCT-ID`, **NONUNIQUEKEY**, path `...AIX.PATH` (`app/jcl/XREFFILE.jcl:72-92`)
 - **CICS files:** `CCXREF` (by card), `CXACAIX` (path, by account; `app/csd/CARDDEMO.CSD:63-75`). In the authorization module, COPAUA0C reads `CCXREF` by card (`app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:477-485`) and COPAUS0C reads `CXACAIX` by account (`app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:817-826`).
 - **Batch DD names by program:** `XREFFILE` in CBACT03C, CBACT04C, CBEXPORT, CBTRN01C and CBTRN02C; `CARDXREF` in CBTRN03C (`app/cbl/CBTRN03C.cbl:33`). CBACT04C reads by account through the path under DD `XREFFIL1` (`app/jcl/INTCALC.jcl:31-32`). CBIMPORT writes a new sequential copy under `XREFOUT`.
-- **Primary key:** `XREF-CARD-NUM`. **Alternate key:** `XREF-ACCT-ID` (several cards per account allowed). CBACT04C reads by `XREF-ACCT-ID` although its `SELECT` does not say `WITH DUPLICATES`; on z/OS a second card for an account is expected to make INTCALC abend (CBACT04C DEF-INTC-007, `app/cbl/CBACT04C.cbl:34-39, 394-414`).
+- **Primary key:** `XREF-CARD-NUM`. **Alternate key:** `XREF-ACCT-ID`, non-unique, but the AIX `RECORDSIZE(50,50)` leaves room for (50 - 5 - 11) / 16 = 2 card numbers per account; a third card for one account cannot be indexed, and what `BLDINDEX` in XREFFILE `STEP30` then does is not verified (XREFFILE DEF-JXREF-003, `app/jcl/XREFFILE.jcl:74-77, 97-102`). No program in the repository adds records to the cross-reference KSDS (CBIMPORT writes a sequential copy under `XREFOUT`, `app/cbl/CBIMPORT.cbl:369`), so the `UPGRADE` path is not exercised today; a target that adds cards online has to keep this limit or lift it. The sample has one card per account. CBACT04C reads by `XREF-ACCT-ID` although its `SELECT` does not say `WITH DUPLICATES`; on z/OS a second card for an account is expected to make INTCALC abend (CBACT04C DEF-INTC-007, `app/cbl/CBACT04C.cbl:34-39, 394-414`).
 
 | Field | Pos | Len | PIC | Type | Meaning |
 | :-- | --: | --: | :-- | :-- | :-- |
@@ -147,7 +161,7 @@ Online reads by account: account view reads `CXACAIX` with a keyed READ by accou
 ## ENT-CUSTOMER · Customer
 
 - **Copybooks:** `app/cpy/CVCUS01Y.cpy:4-23` and `app/cpy/CUSTREC.cpy:4-23` (`CUSTOMER-RECORD`, 500 bytes). The two layouts are identical except for the name of the date-of-birth field: `CUST-DOB-YYYY-MM-DD` in CVCUS01Y, `CUST-DOB-YYYYMMDD` in CUSTREC. Both are `X(10)` at position 309, and the sample data holds `YYYY-MM-DD` with dashes, so the CUSTREC name describes the content wrongly. Specs use the name from the copybook their program copies. CUSTREC is also indented with tab characters, which does not change the layout.
-- **Dataset:** `AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS`, KSDS, `KEYS(9 0)`, `RECORDSIZE(500 500)` (`app/jcl/CUSTFILE.jcl:46-59`). No alternate index.
+- **Dataset:** `AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS`, KSDS, `KEYS(9 0)`, `RECORDSIZE(500 500)` (`app/jcl/CUSTFILE.jcl:46-59`). No alternate index. Job DEFCUST defines an unrelated cluster `AWS.CUSTDATA.CLUSTER` with a 10-byte key; it is not this file and nothing uses it (DEFCUST DEF-JDCUST-002, `app/jcl/DEFCUST.jcl:32-47`).
 - **CICS file:** `CUSTDAT`, `RECOVERY(NONE)` (`app/csd/CARDDEMO.CSD:50-62`). **Batch DD:** `CUSTFILE` (`app/jcl/READCUST.jcl:24`, `app/jcl/CBEXPORT.jcl:49`; also CBTRN01C and CBSTM03A).
 - **Primary key:** `CUST-ID`.
 
@@ -194,7 +208,7 @@ Exposure: READCUST prints `CUST-SSN`, `CUST-GOVT-ISSUED-ID` and `CUST-DOB-YYYY-M
 - **Dataset:** `AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS`, KSDS, `KEYS(16 0)`, `RECORDSIZE(150 150)` (`app/jcl/CARDFILE.jcl:50-63`)
 - **Alternate index:** `AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX`, `KEYS(11 16)` = `CARD-ACCT-ID`, **NONUNIQUEKEY**, `UPGRADE` (`app/jcl/CARDFILE.jcl:83-92`), path `...AIX.PATH` (`app/jcl/CARDFILE.jcl:100-102`)
 - **CICS files:** `CARDDAT` (by card, `app/csd/CARDDEMO.CSD:25-36`), `CARDAIX` (path, by account, `app/csd/CARDDEMO.CSD:13-24`), both `RECOVERY(NONE)`, `UPDATEMODEL(LOCKING)` and `READINTEG(UNCOMMITTED)`. No online program reads `CARDAIX` at run time: card view reads by account only in a paragraph that is never performed (SE-CRDV-002, `app/cbl/COCRDSLC.cbl:779-791`). **Batch DD:** `CARDFILE` (`app/jcl/READCARD.jcl:25`, `app/jcl/CBEXPORT.jcl:57`; also CBTRN01C).
-- **Primary key:** `CARD-NUM`. **Alternate key:** `CARD-ACCT-ID` (several cards per account allowed).
+- **Primary key:** `CARD-NUM`. **Alternate key:** `CARD-ACCT-ID`, non-unique; the AIX `RECORDSIZE(150,150)` leaves room for (150 - 5 - 11) / 16 = 8 card numbers per account, and what happens to a ninth card is not verified (CARDFILE DEF-JCARD-004, `app/jcl/CARDFILE.jcl:85-88`).
 
 | Field | Pos | Len | PIC | Type | Meaning |
 | :-- | --: | --: | :-- | :-- | :-- |
@@ -224,11 +238,11 @@ Exposure: READCARD prints `CARD-CVV-CD` and the embossed name in full (CBACT02C 
 ## ENT-TRANSACTION · Posted transaction (transaction master)
 
 - **Copybook:** `app/cpy/CVTRA05Y.cpy:4-18` (`TRAN-RECORD`, 350 bytes)
-- **Dataset:** `AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS`, `KEYS(16 0)`, `RECORDSIZE(350 350)`, no `REUSE` (`app/jcl/TRANFILE.jcl:49-61`)
-- **Alternate index:** `KEYS(26 304)` = `TRAN-PROC-TS`, non-unique (`app/jcl/TRANFILE.jcl:82-85`, rebuilt by TRANIDX)
+- **Dataset:** `AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS`, `KEYS(16 0)`, `RECORDSIZE(350 350)`, no `REUSE` (`app/jcl/TRANFILE.jcl:49-61`). Also defined, empty and without the alternate index, by TRANBKP `STEP10` with the same key and record size, `SHAREOPTIONS(2 3)` and `ERASE` (TRANBKP SE-JTBKP-004, `app/jcl/TRANBKP.jcl:54-67`). In the cycle the file holds only the latest cycle's transactions: TRANBKP empties it and COMBTRAN reloads it from the latest backup and the interest transactions (`app/jcl/COMBTRAN.jcl:22-48`, INV-053).
+- **Alternate index:** `KEYS(26 304)` = `TRAN-PROC-TS`, non-unique, room for at most 19 transaction IDs per timestamp (`RECORDSIZE(350,350)`, TRANFILE DEF-JTRAN-006; `app/jcl/TRANFILE.jcl:82-87`). TRANBKP deletes it and does not redefine it, COMBTRAN does not rebuild it, and only TRANIDX and TRANFILE define it; no CICS file and no program uses it (DEF-JCSD-006, DEF-JTRAN-007, DEF-JTIDX-004; `app/jcl/TRANBKP.jcl:43-44`, `app/jcl/TRANIDX.jcl:22-55`).
 - **CICS file:** `TRANSACT` (`app/csd/CARDDEMO.CSD:76-87`). Online writers: bill payment (`COBIL00C`) and transaction add (`COTRN02C`), both with ID = highest existing ID + 1 (INV-001). Online readers: list (`COTRN00C`, browse) and view (`COTRN01C`, read with update lock, never rewritten) (`app/cbl/COTRN02C.cbl:444-449, 711-721`; `app/cbl/COTRN00C.cbl:593-696`; `app/cbl/COTRN01C.cbl:267-278`).
-- **Batch writers:** POSTTRAN (`CBTRN02C`) writes the KSDS; INTCALC (`CBACT04C`) writes the same layout to the sequential GDG `SYSTRAN(+1)` (FB 350), which COMBTRAN merges into the KSDS.
-- **Batch DD names by program** (each program's `SELECT ... ASSIGN TO`; the job decides which dataset is behind it): `TRANFILE` in CBTRN02C (POSTTRAN, the KSDS, `app/jcl/POSTTRAN.jcl:28-29`) and CBTRN01C (no JCL); `TRANSACT` in CBEXPORT (the KSDS, `app/jcl/CBEXPORT.jcl:55-56`). The same DD names also point at other datasets with this layout: `TRANFILE` in CBTRN03C reads the sorted daily extract `TRANSACT.DALY(+1)` (`app/jcl/TRANREPT.jcl:65-66`), and `TRANSACT` in CBACT04C writes a new sequential file of interest transactions `SYSTRAN(+1)` (`app/jcl/INTCALC.jcl:37-41`). Utility steps reach the KSDS under their own DD names: IDCAMS `TRANVSAM` in COMBTRAN (`app/jcl/COMBTRAN.jcl:45-46`), SORT `SORTIN` in CREASTMT (`app/jcl/CREASTMT.JCL:45`), and REPROC `PRC001.FILEIN` in TRANBKP (`app/jcl/TRANBKP.jcl:26-27`) and the TRANREPT procedure (`app/proc/TRANREPT.prc:24-25`). Job specs name the dataset for each DD.
+- **Batch writers:** POSTTRAN (`CBTRN02C`) writes the KSDS; INTCALC (`CBACT04C`) writes the same layout to the sequential GDG `SYSTRAN(+1)` (ENT-SYSTRAN, `RECFM=F`, 350, `app/jcl/INTCALC.jcl:39`), which COMBTRAN merges into the KSDS.
+- **Batch DD names by program** (each program's `SELECT ... ASSIGN TO`; the job decides which dataset is behind it): `TRANFILE` in CBTRN02C (POSTTRAN, the KSDS, `app/jcl/POSTTRAN.jcl:28-29`) and CBTRN01C (no JCL); `TRANSACT` in CBEXPORT (the KSDS, `app/jcl/CBEXPORT.jcl:55-56`). The same DD names also point at other datasets with this layout: `TRANFILE` in CBTRN03C reads the sorted daily extract `TRANSACT.DALY(+1)` (`app/jcl/TRANREPT.jcl:65-66`), and `TRANSACT` in CBACT04C writes a new sequential file of interest transactions `SYSTRAN(+1)` (`app/jcl/INTCALC.jcl:37-41`). Utility steps reach the KSDS under their own DD names: IDCAMS `TRANVSAM` in COMBTRAN (`app/jcl/COMBTRAN.jcl:45-46`), SORT `SORTIN` in CREASTMT (`app/jcl/CREASTMT.JCL:45`), and REPROC `PRC001.FILEIN` in TRANBKP (`app/jcl/TRANBKP.jcl:26-27`) and the TRANREPT procedure (`app/proc/TRANREPT.prc:24-25`); also IDCAMS `TRANVSAM` in TRANFILE (the seed load, `app/jcl/TRANFILE.jcl:71-74`) and REPROC `PRC001.FILEIN` in the TRANREPT batch member (`app/jcl/TRANREPT.jcl:26-27`); TRANIDX names the cluster in `BLDINDEX INDATASET`, without a DD (`app/jcl/TRANIDX.jcl:52-54`). Job specs name the dataset for each DD.
 - **Primary key:** `TRAN-ID`.
 
 | Field | Pos | Len | PIC | Type | Meaning |
@@ -282,7 +296,7 @@ Timestamp layouts found in this field pair:
 
 ## ENT-DAILY-REJECT · Rejected daily transaction
 
-- **Defined in:** `app/cbl/CBTRN02C.cbl:176-182` (no copybook). **Dataset:** `AWS.M2.CARDDEMO.DALYREJS(+1)`, GDG `LIMIT(5) SCRATCH` (`app/jcl/DALYREJS.jcl:24-28`), fixed 430, allocated `DISP=(NEW,CATLG,DELETE)` (`app/jcl/POSTTRAN.jcl:34-38`).
+- **Defined in:** `app/cbl/CBTRN02C.cbl:176-182` (no copybook). **Dataset:** `AWS.M2.CARDDEMO.DALYREJS(+1)`, GDG `LIMIT(5) SCRATCH` (`app/jcl/DALYREJS.jcl:24-28`; the catalog confirms `SCRATCH`, `app/catlg/LISTCAT.txt:684-690`; the base is defined only by job DALYREJS, not by DEFGDGB, and the README initialisation tables do not list that job, DEF-JGDGB-004, DEF-JREJS-001), fixed 430, allocated `DISP=(NEW,CATLG,DELETE)` (`app/jcl/POSTTRAN.jcl:34-38`).
 
 | Field | Pos | Len | Type | Meaning |
 | :-- | --: | --: | :-- | :-- |
@@ -295,7 +309,7 @@ Reason codes: 100 `INVALID CARD NUMBER FOUND`, 101 `ACCOUNT RECORD NOT FOUND`, 1
 ## ENT-TCAT-BAL · Balance per account, transaction type and category
 
 - **Copybook:** `app/cpy/CVTRA01Y.cpy:4-10` (`TRAN-CAT-BAL-RECORD`, 50 bytes)
-- **Dataset:** `AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS`, `KEYS(17 0)`, `RECORDSIZE(50 50)` (`app/jcl/TCATBALF.jcl:36-48`). **Batch DD:** `TCATBALF`. Not defined in CICS.
+- **Dataset:** `AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS`, `KEYS(17 0)`, `RECORDSIZE(50 50)` (`app/jcl/TCATBALF.jcl:36-48`). **Batch DD:** `TCATBALF`. Not defined in CICS. Unloaded to ENT-TCATBAL-BACKUP by PRTCATBL (`app/jcl/PRTCATBL.jcl:29-39`). The TCATBALF job replaces the whole file with `TCATBALF.PS`, which discards every balance accumulated by POSTTRAN since that file was written (TCATBALF DEF-JTCAT-002, `app/jcl/TCATBALF.jcl:54-62`).
 - **Primary key:** `TRAN-CAT-KEY` = `TRANCAT-ACCT-ID` + `TRANCAT-TYPE-CD` + `TRANCAT-CD`.
 
 | Field | Pos | Len | PIC | Type | Meaning |
@@ -311,7 +325,7 @@ Sample: 50 records, one per account, type `01` category `0001`. POSTTRAN on the 
 ## ENT-TRAN-TYPE and ENT-TRAN-CATEGORY · Reference codes
 
 - **Copybooks:** `app/cpy/CVTRA03Y.cpy:4-7` (`TRAN-TYPE-RECORD`, 60 bytes) and `app/cpy/CVTRA04Y.cpy:4-9` (`TRAN-CAT-RECORD`, 60 bytes).
-- **Datasets:** `AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS`, `KEYS(2 0)`, and `AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS`, `KEYS(6 0)`, both `RECORDSIZE(60 60)`, loaded by REPRO from `TRANTYPE.PS` and `TRANCATG.PS` by the TRANTYPE and TRANCATG jobs (`app/jcl/TRANTYPE.jcl:36-61`, `app/jcl/TRANCATG.jcl:36-61`). Not defined in CICS. **Batch DD:** `TRANTYPE`, `TRANCATG` (CBTRN03C).
+- **Datasets:** `AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS`, `KEYS(2 0)`, and `AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS`, `KEYS(6 0)`, both `RECORDSIZE(60 60)`, loaded by REPRO from `TRANTYPE.PS` and `TRANCATG.PS` by the TRANTYPE and TRANCATG jobs (`app/jcl/TRANTYPE.jcl:36-61`, `app/jcl/TRANCATG.jcl:36-61`). The type file is defined with `SHAREOPTIONS(1 4)`, the category file with `SHAREOPTIONS(2 3)` like the other masters (TRANTYPE DEF-JTTYP-002); the weekly Db2 refresh rewrites the flat files but never reloads the KSDS (SCHED-CONTROLM DEF-JCTLM-005). Not defined in CICS. **Batch DD:** `TRANTYPE`, `TRANCATG` (CBTRN03C).
 - **Where the data comes from:** the sample files `app/data/ASCII/trantype.txt` and `trancatg.txt`. In the transaction type (Db2) module, TRANEXTR unloads ENT-DB2-TRAN-TYPE and ENT-DB2-TRAN-TYPE-CAT into the same `.PS` datasets; no scheduler runs the TRANTYPE and TRANCATG jobs after it (INV-019, `app/app-transaction-type-db2/jcl/TRANEXTR.jcl:76-84, 106-115`).
 - **Readers:** TRANREPT (`CBTRN03C`) reads both by key for the report descriptions; a missing code abends it (INV-016, `app/cbl/CBTRN03C.cbl:495-513`). Neither pilot program nor transaction add (`COTRN02C`) reads them; transaction add accepts any 2-digit type and 4-digit category without a lookup (`app/cbl/COTRN02C.cbl:322-337, 452-453`).
 
@@ -1163,6 +1177,81 @@ Sample data: 202 details, all approved (`00`, reason `0000`), match status `P`, 
 - **Data set:** `AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0`, DD `DFSURGU1` of job DBPAUTP0, `RECFM=VB`, `LRECL=27990` (`app/app-authorization-ims-db2-mq/jcl/DBPAUTP0.jcl:25-29`); written by the IMS HD Reorganization Unload utility `DFSURGU0` (DBPAUTP0 SE-JDBPA-002). The record format belongs to IMS: a header record, one record per segment (IMS prefix followed by the segment data), and a trailer record. Only the IMS HD reload utility reads it; no CardDemo program does.
 - **Sample data:** `app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat`, 51,736 bytes, 226 variable-length records with 4-byte record descriptors: an 88-byte first and last record naming `PAUTSUM0` at offset 8, 22 records of 140 bytes (`PAUTSUM0`, 100 data bytes) and 202 records of 240 bytes (`PAUTDTL1`, 200 data bytes), each summary followed by its details. This is the source of the 22 summaries and 202 details used as sample data in the program specs.
 
+## ENT-TRAN-BACKUP · Transaction master backup generations
+
+- **Layout:** ENT-TRANSACTION (`app/cpy/CVTRA05Y.cpy:4-18`), 350 bytes. Written by IDCAMS `REPRO` through procedure REPROC (`app/proc/REPROC.prc:21-28`, control card `app/ctl/REPROCT.ctl:15`), so each record is a byte-for-byte copy of a master record, in `TRAN-ID` order.
+- **Dataset:** `AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)`, sequential, `DCB=(LRECL=350,RECFM=FB,BLKSIZE=0)`, `DISP=(NEW,CATLG,DELETE)` (`app/jcl/TRANBKP.jcl:29-33`).
+- **GDG base:** `LIMIT(5) SCRATCH` in the defining job (`app/jcl/DEFGDGB.jcl:24-28`); the catalog lists the base as `NOSCRATCH` with rolled-off generations still cataloged (`app/catlg/LISTCAT.txt:1631-1637`, DEF-JGDGB-002).
+- **Writers:** TRANBKP (SE-JTBKP-001), TRANREPT (`app/jcl/TRANREPT.jcl:29-33`, DEF-JTRPT-002) and the procedure TRANREPT that the online report submits (`app/proc/TRANREPT.prc:27-31`, DEF-JTRPTP-003). **Readers:** COMBTRAN as `BKUP(0)` (`app/jcl/COMBTRAN.jcl:23-24`, SE-JCOMB-001), the sorts of TRANREPT and of the procedure TRANREPT as `BKUP(+1)` within the same job (`app/jcl/TRANREPT.jcl:38-39`, `app/proc/TRANREPT.prc:35-37`), and the restart runbook as the restore point for `TRANSACT`.
+- **Key:** none (sequential); generations are told apart only by their relative number, so any extra writer between TRANBKP and COMBTRAN changes COMBTRAN's input (DEF-JCOMB-001).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| (whole record) | 1 | 350 | `X(350)` | ENT-TRANSACTION | Copy of one transaction master record as it was when the job ran |
+
+## ENT-SYSTRAN · Interest transaction generations
+
+- **Layout:** ENT-TRANSACTION, 350 bytes, written by CBACT04C (area d1); the job's part is the allocation.
+- **Dataset:** `AWS.M2.CARDDEMO.SYSTRAN(+1)` under DD name `TRANSACT`, `DCB=(RECFM=F,LRECL=350,BLKSIZE=0)`, `DISP=(NEW,CATLG,DELETE)` (`app/jcl/INTCALC.jcl:37-41`, SE-JINTC-001, DEF-JINTC-002). `RECFM=F` (unblocked) differs from the `FB` of the other transaction generations.
+- **GDG base:** `LIMIT(5) SCRATCH` (`app/jcl/DEFGDGB.jcl:48-52`; catalog `app/catlg/LISTCAT.txt:1098-1106`).
+- **Reader:** COMBTRAN as `SYSTRAN(0)` (`app/jcl/COMBTRAN.jcl:25-26`).
+- **Key:** none; `TRAN-ID` is the 10-character INTCALC `PARM` followed by a 6-digit counter (NUM-JINTC-001), so two runs with the same `PARM` produce the same IDs (DEF-JINTC-001).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| (whole record) | 1 | 350 | `X(350)` | ENT-TRANSACTION | One interest or fee transaction generated by INTCALC |
+
+## ENT-TRAN-COMBINED · Combined transaction generations
+
+- **Layout:** ENT-TRANSACTION, 350 bytes.
+- **Dataset:** `AWS.M2.CARDDEMO.TRANSACT.COMBINED(+1)`, `DCB=(*.SORTIN)`, so it takes the attributes of the first input, `TRANSACT.BKUP(0)` (`app/jcl/COMBTRAN.jcl:33-37`, NUM-JCOMB-001; that a referback to a concatenated DD takes the first data set's attributes is platform-inferred, high).
+- **GDG base:** `LIMIT(5) SCRATCH` (`app/jcl/DEFGDGB.jcl:54-58`; catalog `app/catlg/LISTCAT.txt:2919-2925`).
+- **Content:** every record of `TRANSACT.BKUP(0)` and `SYSTRAN(0)`, sorted ascending on `TRAN-ID` (bytes 1-16) with no duplicate removal (`app/jcl/COMBTRAN.jcl:22-31`, SE-JCOMB-001). It is loaded into the transaction master with IDCAMS `REPRO` (`app/jcl/COMBTRAN.jcl:41-48`, SE-JCOMB-002), which rejects a second record with the same key (VAL-JCOMB-001; the VSAM duplicate-key rule for `REPRO` into a KSDS, platform-inferred, high).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| (whole record) | 1 | 350 | `X(350)` | ENT-TRANSACTION | Posted or interest transaction, in `TRAN-ID` order |
+
+## ENT-TRAN-REPORT-EXTRACT · Transactions selected for the transaction report
+
+- **Layout:** ENT-TRANSACTION, 350 bytes (`DCB=(*.SORTIN)` from `TRANSACT.BKUP(+1)`).
+- **Dataset:** `AWS.M2.CARDDEMO.TRANSACT.DALY(+1)` (`app/jcl/TRANREPT.jcl:51-55`; `app/proc/TRANREPT.prc:49-53`). Read by CBTRN03C as DD `TRANFILE` in the next step (`app/jcl/TRANREPT.jcl:65-66`).
+- **GDG base:** `LIMIT(5) SCRATCH` in the defining job (`app/jcl/DEFGDGB.jcl:30-34`); the catalog lists it as `NOSCRATCH` (`app/catlg/LISTCAT.txt:3021-3027`, DEF-JGDGB-002).
+- **Content:** the records whose `TRAN-PROC-TS` date part (bytes 305-314) lies between the start and end dates, inclusive, sorted by `TRAN-CARD-NUM` (bytes 263-278) (`app/jcl/TRANREPT.jcl:40-48`, BR-JTRPT-001, BR-JTRPTP-001). The batch member hard-codes 2022-01-01 to 2022-07-06 (DEF-JTRPT-001); the online request supplies the user's dates (FLOW-JTRPTP-001).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| (whole record) | 1 | 350 | `X(350)` | ENT-TRANSACTION | Transaction processed within the report window |
+| `TRAN-CARD-NUM` (sort key) | 263 | 16 | `X(16)` | text(16) | Declared to the sort as `ZD` (`app/jcl/TRANREPT.jcl:41`); the order equals the text order for all-digit card numbers (NUM-JTRPT-001) |
+| `TRAN-PROC-DT` (filter) | 305 | 10 | `X(10)` | date-text | Date part of `TRAN-PROC-TS`, compared as characters (`app/jcl/TRANREPT.jcl:42`) |
+
+## ENT-TCATBAL-BACKUP · Category balance backup generations
+
+- **Layout:** ENT-TCAT-BAL (`app/cpy/CVTRA01Y.cpy:4-10`), 50 bytes, unloaded with REPROC in key order.
+- **Dataset:** `AWS.M2.CARDDEMO.TCATBALF.BKUP(+1)`, `DCB=(LRECL=50,RECFM=FB,BLKSIZE=0)` (`app/jcl/PRTCATBL.jcl:35-39`, SE-JPCAT-002).
+- **GDG base:** `LIMIT(5) SCRATCH` (`app/jcl/DEFGDGB.jcl:42-46`; catalog `app/catlg/LISTCAT.txt:1202-1208`).
+- **Writer:** PRTCATBL only. The restart runbook uses it as the restore point for the category balances (`docs/runbooks/batch-cycle-restart.md:76-81`), so the restore point is only as recent as the last PRTCATBL run; no job of the README cycle runs PRTCATBL.
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| (whole record) | 1 | 50 | `X(50)` | ENT-TCAT-BAL | Copy of one category balance record |
+
+## ENT-TCATBAL-LISTING · Category balance listing
+
+- **Dataset:** `AWS.M2.CARDDEMO.TCATBALF.REPT`, sequential, `DCB=(LRECL=40,RECFM=FB,BLKSIZE=0)`, deleted at the start of each run (`app/jcl/PRTCATBL.jcl:21-25`) and created by the sort (`app/jcl/PRTCATBL.jcl:59-63`). Catalog: plain non-VSAM dataset (`app/catlg/LISTCAT.txt:1319-1333`).
+- **Content:** one line per ENT-TCAT-BAL record, in key order (`app/jcl/PRTCATBL.jcl:52-56`, BR-JPCAT-001).
+
+| Field | Pos | Len | PIC | Type | Meaning |
+| :-- | --: | --: | :-- | :-- | :-- |
+| `TRANCAT-ACCT-ID` | 1 | 11 | `9(11)` | digits(11) | Account, copied as is |
+| (blank) | 12 | 1 | `X` | text(1) | Separator |
+| `TRANCAT-TYPE-CD` | 13 | 2 | `X(02)` | text(2) | Transaction type |
+| (blank) | 15 | 1 | `X` | text(1) | Separator |
+| `TRANCAT-CD` | 16 | 4 | `9(04)` | digits(4) | Category |
+| (blank) | 20 | 1 | `X` | text(1) | Separator |
+| `TRAN-CAT-BAL` edited | 21 | 12 | `EDIT=(TTTTTTTTT.TT)` | text(12) | Balance with leading zeros and a decimal point, **no sign** (NUM-JPCAT-001, DEF-JPCAT-001) |
+| (blanks) | 33 | 8 | `9X` | text(8) | The `OUTREC` asks for 9 blanks (41 bytes); the 40-byte record keeps 8 (DEF-JPCAT-002). The truncation assumes DFSORT's shipped default `TRUNC=RC0`, which shortens the record with a warning; a site that sets `TRUNC=RC16` ends the sort instead (platform-inferred, medium) |
+
 ## Relational mapping hints (input to the architecture step, not decisions)
 
 | Entity | Candidate table | Primary key | Notes |
@@ -1188,6 +1277,8 @@ Sample data: 202 details, all approved (`00`, reason `0000`), match status `P`, 
 | ENT-AUTH-REQUEST, ENT-AUTH-RESPONSE | message contracts, not tables | - | comma-separated text; the reply carries the request's correlation ID; both carry the PAN |
 | ENT-AUTH-ERROR-LOG | log sink, or an `auth_error_log` table | - | the event key holds the PAN for most errors |
 | ENT-AUTH-ROOT-FILE, ENT-AUTH-CHILD-FILE, ENT-AUTH-CHILD-GSAM, ENT-AUTH-HD-UNLOAD | migration file contracts, not tables | - | packed fields; the HD unload is the source of the sample summaries and details |
+| ENT-TRAN-BACKUP, ENT-SYSTRAN, ENT-TRAN-COMBINED, ENT-TRAN-REPORT-EXTRACT | none (database backups, a staging step and a query on `transaction`) | - | they exist because the master holds one cycle (INV-053) and COMBTRAN reloads it from generations (INV-052); a persistent `transaction` table needs a retention decision instead |
+| ENT-TCATBAL-BACKUP, ENT-TCATBAL-LISTING | none (a database backup and a report) | - | the listing drops the balance sign (PRTCATBL DEF-JPCAT-001) |
 
 ## Open questions
 
