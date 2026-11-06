@@ -15,13 +15,13 @@ sources:
 entry_points: [{type: manual, job: CBIMPORT}]
 programs: [CBIMPORT]
 data_stores:
-  - {dd: STEP01.EXPFILE, dataset: AWS.M2.CARDDEMO.EXPORT.DATA, access: [read-sequential]}
-  - {dd: STEP01.CUSTOUT, dataset: AWS.M2.CARDDEMO.CUSTDATA.IMPORT, access: [create, write-sequential]}
+  - {dd: STEP01.EXPFILE, dataset: AWS.M2.CARDDEMO.EXPORT.DATA, entity: ENT-EXPORT-RECORD, access: [read-sequential]}
+  - {dd: STEP01.CUSTOUT, dataset: AWS.M2.CARDDEMO.CUSTDATA.IMPORT, entity: ENT-CUSTOMER, access: [create, write-sequential]}
   - {dd: STEP01.ACCTOUT, dataset: AWS.M2.CARDDEMO.ACCTDATA.IMPORT, entity: ENT-ACCOUNT, access: [create, write-sequential]}
   - {dd: STEP01.XREFOUT, dataset: AWS.M2.CARDDEMO.CARDXREF.IMPORT, entity: ENT-CARD-XREF, access: [create, write-sequential]}
   - {dd: STEP01.TRNXOUT, dataset: AWS.M2.CARDDEMO.TRANSACT.IMPORT, entity: ENT-TRANSACTION, access: [create, write-sequential]}
-  - {dd: STEP01.CARDOUT, dataset: AWS.M2.CARDDEMO.CARDDATA.IMPORT, access: [create, write-sequential]}
-  - {dd: STEP01.ERROUT, dataset: AWS.M2.CARDDEMO.IMPORT.ERRORS, access: [create, write-sequential]}
+  - {dd: STEP01.CARDOUT, dataset: AWS.M2.CARDDEMO.CARDDATA.IMPORT, entity: ENT-CARD, access: [create, write-sequential]}
+  - {dd: STEP01.ERROUT, dataset: AWS.M2.CARDDEMO.IMPORT.ERRORS, entity: ENT-IMPORT-ERROR, access: [create, write-sequential]}
 invoked_by: [operator]
 spec_status: draft
 ---
@@ -74,8 +74,8 @@ All outputs use a system-determined block size (`BLKSIZE=0`). The DD names match
 
 ## 5. Data used
 
-- **Input:** the export record (no entity; `EXPORT-RECORD` in `app/cpy/CVEXPORT.cpy:9-19`), 500 bytes, read in key order, which is the order CBEXPORT wrote it in.
-- **Outputs:** customer records (no entity; `app/cpy/CVCUS01Y.cpy`), ENT-ACCOUNT records, ENT-CARD-XREF records, ENT-TRANSACTION records, card records (no entity; `app/cpy/CVACT02Y.cpy`), and 132-byte error lines (`app/cbl/CBIMPORT.cbl:111-114`). The program's FDs give the record lengths (`app/cbl/CBIMPORT.cbl:86-114`).
+- **Input:** the export record ENT-EXPORT-RECORD (`EXPORT-RECORD` in `app/cpy/CVEXPORT.cpy:9-19`), 500 bytes, read in key order, which is the order CBEXPORT wrote it in.
+- **Outputs:** ENT-CUSTOMER records (`app/cpy/CVCUS01Y.cpy`), ENT-ACCOUNT records, ENT-CARD-XREF records, ENT-TRANSACTION records, ENT-CARD records (`app/cpy/CVACT02Y.cpy`), and 132-byte error lines, ENT-IMPORT-ERROR (`app/cbl/CBIMPORT.cbl:111-114`). The program's FDs give the record lengths (`app/cbl/CBIMPORT.cbl:86-114`).
 
 ## 6. Processing flow
 

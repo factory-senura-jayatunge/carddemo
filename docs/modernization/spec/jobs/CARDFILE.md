@@ -17,12 +17,12 @@ sources:
 entry_points: [{type: manual, job: CARDFILE}, {type: script, file: scripts/run_full_batch.sh, lines: "19-20"}, {type: script, file: scripts/remote_refresh.sh, lines: "19-20"}]
 programs: [SDSF, IDCAMS]
 data_stores:
-  - {cics_file: CARDDAT, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, access: [cics-close, cics-open]}
-  - {cics_file: CARDAIX, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH, access: [cics-close, cics-open]}
-  - {dd: CARDDATA, dataset: AWS.M2.CARDDEMO.CARDDATA.PS, copybook: CVACT02Y, access: [read-sequential]}
-  - {dd: CARDVSAM, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, copybook: CVACT02Y, access: [delete, define, load]}
-  - {dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX, access: [delete, define, build]}
-  - {dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH, access: [define]}
+  - {cics_file: CARDDAT, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, entity: ENT-CARD, access: [cics-close, cics-open]}
+  - {cics_file: CARDAIX, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH, entity: ENT-CARD, access: [cics-close, cics-open]}
+  - {dd: CARDDATA, dataset: AWS.M2.CARDDEMO.CARDDATA.PS, entity: ENT-CARD, copybook: CVACT02Y, access: [read-sequential]}
+  - {dd: CARDVSAM, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, entity: ENT-CARD, copybook: CVACT02Y, access: [delete, define, load]}
+  - {dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX, entity: ENT-CARD, access: [delete, define, build]}
+  - {dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH, entity: ENT-CARD, access: [define]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh]
 spec_status: draft
 ---
@@ -102,7 +102,7 @@ Return code of the job: the highest step return code. Console output is SDSF `IS
 
 ## 5. Data used
 
-- The card record (`CARD-RECORD`, `app/cpy/CVACT02Y.cpy:4-11`, 150 bytes; no entity in `entities.md` yet), whole records copied unchanged from `CARDDATA.PS` to the KSDS. No field is interpreted. The primary key is bytes 1-16 (`CARD-NUM`); the alternate key is bytes 17-27 (`CARD-ACCT-ID`, `9(11)`), the account that owns the card (ENT-ACCOUNT `ACCT-ID`). The record also holds the card verification code `CARD-CVV-CD` (bytes 28-30), which the job copies as is.
+- The card record ENT-CARD (`CARD-RECORD`, `app/cpy/CVACT02Y.cpy:4-11`, 150 bytes), whole records copied unchanged from `CARDDATA.PS` to the KSDS. No field is interpreted. The primary key is bytes 1-16 (`CARD-NUM`); the alternate key is bytes 17-27 (`CARD-ACCT-ID`, `9(11)`), the account that owns the card (ENT-ACCOUNT `ACCT-ID`). The record also holds the card verification code `CARD-CVV-CD` (bytes 28-30), which the job copies as is.
 - Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:150-333`, from the path entry to the end of the AIX): the cluster data component has `KEYLEN 16`, `RKP 0`, `MAXLRECL 150`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:202-207`). The AIX data component has `KEYLEN 11`, `AXRKP 16`, `MAXLRECL 150`, `SHROPTNS(1,3)`, `SPANNED`, `NONUNIQKEY` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:281-287`), space `CYLINDER` primary 5 secondary 1 (`app/catlg/LISTCAT.txt:295-297`), and the AIX is in the upgrade set (`app/catlg/LISTCAT.txt:265`). The path is `UPDATE` (`app/catlg/LISTCAT.txt:163`). All of this matches the JCL except `SPANNED` on the AIX (`app/catlg/LISTCAT.txt:285`), which `STEP40` does not code (its default is non-spanned), so the catalogued AIX was probably defined by another statement than this job's; low confidence, and it does not change the 150-byte maximum. `SHROPTNS(1,3)` on the AIX is the IDCAMS default, since `STEP40` names no `SHAREOPTIONS`.
 - Sample data: `app/data/ASCII/carddata.txt` has 50 records of 150 bytes, card numbers strictly ascending, and 50 distinct account IDs (one card per account). Checked locally with a Python script over the file.
 

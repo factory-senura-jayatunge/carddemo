@@ -22,7 +22,7 @@ data_stores:
   - {dd: XREFFILE, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, entity: ENT-CARD-XREF, access: [read-random]}
   - {dd: XREFFIL1, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, entity: ENT-CARD-XREF, access: [read-random]}
   - {dd: ACCTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, entity: ENT-ACCOUNT, access: [read-random, rewrite]}
-  - {dd: DISCGRP, dataset: AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, access: [read-random]}
+  - {dd: DISCGRP, dataset: AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, entity: ENT-DISC-GROUP, access: [read-random]}
   - {dd: TRANSACT, dataset: "AWS.M2.CARDDEMO.SYSTRAN(+1)", entity: ENT-TRANSACTION, access: [create, write-sequential]}
 invoked_by: [operator, scripts/run_full_batch.sh, Control-M folder MONTHLY-InterestCalculation]
 local_run: "make run-batch PROGRAM=INTCALC"
@@ -75,7 +75,7 @@ Return code of the job: the return code of `CBACT04C` (0), or abend U0999 throug
 
 ## 5. Data used
 
-ENT-TCAT-BAL (input), ENT-CARD-XREF (lookup by account ID through the path), ENT-ACCOUNT (updated), the disclosure group file `AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS` (layout `app/cpy/CVTRA02Y.cpy`, lookup), ENT-TRANSACTION (written, as interest transactions of type `01`, category `05`, source `System`; `app/cbl/CBACT04C.cbl:484-486`). The GDG base `SYSTRAN` has `LIMIT 5`, `SCRATCH` (`app/catlg/LISTCAT.txt:1098-1106`), as DEFGDGB defines it.
+ENT-TCAT-BAL (input), ENT-CARD-XREF (lookup by account ID through the path), ENT-ACCOUNT (updated), ENT-DISC-GROUP, the disclosure group file `AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS` (layout `app/cpy/CVTRA02Y.cpy`, lookup), ENT-TRANSACTION (written, as interest transactions of type `01`, category `05`, source `System`; `app/cbl/CBACT04C.cbl:484-486`). The GDG base `SYSTRAN` has `LIMIT 5`, `SCRATCH` (`app/catlg/LISTCAT.txt:1098-1106`), as DEFGDGB defines it.
 
 ## 6. Processing flow
 

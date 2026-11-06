@@ -15,13 +15,13 @@ sources:
 entry_points: [{type: manual, job: CBEXPORT}]
 programs: [IDCAMS, CBEXPORT]
 data_stores:
-  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.EXPORT.DATA, access: [delete, define]}
-  - {dd: STEP02.CUSTFILE, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, access: [read-sequential]}
+  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.EXPORT.DATA, entity: ENT-EXPORT-RECORD, access: [delete, define]}
+  - {dd: STEP02.CUSTFILE, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, entity: ENT-CUSTOMER, access: [read-sequential]}
   - {dd: STEP02.ACCTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, entity: ENT-ACCOUNT, access: [read-sequential]}
   - {dd: STEP02.XREFFILE, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, entity: ENT-CARD-XREF, access: [read-sequential]}
   - {dd: STEP02.TRANSACT, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [read-sequential]}
-  - {dd: STEP02.CARDFILE, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, access: [read-sequential]}
-  - {dd: STEP02.EXPFILE, dataset: AWS.M2.CARDDEMO.EXPORT.DATA, access: [load]}
+  - {dd: STEP02.CARDFILE, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, entity: ENT-CARD, access: [read-sequential]}
+  - {dd: STEP02.EXPFILE, dataset: AWS.M2.CARDDEMO.EXPORT.DATA, entity: ENT-EXPORT-RECORD, access: [load]}
 invoked_by: [operator]
 spec_status: draft
 ---
@@ -75,8 +75,8 @@ The DD names match the program's `SELECT ... ASSIGN TO` clauses (`app/cbl/CBEXPO
 
 ## 5. Data used
 
-- **Inputs, read in full in key order:** the customer master (no entity; `app/cpy/CVCUS01Y.cpy`), ENT-ACCOUNT, ENT-CARD-XREF, ENT-TRANSACTION and the card master (no entity; `app/cpy/CVACT02Y.cpy`). Nothing is updated.
-- **Output:** the export record (no entity; `EXPORT-RECORD` in `app/cpy/CVEXPORT.cpy:9-19`), 500 bytes: record type X(1), timestamp X(26), `EXPORT-SEQUENCE-NUM` binary 9(9) (4 bytes, bytes 28-31), branch ID X(4), region code X(5) and 460 bytes of record data in one of five layouts. `docs/security/data-handling.md:52` lists its sensitive fields.
+- **Inputs, read in full in key order:** ENT-CUSTOMER (`app/cpy/CVCUS01Y.cpy`), ENT-ACCOUNT, ENT-CARD-XREF, ENT-TRANSACTION and ENT-CARD (`app/cpy/CVACT02Y.cpy`). Nothing is updated.
+- **Output:** the export record ENT-EXPORT-RECORD (`EXPORT-RECORD` in `app/cpy/CVEXPORT.cpy:9-19`), 500 bytes: record type X(1), timestamp X(26), `EXPORT-SEQUENCE-NUM` binary 9(9) (4 bytes, bytes 28-31), branch ID X(4), region code X(5) and 460 bytes of record data in one of five layouts. `docs/security/data-handling.md:52` lists its sensitive fields.
 - The export cluster does not appear in the catalog listing `app/catlg/LISTCAT.txt`.
 
 ## 6. Processing flow

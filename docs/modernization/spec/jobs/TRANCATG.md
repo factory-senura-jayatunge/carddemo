@@ -12,12 +12,12 @@ sources:
   - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "143, 163, 221-222, 363"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "37-38"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "31-41"}
-  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "219-244, 273-298"}
+  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "216-217, 219-244, 271, 273-298"}
 entry_points: [{type: manual, job: TRANCATG}, {type: script, file: scripts/remote_refresh.sh, lines: "37-38"}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "219-244"}]
 programs: [IDCAMS]
 data_stores:
-  - {dd: TRANCATG, dataset: AWS.M2.CARDDEMO.TRANCATG.PS, copybook: CVTRA04Y, access: [read-sequential]}
-  - {dd: TCATVSAM, dataset: AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS, copybook: CVTRA04Y, access: [delete, define, load]}
+  - {dd: TRANCATG, dataset: AWS.M2.CARDDEMO.TRANCATG.PS, entity: ENT-TRAN-CATEGORY, copybook: CVTRA04Y, access: [read-sequential]}
+  - {dd: TCATVSAM, dataset: AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS, entity: ENT-TRAN-CATEGORY, copybook: CVTRA04Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/remote_refresh.sh, CA-7 trigger from CLOSEFIL1]
 spec_status: draft
 ---
@@ -34,20 +34,21 @@ The job has no business rules. Its items:
 
 | ID | Rule |
 | :-- | :-- |
-| SE-JTCATG-001 | Delete the transaction category cluster; the return code is then set to 0 whatever the result. |
+| SE-JTCATG-001 | Delete the transaction category cluster; the return code is then set to 0 unless the delete ended with a severe error (ERR-JTCATG-003). |
 | SE-JTCATG-002 | Define the cluster: key 6 at offset 0, records 60 fixed, `SHAREOPTIONS(2 3)`, `ERASE`, no `REUSE`. |
 | SE-JTCATG-003 | Load the cluster with every record of `TRANCATG.PS`, in file order, with exclusive use of the cluster (`DISP=OLD`). |
 | VAL-JTCATG-001 | The load rejects records out of key order or with duplicate keys (VSAM rule). |
 | ERR-JTCATG-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
 | ERR-JTCATG-002 | The job waits to start while another job has the cluster allocated. |
+| ERR-JTCATG-003 | A severe IDCAMS error (condition code 16) in the delete skips the return-code reset. |
 | NUM-JTCATG-001 | Key and record size. |
 | DEF-JTCATG-001 | The unconditional return-code reset hides every delete failure. |
 | DEF-JTCATG-002 | `scripts/run_full_batch.sh` leaves the job out, although the README sequence includes it. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:163`) and its "Running Batch Jobs" sequence (`./README.md:222`), and in the demo script `scripts/remote_refresh.sh:37-38`, but not in `scripts/run_full_batch.sh` (DEF-JTCATG-002). In the CA-7 schedule, `CLOSEFIL1` (a CLOSEFIL run under schedule ID 031) triggers it and it triggers `WAITSTEP` (`app/scheduler/CardDemo.ca7:219-244, 273-298`). Control-M does not run it. The local runner has no TRANCATG job; it loads `app/data/ASCII/trancatg.txt` into the `TRANCATG` dataset directly (`tools/batch-programs.toml:231-235`).
-- **Preconditions:** no other job has `AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS` allocated (ERR-JTCATG-002); `AWS.M2.CARDDEMO.TRANCATG.PS` exists and is sorted by key (`./README.md:143`, FB 60); volume `AWSHJ1` exists. The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
+- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:163`) and its "Running Batch Jobs" sequence (`./README.md:222`), and in the demo script `scripts/remote_refresh.sh:37-38`, but not in `scripts/run_full_batch.sh` (DEF-JTCATG-002). In the CA-7 schedule, `CLOSEFIL1` (a CLOSEFIL run under schedule ID 031) triggers it with SCHID 031 (`app/scheduler/CardDemo.ca7:244`) and it triggers `WAITSTEP` with SCHID 031 (`app/scheduler/CardDemo.ca7:298`). A trigger fires only when its job completed under the trigger's schedule ID, and the triggered job inherits that ID (FLOW-JCA7-005), so TRANCATG runs only in a run under SCHID 031: WAITSTEP's trigger of `CLOSEFIL1` is defined for 031 (`app/scheduler/CardDemo.ca7:216`), and its trigger of `CLOSEFIL2`, which leads to TCATBALF, for 032 (`app/scheduler/CardDemo.ca7:217, 271`). One WAITSTEP completion therefore never starts both TRANCATG and TCATBALF. The WAITSTEP that follows TRANTYPE in the regular run under 030 never reaches TRANCATG (FLOW-JCA7-002). Under 031 the job is also part of chain 4, after PRTCATBL (FLOW-JCA7-004), and that run reloads the category file on every round without end (DEF-JCA7-008). This reading of the schedule is platform-inferred (medium). Control-M does not run it. The local runner has no TRANCATG job; it loads `app/data/ASCII/trancatg.txt` into the `TRANCATG` dataset directly (`tools/batch-programs.toml:231-235`).
+- **Preconditions:** no other job has `AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS` allocated (ERR-JTCATG-002); `AWS.M2.CARDDEMO.TRANCATG.PS` exists and is sorted by key (`./README.md:143`, FB 60). The define names volume `AWSHJ1`, but the cluster is SMS-managed (storage class `SCTECH`, `app/catlg/LISTCAT.txt:1446`) and the catalog shows its data component on volume `YYYYTL` (`app/catlg/LISTCAT.txt:1492`), so on the reference system SMS chose the volume; `AWSHJ1` matters only where SMS does not manage these names (platform-inferred, medium). The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 
 ## 4. Interfaces
@@ -67,7 +68,7 @@ Return code of the job: the highest step return code. Console output is IDCAMS `
 
 ## 5. Data used
 
-- ENT-TRAN-CATEGORY (`TRAN-CAT-RECORD`, `app/cpy/CVTRA04Y.cpy:4-9`, 60 bytes), whole records copied unchanged from `TRANCATG.PS` to the KSDS. No field is interpreted. The key is bytes 1-6 (`TRAN-CAT-KEY`: `TRAN-TYPE-CD` `X(02)`, `TRAN-CAT-CD` `9(04)`); the description `TRAN-CAT-TYPE-DESC` (`X(50)`) and a 4-byte filler are carried along.
+- ENT-TRAN-CATEGORY (`TRAN-CAT-RECORD`, `app/cpy/CVTRA04Y.cpy:4-9`, 60 bytes), whole records copied unchanged from `TRANCATG.PS` to the KSDS. No field is interpreted. The key is bytes 1-6 (`TRAN-CAT-KEY`: `TRAN-TYPE-CD` `X(02)`, `TRAN-CAT-CD` `9(04)`); the description `TRAN-CAT-TYPE-DESC` (`X(50)`) and a 4-byte filler are carried along. The filler holds `0000` in every sample record, and TRANEXTR writes the same four zeros when it rebuilds the flat file from Db2 (`REPEAT('0',4)`, `app/app-transaction-type-db2/jcl/TRANEXTR.jcl:106-115`), so both sources give the same bytes. The content of the filler is incidental.
 - Catalog state (`app/catlg/LISTCAT.txt:1440-1526`): the data component has `KEYLEN 6`, `RKP 0`, `MAXLRECL 60`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` (`app/catlg/LISTCAT.txt:1475-1477`), `REC-TOTAL 18` with no inserts or updates (`app/catlg/LISTCAT.txt:1482-1485`), space `CYLINDER` primary 1 secondary 5 (`app/catlg/LISTCAT.txt:1489-1490`). This matches SE-JTCATG-002. Its system timestamp (`X'DBD5...'`, `app/catlg/LISTCAT.txt:1485`) is older than those of the other reloaded clusters in the listing (`X'DC08...'`), so it was last loaded before them.
 - Sample data: `app/data/ASCII/trancatg.txt` has 18 records of 60 bytes, keys strictly ascending from `010001` (Regular Sales Draft) to `070001` (Sales draft credit adjustment), covering types `01` to `07`. Checked locally with a Python script over the file.
 
@@ -107,7 +108,7 @@ In execution order. There is no rollback: each step's change is permanent.
 
 #### SE-JTCATG-001 · Delete the transaction category cluster
 - **What:** `DELETE AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS CLUSTER`, which removes the cluster with its data and index components and all its records.
-- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did. A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JTCATG-001).
+- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did, unless the delete ends with condition code 16 and IDCAMS skips the `SET` (ERR-JTCATG-003). A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JTCATG-001).
 - **Source:** `:25-27`
 - **Fidelity:** must-preserve (the reload starts from nothing) · **Confidence:** reviewed
 
@@ -149,6 +150,12 @@ If a later step fails, everything before it has happened: the old cluster is gon
 - **Source:** `:58-59`
 - **Fidelity:** must-preserve (no reader or updater may use the file during the reload); incidental (mechanism) · **Confidence:** platform-inferred
 
+#### ERR-JTCATG-003 · A severe IDCAMS error skips the return-code reset
+- **When:** the `DELETE` in `STEP05` ends with condition code 16, a severe error such as a catalog that cannot be accessed.
+- **Then:** IDCAMS does not process the remaining commands of the step, so `SET MAXCC = 0` never runs and `STEP05` ends with return code 16. The job still goes on to `STEP10` (ERR-JTCATG-001). The unconditional reset therefore turns every delete result except 16 into 0. `STEP10` and `STEP15` hold one command each, so for them a severe error simply ends the step with 16.
+- **Source:** `:25-27`
+- **Fidelity:** incidental · **Confidence:** platform-inferred (high; IDCAMS condition-code rules, no local run)
+
 ## 11. Interactions
 
 - **Upstream (optional Db2 module):** TRANEXTR copies `TRANCATG.PS` to a backup generation, deletes it, and writes it again from Db2 table `CARDDEMO.TRANSACTION_TYPE_CATEGORY`, ordered by type and category (`app/app-transaction-type-db2/jcl/TRANEXTR.jcl:42-61, 95-115`). The README runs TRANEXTR before TRANCATG (`./README.md:221-222`). Without the module, `TRANCATG.PS` is the shipped sample.
@@ -165,7 +172,7 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 13. Known defects and oddities
 
 #### DEF-JTCATG-001 · The unconditional return-code reset hides every delete failure
-- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
+- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error); only a severe error with condition code 16 escapes it (ERR-JTCATG-003). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
 - **Source:** `:27, 33, 54`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
@@ -189,6 +196,6 @@ After a successful run (return code 0), the transaction category store contains 
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP05` | 22-28 | SE-JTCATG-001, DEF-JTCATG-001 |
+| `STEP05` | 22-28 | SE-JTCATG-001, ERR-JTCATG-003, DEF-JTCATG-001 |
 | `STEP10` | 33-50 | SE-JTCATG-002, NUM-JTCATG-001, ERR-JTCATG-001 |
 | `STEP15` | 54-62 | SE-JTCATG-003, VAL-JTCATG-001, ERR-JTCATG-001, ERR-JTCATG-002 |

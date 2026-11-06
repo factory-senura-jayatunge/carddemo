@@ -20,8 +20,8 @@ data_stores:
   - {dd: SYSUT2, dataset: "AWS.M2.CARDDEMO.TRANTYPE.BKUP(+1)", entity: ENT-TRAN-TYPE, access: [define-gdg-base, create]}
   - {dd: SYSUT1, dataset: AWS.M2.CARDDEMO.TRANCATG.PS, entity: ENT-TRAN-CATEGORY, access: [read-sequential]}
   - {dd: SYSUT2, dataset: "AWS.M2.CARDDEMO.TRANCATG.PS.BKUP(+1)", entity: ENT-TRAN-CATEGORY, access: [define-gdg-base, create]}
-  - {dd: SYSUT1, dataset: AWS.M2.CARDDEMO.DISCGRP.PS, access: [read-sequential]}
-  - {dd: SYSUT2, dataset: "AWS.M2.CARDDEMO.DISCGRP.BKUP(+1)", access: [define-gdg-base, create]}
+  - {dd: SYSUT1, dataset: AWS.M2.CARDDEMO.DISCGRP.PS, entity: ENT-DISC-GROUP, access: [read-sequential]}
+  - {dd: SYSUT2, dataset: "AWS.M2.CARDDEMO.DISCGRP.BKUP(+1)", entity: ENT-DISC-GROUP, access: [define-gdg-base, create]}
 invoked_by: [operator]
 spec_status: draft
 ---
@@ -88,7 +88,7 @@ No `SYSUT2` has a `UNIT`; the system or SMS chooses the device. Return code of t
 
 - ENT-TRAN-TYPE: whole 60-byte records (copybook `app/cpy/CVTRA03Y.cpy`), copied unchanged from `TRANTYPE.PS`.
 - ENT-TRAN-CATEGORY: whole 60-byte records (copybook `app/cpy/CVTRA04Y.cpy`), copied unchanged from `TRANCATG.PS`.
-- Disclosure groups, `AWS.M2.CARDDEMO.DISCGRP.PS`: whole 50-byte records, layout `DIS-GROUP-RECORD` in `app/cpy/CVTRA02Y.cpy:4-10` (no entity in `entities.md` yet), copied unchanged.
+- Disclosure groups, `AWS.M2.CARDDEMO.DISCGRP.PS`: whole 50-byte records, layout `DIS-GROUP-RECORD` in `app/cpy/CVTRA02Y.cpy:4-10` (ENT-DISC-GROUP), copied unchanged.
 - No field is interpreted. The record sizes agree with the README's data set table (`./README.md:142-144`).
 
 ## 6. Processing flow

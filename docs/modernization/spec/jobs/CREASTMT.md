@@ -20,15 +20,15 @@ entry_points: [{type: manual, job: CREASTMT}, {type: scheduler, file: app/schedu
 programs: [IDCAMS, SORT, IEFBR14, CBSTM03A]
 procs: []
 data_stores:
-  - {dd: none (IDCAMS DELETE), dataset: AWS.M2.CARDDEMO.TRXFL.SEQ, entity: ENT-TRANSACTION, access: [delete]}
-  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, entity: ENT-TRANSACTION, access: [delete, define]}
+  - {dd: none (IDCAMS DELETE), dataset: AWS.M2.CARDDEMO.TRXFL.SEQ, entity: ENT-STMT-TRAN, access: [delete]}
+  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, entity: ENT-STMT-TRAN, access: [delete, define]}
   - {dd: STEP010.SORTIN, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [read-sequential]}
-  - {dd: STEP010.SORTOUT, dataset: AWS.M2.CARDDEMO.TRXFL.SEQ, entity: ENT-TRANSACTION, access: [create]}
-  - {dd: STEP020.INFILE, dataset: AWS.M2.CARDDEMO.TRXFL.SEQ, entity: ENT-TRANSACTION, access: [read-sequential]}
-  - {dd: STEP020.OUTFILE, dataset: AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, entity: ENT-TRANSACTION, access: [load]}
+  - {dd: STEP010.SORTOUT, dataset: AWS.M2.CARDDEMO.TRXFL.SEQ, entity: ENT-STMT-TRAN, access: [create]}
+  - {dd: STEP020.INFILE, dataset: AWS.M2.CARDDEMO.TRXFL.SEQ, entity: ENT-STMT-TRAN, access: [read-sequential]}
+  - {dd: STEP020.OUTFILE, dataset: AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, entity: ENT-STMT-TRAN, access: [load]}
   - {dd: STEP030.HTMLFILE, dataset: AWS.M2.CARDDEMO.STATEMNT.HTML, entity: none, access: [delete]}
   - {dd: STEP030.STMTFILE, dataset: AWS.M2.CARDDEMO.STATEMNT.PS, entity: none, access: [delete]}
-  - {dd: STEP040.TRNXFILE, dataset: AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, entity: ENT-TRANSACTION, access: [read-sequential]}
+  - {dd: STEP040.TRNXFILE, dataset: AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, entity: ENT-STMT-TRAN, access: [read-sequential]}
   - {dd: STEP040.XREFFILE, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, entity: ENT-CARD-XREF, access: [read-sequential]}
   - {dd: STEP040.ACCTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, entity: ENT-ACCOUNT, access: [read-random]}
   - {dd: STEP040.CUSTFILE, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, entity: ENT-CUSTOMER, access: [read-random]}
@@ -101,7 +101,7 @@ The program's own files are only `STMT-FILE` (DD `STMTFILE`, 80 bytes) and `HTML
 
 ## 5. Data used
 
-- ENT-TRANSACTION, whole records of `TRANSACT` (layout `app/cpy/CVTRA05Y.cpy:4-18`), re-keyed into the work layout `TRNX-RECORD` (`app/cpy/COSTM01.CPY:20-36`, NUM-JSTMT-001). The statement uses the transaction ID, description and amount of each record (`app/cbl/CBSTM03A.CBL:675-679`).
+- ENT-TRANSACTION, whole records of `TRANSACT` (layout `app/cpy/CVTRA05Y.cpy:4-18`), re-keyed into the work layout `TRNX-RECORD` of ENT-STMT-TRAN (`app/cpy/COSTM01.CPY:20-36`, NUM-JSTMT-001). The statement uses the transaction ID, description and amount of each record (`app/cbl/CBSTM03A.CBL:675-679`).
 - ENT-CARD-XREF, read in key order (card number); ENT-CUSTOMER, read by `XREF-CUST-ID`; ENT-ACCOUNT, read by `XREF-ACCT-ID` (`app/cbl/CBSTM03A.CBL:345-414`).
 - `STATEMNT.PS` and `STATEMNT.HTML` hold customer name and full address (`docs/security/data-handling.md:98-99`); they are replaced on every run (`docs/security/data-handling.md:171`). Neither the statements nor `TRXFL` appear in the 09/01/22 catalog listing `app/catlg/LISTCAT.txt`.
 

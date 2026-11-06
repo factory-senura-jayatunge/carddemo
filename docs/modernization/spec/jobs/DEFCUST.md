@@ -58,7 +58,7 @@ Return code of the job: the highest step return code. Console output is IDCAMS `
 
 ## 5. Data used
 
-- No records are read or written. The record size of 500 matches the customer record (`CUSTOMER-RECORD`, `app/cpy/CVCUS01Y.cpy:4-23`, 500 bytes; no entity in `entities.md` yet), but its key is `CUST-ID` `9(09)`, 9 bytes, not 10 (DEF-JDCUST-002).
+- No records are read or written. The record size of 500 matches the customer record ENT-CUSTOMER (`CUSTOMER-RECORD`, `app/cpy/CVCUS01Y.cpy:4-23`, 500 bytes), but its key is `CUST-ID` `9(09)`, 9 bytes, not 10 (DEF-JDCUST-002).
 - Catalog: the listing `app/catlg/LISTCAT.txt` has no entry for `AWS.CCDA.CUSTDATA.CLUSTER` or `AWS.CUSTDATA.CLUSTER` (checked with a search over the file).
 
 ## 6. Processing flow

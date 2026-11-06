@@ -19,12 +19,12 @@ sources:
 entry_points: [{type: manual, job: TRANFILE}, {type: script, file: scripts/remote_refresh.sh, lines: "28-29"}]
 programs: [SDSF, IDCAMS]
 data_stores:
-  - {cics_file: TRANSACT, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, access: [cics-close, cics-open]}
-  - {cics_file: CXACAIX, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, access: [cics-close, cics-open]}
-  - {dd: TRANSACT, dataset: AWS.M2.CARDDEMO.DALYTRAN.PS.INIT, copybook: CVTRA06Y, access: [read-sequential]}
-  - {dd: TRANVSAM, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, copybook: CVTRA05Y, access: [delete, define, load]}
-  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, access: [delete, define, build]}
-  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH, access: [define]}
+  - {cics_file: TRANSACT, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [cics-close, cics-open]}
+  - {cics_file: CXACAIX, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, entity: ENT-CARD-XREF, access: [cics-close, cics-open]}
+  - {dd: TRANSACT, dataset: AWS.M2.CARDDEMO.DALYTRAN.PS.INIT, entity: ENT-DAILY-TRAN, copybook: CVTRA06Y, access: [read-sequential]}
+  - {dd: TRANVSAM, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, copybook: CVTRA05Y, access: [delete, define, load]}
+  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, entity: ENT-TRANSACTION, access: [delete, define, build]}
+  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH, entity: ENT-TRANSACTION, access: [define]}
 invoked_by: [operator, scripts/remote_refresh.sh]
 spec_status: draft
 ---

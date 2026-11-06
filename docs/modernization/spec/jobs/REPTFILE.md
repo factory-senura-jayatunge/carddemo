@@ -14,7 +14,7 @@ sources:
 entry_points: [{type: manual, job: REPTFILE}]
 programs: [IDCAMS]
 data_stores:
-  - {dataset: AWS.M2.CARDDEMO.TRANREPT, access: [define-gdg-base]}
+  - {dataset: AWS.M2.CARDDEMO.TRANREPT, entity: ENT-TRAN-REPORT, access: [define-gdg-base]}
 invoked_by: [operator]
 spec_status: draft
 ---
@@ -56,7 +56,7 @@ The job allocates no data set; the GDG base is a catalog entry. Return code of t
 
 ## 5. Data used
 
-- No records are read or written. The future generations `AWS.M2.CARDDEMO.TRANREPT.GnnnnV00` hold the 133-byte report lines that CBTRN03C writes (`app/jcl/TRANREPT.jcl:76-80`); the report has no entry in `entities.md`.
+- No records are read or written. The future generations `AWS.M2.CARDDEMO.TRANREPT.GnnnnV00` hold the 133-byte report lines that CBTRN03C writes (`app/jcl/TRANREPT.jcl:76-80`), the report ENT-TRAN-REPORT.
 - Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:1527-1541`): GDG base `AWS.M2.CARDDEMO.TRANREPT`, `LIMIT 5`, `SCRATCH`, `NOEMPTY`, `LIFO`, `NOPURGE`, `NOEXTENDED`, created 2022.156, last altered 2022.199, with five generations `G0010V00` to `G0014V00`. These are DEFGDGB's attributes, not this job's (DEF-JREPT-001).
 
 ## 6. Processing flow

@@ -17,7 +17,7 @@ programs: [IDCAMS]
 data_stores:
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.BKUP, entity: ENT-TRANSACTION, access: [define-gdg-base]}
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.DALY, entity: ENT-TRANSACTION, access: [define-gdg-base]}
-  - {dataset: AWS.M2.CARDDEMO.TRANREPT, access: [define-gdg-base]}
+  - {dataset: AWS.M2.CARDDEMO.TRANREPT, entity: ENT-TRAN-REPORT, access: [define-gdg-base]}
   - {dataset: AWS.M2.CARDDEMO.TCATBALF.BKUP, entity: ENT-TCAT-BAL, access: [define-gdg-base]}
   - {dataset: AWS.M2.CARDDEMO.SYSTRAN, entity: ENT-TRANSACTION, access: [define-gdg-base]}
   - {dataset: AWS.M2.CARDDEMO.TRANSACT.COMBINED, entity: ENT-TRANSACTION, access: [define-gdg-base]}

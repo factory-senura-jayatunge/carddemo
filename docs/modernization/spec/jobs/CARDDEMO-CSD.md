@@ -22,7 +22,7 @@ data_stores:
   - {cics_file: CUSTDAT, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, entity: ENT-CUSTOMER, access: [read, browse, add, update, delete]}
   - {cics_file: CXACAIX, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH, entity: ENT-CARD-XREF, access: [read, browse, add, update, delete]}
   - {cics_file: TRANSACT, dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, access: [read, browse, add, update, delete]}
-  - {cics_file: USRSEC, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: none, access: [read, browse, add, update, delete]}
+  - {cics_file: USRSEC, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [read, browse, add, update, delete]}
   - {tdqueue: JOBS, ddname: INREADER, access: [write]}
 invoked_by: [CICS region (group CARDDEMO installed)]
 spec_status: draft

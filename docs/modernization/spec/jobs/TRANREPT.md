@@ -25,8 +25,8 @@ data_stores:
   - {dd: CARDXREF, dataset: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, entity: ENT-CARD-XREF, access: [read-random]}
   - {dd: TRANTYPE, dataset: AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS, entity: ENT-TRAN-TYPE, access: [read-random]}
   - {dd: TRANCATG, dataset: AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS, entity: ENT-TRAN-CATEGORY, access: [read-random]}
-  - {dd: DATEPARM, dataset: AWS.M2.CARDDEMO.DATEPARM, access: [read-sequential]}
-  - {dd: TRANREPT, dataset: "AWS.M2.CARDDEMO.TRANREPT(+1)", access: [create]}
+  - {dd: DATEPARM, dataset: AWS.M2.CARDDEMO.DATEPARM, entity: ENT-DATE-PARM, access: [read-sequential]}
+  - {dd: TRANREPT, dataset: "AWS.M2.CARDDEMO.TRANREPT(+1)", entity: ENT-TRAN-REPORT, access: [create]}
 invoked_by: [operator]
 local_run: "make run-batch PROGRAM=TRANREPT"
 spec_status: draft

@@ -8,7 +8,7 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/TRANTYPE.jcl, sha256: 7a10aa43bd67, role: job}
   - {path: app/cpy/CVTRA03Y.cpy, sha256: fb15dbc4a692, role: copybook}
-  - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "3727-3828"}
+  - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "284, 487, 3727-3828, 3885"}
   - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "144, 164, 221-223, 364"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "37-38"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "40-41"}
@@ -16,8 +16,8 @@ sources:
 entry_points: [{type: manual, job: TRANTYPE}, {type: script, file: scripts/run_full_batch.sh, lines: "37-38"}, {type: script, file: scripts/remote_refresh.sh, lines: "40-41"}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "159-162"}]
 programs: [IDCAMS]
 data_stores:
-  - {dd: TRANTYPE, dataset: AWS.M2.CARDDEMO.TRANTYPE.PS, copybook: CVTRA03Y, access: [read-sequential]}
-  - {dd: TTYPVSAM, dataset: AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS, copybook: CVTRA03Y, access: [delete, define, load]}
+  - {dd: TRANTYPE, dataset: AWS.M2.CARDDEMO.TRANTYPE.PS, entity: ENT-TRAN-TYPE, copybook: CVTRA03Y, access: [read-sequential]}
+  - {dd: TTYPVSAM, dataset: AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS, entity: ENT-TRAN-TYPE, copybook: CVTRA03Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, CA-7 trigger from CLOSEFIL]
 spec_status: draft
 ---
@@ -34,21 +34,22 @@ The job has no business rules. Its items:
 
 | ID | Rule |
 | :-- | :-- |
-| SE-JTTYP-001 | Delete the transaction type cluster; the return code is then set to 0 whatever the result. |
+| SE-JTTYP-001 | Delete the transaction type cluster; the return code is then set to 0 unless the delete ended with a severe error (ERR-JTTYP-003). |
 | SE-JTTYP-002 | Define the cluster: key 2 at offset 0, records 60 fixed, `SHAREOPTIONS(1 4)`, `ERASE`, no `REUSE`. |
 | SE-JTTYP-003 | Load the cluster with every record of `TRANTYPE.PS`, in file order, with exclusive use of the cluster (`DISP=OLD`). |
 | VAL-JTTYP-001 | The load rejects records out of key order or with duplicate keys (VSAM rule). |
 | ERR-JTTYP-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
 | ERR-JTTYP-002 | The job waits to start while another job has the cluster allocated. |
+| ERR-JTTYP-003 | A severe IDCAMS error (condition code 16) in the delete skips the return-code reset. |
 | NUM-JTTYP-001 | Key and record size. |
 | DEF-JTTYP-001 | The unconditional return-code reset hides every delete failure. |
-| DEF-JTTYP-002 | The cluster has `SHAREOPTIONS(1 4)`, unlike every other cluster the reload jobs define. |
+| DEF-JTTYP-002 | The cluster has `SHAREOPTIONS(1 4)`, unlike the `(2 3)` that the other reload jobs code. |
 | DEF-JTTYP-003 | Two comments misspell "TRANSACTION". |
 
 ## 3. Actors and triggers
 
 - **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:164`) and its "Running Batch Jobs" sequence (`./README.md:223`), and in the demo scripts `scripts/run_full_batch.sh:37-38` and `scripts/remote_refresh.sh:40-41`. In the CA-7 schedule, CLOSEFIL (schedule ID 030) triggers it and it triggers `WAITSTEP` (`app/scheduler/CardDemo.ca7:159-189`). Control-M does not run it. The local runner has no TRANTYPE job; it loads `app/data/ASCII/trantype.txt` into the `TRANTYPE` dataset directly (`tools/batch-programs.toml:225-229`).
-- **Preconditions:** no other job has `AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS` allocated (ERR-JTTYP-002); `AWS.M2.CARDDEMO.TRANTYPE.PS` exists and is sorted by key (`./README.md:144`, FB 60); volume `AWSHJ1` exists. The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
+- **Preconditions:** no other job has `AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS` allocated (ERR-JTTYP-002); `AWS.M2.CARDDEMO.TRANTYPE.PS` exists and is sorted by key (`./README.md:144`, FB 60). The define names volume `AWSHJ1`, but the cluster is SMS-managed (storage class `SCTECH`, `app/catlg/LISTCAT.txt:3748`) and the catalog shows its data component on volume `YYYYTP` (`app/catlg/LISTCAT.txt:3794`), so on the reference system SMS chose the volume; `AWSHJ1` matters only where SMS does not manage these names (platform-inferred, medium). The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 
 ## 4. Interfaces
@@ -68,7 +69,7 @@ Return code of the job: the highest step return code. Console output is IDCAMS `
 
 ## 5. Data used
 
-- ENT-TRAN-TYPE (`TRAN-TYPE-RECORD`, `app/cpy/CVTRA03Y.cpy:4-7`, 60 bytes), whole records copied unchanged from `TRANTYPE.PS` to the KSDS. No field is interpreted. The key is bytes 1-2 (`TRAN-TYPE`, `X(02)`); the description `TRAN-TYPE-DESC` (`X(50)`) and an 8-byte filler are carried along.
+- ENT-TRAN-TYPE (`TRAN-TYPE-RECORD`, `app/cpy/CVTRA03Y.cpy:4-7`, 60 bytes), whole records copied unchanged from `TRANTYPE.PS` to the KSDS. No field is interpreted. The key is bytes 1-2 (`TRAN-TYPE`, `X(02)`); the description `TRAN-TYPE-DESC` (`X(50)`) and an 8-byte filler are carried along. The filler holds `00000000` in every sample record, and TRANEXTR writes the same eight zeros when it rebuilds the flat file from Db2 (`REPEAT('0',8)`, `app/app-transaction-type-db2/jcl/TRANEXTR.jcl:76-84`), so both sources give the same bytes. The content of the filler is incidental.
 - Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:3742-3828`): the data component has `KEYLEN 2`, `RKP 0`, `MAXLRECL 60`, `SHROPTNS(1,4)`, `ERASE`, `NOREUSE` (`app/catlg/LISTCAT.txt:3779-3781`), `REC-TOTAL 7` with no inserts or updates (`app/catlg/LISTCAT.txt:3784-3787`), space `CYLINDER` primary 1 secondary 5 (`app/catlg/LISTCAT.txt:3791-3792`). This matches SE-JTTYP-002.
 - Sample data: `app/data/ASCII/trantype.txt` has 7 records of 60 bytes, keys `01` (Purchase) to `07` (Adjustment), strictly ascending. Checked locally with a Python script over the file.
 
@@ -108,7 +109,7 @@ In execution order. There is no rollback: each step's change is permanent.
 
 #### SE-JTTYP-001 · Delete the transaction type cluster
 - **What:** `DELETE AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS CLUSTER`, which removes the cluster with its data and index components and all its records.
-- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did. A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JTTYP-001).
+- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did, unless the delete ends with condition code 16 and IDCAMS skips the `SET` (ERR-JTTYP-003). A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JTTYP-001).
 - **Source:** `:25-27`
 - **Fidelity:** must-preserve (the reload starts from nothing) · **Confidence:** reviewed
 
@@ -150,6 +151,12 @@ If a later step fails, everything before it has happened: the old cluster is gon
 - **Source:** `:58-59`
 - **Fidelity:** must-preserve (no reader or updater may use the file during the reload); incidental (mechanism) · **Confidence:** platform-inferred
 
+#### ERR-JTTYP-003 · A severe IDCAMS error skips the return-code reset
+- **When:** the `DELETE` in `STEP05` ends with condition code 16, a severe error such as a catalog that cannot be accessed.
+- **Then:** IDCAMS does not process the remaining commands of the step, so `SET MAXCC = 0` never runs and `STEP05` ends with return code 16. The job still goes on to `STEP10` (ERR-JTTYP-001). The unconditional reset therefore turns every delete result except 16 into 0. `STEP10` and `STEP15` hold one command each, so for them a severe error simply ends the step with 16.
+- **Source:** `:25-27`
+- **Fidelity:** incidental · **Confidence:** platform-inferred (high; IDCAMS condition-code rules, no local run)
+
 ## 11. Interactions
 
 - **Upstream (optional Db2 module):** TRANEXTR copies `TRANTYPE.PS` to a backup generation, deletes it, and writes it again from Db2 table `CARDDEMO.TRANSACTION_TYPE`, ordered by type (`app/app-transaction-type-db2/jcl/TRANEXTR.jcl:31-38, 53-57, 65-84`). The README runs TRANEXTR before TRANTYPE (`./README.md:221-223`). Without the module, `TRANTYPE.PS` is the shipped sample.
@@ -166,12 +173,13 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 13. Known defects and oddities
 
 #### DEF-JTTYP-001 · The unconditional return-code reset hides every delete failure
-- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
+- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error); only a severe error with condition code 16 escapes it (ERR-JTTYP-003). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
 - **Source:** `:27, 33, 54`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JTTYP-002 · Share options differ from the other reloaded clusters
-- The cluster is defined with `SHAREOPTIONS(1 4)`; every other cluster that the reload jobs define uses `SHAREOPTIONS(2 3)`. Cross-region option 1 lets either one job open the file for update or any number of jobs open it for reading, but not both at once; cross-system option 4 lets other systems share it without VSAM integrity checks. For a file that is only read after the load this has no visible effect.
+- The cluster is defined with `SHAREOPTIONS(1 4)`. The other reload jobs that code share options (ACCTFILE, CARDFILE, CUSTFILE, XREFFILE, TCATBALF, TRANCATG, DISCGRP) use `SHAREOPTIONS(2 3)`, but not every catalogued cluster has `(2 3)`: DUSRSECJ codes none, and the user security cluster shows the default `(1,3)` (`app/catlg/LISTCAT.txt:3885`), as do the alternate indexes that CARDFILE and XREFFILE define (`app/catlg/LISTCAT.txt:284, 487`). DEFCUST, which defines a separate customer cluster, also codes `(1 4)` (`app/jcl/DEFCUST.jcl:39`).
+- Cross-region option 1 lets either one job open the file for update or any number of jobs open it for reading, but not both at once. While a reader such as TRANREPT has the cluster open, the load's open for output in `STEP15` is therefore refused, and while the load has it open no reader can open it. Within one system the `DISP=OLD` enqueue (ERR-JTTYP-002) already keeps other jobs away during the reload, so the option adds little there. Cross-system option 4 lets other systems share the file without VSAM integrity checks. For a file that is only read after the load this has no visible effect.
 - **Source:** `:42`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (value); platform-inferred (meaning)
 
@@ -195,6 +203,6 @@ After a successful run (return code 0), the transaction type store contains exac
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP05` | 22-28 | SE-JTTYP-001, DEF-JTTYP-001, DEF-JTTYP-003 |
+| `STEP05` | 22-28 | SE-JTTYP-001, ERR-JTTYP-003, DEF-JTTYP-001, DEF-JTTYP-003 |
 | `STEP10` | 33-50 | SE-JTTYP-002, NUM-JTTYP-001, ERR-JTTYP-001, DEF-JTTYP-002, DEF-JTTYP-003 |
 | `STEP15` | 54-62 | SE-JTTYP-003, VAL-JTTYP-001, ERR-JTTYP-001, ERR-JTTYP-002 |

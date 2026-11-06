@@ -18,9 +18,9 @@ sources:
 entry_points: [{type: manual, job: TRANIDX}, {type: script, file: scripts/run_full_batch.sh, lines: "61-63"}, {type: script, file: scripts/run_posting.sh, lines: "29-31"}, {type: script, file: scripts/run_interest_calc.sh, lines: "29-31"}]
 programs: [IDCAMS]
 data_stores:
-  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, copybook: CVTRA05Y, access: [read-sequential]}
-  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, access: [define, build]}
-  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH, access: [define]}
+  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, entity: ENT-TRANSACTION, copybook: CVTRA05Y, access: [read-sequential]}
+  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, entity: ENT-TRANSACTION, access: [define, build]}
+  - {dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH, entity: ENT-TRANSACTION, access: [define]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/run_posting.sh, scripts/run_interest_calc.sh]
 spec_status: draft
 ---

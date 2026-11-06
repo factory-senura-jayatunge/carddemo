@@ -13,13 +13,13 @@ sources:
 entry_points: [{type: manual, job: ESDSRRDS}]
 programs: [IEFBR14, IEBGENER, IDCAMS]
 data_stores:
-  - {dd: PREDEL.DD01, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, access: [delete]}
-  - {dd: STEP01.SYSUT2, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, access: [create, write-sequential]}
-  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS, access: [delete, define]}
-  - {dd: STEP03.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS, access: [load]}
-  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS, access: [delete, define]}
-  - {dd: STEP05.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS, access: [load]}
-  - {dd: STEP03.IN and STEP05.IN, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, access: [read-sequential]}
+  - {dd: PREDEL.DD01, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, entity: ENT-USER-SECURITY, access: [delete]}
+  - {dd: STEP01.SYSUT2, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, entity: ENT-USER-SECURITY, access: [create, write-sequential]}
+  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS, entity: ENT-USER-SECURITY, access: [delete, define]}
+  - {dd: STEP03.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS, entity: ENT-USER-SECURITY, access: [load]}
+  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS, entity: ENT-USER-SECURITY, access: [delete, define]}
+  - {dd: STEP05.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS, entity: ENT-USER-SECURITY, access: [load]}
+  - {dd: STEP03.IN and STEP05.IN, dataset: AWS.M2.CARDDEMO.ESDSRRDS.PS, entity: ENT-USER-SECURITY, access: [read-sequential]}
 invoked_by: [operator]
 spec_status: draft
 ---
@@ -82,7 +82,7 @@ Return code of the job: the highest step return code. Console output is utility 
 
 ## 5. Data used
 
-- **User security record** (no entity in `entities.md`; layout `SEC-USER-DATA` in `app/cpy/CSUSR01Y.cpy:17-23`), 80 bytes: user ID X(8), first name X(20), last name X(20), password X(8) in clear text, user type X(1), filler X(23).
+- **User security record** (ENT-USER-SECURITY; layout `SEC-USER-DATA` in `app/cpy/CSUSR01Y.cpy:17-23`), 80 bytes: user ID X(8), first name X(20), last name X(20), password X(8) in clear text, user type X(1), filler X(23).
 - **In-stream content** (`:36-45`): the same ten records as DUSRSECJ (`app/jcl/DUSRSECJ.jcl:35-44`), byte for byte: `ADMIN001` to `ADMIN005` with type `A`, `USER0001` to `USER0005` with type `U`, all with the public demo password.
 - None of the four datasets appears in the catalog listing `app/catlg/LISTCAT.txt`, so there is no recorded catalog state to compare with.
 

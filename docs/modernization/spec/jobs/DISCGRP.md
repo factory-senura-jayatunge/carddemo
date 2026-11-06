@@ -12,13 +12,13 @@ sources:
   - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "142, 161, 224, 361"}
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "31-32"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "31-32"}
-  - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "32-56"}
+  - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "26-63"}
   - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "89-90, 97-98"}
 entry_points: [{type: manual, job: DISCGRP}, {type: script, file: scripts/run_full_batch.sh, lines: "31-32"}, {type: script, file: scripts/remote_refresh.sh, lines: "31-32"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "38-43"}]
 programs: [IDCAMS]
 data_stores:
-  - {dd: DISCGRP, dataset: AWS.M2.CARDDEMO.DISCGRP.PS, copybook: CVTRA02Y, access: [read-sequential]}
-  - {dd: DISCVSAM, dataset: AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, copybook: CVTRA02Y, access: [delete, define, load]}
+  - {dd: DISCGRP, dataset: AWS.M2.CARDDEMO.DISCGRP.PS, entity: ENT-DISC-GROUP, copybook: CVTRA02Y, access: [read-sequential]}
+  - {dd: DISCVSAM, dataset: AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, entity: ENT-DISC-GROUP, copybook: CVTRA02Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, Control-M folder WEEKLY-DisclosureGroupsRefresh]
 spec_status: draft
 ---
@@ -35,19 +35,20 @@ The job has no business rules. Its items:
 
 | ID | Rule |
 | :-- | :-- |
-| SE-JDISC-001 | Delete the disclosure group cluster; the return code is then set to 0 whatever the result. |
+| SE-JDISC-001 | Delete the disclosure group cluster; the return code is then set to 0 unless the delete ended with a severe error (ERR-JDISC-003). |
 | SE-JDISC-002 | Define the cluster: key 16 at offset 0, records 50 fixed, `SHAREOPTIONS(2 3)`, `ERASE`, no `REUSE`. |
 | SE-JDISC-003 | Load the cluster with every record of `DISCGRP.PS`, in file order, with exclusive use of the cluster (`DISP=OLD`). |
 | VAL-JDISC-001 | The load rejects records out of key order or with duplicate keys (VSAM rule). |
 | ERR-JDISC-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
 | ERR-JDISC-002 | The job waits to start while another job has the cluster allocated. |
+| ERR-JDISC-003 | A severe IDCAMS error (condition code 16) in the delete skips the return-code reset. |
 | NUM-JDISC-001 | Key and record size. |
 | DEF-JDISC-001 | The unconditional return-code reset hides every delete failure. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:161`) and its "Running Batch Jobs" sequence (`./README.md:224`), and in the demo scripts `scripts/run_full_batch.sh:31-32` and `scripts/remote_refresh.sh:31-32`. Control-M runs it in the smart folder `WEEKLY-DisclosureGroupsRefresh` on Saturdays (`DAYS="SA"`), after CLOSEFIL and before WAITSTEP and OPENFIL, once the condition from the transaction type Db2 refresh is set (`app/scheduler/CardDemo.controlm:32-56`). CA-7 does not run it. The local runner has no DISCGRP job; it loads `app/data/ASCII/discgrp.txt` into the `DISCGRP` dataset directly (`tools/batch-programs.toml:219-223`).
-- **Preconditions:** no other job has `AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS` allocated (ERR-JDISC-002); `AWS.M2.CARDDEMO.DISCGRP.PS` exists and is sorted by key (`./README.md:142`, FB 50); volume `AWSHJ1` exists. The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
+- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:161`) and its "Running Batch Jobs" sequence (`./README.md:224`), and in the demo scripts `scripts/run_full_batch.sh:31-32` and `scripts/remote_refresh.sh:31-32`. Control-M runs it in the smart folder `WEEKLY-DisclosureGroupsRefresh` on Saturdays (`DAYS="SA"`), after CLOSEFIL and before WAITSTEP and OPENFIL (`app/scheduler/CardDemo.controlm:32-56`). The folder's CLOSEFIL waits for condition `WEEKLY-TransactionTypesDBRefresh-MNTTRDB2` (`app/scheduler/CardDemo.controlm:34`), which job MNTTRDB2 in folder `WEEKLY-TransactionTypesDBRefresh` sets (`app/scheduler/CardDemo.controlm:28`), and the smart folder deletes the condition when it ends (`app/scheduler/CardDemo.controlm:55`). The condition does not come from TRANEXTR: TRANEXTR, in smart folder `WEEKLY-TransactionTypesDBRefresh`, waits on the same MNTTRDB2 condition (`app/scheduler/CardDemo.controlm:59`) and that folder deletes it too (`app/scheduler/CardDemo.controlm:62`), so DISCGRP and TRANEXTR start from the same event and do not wait on each other. CA-7 does not run it. The local runner has no DISCGRP job; it loads `app/data/ASCII/discgrp.txt` into the `DISCGRP` dataset directly (`tools/batch-programs.toml:219-223`).
+- **Preconditions:** no other job has `AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS` allocated (ERR-JDISC-002); `AWS.M2.CARDDEMO.DISCGRP.PS` exists and is sorted by key (`./README.md:142`, FB 50). The define names volume `AWSHJ1`, but the cluster is SMS-managed (storage class `SCTECH`, `app/catlg/LISTCAT.txt:867`) and the catalog shows its data component on volume `YYYYTI` (`app/catlg/LISTCAT.txt:913`), so on the reference system SMS chose the volume; `AWSHJ1` matters only where SMS does not manage these names (platform-inferred, medium). The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 
 ## 4. Interfaces
@@ -67,7 +68,7 @@ Return code of the job: the highest step return code. Console output is IDCAMS `
 
 ## 5. Data used
 
-- The disclosure group record (`DIS-GROUP-RECORD`, `app/cpy/CVTRA02Y.cpy:4-10`, 50 bytes; no entity in `entities.md` yet), whole records copied unchanged from `DISCGRP.PS` to the KSDS. No field is interpreted. The key is bytes 1-16 (`DIS-GROUP-KEY`: `DIS-ACCT-GROUP-ID` `X(10)`, `DIS-TRAN-TYPE-CD` `X(02)`, `DIS-TRAN-CAT-CD` `9(04)`); the rate `DIS-INT-RATE` (`S9(04)V99`, zoned decimal with the sign in the last digit, bytes 17-22, an annual percentage that INTCALC divides by 1200, `docs/runbooks/batch-cycle-restart.md:89-90`) and a 28-byte filler are carried along.
+- The disclosure group record, ENT-DISC-GROUP (`DIS-GROUP-RECORD`, `app/cpy/CVTRA02Y.cpy:4-10`, 50 bytes), whole records copied unchanged from `DISCGRP.PS` to the KSDS. No field is interpreted. The key is bytes 1-16 (`DIS-GROUP-KEY`: `DIS-ACCT-GROUP-ID` `X(10)`, `DIS-TRAN-TYPE-CD` `X(02)`, `DIS-TRAN-CAT-CD` `9(04)`); the rate `DIS-INT-RATE` (`S9(04)V99`, zoned decimal with the sign in the last digit, bytes 17-22, an annual percentage that INTCALC divides by 1200, `docs/runbooks/batch-cycle-restart.md:89-90`) and a 28-byte filler are carried along.
 - Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:859-945`): the data component has `KEYLEN 16`, `RKP 0`, `MAXLRECL 50`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` (`app/catlg/LISTCAT.txt:896-898`), `REC-TOTAL 51` with no inserts or updates (`app/catlg/LISTCAT.txt:901-904`), space `CYLINDER` primary 1 secondary 5 (`app/catlg/LISTCAT.txt:908-909`). This matches SE-JDISC-002.
 - Sample data: `app/data/ASCII/discgrp.txt` has 51 records of 50 bytes, keys strictly ascending, 17 for each of the groups `A000000000`, `DEFAULT` and `ZEROAPR`. `DEFAULT` has rates from 0.00 to 25.00 (for example 15.00 for type `01`, category `0001`) and `ZEROAPR` has 0.00 throughout. Checked locally with a Python script over the file.
 
@@ -107,7 +108,7 @@ In execution order. There is no rollback: each step's change is permanent.
 
 #### SE-JDISC-001 · Delete the disclosure group cluster
 - **What:** `DELETE AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS CLUSTER`, which removes the cluster with its data and index components and all its records.
-- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did. A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JDISC-001).
+- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did, unless the delete ends with condition code 16 and IDCAMS skips the `SET` (ERR-JDISC-003). A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JDISC-001).
 - **Source:** `:25-27`
 - **Fidelity:** must-preserve (the reload starts from nothing) · **Confidence:** reviewed
 
@@ -149,6 +150,12 @@ If a later step fails, everything before it has happened: the old cluster is gon
 - **Source:** `:58-59`
 - **Fidelity:** must-preserve (no reader or updater may use the file during the reload); incidental (mechanism) · **Confidence:** platform-inferred
 
+#### ERR-JDISC-003 · A severe IDCAMS error skips the return-code reset
+- **When:** the `DELETE` in `STEP05` ends with condition code 16, a severe error such as a catalog that cannot be accessed.
+- **Then:** IDCAMS does not process the remaining commands of the step, so `SET MAXCC = 0` never runs and `STEP05` ends with return code 16. The job still goes on to `STEP10` (ERR-JDISC-001). The unconditional reset therefore turns every delete result except 16 into 0. `STEP10` and `STEP15` hold one command each, so for them a severe error simply ends the step with 16.
+- **Source:** `:25-27`
+- **Fidelity:** incidental · **Confidence:** platform-inferred (high; IDCAMS condition-code rules, no local run)
+
 ## 11. Interactions
 
 - **Upstream:** none. In the Control-M folder a CLOSEFIL run precedes it and an OPENFIL run follows, although the CSD defines no CICS file on this cluster.
@@ -166,7 +173,7 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 13. Known defects and oddities
 
 #### DEF-JDISC-001 · The unconditional return-code reset hides every delete failure
-- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
+- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error); only a severe error with condition code 16 escapes it (ERR-JDISC-003). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
 - **Source:** `:27, 33, 54`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
@@ -185,6 +192,6 @@ After a successful run (return code 0), the disclosure group store contains exac
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP05` | 22-28 | SE-JDISC-001, DEF-JDISC-001 |
+| `STEP05` | 22-28 | SE-JDISC-001, ERR-JDISC-003, DEF-JDISC-001 |
 | `STEP10` | 33-50 | SE-JDISC-002, NUM-JDISC-001, ERR-JDISC-001 |
 | `STEP15` | 54-62 | SE-JDISC-003, VAL-JDISC-001, ERR-JDISC-001, ERR-JDISC-002 |

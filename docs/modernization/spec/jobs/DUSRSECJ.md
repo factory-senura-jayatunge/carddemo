@@ -9,20 +9,21 @@ sources:
   - {path: app/jcl/DUSRSECJ.jcl, sha256: 02b0b78847e7, role: job}
   - {path: app/cpy/CSUSR01Y.cpy, sha256: 37c34094dc41, role: record-layout, lines: "17-23"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "3831-3934"}
-  - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "88-89"}
+  - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "88-99"}
   - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 213-235, 351-379"}
-  - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "40-41"}
+  - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "12-13, 40-41"}
+  - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "12-13, 43-44"}
   - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21"}
   - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook, lines: "19, 37, 69"}
   - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "18-54"}
-entry_points: [{type: manual, job: DUSRSECJ}, {type: script, file: scripts/run_full_batch.sh, lines: "40-41"}, {type: script, file: scripts/remote_refresh.sh, lines: "44"}]
+entry_points: [{type: manual, job: DUSRSECJ}, {type: script, file: scripts/run_full_batch.sh, lines: "40-41"}, {type: script, file: scripts/remote_refresh.sh, lines: "43-44"}]
 programs: [IEFBR14, IEBGENER, IDCAMS]
 data_stores:
-  - {dd: PREDEL.DD01, dataset: AWS.M2.CARDDEMO.USRSEC.PS, access: [delete]}
-  - {dd: STEP01.SYSUT2, dataset: AWS.M2.CARDDEMO.USRSEC.PS, access: [create, write-sequential]}
-  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, access: [delete, define]}
-  - {dd: STEP03.IN, dataset: AWS.M2.CARDDEMO.USRSEC.PS, access: [read-sequential]}
-  - {dd: STEP03.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, access: [load]}
+  - {dd: PREDEL.DD01, dataset: AWS.M2.CARDDEMO.USRSEC.PS, entity: ENT-USER-SECURITY, access: [delete]}
+  - {dd: STEP01.SYSUT2, dataset: AWS.M2.CARDDEMO.USRSEC.PS, entity: ENT-USER-SECURITY, access: [create, write-sequential]}
+  - {dd: none (IDCAMS DELETE/DEFINE), dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [delete, define]}
+  - {dd: STEP03.IN, dataset: AWS.M2.CARDDEMO.USRSEC.PS, entity: ENT-USER-SECURITY, access: [read-sequential]}
+  - {dd: STEP03.OUT, dataset: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, entity: ENT-USER-SECURITY, access: [load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh]
 spec_status: draft
 ---
@@ -41,20 +42,23 @@ The job has no business rules. Its items:
 | :-- | :-- |
 | SE-JUSEC-001 | Delete the flat file `USRSEC.PS` if it exists. |
 | SE-JUSEC-002 | Write the ten in-stream user records (five admins, five regular users) to a new `USRSEC.PS`, fixed 80 bytes. |
-| SE-JUSEC-003 | Delete the user security cluster; any failure is reset to return code 0. |
+| SE-JUSEC-003 | Delete the user security cluster; any failure except a severe error (ERR-JUSEC-002) is reset to return code 0. |
 | SE-JUSEC-004 | Define the cluster: key 8 at offset 0, records 80 fixed, `REUSE`, default share options. |
 | SE-JUSEC-005 | Load the cluster with every record of `USRSEC.PS`, in file order. |
 | VAL-JUSEC-001 | The load rejects records out of key order or with duplicate user IDs (VSAM rule). |
-| ERR-JUSEC-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
+| ERR-JUSEC-001 | No step has a `COND`: a non-zero return code lets the later steps run, while an abend or a JCL error ends the job. |
+| ERR-JUSEC-002 | A severe IDCAMS error (condition code 16) in the delete skips both the return-code reset and the define. |
+| ERR-JUSEC-003 | Nothing is reloaded while CICS has `USRSEC` open. |
 | DEF-JUSEC-001 | [security] Passwords are stored and shipped in clear text. |
 | DEF-JUSEC-002 | `UNIT=SYSAD` is a typo for `SYSDA` that was fixed once and came back. |
 | DEF-JUSEC-003 | `SET MAXCC = 0` hides every delete failure, including "file in use". |
 | DEF-JUSEC-004 | The job does not close `USRSEC` in CICS itself. |
+| DEF-JUSEC-005 | The README's initialisation sequence lists the job before CLOSEFIL. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:152`) and batch job list (`./README.md:226`), in the demo full-batch script as "Job 11: Refresh User Security  File" (`scripts/run_full_batch.sh:40-41`) and in `scripts/remote_refresh.sh:44`. The restart runbook lists it in the data refresh (`docs/runbooks/batch-cycle-restart.md:14`). Neither the CA-7 nor the Control-M schedule runs it.
-- **Preconditions:** CICS has closed file `USRSEC` (CLOSEFIL; DEF-JUSEC-004). The unit name in `STEP01` must exist on the system (DEF-JUSEC-002).
+- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:152`) and batch job list (`./README.md:226`), in the demo full-batch script as "Job 11: Refresh User Security  File" (`scripts/run_full_batch.sh:40-41`) and as "Job 11: Refresh User Security  File" in `scripts/remote_refresh.sh:43-44`. Both scripts submit CLOSEFIL first (`scripts/run_full_batch.sh:12-13`, `scripts/remote_refresh.sh:12-13`), and so does the README's batch job list (`./README.md:215`); its initialisation sequence does not (DEF-JUSEC-005). The restart runbook lists it in the data refresh (`docs/runbooks/batch-cycle-restart.md:14`). Neither the CA-7 nor the Control-M schedule runs it.
+- **Preconditions:** CICS has closed file `USRSEC` (CLOSEFIL; DEF-JUSEC-004, ERR-JUSEC-003). The unit name in `STEP01` must exist on the system (DEF-JUSEC-002). Neither define names a volume, and the catalog shows both `USRSEC.PS` and the cluster SMS-managed with storage class `SCTECH` (`app/catlg/LISTCAT.txt:3838, 3852`), the cluster's data component on volume `YYYYTC` (`app/catlg/LISTCAT.txt:3898`), so no particular volume is needed.
 - **Job card:** `REGION=8M,CLASS=A,MSGCLASS=H,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 - The README's batch table names the job's program as IEBGENER (`./README.md:353`); IEBGENER only runs in `STEP01`, and IDCAMS does the define and load.
 
@@ -75,11 +79,11 @@ The job has no business rules. Its items:
 | `STEP03` | IDCAMS | `SYSPRINT` | `SYSOUT=*` | - | IDCAMS messages | `:85` |
 | `STEP03` | IDCAMS | `SYSIN` | in-stream | - | `REPRO` statement | `:86-88` |
 
-Return code of the job: the highest step return code. Console output is utility messages only (incidental).
+Return code of the job: the highest step return code. Console output is utility messages only (incidental). The last line of the member is a `//` null statement (`:89`), which marks the end of the job.
 
 ## 5. Data used
 
-- **User security record** (no entity in `entities.md`; layout `SEC-USER-DATA` in `app/cpy/CSUSR01Y.cpy:17-23`), 80 bytes: `SEC-USR-ID` X(8) bytes 1-8 (the key), `SEC-USR-FNAME` X(20), `SEC-USR-LNAME` X(20), `SEC-USR-PWD` X(8) in clear text, `SEC-USR-TYPE` X(1) (`A` admin, `U` regular user), `SEC-USR-FILLER` X(23).
+- **User security record**, ENT-USER-SECURITY (layout `SEC-USER-DATA` in `app/cpy/CSUSR01Y.cpy:17-23`), 80 bytes: `SEC-USR-ID` X(8) bytes 1-8 (the key), `SEC-USR-FNAME` X(20), `SEC-USR-LNAME` X(20), `SEC-USR-PWD` X(8) in clear text, `SEC-USR-TYPE` X(1) (`A` admin, `U` regular user), `SEC-USR-FILLER` X(23).
 - **In-stream content** (`:35-44`): user IDs `ADMIN001` to `ADMIN005` with type `A` and `USER0001` to `USER0005` with type `U`, each with a first and last name. Every record carries the same password, the public demo password that the README and `docs/security/secrets.md:18-19` publish for `ADMIN001` and `USER0001`. Each card image holds 57 significant characters; the rest of the 80-byte record (the filler) is blanks. The records are already in ascending user-ID order.
 - The EBCDIC sample file `app/data/EBCDIC/AWS.M2.CARDDEMO.USRSEC.PS` holds the same ten records.
 - **Catalog state on 09/01/22:** `USRSEC.PS` is catalogued (`app/catlg/LISTCAT.txt:3831`). The cluster (`app/catlg/LISTCAT.txt:3846-3872`) has data component `...KSDS.DAT` with `KEYLEN 8`, `RKP 0`, `AVGLRECL 80`, `MAXLRECL 80`, `CISIZE 8192`, `SHROPTNS(1,3)`, `NOERASE`, `INDEXED`, `REUSE` and `REC-TOTAL 10` (`app/catlg/LISTCAT.txt:3883-3888`), and index `...KSDS.IDX` (`app/catlg/LISTCAT.txt:3906`). That matches SE-JUSEC-004 and the ten seed users. The catalog reports 3 primary cylinders, which is the 45 tracks of the define on a 3390 device (15 tracks per cylinder).
@@ -128,13 +132,13 @@ In execution order. There is no rollback: each step's change is permanent.
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
 #### SE-JUSEC-002 · Write the in-stream users to the flat file
-- **What:** IEBGENER with `SYSIN DD DUMMY` copies the ten in-stream card images (`:35-44`) unchanged, in order, into a new catalogued dataset `AWS.M2.CARDDEMO.USRSEC.PS` with `LRECL=80,RECFM=FB` (system-determined block size). If the step fails, `DISP=(NEW,CATLG,DELETE)` deletes the new file.
+- **What:** IEBGENER with `SYSIN DD DUMMY` copies the ten in-stream card images (`:35-44`) unchanged, in order, into a new catalogued dataset `AWS.M2.CARDDEMO.USRSEC.PS` with `LRECL=80,RECFM=FB` (system-determined block size). In `DISP=(NEW,CATLG,DELETE)` the abnormal disposition `DELETE` applies only when the step abends; if IEBGENER ends with a non-zero return code without abending, the new file is still catalogued, possibly incomplete (ERR-JUSEC-001).
 - **Source:** `:32-52`
 - **Fidelity:** must-preserve (record content and order) · **Confidence:** reviewed
 
 #### SE-JUSEC-003 · Delete the user security cluster
 - **What:** `DELETE                  AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS` removes the cluster with its data and index components and every record. The statement has no entry type, so IDCAMS deletes whatever object has that name.
-- **Return code:** `SET       MAXCC = 0` follows unconditionally, so every delete result, including a failure, becomes 0 (DEF-JUSEC-003). A missing cluster on a first run is therefore not an error.
+- **Return code:** `SET       MAXCC = 0` follows unconditionally, so every delete result, including a failure, becomes 0 (DEF-JUSEC-003), except a severe error with condition code 16, after which IDCAMS skips the rest of the step (ERR-JUSEC-002). A missing cluster on a first run is therefore not an error.
 - **Source:** `:62-63`
 - **Fidelity:** must-preserve (delete before define) · **Confidence:** reviewed
 
@@ -157,23 +161,35 @@ In execution order. There is no rollback: each step's change is permanent.
 - **Fidelity:** must-preserve (key and record size); incidental (space, CI size, free space, share options) · **Confidence:** reviewed
 
 #### SE-JUSEC-005 · Load the cluster from the flat file
-- **What:** `REPRO INFILE(IN) OUTFILE(OUT)` copies every record of `AWS.M2.CARDDEMO.USRSEC.PS`, in file order and byte for byte, into the cluster. The statement does not use the `REUSE` keyword, so if the cluster still holds records (because the delete and define failed), the new records are merged into it rather than replacing it.
+- **What:** `REPRO INFILE(IN) OUTFILE(OUT)` copies every record of `AWS.M2.CARDDEMO.USRSEC.PS`, in file order and byte for byte, into the cluster. The statement does not use the `REUSE` keyword, so if an old, loaded cluster were still there and could be opened, the records would be merged into it rather than replacing it. The usual reason for a failed delete, CICS still holding the file, also makes this open fail (ERR-JUSEC-003), so a merge needs a delete that failed for another reason while no other job or region has the cluster open.
 - **Before a failure:** if `STEP02` failed, `STEP03` still runs against whatever cluster exists (ERR-JUSEC-001).
 - **Source:** `:82-87`
-- **Fidelity:** must-preserve · **Confidence:** reviewed
+- **Fidelity:** must-preserve · **Confidence:** reviewed (statement); platform-inferred (open failure)
 
 ## 10. Error handling
 
 #### ERR-JUSEC-001 · Steps run regardless of earlier failures
-- **When:** a step ends with a non-zero return code without abending.
-- **Then:** the next step still runs, because no `EXEC` has a `COND` parameter. If `STEP01` fails, its new `USRSEC.PS` is deleted, `STEP02` still deletes the cluster and defines it empty, and `STEP03` fails on the missing input, which leaves the online system with an empty user file and no one able to sign on. If `STEP02` fails, `STEP03` loads into whatever cluster exists. An abend skips the remaining steps (JES default).
-- **Source:** `:23, 32, 58, 80`
+- **When:** a step ends with a non-zero return code, abends, or cannot be allocated.
+- **Then:** no `EXEC` has a `COND` parameter, so after a non-zero return code without an abend every later step still runs. If IEBGENER in `STEP01` ends with a non-zero return code, `USRSEC.PS` is still catalogued (SE-JUSEC-002), and `STEP02` and `STEP03` rebuild the cluster from whatever the file holds. If `STEP01` abends, the system deletes the new file and skips `STEP02` and `STEP03` (JES default), so the cluster keeps its old users. If `STEP01` cannot be allocated, for example because unit `SYSAD` does not exist (DEF-JUSEC-002), that is a JCL error that ends the job after `PREDEL`: `USRSEC.PS` is gone and the cluster is unchanged. If `STEP02` fails without abending, `STEP03` loads into whatever cluster exists (SE-JUSEC-005, ERR-JUSEC-003).
+- **Source:** `:23, 32, 46-49, 58, 80`
 - **Fidelity:** defect-decide · **Confidence:** platform-inferred
+
+#### ERR-JUSEC-002 · A severe IDCAMS error skips the reset and the define
+- **When:** the `DELETE` in `STEP02` ends with condition code 16, a severe error such as a catalog that cannot be accessed.
+- **Then:** IDCAMS does not process the remaining commands of the step, so neither `SET MAXCC = 0` nor `DEFINE CLUSTER` runs, and `STEP02` ends with return code 16. `STEP03` still runs against whatever cluster exists (ERR-JUSEC-001).
+- **Source:** `:62-64`
+- **Fidelity:** incidental · **Confidence:** platform-inferred (high; IDCAMS condition-code rules, no local run)
+
+#### ERR-JUSEC-003 · Nothing is reloaded while CICS has the file open
+- **When:** CICS file `USRSEC` is open when the job runs, because CLOSEFIL has not run or CICS has not yet closed the file (DEF-JUSEC-004, DEF-JUSEC-005). CICS opens the file for update, since its definition allows add, update and delete (`app/csd/CARDDEMO.CSD:88-99`).
+- **Then:** `PREDEL` and `STEP01` rebuild `USRSEC.PS` as usual. In `STEP02` the delete fails because the cluster is in use (`docs/runbooks/cics-vsam-files.md:37`), the reset sets the return code to 0, and the define fails because the name still exists. In `STEP03` the open for output is refused, because share options `(1,3)` (`app/catlg/LISTCAT.txt:3885`) allow no other opener while CICS has the file open for update, so no record is copied and nothing is merged. The cluster keeps its old users, including any added online, and the job ends with a non-zero return code from `STEP02` and `STEP03`.
+- **Source:** `:62-64, 83, 87`
+- **Fidelity:** must-preserve (a reload must not proceed while the online system has the file open) · **Confidence:** platform-inferred (high; VSAM share-option rules, no local run)
 
 ## 11. Interactions
 
 - **Upstream:** CLOSEFIL closes `USRSEC` in CICS (`app/jcl/CLOSEFIL.jcl:30`); the restart runbook's step 1 (`docs/runbooks/batch-cycle-restart.md:13`).
-- **Downstream:** CICS file `USRSEC` (`app/csd/CARDDEMO.CSD:88-89`) points at the cluster. It is read by the sign-on program COSGN00C and maintained by the user administration programs COUSR00C, COUSR01C, COUSR02C and COUSR03C, reached from the admin menu COADM01C. OPENFIL reopens it (`app/jcl/OPENFIL.jcl:30`).
+- **Downstream:** CICS file `USRSEC` (`app/csd/CARDDEMO.CSD:88-99`) points at the cluster. It is read by the sign-on program COSGN00C and maintained by the user administration programs COUSR00C, COUSR01C, COUSR02C and COUSR03C, reached from the admin menu COADM01C. OPENFIL reopens it (`app/jcl/OPENFIL.jcl:30`).
 - **Shared data:** ESDSRRDS writes the same ten records into other datasets (`app/jcl/ESDSRRDS.jcl:36-45`); changing the seed users in one job does not change the other.
 
 ## 12. Numeric, date and format details
@@ -188,16 +204,20 @@ None. The job copies bytes; it does not interpret any field.
 
 #### DEF-JUSEC-002 · `UNIT=SYSAD` instead of `SYSDA`
 - `STEP01` asks for unit `SYSAD` (`:49`), which is not the standard esoteric name `SYSDA`. On a system without a `SYSAD` unit, allocation of `STEP01` fails with a JCL error and the job ends there: `PREDEL` has already deleted `USRSEC.PS`, and the cluster is left as it was. Where SMS manages the new dataset, its storage class can override the unit and the typo has no effect. The git history shows this typo was fixed in 2022 ("Issue #2 Typo in DUSRSECJ.jcl") and reintroduced in a later commit; READACCT and ESDSRRDS have the same value.
-- **Status:** open · **Fidelity:** defect-fix · **Confidence:** platform-inferred (no unit table in the repository)
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (no unit table in the repository)
 
 #### DEF-JUSEC-003 · `SET MAXCC = 0` hides every delete failure
-- Unlike ACCTFILE, which resets only results of 8 or less, this job resets the return code unconditionally after the delete (`:63`). When the cluster cannot be deleted because CICS still has it open (`docs/runbooks/cics-vsam-files.md:37`), the define then fails because the name exists, and `STEP03` merges the ten records into the existing loaded cluster: records whose user IDs already exist are rejected as duplicates, records for new IDs are added, and users added online stay.
+- Unlike ACCTFILE, which resets only results of 8 or less, this job resets the return code unconditionally after the delete (`:63`), so every delete failure except condition code 16 (ERR-JUSEC-002) disappears from the step's return code; only the define's result remains. When the cluster cannot be deleted because CICS still has it open (`docs/runbooks/cics-vsam-files.md:37`), the define then fails because the name exists, and `STEP03` fails too, because the open for output is refused while CICS has the file open (ERR-JUSEC-003). No records are merged: the old users stay, including those added online, and the job ends with a non-zero code from `STEP02` and `STEP03`, while the delete's own failure shows only in the IDCAMS messages.
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JUSEC-004 · The job does not close the file in CICS
 - The job has no CICS close and open step, so it depends on CLOSEFIL having closed `USRSEC` first and on OPENFIL afterwards. While the cluster is being rebuilt, no one can sign on.
 - **Source:** `:23-88`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
+
+#### DEF-JUSEC-005 · The README initialisation sequence runs the job before CLOSEFIL
+- The README's initialisation table lists DUSRSECJ (`./README.md:152`) before CLOSEFIL (`./README.md:153`), although the job needs CICS to have closed `USRSEC` (§3). Followed in that order on a region that already has the file open, the run reloads nothing (ERR-JUSEC-003). CICS opens the file on first reference (`OPENTIME(FIRSTREF)`, `app/csd/CARDDEMO.CSD:91`), so on a first installation, before anyone has signed on, the order does no harm. The README's batch job list (`./README.md:215, 226`) and both scripts (`scripts/run_full_batch.sh:12-13, 40-41`, `scripts/remote_refresh.sh:12-13, 43-44`) run CLOSEFIL first.
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (order); platform-inferred (effect)
 
 ## 14. Open questions
 
@@ -217,5 +237,6 @@ After a successful run (return code 0 in every step), the user store contains ex
 | (job card) | 1-2 | §3 |
 | `PREDEL` | 23-26 | SE-JUSEC-001 |
 | `STEP01` | 32-52 | SE-JUSEC-002, DEF-JUSEC-001, DEF-JUSEC-002, ERR-JUSEC-001 |
-| `STEP02` | 58-74 | SE-JUSEC-003, SE-JUSEC-004, DEF-JUSEC-003 |
-| `STEP03` | 80-88 | SE-JUSEC-005, VAL-JUSEC-001, ERR-JUSEC-001 |
+| `STEP02` | 58-74 | SE-JUSEC-003, SE-JUSEC-004, ERR-JUSEC-001, ERR-JUSEC-002, ERR-JUSEC-003, DEF-JUSEC-003 |
+| `STEP03` | 80-88 | SE-JUSEC-005, VAL-JUSEC-001, ERR-JUSEC-001, ERR-JUSEC-003 |
+| (end of job) | 89 | §4 |

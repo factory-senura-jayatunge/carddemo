@@ -13,13 +13,13 @@ sources:
   - {path: scripts/run_full_batch.sh, sha256: 5380076d14e7, role: script, lines: "34-35"}
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "34-35"}
   - {path: scripts/run_posting.sh, sha256: a8e231c46316, role: script, lines: "19-20"}
-  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "246-271, 305-330"}
+  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "216-217, 246-271, 305-330"}
   - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "15-16, 73-81, 89-91, 99"}
 entry_points: [{type: manual, job: TCATBALF}, {type: script, file: scripts/run_full_batch.sh, lines: "34-35"}, {type: script, file: scripts/remote_refresh.sh, lines: "34-35"}, {type: script, file: scripts/run_posting.sh, lines: "19-20"}, {type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "246-271"}]
 programs: [IDCAMS]
 data_stores:
-  - {dd: TCATBAL, dataset: AWS.M2.CARDDEMO.TCATBALF.PS, copybook: CVTRA01Y, access: [read-sequential]}
-  - {dd: TCATBALV, dataset: AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS, copybook: CVTRA01Y, access: [delete, define, load]}
+  - {dd: TCATBAL, dataset: AWS.M2.CARDDEMO.TCATBALF.PS, entity: ENT-TCAT-BAL, copybook: CVTRA01Y, access: [read-sequential]}
+  - {dd: TCATBALV, dataset: AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS, entity: ENT-TCAT-BAL, copybook: CVTRA01Y, access: [delete, define, load]}
 invoked_by: [operator, scripts/run_full_batch.sh, scripts/remote_refresh.sh, scripts/run_posting.sh, CA-7 trigger from CLOSEFIL2]
 spec_status: draft
 ---
@@ -36,20 +36,21 @@ The job has no business rules. Its items:
 
 | ID | Rule |
 | :-- | :-- |
-| SE-JTCAT-001 | Delete the category balance cluster; the return code is then set to 0 whatever the result. |
+| SE-JTCAT-001 | Delete the category balance cluster; the return code is then set to 0 unless the delete ended with a severe error (ERR-JTCAT-003). |
 | SE-JTCAT-002 | Define the cluster: key 17 at offset 0, records 50 fixed, `SHAREOPTIONS(2 3)`, `ERASE`, no `REUSE`. |
 | SE-JTCAT-003 | Load the cluster with every record of `TCATBALF.PS`, in file order, with exclusive use of the cluster (`DISP=OLD`). |
 | VAL-JTCAT-001 | The load rejects records out of key order or with duplicate keys (VSAM rule). |
 | ERR-JTCAT-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
 | ERR-JTCAT-002 | The job waits to start while another job has the cluster allocated. |
+| ERR-JTCAT-003 | A severe IDCAMS error (condition code 16) in the delete skips the return-code reset. |
 | NUM-JTCAT-001 | Key and record size. |
 | DEF-JTCAT-001 | The unconditional return-code reset hides every delete failure. |
-| DEF-JTCAT-002 | A reload replaces every running balance with the flat file's values, and the CA-7 schedule triggers it like a regular job. |
+| DEF-JTCAT-002 | A reload replaces every running balance with the flat file's values; in CA-7 it runs only in a run under SCHID 032, which loops without end. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:162`) and its "Running Batch Jobs" sequence (`./README.md:225`), and in the demo scripts `scripts/run_full_batch.sh:34-35`, `scripts/remote_refresh.sh:34-35` and `scripts/run_posting.sh:19-20`. In the CA-7 schedule, `CLOSEFIL2` (a CLOSEFIL run under schedule ID 032) triggers it and it triggers `WAITSTEP` (`app/scheduler/CardDemo.ca7:246-271, 305-330`). Control-M does not run it. The restart runbook uses it to restore the demo balances after a partial POSTTRAN (`docs/runbooks/batch-cycle-restart.md:73-75`). The local runner has no TCATBALF job; it loads `app/data/ASCII/tcatbal.txt` into the `TCATBALF` dataset directly for every run (`tools/batch-programs.toml:213-217`).
-- **Preconditions:** no other job has `AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS` allocated (ERR-JTCAT-002); `AWS.M2.CARDDEMO.TCATBALF.PS` exists and is sorted by key (`./README.md:145`, FB 50); volume `AWSHJ1` exists. The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
+- **Trigger:** submitted by an operator. It is in the README's initialisation sequence (`./README.md:162`) and its "Running Batch Jobs" sequence (`./README.md:225`), and in the demo scripts `scripts/run_full_batch.sh:34-35`, `scripts/remote_refresh.sh:34-35` and `scripts/run_posting.sh:19-20`. In the CA-7 schedule, `CLOSEFIL2` (a CLOSEFIL run under schedule ID 032) triggers it with SCHID 032 (`app/scheduler/CardDemo.ca7:271`) and it triggers `WAITSTEP` with SCHID 032 (`app/scheduler/CardDemo.ca7:330`). A trigger fires only when its job completed under the trigger's schedule ID, and the triggered job inherits that ID (FLOW-JCA7-005), so TCATBALF runs only in a run under SCHID 032: WAITSTEP's trigger of `CLOSEFIL2` is defined for 032 (`app/scheduler/CardDemo.ca7:217`), and its trigger of `CLOSEFIL1`, which leads to TRANCATG, for 031 (`app/scheduler/CardDemo.ca7:216, 244`). One WAITSTEP completion therefore never starts both TCATBALF and TRANCATG. The WAITSTEP that follows TRANTYPE in the regular run under 030 never reaches TCATBALF (FLOW-JCA7-002), and a run under 032 loops `CLOSEFIL2`, TCATBALF, WAITSTEP without end (DEF-JCA7-008). This reading of the schedule is platform-inferred (medium). Control-M does not run it. The restart runbook uses it to restore the demo balances after a partial POSTTRAN (`docs/runbooks/batch-cycle-restart.md:73-75`). The local runner has no TCATBALF job; it loads `app/data/ASCII/tcatbal.txt` into the `TCATBALF` dataset directly for every run (`tools/batch-programs.toml:213-217`).
+- **Preconditions:** no other job has `AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS` allocated (ERR-JTCAT-002); `AWS.M2.CARDDEMO.TCATBALF.PS` exists and is sorted by key (`./README.md:145`, FB 50). The define names volume `AWSHJ1`, but the cluster is SMS-managed (storage class `SCTECH`, `app/catlg/LISTCAT.txt:1342`) and the catalog shows its data component on volume `YYYYTT` (`app/catlg/LISTCAT.txt:1388`), so on the reference system SMS chose the volume; `AWSHJ1` matters only where SMS does not manage these names (platform-inferred, medium). The CSD defines no CICS file on this cluster (checked with a search over `app/csd/CARDDEMO.CSD`), so no CICS close is needed for it.
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 
 ## 4. Interfaces
@@ -70,7 +71,7 @@ Return code of the job: the highest step return code. Console output is IDCAMS `
 ## 5. Data used
 
 - ENT-TCAT-BAL (`TRAN-CAT-BAL-RECORD`, `app/cpy/CVTRA01Y.cpy:4-10`, 50 bytes), whole records copied unchanged from `TCATBALF.PS` to the KSDS. No field is interpreted. The key is bytes 1-17 (`TRAN-CAT-KEY`: `TRANCAT-ACCT-ID` `9(11)`, `TRANCAT-TYPE-CD` `X(02)`, `TRANCAT-CD` `9(04)`); the balance `TRAN-CAT-BAL` (`S9(09)V99`, zoned decimal with the sign in the last digit, bytes 18-28) and a 22-byte filler are carried along.
-- Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:1334-1422`): the data component has `KEYLEN 17`, `RKP 0`, `MAXLRECL 50`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` (`app/catlg/LISTCAT.txt:1371-1373`), space `CYLINDER` primary 1 secondary 5 (`app/catlg/LISTCAT.txt:1383-1384`). This matches SE-JTCAT-002. Its statistics, `REC-TOTAL 100`, `REC-INSERTED 49` and `REC-UPDATED 212` (`app/catlg/LISTCAT.txt:1376-1379`), show a cluster that POSTTRAN had already updated after the load, not the state right after this job. The listing also shows the backup GDG `AWS.M2.CARDDEMO.TCATBALF.BKUP` with five generations written by PRTCATBL (`app/catlg/LISTCAT.txt:1202-1302`); this job neither reads nor writes it.
+- Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:1334-1422`): the data component has `KEYLEN 17`, `RKP 0`, `MAXLRECL 50`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` (`app/catlg/LISTCAT.txt:1371-1373`), space `CYLINDER` primary 1 secondary 5 (`app/catlg/LISTCAT.txt:1383-1384`). This matches SE-JTCAT-002. Its statistics are `REC-TOTAL 100`, `REC-INSERTED 49` and `REC-UPDATED 212` (`app/catlg/LISTCAT.txt:1376-1379`). The updates show that the balances were changed after the load, so this is not the state right after this job. The counts do not reconcile with the sample data: the 50 sample records plus 49 inserts make 99, not 100. The listing does not show whether the loaded flat file differed from `tcatbal.txt` or how the added records were counted. The listing also shows the backup GDG `AWS.M2.CARDDEMO.TCATBALF.BKUP` with five generations written by PRTCATBL (`app/catlg/LISTCAT.txt:1202-1302`); this job neither reads nor writes it.
 - Sample data: `app/data/ASCII/tcatbal.txt` has 50 records of 50 bytes, keys strictly ascending, one record per account from `00000000001` to `00000000050`, all with type `01` and category `0001`. Checked locally with a Python script over the file.
 
 ## 6. Processing flow
@@ -109,7 +110,7 @@ In execution order. There is no rollback: each step's change is permanent.
 
 #### SE-JTCAT-001 · Delete the category balance cluster
 - **What:** `DELETE AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS CLUSTER`, which removes the cluster with its data and index components and all its records.
-- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did. A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JTCAT-001).
+- **Return code:** `SET MAXCC = 0` follows without a condition, so the step ends with return code 0 whatever the delete did, unless the delete ends with condition code 16 and IDCAMS skips the `SET` (ERR-JTCAT-003). A missing cluster (first run) is therefore not an error, but neither is any other failure (DEF-JTCAT-001).
 - **Source:** `:25-27`
 - **Fidelity:** must-preserve (the reload starts from nothing) · **Confidence:** reviewed
 
@@ -151,6 +152,12 @@ If a later step fails, everything before it has happened: the old cluster is gon
 - **Source:** `:58-59`
 - **Fidelity:** must-preserve (no reader or updater may use the file during the reload); incidental (mechanism) · **Confidence:** platform-inferred
 
+#### ERR-JTCAT-003 · A severe IDCAMS error skips the return-code reset
+- **When:** the `DELETE` in `STEP05` ends with condition code 16, a severe error such as a catalog that cannot be accessed.
+- **Then:** IDCAMS does not process the remaining commands of the step, so `SET MAXCC = 0` never runs and `STEP05` ends with return code 16. The job still goes on to `STEP10` (ERR-JTCAT-001). The unconditional reset therefore turns every delete result except 16 into 0. `STEP10` and `STEP15` hold one command each, so for them a severe error simply ends the step with 16.
+- **Source:** `:25-27`
+- **Fidelity:** incidental · **Confidence:** platform-inferred (high; IDCAMS condition-code rules, no local run)
+
 ## 11. Interactions
 
 - **Upstream:** none. In the CA-7 chain a CLOSEFIL run precedes it, although the CSD defines no CICS file on this cluster.
@@ -169,14 +176,14 @@ If a later step fails, everything before it has happened: the old cluster is gon
 ## 13. Known defects and oddities
 
 #### DEF-JTCAT-001 · The unconditional return-code reset hides every delete failure
-- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
+- `SET MAXCC = 0` is meant for "cluster not found" on a first run, but it has no `IF`, so it also hides a delete that failed for any other reason (cluster in use from another system, no authority, catalog error); only a severe error with condition code 16 escapes it (ERR-JTCAT-003). The card, customer and cross-reference reload jobs at least limit their reset to `IF MAXCC LE 08`. After a hidden failure `STEP10` fails because the name already exists, and `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, new keys are added, and the job ends with a non-zero code from `STEP10` and `STEP15`, but old and new data stay mixed.
 - **Source:** `:27, 33, 54`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JTCAT-002 · A reload resets every running balance
-- `TRAN-CAT-BAL` is not reference data: POSTTRAN adds every posted transaction to it and INTCALC computes interest from it. This job replaces the whole file with `TCATBALF.PS`, so every balance accumulated since that file was written is lost, and the balance records that POSTTRAN created are removed. The job takes no backup first; PRTCATBL is a separate job. That suits the demo refresh, but the CA-7 schedule triggers the job from `CLOSEFIL2` (`app/scheduler/CardDemo.ca7:246-271`) like a regular job, which in a real cycle would discard the balances.
+- `TRAN-CAT-BAL` is not reference data: POSTTRAN adds every posted transaction to it and INTCALC computes interest from it. This job replaces the whole file with `TCATBALF.PS`, so every balance accumulated since that file was written is lost, and the balance records that POSTTRAN created are removed. The job takes no backup first; PRTCATBL is a separate job. That suits the demo refresh. The CA-7 schedule triggers the job from `CLOSEFIL2` (`app/scheduler/CardDemo.ca7:271`) like a regular job, but because the triggered job inherits the schedule ID (FLOW-JCA7-005) it runs only in a run under SCHID 032, which the regular run under 030 never reaches (FLOW-JCA7-002). Once a run under 032 is started, by an operator demand or by the schedule, it loops `CLOSEFIL2`, TCATBALF, WAITSTEP without end (`app/scheduler/CardDemo.ca7:217, 271, 330`; DEF-JCA7-008) and resets the balances on every round.
 - **Source:** `:22-27, 54-61`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (job); platform-inferred (intent of the schedule)
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (job); platform-inferred, medium (schedule ID inheritance and the resulting runs)
 
 ## 14. Open questions
 
@@ -193,6 +200,6 @@ After a successful run (return code 0), the category balance store contains exac
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP05` | 22-28 | SE-JTCAT-001, DEF-JTCAT-001, DEF-JTCAT-002 |
+| `STEP05` | 22-28 | SE-JTCAT-001, ERR-JTCAT-003, DEF-JTCAT-001, DEF-JTCAT-002 |
 | `STEP10` | 33-50 | SE-JTCAT-002, NUM-JTCAT-001, ERR-JTCAT-001 |
 | `STEP15` | 54-62 | SE-JTCAT-003, VAL-JTCAT-001, ERR-JTCAT-001, ERR-JTCAT-002, DEF-JTCAT-002 |
