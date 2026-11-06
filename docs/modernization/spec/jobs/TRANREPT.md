@@ -49,16 +49,17 @@ TRANREPT prints the transaction detail report for a fixed date window. `STEP05R`
 | SE-JTRPT-003 | Create the report generation `TRANREPT(+1)`, FB 133. |
 | ERR-JTRPT-001 | No step has a `COND`: each step runs whatever the previous one returned. |
 | NUM-JTRPT-001 | Card number sorted as 16-digit zoned decimal; dates compared as 10 characters. |
-| DEF-JTRPT-001 | The date window is hard-coded twice, in the JCL and in the `DATEPARM` dataset. |
+| DEF-JTRPT-001 | The date window is hard-coded twice, in the JCL and in the `DATEPARM` dataset; a narrower `DATEPARM` silently cuts the report off. |
 | DEF-JTRPT-002 | Each run adds a `TRANSACT.BKUP` generation, the GDG that COMBTRAN reads. |
 | DEF-JTRPT-003 | Two steps have the same name `STEP05R`. |
 | DEF-JTRPT-004 | [security] The job log prints every selected transaction, card number included. |
+| DEF-JTRPT-005 | The job copies `TRANSACT` while CICS may have it open; nothing closes it first. |
 
 ## 3. Actors and triggers
 
 - **Trigger:** submitted by an operator. The README component table describes TRANREPT as "Transaction Report - Submitted from CICS" (`./README.md:375`), but the CICS report program CORPT00C builds its own job `TRNRPT00` that runs `EXEC PROC=TRANREPT` (`app/cbl/CORPT00C.cbl:84, 94`), not this member. Neither schedule runs it, and neither the README batch sequence nor the full-batch script lists it. The local runner emulates it: it runs POSTTRAN first, replaces the two `STEP05R` steps by a Python filter and sort with the same window, and passes `2022-01-01 2022-07-06` as `DATEPARM` (`tools/carddemo.py:617-629, 664-671`).
 - **Preconditions:** the GDG bases `TRANSACT.BKUP`, `TRANSACT.DALY` and `TRANREPT` exist (DEFGDGB, `app/jcl/DEFGDGB.jcl:24-41`); `AWS.M2.CARDDEMO.DATEPARM` exists with a date range record; the procedure library holds REPROC.
-- **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). Procedure library `JCLLIB ORDER=('AWS.M2.CARDDEMO.PROC')` (`:19`). Symbolic parameter `CNTLLIB=AWS.M2.CARDDEMO.CNTL` on the first step (`:23-24`). The job ends at the null statement `//` (`:81`).
+- **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). Procedure library: a `JCLLIB ORDER=('AWS.M2.CARDDEMO.PROC')` statement whose label is `JOBLIB` (`:19`); it is not a `JOBLIB` DD. Symbolic parameter `CNTLLIB=AWS.M2.CARDDEMO.CNTL` on the first step (`:23-24`). The job ends at the null statement `//` (`:81`).
 
 ## 4. Interfaces
 
@@ -87,7 +88,7 @@ Return code of the job: the highest step return code.
 
 - ENT-TRANSACTION, whole 350-byte records. The job interprets two fields: `TRAN-CARD-NUM` (bytes 263-278) and the date part of `TRAN-PROC-TS` (bytes 305-314, `YYYY-MM-DD`). The program also uses ENT-CARD-XREF, ENT-TRAN-TYPE and ENT-TRAN-CATEGORY for the report lines.
 - `AWS.M2.CARDDEMO.DATEPARM` is a cataloged sequential dataset (`app/catlg/LISTCAT.txt:818-832`); its content is not in the repository. `CBTRN03C` reads it as `WS-START-DATE X(10)`, one filler byte, `WS-END-DATE X(10)` (`app/cbl/CBTRN03C.cbl:122-125`).
-- GDGs: `TRANSACT.DALY` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:3021-3027`); `TRANREPT` `LIMIT 5`, `SCRATCH` (`app/catlg/LISTCAT.txt:1527-1535`).
+- GDGs: `TRANSACT.BKUP` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:1631-1637`); `TRANSACT.DALY` `LIMIT 5`, `NOSCRATCH` (`app/catlg/LISTCAT.txt:3021-3027`); `TRANREPT` `LIMIT 5`, `SCRATCH` (`app/catlg/LISTCAT.txt:1527-1535`).
 
 ## 6. Processing flow
 
@@ -156,6 +157,7 @@ In execution order. No step undoes an earlier one.
 - **Upstream:** POSTTRAN and COMBTRAN fill `TRANSACT`; the reference jobs TRANTYPE, TRANCATG and XREFFILE load the lookup files.
 - **Shared data:** `TRANSACT.BKUP` with TRANBKP and COMBTRAN (DEF-JTRPT-002); `TRANSACT.DALY` and `TRANREPT` with the procedure `app/proc/TRANREPT.prc`, which CORPT00C submits through the CICS transient data queue `JOBS` (`app/cbl/CORPT00C.cbl:498-523`).
 - **Downstream:** none in the repository; the report is for printing.
+- **Related:** the procedure `app/proc/TRANREPT.prc` starts with `//REPROC PROC` and nests `EXEC PROC=REPROC`. Q-RPTS-005 (CORPT00C) asks whether this works; the batch-area answer is in DEF-JTRPTP-001 (the member found is `TRANREPT`, and the nested call reaches the cataloged REPROC). This batch job does not use that procedure: it calls REPROC directly (`:23-24`).
 
 ## 12. Numeric, date and format details
 
@@ -167,14 +169,17 @@ In execution order. No step undoes an earlier one.
 ## 13. Known defects and oddities
 
 #### DEF-JTRPT-001 · The date window is hard-coded twice
-- The window is a literal in the `SYMNAMES` (`:43-44`), and `CBTRN03C` filters again with the range in the dataset `AWS.M2.CARDDEMO.DATEPARM` (`:73-74`), whose content is maintained outside the repository. Changing one without the other gives a report for the intersection of the two ranges, while the `Reporting from` line shows only the `DATEPARM` range. The online path solves this by overriding both (see `TRANREPT-PROC.md`).
-- **Source:** `:43-44, 73-74`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+- The window is a literal in the `SYMNAMES` (`:43-44`), and `CBTRN03C` tests the date again against the range in the dataset `AWS.M2.CARDDEMO.DATEPARM` (`:73-74`), whose content is maintained outside the repository. The two are not combined as an intersection. The program's "outside the range" branch is `NEXT SENTENCE`, which continues after the end of the whole read loop (`app/cbl/CBTRN03C.cbl:173-178, 207`; FLOW-TRPT-001, DEF-TRPT-001). So:
+  - If `DATEPARM` is narrower than the `SYMNAMES` window, the first selected record (in card order) whose processing date is outside `DATEPARM` ends the report. Later records are not printed, and no account, page or grand total is written. The files are closed normally and the return code is 0, so nothing signals the cut-off.
+  - If `DATEPARM` is wider, every selected record is printed, but the `Reporting from` line and the heading show the `DATEPARM` range, not the range actually selected.
+- The online path avoids both cases by writing the same range into both places (see `TRANREPT-PROC.md`, FLOW-JTRPTP-002).
+- **Source:** `:43-44, 73-74`, `app/cbl/CBTRN03C.cbl:173-178, 207`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (job); runtime-verified at program level (the cut-off, FLOW-TRPT-001)
 
 #### DEF-JTRPT-002 · The report adds a generation to the transaction backup GDG
-- The first step writes `TRANSACT.BKUP(+1)`, the GDG that TRANBKP uses for the cycle backup and COMBTRAN reads as `(0)`. A TRANREPT run between TRANBKP and COMBTRAN makes COMBTRAN read this copy instead (DEF-JCOMB-001), and every run uses one of the 5 generations, pushing older cycle backups out.
-- **Source:** `:29-33`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+- The first step writes `TRANSACT.BKUP(+1)`, the GDG that TRANBKP uses for the cycle backup and COMBTRAN reads as `(0)`. A TRANREPT run between TRANBKP and COMBTRAN makes COMBTRAN read this copy instead (DEF-JCOMB-001). At that point TRANBKP has already deleted and redefined the transaction cluster (`app/jcl/TRANBKP.jcl:37-67`), so the copy is empty: IDCAMS copies no records or (platform-inferred) cannot open the never-loaded cluster and ends with condition code 12. Either way the step ends normally and the empty generation is cataloged. COMBTRAN then reloads `TRANSACT` from that empty copy plus `SYSTRAN` only (`app/jcl/COMBTRAN.jcl:22-26, 41-48`), so the day's posted transactions are lost from the master. Every run also uses one of the 5 generations, pushing older cycle backups out.
+- **Source:** `:29-33`, `app/jcl/TRANBKP.jcl:37-67`, `app/jcl/COMBTRAN.jcl:22-26, 41-48`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (job order and datasets); platform-inferred (IDCAMS result on a never-loaded cluster, medium)
 
 #### DEF-JTRPT-003 · Duplicate step name
 - The first and second steps are both named `STEP05R` (`:23, 37`). JES accepts it, but step-level overrides, restarts (`RESTART=STEP05R`) and referbacks to `STEP05R` cannot address the second step. The comment line `:20` also contains a stray backtick.
@@ -185,6 +190,11 @@ In execution order. No step undoes an earlier one.
 - `CBTRN03C` displays each transaction record it reads (`DISPLAY TRAN-RECORD`, `app/cbl/CBTRN03C.cbl:180`), and `SYSOUT` goes to the spool (`:62`). The job log therefore holds every card number in the report window. The local run shows the 262 records on the console.
 - **Source:** `:62`, `app/cbl/CBTRN03C.cbl:180`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** runtime-verified
+
+#### DEF-JTRPT-005 · The transaction master is copied while CICS may have it open
+- The first step reads `AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS` with `DISP=SHR` (`:26-27`). The job has no step that closes the CICS file `TRANSACT` (as CLOSEFIL does, `app/jcl/CLOSEFIL.jcl:26`), and no schedule runs the job, so nothing orders it after CLOSEFIL. The CICS region defines the file on the same cluster with `ADD(YES)` and `UPDATE(YES)` (`app/csd/CARDDEMO.CSD:76-82`), so online programs such as the transaction add can write to it while the copy runs. The cluster's `SHAREOPTIONS(2 3)` (`app/jcl/TRANBKP.jcl:60`) lets one updater and batch readers share it across regions, without read integrity for the readers, so the copy (and the report) can miss or partly reflect records being added at that moment. The online procedure has the same exposure (TRANREPT-PROC section 3).
+- **Source:** `:26-27`, `app/jcl/TRANBKP.jcl:60`, `app/csd/CARDDEMO.CSD:76-82`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (VSAM cross-region share options, medium)
 
 ## 14. Open questions
 
@@ -201,7 +211,7 @@ For the same transaction store and window, the report input holds exactly the tr
 
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
-| (job card and JOBLIB) | 1-19 | §3 |
-| `STEP05R` | 23-33 | SE-JTRPT-001, DEF-JTRPT-002, DEF-JTRPT-003 |
+| (job card and JCLLIB) | 1-19 | §3 |
+| `STEP05R` | 23-33 | SE-JTRPT-001, DEF-JTRPT-002, DEF-JTRPT-003, DEF-JTRPT-005 |
 | `STEP05R` | 37-55 | BR-JTRPT-001, SE-JTRPT-002, NUM-JTRPT-001, DEF-JTRPT-001, DEF-JTRPT-003 |
 | `STEP10R` | 59-80 | FLOW-JTRPT-001, SE-JTRPT-003, ERR-JTRPT-001, DEF-JTRPT-001, DEF-JTRPT-004 |

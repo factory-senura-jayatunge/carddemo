@@ -9,8 +9,8 @@ sources:
   - {path: app/jcl/REPTFILE.jcl, sha256: 638afb651173, role: job}
   - {path: app/jcl/DEFGDGB.jcl, sha256: 4e515d5e5fa9, role: conflicting-define, lines: "36-41"}
   - {path: app/catlg/LISTCAT.txt, sha256: d207911955e1, role: catalog, lines: "1527-1541"}
-  - {path: app/jcl/TRANREPT.jcl, sha256: 7d8fc0777e6b, role: consumer, lines: "76-80"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 351-379"}
+  - {path: app/jcl/TRANREPT.jcl, sha256: 7d8fc0777e6b, role: consumer, lines: "59, 76-80"}
+  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 213-235, 351-379"}
 entry_points: [{type: manual, job: REPTFILE}]
 programs: [IDCAMS]
 data_stores:
@@ -37,10 +37,11 @@ The job has no business rules. Its items:
 | DEF-JREPT-001 | Conflicts with DEFGDGB's define of the same base (`LIMIT(5) SCRATCH`). |
 | DEF-JREPT-002 | The step comment describes a delete of the transaction master, which the job does not do. |
 | DEF-JREPT-003 | No documentation or schedule says when to run the job. |
+| DEF-JREPT-004 | Without a base from this job or DEFGDGB, TRANREPT cannot write its report. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** none documented. The README lists the job in neither its initialisation table (`./README.md:150-167`) nor its batch table (`./README.md:351-379`), no runbook names it, neither the CA-7 nor the Control-M schedule runs it, and `scripts/run_full_batch.sh` does not submit it. It can only be submitted by hand. The local runner does not emulate it: TRANREPT's report DD is a plain new file there (`tools/carddemo.py:670`).
+- **Trigger:** none documented. The README lists the job in none of its three job tables: initialisation (`./README.md:150-167`), "Running Batch Jobs" (`./README.md:213-235`) and batch components (`./README.md:351-379`); no runbook names it, neither the CA-7 nor the Control-M schedule runs it, and `scripts/run_full_batch.sh` does not submit it. It can only be submitted by hand. The local runner does not emulate it: TRANREPT's report DD is a plain new file there (`tools/carddemo.py:670`).
 - **Preconditions:** the base `AWS.M2.CARDDEMO.TRANREPT` does not exist yet (otherwise ERR-JREPT-001).
 - **Job card:** `'DEF GDG FOR REPORT FILE',CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters, no symbolic overrides.
 
@@ -132,6 +133,11 @@ DEFINE GENERATIONDATAGROUP -
 - **Source:** `:1-2`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
+#### DEF-JREPT-004 · Without a base, TRANREPT cannot write its report
+- TRANREPT's `STEP10R` allocates the new generation `AWS.M2.CARDDEMO.TRANREPT(+1)` (`app/jcl/TRANREPT.jcl:59, 76-80`), and the procedure that CORPT00C submits online does the same (`app/proc/TRANREPT.prc:74-78`). A relative generation needs a GDG base, so if neither this job nor DEFGDGB has defined `AWS.M2.CARDDEMO.TRANREPT`, that allocation fails with a JCL error, `STEP10R` does not run and no report is written; the earlier steps of TRANREPT have already created their own generations. Because nothing says when to run REPTFILE (DEF-JREPT-003), only the README's DEFGDGB step (`./README.md:166`) prevents this.
+- **Source:** `:25-28`; `app/jcl/TRANREPT.jcl:59, 76-80`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (allocation); platform-inferred, high (a relative generation without a GDG base fails at allocation)
+
 ## 14. Open questions
 
 | ID | Question | For |
@@ -147,4 +153,4 @@ None of the job's own behaviour needs reproducing beyond the report retention th
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP05` | 22-29 | SE-JREPT-001, ERR-JREPT-001, NUM-JREPT-001, DEF-JREPT-001, DEF-JREPT-002 |
+| `STEP05` | 22-29 | SE-JREPT-001, ERR-JREPT-001, NUM-JREPT-001, DEF-JREPT-001, DEF-JREPT-002, DEF-JREPT-004 |

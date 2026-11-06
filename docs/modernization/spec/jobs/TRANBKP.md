@@ -49,11 +49,12 @@ The job has no business rules. Its items:
 | DEF-JTBKP-002 | The return-code reset also hides a delete that failed because the file is in use. |
 | DEF-JTBKP-003 | Catalog and JCL disagree on the backup GDG (`NOSCRATCH` against `SCRATCH`). |
 | DEF-JTBKP-004 | One job name for two different purposes in the README sequence. |
+| DEF-JTBKP-005 | Backing up a `TRANSACT` that was defined but never loaded fails, and the job then leaves no transaction master. |
 
 ## 3. Actors and triggers
 
 - **Trigger:** submitted by an operator or a scheduler. The README "Running Batch Jobs" sequence lists it twice: in the data refresh as "Creates Transaction database" (`./README.md:220`) and after INTCALC as "Backup Transaction database" (`./README.md:229`). The demo full-batch script submits it in both places (`scripts/run_full_batch.sh:28-29`, `scripts/run_full_batch.sh:54-55`). Control-M runs it in folder `DAILY-TransactionBackup` between CLOSEFIL and WAITSTEP (`app/scheduler/CardDemo.controlm:8-13`). CA-7 does not run it (see `SCHED-CA7.md`).
-- **Preconditions:** CICS has closed file `TRANSACT` (run CLOSEFIL first; see DEF-JTBKP-002); the GDG base `AWS.M2.CARDDEMO.TRANSACT.BKUP` exists (DEFGDGB, `app/jcl/DEFGDGB.jcl:24-29`); the procedure library `AWS.M2.CARDDEMO.PROC` holds `REPROC` and `AWS.M2.CARDDEMO.CNTL` holds member `REPROCT`; volume `AWSHJ1` exists. On the very first run the cluster must exist, or `STEP05R` fails (ERR-JTBKP-002).
+- **Preconditions:** CICS has closed file `TRANSACT` (run CLOSEFIL first; see DEF-JTBKP-002); the GDG base `AWS.M2.CARDDEMO.TRANSACT.BKUP` exists (DEFGDGB, `app/jcl/DEFGDGB.jcl:24-29`); the procedure library `AWS.M2.CARDDEMO.PROC` holds `REPROC` and `AWS.M2.CARDDEMO.CNTL` holds member `REPROCT`; volume `AWSHJ1` exists. The cluster must exist even on the very first run: otherwise the job ends with a JCL error when `STEP05R` is allocated and no step runs (ERR-JTBKP-002).
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). The procedure library is set by `//JOBLIB JCLLIB ORDER=('AWS.M2.CARDDEMO.PROC')` (`:19`). The only symbolic parameter is `CNTLLIB=AWS.M2.CARDDEMO.CNTL` on `STEP05R` (`:23-24`).
 
 ## 4. Interfaces
@@ -147,23 +148,23 @@ In execution order. There is no rollback: each step's change is permanent.
 ## 10. Error handling
 
 #### ERR-JTBKP-001 · The delete runs even when the backup failed
-- **When:** `STEP05R` ends with a return code above 0 without abending (for example 12 because `TRANSACT` does not exist or cannot be opened).
+- **When:** `STEP05R` ends with a return code above 0 without abending (for example 12 when `REPRO` cannot open or read the existing cluster, as in DEF-JTBKP-005). A cluster that does not exist at all does not lead here: allocation of `PRC001.FILEIN` fails with a JCL error and no step runs (ERR-JTBKP-002).
 - **Then:** `STEP05` still runs, because its `EXEC` has no `COND`, and deletes the cluster. See DEF-JTBKP-001.
 - **Source:** `:37`
 - **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### ERR-JTBKP-002 · The define is skipped after any return code above 4
 - **When:** any earlier step (`STEP05R.PRC001` or `STEP05`) ends with a return code above 4.
-- **Then:** `COND=(4,LT)` bypasses `STEP10` (the test "4 is less than the return code" is true), so no new cluster is defined. `STEP05` reaches this only with a result above 8, because of its resets. An abend in any step skips the remaining steps (JES default). On the first run, before any `TRANSACT` exists, `STEP05R` fails and `STEP10` is skipped, so TRANBKP cannot create the file from nothing; TRANFILE does that.
+- **Then:** `COND=(4,LT)` bypasses `STEP10` (the test "4 is less than the return code" is true), so no new cluster is defined. `STEP05` reaches this only with a result above 8, because of its resets. An abend in any step skips the remaining steps (JES default). On the very first run, before any `TRANSACT` exists, the job does not get that far: `PRC001.FILEIN` names the cluster with `DISP=SHR` (`:26-27`), so allocation of `STEP05R` fails with a JCL error (data set not found) and no step runs, `STEP05` and `STEP10` included; nothing is deleted or defined. TRANBKP therefore cannot create the file from nothing; TRANFILE does that.
 - **Restart:** the runbook describes recovery: do not run COMBTRAN, define the cluster with the `STEP10` statements, `REPRO` the last good generation into it, fix the cause and rerun TRANBKP (`docs/runbooks/batch-cycle-restart.md:123-137`).
-- **Source:** `:51`
-- **Fidelity:** must-preserve (no empty master after a failed backup is the intent) · **Confidence:** platform-inferred
+- **Source:** `:26-27, 51`
+- **Fidelity:** must-preserve (no empty master after a failed backup is the intent) · **Confidence:** platform-inferred (high)
 
 ## 11. Interactions
 
 - **Upstream:** CLOSEFIL closes `TRANSACT` in CICS (Control-M `app/scheduler/CardDemo.controlm:3-13`). In the cycle, INTCALC runs before the backup role (`./README.md:228-229`).
 - **Downstream:** POSTTRAN (`CBTRN02C`) opens the empty `TRANSACT` for output (`docs/runbooks/batch-cycle-restart.md:34-36`); COMBTRAN reads `TRANSACT.BKUP(0)`, the generation this job created, and reloads `TRANSACT`; TRANIDX rebuilds the alternate index that `STEP05` deleted; the online programs see an empty `TRANSACT` until COMBTRAN reloads it.
-- **Shared data:** TRANREPT also writes `TRANSACT.BKUP(+1)` (its own `STEP05R`), so a TRANREPT run between TRANBKP and COMBTRAN changes what `TRANSACT.BKUP(0)` means for COMBTRAN.
+- **Shared data:** TRANREPT also writes `TRANSACT.BKUP(+1)`: the TRANREPT job in its step `STEP05R` (`app/jcl/TRANREPT.jcl:23-33`) and the TRANREPT procedure, which CORPT00C submits from CICS, in its step `STEP01R` (`app/proc/TRANREPT.prc:21-31`). So a TRANREPT run between TRANBKP and COMBTRAN changes what `TRANSACT.BKUP(0)` means for COMBTRAN.
 
 ## 12. Numeric, date and format details
 
@@ -175,8 +176,8 @@ In execution order. There is no rollback: each step's change is permanent.
 ## 13. Known defects and oddities
 
 #### DEF-JTBKP-001 · A failed backup leaves no transaction master at all
-- When `STEP05R` ends with a return code above 4 without abending, `STEP05` deletes `TRANSACT` anyway (ERR-JTBKP-001) and `STEP10` is skipped (ERR-JTBKP-002). The file no longer exists and the generation that `STEP05R` cataloged may be incomplete. The posted transactions survive only in earlier backup generations. The restart runbook describes this case (`docs/runbooks/batch-cycle-restart.md:128-130`).
-- **Source:** `:23, 37, 51`
+- When `STEP05R` ends with a return code above 4 without abending, `STEP05` deletes `TRANSACT` anyway (ERR-JTBKP-001) and `STEP10` is skipped (ERR-JTBKP-002). The file no longer exists and the generation that `STEP05R` cataloged may be incomplete. In the backup role (after INTCALC) the day's posted transactions existed only in `TRANSACT`, so that possibly incomplete generation is now their only copy; earlier generations hold earlier states. The restart runbook describes this case (`docs/runbooks/batch-cycle-restart.md:128-130`) and has the operator restore the generation before it, `TRANSACT.BKUP(-1)` (`docs/runbooks/batch-cycle-restart.md:133-136`), which brings back the earlier state without the day's postings: they are lost unless they are salvaged from the partial generation or posted again.
+- **Source:** `:23, 37, 51`, `docs/runbooks/batch-cycle-restart.md:128-136`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JTBKP-002 · The return-code reset hides a failed delete
@@ -185,14 +186,19 @@ In execution order. There is no rollback: each step's change is permanent.
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JTBKP-003 · Catalog and JCL disagree on the backup GDG
-- DEFGDGB defines `TRANSACT.BKUP` with `SCRATCH` (`app/jcl/DEFGDGB.jcl:25-27`), but the 09/01/22 catalog shows `NOSCRATCH` and a last alter date of 2022.242 (`app/catlg/LISTCAT.txt:1635-1637`), and generations `G0001V00` to `G0071V00` still listed after they rolled off the base. The installation was altered by hand after DEFGDGB ran; rolled-off backups are kept rather than scratched.
-- **Source:** `app/jcl/DEFGDGB.jcl:24-29`, `app/catlg/LISTCAT.txt:1631-1643`
-- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
+- DEFGDGB defines `TRANSACT.BKUP` with `SCRATCH` (`app/jcl/DEFGDGB.jcl:25-27`), but the 09/01/22 catalog shows `NOSCRATCH` (`app/catlg/LISTCAT.txt:1635-1637`), and generations `G0001V00` to `G0071V00` are still cataloged with no GDG association after they rolled off the base (`app/catlg/LISTCAT.txt:1733-2903`). So the base was most likely changed to `NOSCRATCH` after DEFGDGB ran (for example by an `ALTER`, or by a different definition), and rolled-off backups are kept rather than scratched. The last alter date 2022.242 alone does not show it: `SYSTRAN`, `TRANSACT.COMBINED` and `DALYREJS` carry the same date and are still `SCRATCH` (`app/catlg/LISTCAT.txt:1104, 2923, 688`).
+- **Source:** `app/jcl/DEFGDGB.jcl:24-29`, `app/catlg/LISTCAT.txt:1631-1643, 1733-2903`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (catalog content); platform-inferred (how the attribute changed)
 
 #### DEF-JTBKP-004 · One job name for two purposes
 - The README sequence runs TRANBKP once as "Creates Transaction database" in the data refresh and once as "Backup Transaction database" after INTCALC (`./README.md:220, 229`). The README component table calls it "Refresh Transaction Master" (`./README.md:368`). The job always does both things (backup, then reset); in the refresh role the backup is a by-product that uses one of the five generations.
 - **Source:** `:1, 23-68`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
+
+#### DEF-JTBKP-005 · A defined but never loaded transaction master cannot be backed up
+- `STEP10` leaves `TRANSACT` defined and empty, and it stays in that never-loaded state until a program writes a record into it. A VSAM cluster in that state cannot be opened for input, so when TRANBKP runs against it (TRANBKP run twice with no POSTTRAN in between, or a POSTTRAN that wrote no transaction), `REPRO` most likely fails at open (VSAM open return code 160, IDCAMS condition code 12). The empty generation is still cataloged (SE-JTBKP-001), `STEP05` deletes the cluster (ERR-JTBKP-001) and `STEP10` is skipped (ERR-JTBKP-002), so the job ends with no transaction master and the next POSTTRAN fails at allocation of `TRANFILE`. No transaction is lost, but one of the five generations is used by an empty backup.
+- **Source:** `:23-33, 37, 51`, `app/ctl/REPROCT.ctl:15`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (medium-low, about 50%: depends on the VSAM handling of an unloaded cluster and on the REPRO error path)
 
 ## 14. Open questions
 
@@ -210,6 +216,6 @@ After a successful run (return code 0): the new backup generation contains exact
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card and JOBLIB) | 1-19 | §3 |
-| `STEP05R` | 23-33 | SE-JTBKP-001, NUM-JTBKP-001, DEF-JTBKP-001 |
-| `STEP05` | 37-46 | SE-JTBKP-002, SE-JTBKP-003, ERR-JTBKP-001, DEF-JTBKP-002 |
-| `STEP10` | 51-68 | SE-JTBKP-004, ERR-JTBKP-002 |
+| `STEP05R` | 23-33 | SE-JTBKP-001, NUM-JTBKP-001, ERR-JTBKP-002, DEF-JTBKP-001, DEF-JTBKP-005 |
+| `STEP05` | 37-46 | SE-JTBKP-002, SE-JTBKP-003, ERR-JTBKP-001, DEF-JTBKP-002, DEF-JTBKP-005 |
+| `STEP10` | 51-68 | SE-JTBKP-004, ERR-JTBKP-002, DEF-JTBKP-005 |

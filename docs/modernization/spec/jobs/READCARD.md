@@ -16,7 +16,7 @@ sources:
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "366-367"}, {type: manual, job: READCARD}]
 programs: [CBACT02C]
 data_stores:
-  - {dd: STEP05.CARDFILE, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, access: [read-sequential]}
+  - {dd: STEP05.CARDFILE, dataset: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, entity: ENT-CARD, access: [read-sequential]}
 invoked_by: [CA-7, operator]
 spec_status: draft
 ---
@@ -57,7 +57,7 @@ The DD name matches the program's `SELECT ... ASSIGN TO` clause (`app/cbl/CBACT0
 
 ## 5. Data used
 
-- The card master record (no entity in `entities.md`; layout `app/cpy/CVACT02Y.cpy`), 150 bytes, read in ascending key order; nothing is updated.
+- ENT-CARD, whole 150-byte records (layout `app/cpy/CVACT02Y.cpy`), read in ascending key order; nothing is updated.
 - Catalog state on 09/01/22: the data component has `KEYLEN 16`, `MAXLRECL 150`, `SHROPTNS(2,3)` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:202-207`), so a run on that file prints 50 records.
 
 ## 6. Processing flow
@@ -87,7 +87,7 @@ None. The job reads and prints; it makes no decision about the data.
 
 ## 8. Validations and messages
 
-None in the job. The program's own messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBACT02C` and `END OF EXECUTION OF PROGRAM CBACT02C` around the records, and `ERROR OPENING CARDFILE`, `ERROR READING CARDFILE` or `ERROR CLOSING CARDFILE` followed by the file status on an error (ERR-JRCARD-001).
+None in the job. The program's own messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBACT02C` and `END OF EXECUTION OF PROGRAM CBACT02C` around the records, and `ERROR OPENING CARDFILE`, `ERROR READING CARDFILE` or `ERROR CLOSING CARDFILE` followed on an error by the literal text `FILE STATUS IS: NNNN` with the status as four characters appended (`FILE STATUS IS: NNNN0035` for status `35`) and `ABENDING PROGRAM` (`app/cbl/CBACT02C.cbl:110, 129, 147, 154-174`); see ERR-JRCARD-001.
 
 ## 9. Side effects
 
@@ -97,9 +97,9 @@ None. The job opens its only file for input and writes nothing except the job lo
 
 #### ERR-JRCARD-001 · I/O errors abend the step
 - **When:** opening, reading or closing `CARDFILE` returns a status other than success (or end of file on the read), for example because the file is missing or not loaded.
-- **Then:** the program displays the error message and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBACT02C.cbl:154-158`); the step ends with user abend U999. Nothing has been changed, so a rerun is safe. In CA-7 an abend stops the chain at this job, so the later readers, WAITSTEP and OPENFIL do not run until the operator intervenes.
+- **Then:** the program displays the error message and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBACT02C.cbl:154-158`); the step ends with user abend U999. Nothing has been changed, so a rerun is safe. In CA-7 an abend ends this reader path: CA-7 does not trigger READCUST, READXREF or this path's WAITSTEP. The other paths that the same CLOSEFIL completion starts still reach WAITSTEP, which triggers OPENFIL (DEF-JCA7-002), so the abend does not by itself keep the CICS files closed.
 - **Source:** `:22-26`
-- **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed (program); platform-inferred (CA-7 does not trigger successors of an abended job)
+- **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed (program); platform-inferred (CA-7 does not trigger successors of an abended job; schedule ID inheritance)
 
 ## 11. Interactions
 
@@ -114,7 +114,7 @@ None. The job prints records as stored; it does not interpret any field.
 ## 13. Known defects and oddities
 
 #### DEF-JRCARD-001 · [security] Every card record is printed to `SYSOUT`
-- The program displays each whole record, which includes the card number, the card verification value (CVV), the embossed name and the expiry date (`docs/security/data-handling.md:88`), to the job log. Anyone who can browse the job output sees the whole file. The repository's guidance is not to run the READ* jobs against real data (`docs/security/data-handling.md:94`).
+- The program displays each whole record, which includes the card number and the card verification value (CVV) (`docs/security/data-handling.md:88`) as well as the account ID, the embossed name, the expiry date and the active flag (`app/cpy/CVACT02Y.cpy:5-10`), to the job log. Anyone who can browse the job output sees the whole file. The repository's guidance is not to run the READ* jobs against real data (`docs/security/data-handling.md:94`).
 - **Status:** open · **Fidelity:** defect-decide (the target must not print these fields) · **Confidence:** reviewed
 
 #### DEF-JRCARD-002 · The job has no output except the log

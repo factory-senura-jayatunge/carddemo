@@ -9,19 +9,19 @@ sources:
   - {path: app/jcl/READACCT.jcl, sha256: 0965badda9c8, role: job}
   - {path: app/cbl/CBACT01C.cbl, sha256: efa324059416, role: program, lines: "29-85, 290-318, 409-413"}
   - {path: app/cpy/CVACT01Y.cpy, sha256: 81a08bad15af, role: record-layout}
-  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "334-367"}
+  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "43, 70, 334-367"}
   - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "83-94"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "632-637"}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "339-340"}, {type: manual, job: READACCT}]
 programs: [IEFBR14, CBACT01C]
 data_stores:
-  - {dd: PREDEL.DD01, dataset: AWS.M2.CARDDEMO.ACCTDATA.PSCOMP, entity: ENT-ACCOUNT, access: [delete]}
-  - {dd: PREDEL.DD02, dataset: AWS.M2.CARDDEMO.ACCTDATA.ARRYPS, entity: ENT-ACCOUNT, access: [delete]}
-  - {dd: PREDEL.DD03, dataset: AWS.M2.CARDDEMO.ACCTDATA.VBPS, entity: ENT-ACCOUNT, access: [delete]}
+  - {dd: PREDEL.DD01, dataset: AWS.M2.CARDDEMO.ACCTDATA.PSCOMP, entity: ENT-ACCT-EXTRACT, access: [delete]}
+  - {dd: PREDEL.DD02, dataset: AWS.M2.CARDDEMO.ACCTDATA.ARRYPS, entity: ENT-ACCT-EXTRACT, access: [delete]}
+  - {dd: PREDEL.DD03, dataset: AWS.M2.CARDDEMO.ACCTDATA.VBPS, entity: ENT-ACCT-EXTRACT, access: [delete]}
   - {dd: STEP05.ACCTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, entity: ENT-ACCOUNT, access: [read-sequential]}
-  - {dd: STEP05.OUTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.PSCOMP, entity: ENT-ACCOUNT, access: [create, write-sequential]}
-  - {dd: STEP05.ARRYFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.ARRYPS, entity: ENT-ACCOUNT, access: [create, write-sequential]}
-  - {dd: STEP05.VBRCFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VBPS, entity: ENT-ACCOUNT, access: [create, write-sequential]}
+  - {dd: STEP05.OUTFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.PSCOMP, entity: ENT-ACCT-EXTRACT, access: [create, write-sequential]}
+  - {dd: STEP05.ARRYFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.ARRYPS, entity: ENT-ACCT-EXTRACT, access: [create, write-sequential]}
+  - {dd: STEP05.VBRCFILE, dataset: AWS.M2.CARDDEMO.ACCTDATA.VBPS, entity: ENT-ACCT-EXTRACT, access: [create, write-sequential]}
 invoked_by: [CA-7, operator]
 spec_status: draft
 ---
@@ -30,7 +30,7 @@ spec_status: draft
 
 ## 1. Summary
 
-READACCT runs CBACT01C over the account master to show that the file is readable and to demonstrate three output record formats. `PREDEL` deletes the three output files of the previous run; `STEP05` reads every record of `AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS` in key order, prints each account to `SYSOUT`, and writes a fixed 107-byte copy with a packed field (`ACCTDATA.PSCOMP`), a fixed 110-byte record with a repeating group (`ACCTDATA.ARRYPS`) and two variable-length records per account (`ACCTDATA.VBPS`). No other job or program reads the three outputs. CA-7 runs it as the first of four diagnostic readers after CLOSEFIL. The job itself has no business logic; what the program puts into each output record belongs to the CBACT01C program spec.
+READACCT runs CBACT01C over the account master to show that the file is readable and to demonstrate three output record formats. `PREDEL` deletes the three output files of the previous run; `STEP05` reads every record of `AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS` in key order, prints each account to `SYSOUT`, and writes a fixed 107-byte copy with a packed field (`ACCTDATA.PSCOMP`), a fixed 110-byte record with a repeating group (`ACCTDATA.ARRYPS`) and two variable-length records per account (`ACCTDATA.VBPS`). No other job or program reads the three outputs. CA-7 runs it as the first of four diagnostic readers after CLOSEFIL; the same CLOSEFIL completion also starts the chain that leads to POSTTRAN, so the read may overlap the posting run that updates the account master (DEF-JRACCT-005). The job itself has no business logic; what the program puts into each output record belongs to the CBACT01C program spec.
 
 ## 2. Rules at a glance
 
@@ -46,11 +46,12 @@ The job has no business rules. Its items:
 | DEF-JRACCT-002 | [security] Every account record is printed to `SYSOUT`. |
 | DEF-JRACCT-003 | The program never closes its three output files. |
 | DEF-JRACCT-004 | Nothing reads the three output files. |
+| DEF-JRACCT-005 | In CA-7 the read can run while POSTTRAN updates the account master. |
 
 ## 3. Actors and triggers
 
 - **Trigger:** CA-7 submits it when CLOSEFIL ends (`app/scheduler/CardDemo.ca7:339-340`), and it triggers READCARD in turn (`app/scheduler/CardDemo.ca7:366-367`). The chain continues with READCUST, READXREF, WAITSTEP and OPENFIL. Control-M, the README job tables and the demo scripts do not run it. It can be submitted by hand.
-- **Preconditions:** the account master is loaded (ACCTFILE). The job opens it for input with `DISP=SHR`, so CICS may keep it open; CA-7 runs CLOSEFIL first anyway.
+- **Preconditions:** the account master is loaded (ACCTFILE). The job opens it for input with `DISP=SHR`, so CICS may keep it open. In CA-7, CLOSEFIL runs first and closes the CICS files, but the same CLOSEFIL completion also triggers CBPAUP0J and through it POSTTRAN, which updates the account master; nothing orders READACCT before or after POSTTRAN (DEF-JRACCT-005). The load library must also hold the assembler routine COBDATFT, which CBACT01C calls once per account to reformat the reissue date (`app/cbl/CBACT01C.cbl:232`).
 - **Job card:** `REGION=8M,CLASS=A,MSGCLASS=H,NOTIFY=&SYSUID` (`:1-2`). Line 1 also carries `JOB05427` in columns 73-80, which JCL ignores (a JES job number pasted from a job log). No parameters.
 
 ## 4. Interfaces
@@ -60,7 +61,7 @@ The job has no business rules. Its items:
 | `PREDEL` | IEFBR14 | `DD01` | `AWS.M2.CARDDEMO.ACCTDATA.PSCOMP` | `(MOD,DELETE,DELETE)` | delete if present | `:23-24` |
 | `PREDEL` | IEFBR14 | `DD02` | `AWS.M2.CARDDEMO.ACCTDATA.ARRYPS` | `(MOD,DELETE,DELETE)` | delete if present | `:25-26` |
 | `PREDEL` | IEFBR14 | `DD03` | `AWS.M2.CARDDEMO.ACCTDATA.VBPS` | `(MOD,DELETE,DELETE)` | delete if present | `:27-28` |
-| `STEP05` | CBACT01C | `STEPLIB` | `AWS.M2.CARDDEMO.LOADLIB` | `SHR` | program library | `:33-34` |
+| `STEP05` | CBACT01C | `STEPLIB` | `AWS.M2.CARDDEMO.LOADLIB` | `SHR` | program library; also holds the called routine COBDATFT | `:33-34` |
 | `STEP05` | CBACT01C | `ACCTFILE` | `AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS` | `SHR` | input, KSDS read sequentially in key order | `:35-36` |
 | `STEP05` | CBACT01C | `OUTFILE` | `AWS.M2.CARDDEMO.ACCTDATA.PSCOMP` | `(NEW,CATLG,DELETE)` | output, `LRECL=107,RECFM=FB`, `UNIT=SYSAD`, `SPACE=(CYL,(1,2),RLSE)` | `:37-40` |
 | `STEP05` | CBACT01C | `ARRYFILE` | `AWS.M2.CARDDEMO.ACCTDATA.ARRYPS` | `(NEW,CATLG,DELETE)` | output, `LRECL=110,RECFM=FB`, same unit and space | `:41-44` |
@@ -73,7 +74,7 @@ The DD names match the program's `SELECT ... ASSIGN TO` clauses (`app/cbl/CBACT0
 ## 5. Data used
 
 - ENT-ACCOUNT, whole 300-byte records read from the KSDS in ascending `ACCT-ID` order (layout `app/cpy/CVACT01Y.cpy`). The program reads; it does not update.
-- The three outputs are derived account records; their layouts are in the program: `OUT-ACCT-REC`, 107 bytes (`app/cbl/CBACT01C.cbl:57-69`), `ARR-ARRAY-REC`, 110 bytes (`app/cbl/CBACT01C.cbl:72-78`), and `VBR-REC`, 10 to 80 bytes (`app/cbl/CBACT01C.cbl:80-85`). The `LRECL` values in the JCL match them: 107 and 110 for the fixed files, 84 (80 plus the 4-byte record descriptor word) for the variable file.
+- The three outputs are ENT-ACCT-EXTRACT, derived from the account records; their layouts are in the program: `OUT-ACCT-REC`, 107 bytes (`app/cbl/CBACT01C.cbl:57-69`), `ARR-ARRAY-REC`, 110 bytes (`app/cbl/CBACT01C.cbl:72-78`), and `VBR-REC`, 10 to 80 bytes (`app/cbl/CBACT01C.cbl:80-85`). The `LRECL` values in the JCL match them: 107 and 110 for the fixed files, 84 (80 plus the 4-byte record descriptor word) for the variable file.
 
 ## 6. Processing flow
 
@@ -103,7 +104,7 @@ None in the job. The values the program moves into the output records, including
 
 ## 8. Validations and messages
 
-None in the job. The program's messages (`ERROR OPENING ACCTFILE`, `ERROR READING ACCOUNT FILE`, `ACCOUNT FILE WRITE STATUS IS:` and others) go to `SYSOUT`; see ERR-JRACCT-001.
+None in the job. The program's messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBACT01C` and `END OF EXECUTION OF PROGRAM CBACT01C` around the records (`app/cbl/CBACT01C.cbl:141, 158`), and on an error one of `ERROR OPENING ACCTFILE`, `ERROR READING ACCOUNT FILE`, `ERROR CLOSING ACCOUNT FILE`, `ERROR OPENING OUTFILE`, `ERROR OPENING ARRAYFILE` or `ERROR OPENING VBRC FILE` (the last three with the file status appended) or `ACCOUNT FILE WRITE STATUS IS:` with the status, then the literal text `FILE STATUS IS: NNNN` followed by the status as four characters (`FILE STATUS IS: NNNN0035` for status `35`), then `ABENDING PROGRAM` (`app/cbl/CBACT01C.cbl:192, 249, 271, 297, 312, 331, 348, 366, 384, 402, 409-413, 416-429`); see ERR-JRACCT-001.
 
 ## 9. Side effects
 
@@ -120,14 +121,14 @@ None in the job. The program's messages (`ERROR OPENING ACCTFILE`, `ERROR READIN
 ## 10. Error handling
 
 #### ERR-JRACCT-001 · I/O errors abend the step
-- **When:** opening, reading or closing `ACCTFILE`, or opening or writing an output file, returns a status other than success (or end of file on the read).
+- **When:** opening or closing `ACCTFILE`, or opening an output file, returns a status other than `00`; reading `ACCTFILE` returns a status other than `00` or `10` (end of file); or writing an output record returns a status other than `00` or `10`.
 - **Then:** the program displays the error and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBACT01C.cbl:409-413`), so the step ends with user abend U999. The three new outputs are deleted by their abnormal disposition; the account master is unchanged. The step is the last one, so nothing else is skipped.
-- **Source:** `:32, 37-48`
+- **Source:** `:32, 37-48`; `app/cbl/CBACT01C.cbl:165-198, 245-318, 320-407, 409-413`
 - **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed
 
 ## 11. Interactions
 
-- **Upstream:** ACCTFILE loads the account master; in CA-7, CLOSEFIL precedes this job.
+- **Upstream:** ACCTFILE loads the account master; in CA-7, CLOSEFIL precedes this job and, in the same run, starts CBPAUP0J and POSTTRAN, which may update the account master while this job reads it (DEF-JRACCT-005).
 - **Downstream:** READCARD (CA-7 trigger). No job or program reads `ACCTDATA.PSCOMP`, `ACCTDATA.ARRYPS` or `ACCTDATA.VBPS`; the names appear only in this JCL (DEF-JRACCT-004).
 - **Local runner:** `tools/carddemo.py:632-637` emulates the job with the same DD names and the sample account file.
 
@@ -135,16 +136,17 @@ None in the job. The program's messages (`ERROR OPENING ACCTFILE`, `ERROR READIN
 
 #### NUM-JRACCT-001 · Output record formats
 - `ACCTDATA.PSCOMP` is fixed 107: one of its amount fields (`OUT-ACCT-CURR-CYC-DEBIT`) is packed decimal, the others are zoned. `ACCTDATA.ARRYPS` is fixed 110: an 11-digit account ID, five repetitions of a zoned and a packed amount, and 4 bytes of filler. `ACCTDATA.VBPS` is variable-blocked with a 4-byte record descriptor word in front of each 12- or 39-byte record. A target that produces these files must keep the packed fields and the record descriptor words, or say that it replaces them with a different format.
+- **Source:** `app/cbl/CBACT01C.cbl:57-85, 123-130`
 - **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 13. Known defects and oddities
 
 #### DEF-JRACCT-001 · `UNIT=SYSAD` instead of `SYSDA`
 - All three output DDs ask for unit `SYSAD` (`:40`, `:44`, `:48`). Without such a unit, allocation of `STEP05` fails with a JCL error and the program does not run; with SMS-managed storage the unit may be ignored. DUSRSECJ and ESDSRRDS have the same value.
-- **Status:** open · **Fidelity:** defect-fix · **Confidence:** platform-inferred
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JRACCT-002 · [security] Account records printed to `SYSOUT`
-- The program displays every account record, balances and credit limits included, to the job log (`docs/security/data-handling.md:90`). Anyone who can browse the job output sees the whole account master. The repository's guidance is not to run the READ* jobs against real data (`docs/security/data-handling.md:94`).
+- The program displays every account record, balances and credit limits included, to the job log (`docs/security/data-handling.md:90`). Each account appears three times, in this order: as a list of 11 labelled fields and a separator line (`app/cbl/CBACT01C.cbl:200-212`), as the two variable records `VBRC-REC1:` and `VBRC-REC2:` (`app/cbl/CBACT01C.cbl:286-287`), and as the whole 300-byte record (`app/cbl/CBACT01C.cbl:151`), so the 50 sample accounts give 750 lines between the start and end messages. Anyone who can browse the job output sees the whole account master. The repository's guidance is not to run the READ* jobs against real data (`docs/security/data-handling.md:94`).
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-JRACCT-003 · The output files are never closed
@@ -154,6 +156,11 @@ None in the job. The program's messages (`ERROR OPENING ACCTFILE`, `ERROR READIN
 #### DEF-JRACCT-004 · Nothing reads the outputs
 - The three files demonstrate a packed field, a repeating group and variable-length records; no job, program or schedule uses them.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (repository-wide search for the dataset names)
+
+#### DEF-JRACCT-005 · In CA-7 the read can overlap posting
+- The CLOSEFIL completion under SCHID 030 that triggers READACCT (`app/scheduler/CardDemo.ca7:340`) also triggers CBPAUP0J (`app/scheduler/CardDemo.ca7:43`), and CBPAUP0J's completion triggers POSTTRAN (`app/scheduler/CardDemo.ca7:70`); the triggered jobs inherit the schedule ID, so both paths belong to the same run (DEF-JCA7-002, DEF-JCA7-006). Nothing orders READACCT before or after POSTTRAN. POSTTRAN opens the same account master for update and rewrites the accounts it posts to (`app/cbl/CBTRN02C.cbl:311, 555`). Both jobs allocate it with `DISP=SHR` (`:35-36`, `app/jcl/POSTTRAN.jcl:39-40`), so z/OS does not make one wait for the other, and the cluster's `SHROPTNS(2,3)` (`app/catlg/LISTCAT.txt:61`) lets one job update while others read, without read integrity. Depending on timing, READACCT prints and extracts the balances from before posting, after it, or a mix of both.
+- **Source:** `:35-36`; `app/scheduler/CardDemo.ca7:43, 70, 340`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred, medium (CA-7 schedule ID inheritance; VSAM share option 2 without read integrity)
 
 ## 14. Open questions
 
@@ -171,4 +178,4 @@ After a successful run (return code 0), the account master is unchanged, and the
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
 | `PREDEL` | 22-28 | SE-JRACCT-001 |
-| `STEP05` | 32-50 | FLOW-JRACCT-001, SE-JRACCT-002, ERR-JRACCT-001, NUM-JRACCT-001, DEF-JRACCT-001, DEF-JRACCT-002, DEF-JRACCT-003, DEF-JRACCT-004 |
+| `STEP05` | 32-50 | FLOW-JRACCT-001, SE-JRACCT-002, ERR-JRACCT-001, NUM-JRACCT-001, DEF-JRACCT-001, DEF-JRACCT-002, DEF-JRACCT-003, DEF-JRACCT-004, DEF-JRACCT-005 |

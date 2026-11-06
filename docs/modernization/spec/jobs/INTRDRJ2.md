@@ -89,7 +89,7 @@ None. No input is checked; IDCAMS writes its own messages to `SYSPRINT`.
 
 #### ERR-JIRD2-001 · Failures end the job, nothing reacts
 - **When:** the `REPRO` fails, or `IN` or `OUT` cannot be allocated.
-- **Then:** the job ends with the IDCAMS condition code (for example 12) or a JCL error. No later step or job checks it: INTRDRJ1 has already ended when INTRDRJ2 runs, and no schedule follows it. Restart means resubmitting the job; the copy is repeatable.
+- **Then:** the job ends with the IDCAMS condition code (for example 12) or a JCL error. No later step or job checks it: INTRDRJ1 has normally ended when INTRDRJ2 runs (JES does not guarantee that order, FLOW-JIRD1-001), it does not wait for INTRDRJ2 in any case, and no schedule follows it. Restart means resubmitting the job; the copy is repeatable.
 - **Source:** `:7, 12`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 

@@ -102,9 +102,9 @@ None in the job. Messages from TSO and the exec go to `SYSTSPRT`.
 
 #### ERR-JPDF-001 · No effective condition, no clean-up before a rerun
 - **When:** the job runs after a failed CREASTMT, or a second time.
-- **Then:** `COND=(0,NE)` tests the return codes of earlier steps of the same job, and there are none, so the step always runs (DEF-JPDF-002). CA-7 triggers TXT2PDF1 only when CREASTMT ends successfully, which is the real guard. If `STATEMNT.PS` is missing, the `INDD` allocation fails with a JCL error and the step does not run. If the PDF dataset still exists from an earlier run, the outcome (overwrite or allocation failure) depends on the exec. IKJEFT1B passes the exec's return code back as the step's return code, so a failure inside the exec can surface only as a non-zero return code, and CA-7 does not then trigger WAITSTEP and OPENFIL.
-- **Source:** `:24-26, 33`
-- **Fidelity:** defect-decide · **Confidence:** platform-inferred
+- **Then:** `COND=(0,NE)` tests the return codes of earlier steps of the same job, and there are none, so the step always runs (DEF-JPDF-002). CA-7 triggers TXT2PDF1 when CREASTMT completes normally (`app/scheduler/CardDemo.ca7:494-495`), which is the real guard. Whether a non-zero return code of CREASTMT counts as normal completion depends on the condition-code test in CREASTMT's CA-7 definition, which the listing does not show; without such a test, only an abend or a JCL error stops the trigger. If `STATEMNT.PS` is missing, the `INDD` allocation fails with a JCL error and the step does not run. If the PDF dataset still exists from an earlier run, the outcome (overwrite or allocation failure) depends on the exec. IKJEFT1B passes the exec's return code back as the step's return code, so a failure inside the exec can surface only as a non-zero return code. CA-7 then holds back WAITSTEP and OPENFIL (`app/scheduler/CardDemo.ca7:521-527`) only if TXT2PDF1's CA-7 definition treats that code as a failure, which is not visible in the repository (Q-JPDF-003).
+- **Source:** `:24-26, 33`, `app/scheduler/CardDemo.ca7:494-495, 521-527`
+- **Fidelity:** defect-decide · **Confidence:** platform-inferred (CA-7 completion and condition-code rules, low-medium)
 
 ## 11. Interactions
 
@@ -136,6 +136,7 @@ None. The job passes the statement lines to the exec without interpreting them.
 | :-- | :-- | :-- |
 | Q-JPDF-001 | Which TXT2PDF version and options does the installation use (page size, font, what `BROWSE Y` does), and must the target reproduce that PDF layout or only deliver the same statement content as PDF? | product owner |
 | Q-JPDF-002 | Should the target keep the PDF after each run, replace it, or archive it per statement cycle? | operations |
+| Q-JPDF-003 | Which condition-code test do the CA-7 definitions of CREASTMT and TXT2PDF1 use, that is, does a non-zero return code stop the triggers to TXT2PDF1 and to WAITSTEP and OPENFIL? | mainframe team, operations |
 
 ## 15. Equivalence contract
 

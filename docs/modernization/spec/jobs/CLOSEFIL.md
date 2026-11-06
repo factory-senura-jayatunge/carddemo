@@ -8,7 +8,7 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/CLOSEFIL.jcl, sha256: 6a9adef38b7b, role: job}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "1-99"}
-  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "18-43, 219-271"}
+  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "18-43, 159-162, 219-271, 300-303, 332-340, 465-468, 529-537"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "4-7, 33-37, 65-68"}
   - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "18-43"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "4-7"}, {type: manual, job: CLOSEFIL}]
@@ -27,7 +27,7 @@ spec_status: draft
 
 ## 1. Summary
 
-CLOSEFIL hands five VSAM files over from the online system to batch. Its only step runs the SDSF batch interface, which issues five MVS `MODIFY` commands to the CICS region `CICSAWSA`; each command asks CICS to close one file (`CEMT SET FIL(...) CLO`). After CICS has closed them, batch jobs can delete, redefine, load or update the files without a sharing conflict. It is the first job of every chain in both schedules and of the README and demo-script sequences. It contains no business logic.
+CLOSEFIL hands five VSAM files over from the online system to batch. Its only step runs the SDSF batch interface, which issues five MVS `MODIFY` commands to the CICS region `CICSAWSA`; each command asks CICS to close one file (`CEMT SET FIL(...) CLO`). After CICS has closed them, batch jobs can delete, redefine, load or update the files without a sharing conflict. It opens most chains in both schedules and the README and demo-script sequences, but not all of them: in CA-7 it is also triggered in the middle of chains, by WAITSTEP and by OPENFIL (section 3), and the Control-M smart folder that runs TRANEXTR has no CLOSEFIL (`app/scheduler/CardDemo.controlm:57-63`). It contains no business logic.
 
 ## 2. Rules at a glance
 
@@ -43,8 +43,8 @@ CLOSEFIL hands five VSAM files over from the online system to batch. Its only st
 ## 3. Actors and triggers
 
 - **Triggers:**
-  - CA-7: job `CLOSEFIL` (`app/scheduler/CardDemo.ca7:18-43`) and two more CA-7 jobs, `CLOSEFIL1` and `CLOSEFIL2`, that run the same member (`app/scheduler/CardDemo.ca7:219-225, 246-252`). CLOSEFIL is also the target of WAITSTEP triggers (`app/scheduler/CardDemo.ca7:302-303, 334-335`). See `SCHED-CA7.md`.
-  - Control-M: first job of the folders `DAILY-TransactionBackup`, `WEEKLY-DisclosureGroupsRefresh` and `MONTHLY-InterestCalculation` (`app/scheduler/CardDemo.controlm:4-7, 33-37, 65-68`). See `SCHED-CONTROLM.md`.
+  - CA-7: job `CLOSEFIL` (`app/scheduler/CardDemo.ca7:18-43`) and two more CA-7 jobs, `CLOSEFIL1` and `CLOSEFIL2`, that run the same member (`app/scheduler/CardDemo.ca7:219-225, 246-252`). CLOSEFIL is also the target of WAITSTEP triggers with SCHID 030 (`app/scheduler/CardDemo.ca7:302-303, 334-335`) and of an OPENFIL trigger with SCHID 031 (`app/scheduler/CardDemo.ca7:531-532`). A trigger fires only when its job runs under that schedule ID, and CLOSEFIL then runs under the same ID: under 030 it triggers CBPAUP0J, TRANTYPE, READACCT and CREASTMT, under 031 PRTCATBL (`app/scheduler/CardDemo.ca7:43, 159-162, 337-340, 465-468, 534-537`). `CLOSEFIL1` is triggered only under 031 and `CLOSEFIL2` only under 032 (`app/scheduler/CardDemo.ca7:216-217`). See `SCHED-CA7.md` (FLOW-JCA7-006).
+  - Control-M: first job of the folders `DAILY-TransactionBackup`, `WEEKLY-DisclosureGroupsRefresh` and `MONTHLY-InterestCalculation` (`app/scheduler/CardDemo.controlm:4-7, 33-37, 65-68`); the MNTTRDB2 folder and the TRANEXTR smart folder have none (`app/scheduler/CardDemo.controlm:26-31, 57-63`). See `SCHED-CONTROLM.md`.
   - By hand: README initialisation step 2 (`./README.md:153`), demo script job 1 (`scripts/run_full_batch.sh:12-14`), batch cycle step 1 (`docs/runbooks/batch-cycle-restart.md:13`).
 - **Preconditions:** the CICS region is called `CICSAWSA` and is up; the submitting user may issue MVS `MODIFY` commands through SDSF (`docs/runbooks/cics-vsam-files.md:54-56`).
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters.
@@ -100,7 +100,7 @@ None. The job checks nothing itself; CICS writes its responses to the console an
 - **Fidelity:** incidental (mechanism) · **Confidence:** reviewed
 
 #### SE-JCLOSE-001 · CICS closes the five files
-- **What:** for each command, CICS closes the named file. A file that a running task is using is closed when that task has finished with it (`docs/runbooks/cics-vsam-files.md:57-58`). While closed, online transactions that use the file fail with a "not open" or "disabled" condition (`docs/runbooks/cics-vsam-files.md:39-40`), so sign-on (`USRSEC`), account, card cross-reference and transaction screens are unavailable until OPENFIL runs.
+- **What:** for each command, CICS closes the named file. A file that a running task is using is closed when that task has finished with it (`docs/runbooks/cics-vsam-files.md:57-58`). A file closed by command is also left UNENABLED, and CICS does not reopen an UNENABLED file at its first use despite `OPENTIME(FIRSTREF)`. Online transactions that use the file then fail with a "not open" condition (`docs/runbooks/cics-vsam-files.md:39-40`), so sign-on (`USRSEC`), account, card cross-reference and transaction screens are unavailable until OPENFIL runs (SE-JOPEN-001).
 - **Effect on batch:** with the files closed in CICS, batch jobs can open them for update, or delete and redefine them, under `SHAREOPTIONS(2 3)` (`docs/runbooks/cics-vsam-files.md:3-6`).
 - **Source:** `:26-30`, `app/csd/CARDDEMO.CSD:1-12, 37-49, 63-99`
 - **Fidelity:** must-preserve (the target must keep batch updates and online access from overlapping) · **Confidence:** platform-inferred
@@ -137,9 +137,9 @@ None. The job has no data fields.
 - **Status:** open (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCLOSE-003 · Card and customer files stay open
-- The CSD defines eight files (`app/csd/CARDDEMO.CSD:1-99`); CLOSEFIL closes five. `CARDDAT`, `CARDAIX` and `CUSTDAT` stay open, so the reload jobs CARDFILE and CUSTFILE close and reopen them themselves, and CREASTMT reads `CUSTDATA` and `CARDXREF` while CICS may still hold `CUSTDAT` open (`docs/runbooks/cics-vsam-files.md:13-22, 72-73`).
+- The CSD defines eight files (`app/csd/CARDDEMO.CSD:1-99`); CLOSEFIL closes five. `CARDDAT`, `CARDAIX` and `CUSTDAT` stay open, so the reload jobs CARDFILE and CUSTFILE close and reopen them themselves (`docs/runbooks/cics-vsam-files.md:13-22, 72-73`). CREASTMT reads `CUSTDATA` while CICS may still hold `CUSTDAT` open (the cross-reference file it also reads is closed, as `CCXREF`, `:27`). Under `SHAREOPTIONS(2 3)` (`docs/runbooks/cics-vsam-files.md:3-6`) a batch reader may open a cluster that CICS has open for update, but VSAM does not guarantee read integrity to it: CREASTMT can read a customer record while an online update is changing it.
 - **Source:** `:26-30`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (files closed); platform-inferred (read integrity)
 
 ## 14. Open questions
 

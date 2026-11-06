@@ -40,6 +40,7 @@ The job has no business rules. Its items:
 | DEF-JFTP-003 | The header comment says the job receives a file; it sends one. |
 | DEF-JFTP-004 | [security] Plain FTP: login and data cross the network unencrypted unless the site enforces TLS. |
 | DEF-JFTP-005 | Host and remote folder are placeholders. |
+| DEF-JFTP-006 | The step's `REGION=2048K` has no effect: the JOB statement's `REGION=0M` applies to every step. |
 
 ## 3. Actors and triggers
 
@@ -54,7 +55,7 @@ The job has no business rules. Its items:
 | `STEP1` | FTP | `NETRC` | `&SYSUID..NETRC` | `SHR` | user ID and password for the host, read by the FTP client | `:45` |
 | `STEP1` | FTP | `SYSIN` | in-stream | - | host, then FTP subcommands | `:46-53` |
 
-- `EXEC PGM=FTP,REGION=2048K` (`:43`). The commented line `PARM='MY.FTP.SERVER.COM (EXIT TIMEOUT 20'` (`:44`) is not part of the statement.
+- `EXEC PGM=FTP,REGION=2048K` (`:43`); because the JOB statement codes `REGION=0M` (`:2`), the step's value is ignored (DEF-JFTP-006). The commented line `PARM='MY.FTP.SERVER.COM (EXIT TIMEOUT 20'` (`:44`) is not part of the statement.
 - The step has no `OUTPUT` or `SYSPRINT` DD, so the JCL does not say where the client's transfer log goes (Q-JFTP-002).
 - The data set sent is named in the `PUT` subcommand, not on a DD (`:52`), so the FTP client allocates it itself.
 - Return code of the job: the FTP client's return code (ERR-JFTP-001).
@@ -133,6 +134,7 @@ None. The job checks nothing itself; every message comes from the FTP client and
 
 #### NUM-JFTP-001 · ASCII mode translates every byte
 - In `ASCII` mode each record is translated from EBCDIC to ASCII and ends with a line break. Text fields survive; packed-decimal (`COMP-3`) and binary fields are translated byte by byte as if they were characters and are corrupted, and zoned-decimal signs become overpunch letters. The test data set's content is unknown, so whether this matters cannot be decided from the repository.
+- **Source:** `:48, 52`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
 ## 13. Known defects and oddities
@@ -162,6 +164,11 @@ None. The job checks nothing itself; every message comes from the FTP client and
 - **Source:** `:47, 51`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
+#### DEF-JFTP-006 · The step region is overridden by the job region
+- The JOB statement codes `REGION=0M` (`:2`) and `STEP1` codes `REGION=2048K` (`:43`). On z/OS a `REGION` on the JOB statement applies to every step and overrides any `REGION` on an `EXEC` statement, so the FTP client runs with `REGION=0M`, which requests all the private storage available (subject to site exits such as IEFUSI), not 2 MB. The `REGION=2048K` that the comment at `:40-41` refers to is therefore inert. No effect on the transfer itself.
+- **Source:** `:2, 43`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred (JCL precedence of JOB over EXEC `REGION`; high confidence)
+
 ## 14. Open questions
 
 | ID | Question | For |
@@ -177,5 +184,5 @@ There is no data result to reproduce on the mainframe side: the job only reads o
 
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
-| (job card) | 1-2 | §3, DEF-JFTP-001 |
-| `STEP1` | 43-53 | FLOW-JFTP-001, SE-JFTP-001, ERR-JFTP-001, NUM-JFTP-001, DEF-JFTP-002, DEF-JFTP-003, DEF-JFTP-004, DEF-JFTP-005 |
+| (job card) | 1-2 | §3, DEF-JFTP-001, DEF-JFTP-006 |
+| `STEP1` | 43-53 | FLOW-JFTP-001, SE-JFTP-001, ERR-JFTP-001, NUM-JFTP-001, DEF-JFTP-002, DEF-JFTP-003, DEF-JFTP-004, DEF-JFTP-005, DEF-JFTP-006 |

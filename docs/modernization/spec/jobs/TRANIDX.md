@@ -43,7 +43,7 @@ The job has no business rules. Its items:
 | ERR-JTIDX-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
 | NUM-JTIDX-001 | Alternate key and index capacity. |
 | DEF-JTIDX-001 | The job cannot be rerun: it has no delete step. |
-| DEF-JTIDX-002 | The index holds at most 19 transactions per processed timestamp. |
+| DEF-JTIDX-002 | The index holds at most 19 transactions per processed timestamp; extra ones are most likely left out with a warning. |
 | DEF-JTIDX-003 | The job does not close the transaction file in CICS. |
 | DEF-JTIDX-004 | Nothing in the repository reads the index. |
 
@@ -69,7 +69,7 @@ The steps name the cluster, the alternate index and the path by dataset name ins
 ## 5. Data used
 
 - ENT-TRANSACTION (`TRAN-RECORD`, `app/cpy/CVTRA05Y.cpy:4-18`, 350 bytes), read by `BLDINDEX` only for the transaction ID (bytes 1-16) and the processed timestamp `TRAN-PROC-TS` (bytes 305-330, `X(26)`, `YYYY-MM-DD-HH.MM.SS.hh0000`). No record is changed.
-- Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:3541-3720`): the AIX is `UPGRADE` (`app/catlg/LISTCAT.txt:3656`); its data component has `KEYLEN 26`, `AXRKP 304`, `MAXLRECL 350`, `SHROPTNS(1,3)`, `SPANNED`, `NONUNIQKEY` (`app/catlg/LISTCAT.txt:3674-3678`), `REC-TOTAL 39` (`app/catlg/LISTCAT.txt:3680`) and space `CYLINDER` primary 5 secondary 1 (`app/catlg/LISTCAT.txt:3687-3688`), for 311 transactions in the cluster (`app/catlg/LISTCAT.txt:3598`). The path has `UPDATE` (`app/catlg/LISTCAT.txt:3554`). This matches SE-JTIDX-001 and SE-JTIDX-002.
+- Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:3541-3720`): the AIX is `UPGRADE` (`app/catlg/LISTCAT.txt:3656`); its data component has `KEYLEN 26`, `AXRKP 304`, `MAXLRECL 350`, `SHROPTNS(1,3)`, `SPANNED`, `NONUNIQKEY` (`app/catlg/LISTCAT.txt:3674-3678`), `REC-TOTAL 39` (`app/catlg/LISTCAT.txt:3680`) and space `CYLINDER` primary 5 secondary 1 (`app/catlg/LISTCAT.txt:3687-3688`), for 311 transactions in the cluster (`app/catlg/LISTCAT.txt:3598`). The path has `UPDATE` (`app/catlg/LISTCAT.txt:3554`). This matches SE-JTIDX-001 and SE-JTIDX-002 except for `SPANNED` (`app/catlg/LISTCAT.txt:3678`), which `STEP20` does not code (its default is non-spanned), so the catalogued AIX was probably defined by another statement than this job's; low confidence, and it does not change the 350-byte maximum.
 - Sample data: none of its own; the index is built from whatever POSTTRAN or COMBTRAN left in the cluster.
 
 ## 6. Processing flow
@@ -163,9 +163,9 @@ If a later step fails, the earlier ones have happened: an empty AIX may exist wi
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (missing step); platform-inferred (failure)
 
 #### DEF-JTIDX-002 · At most 19 transactions per processed timestamp
-- POSTTRAN sets `TRAN-PROC-TS` from the current time to the hundredth of a second (`app/cbl/CBTRN02C.cbl:694-702`), so a run posts many transactions with the same timestamp; the catalog shows 311 transactions on 39 timestamps (`app/catlg/LISTCAT.txt:3598, 3680`). When more than 19 share one (NUM-JTIDX-001), `BLDINDEX` fails for that timestamp and the job ends with a non-zero return code. The same limit applies to TRANFILE (DEF-JTRAN-006), but only this job builds the index over a posted file.
+- POSTTRAN sets `TRAN-PROC-TS` from the current time to the hundredth of a second (`app/cbl/CBTRN02C.cbl:694-702`), so a run posts many transactions with the same timestamp; the catalog shows 311 transactions on 39 timestamps (`app/catlg/LISTCAT.txt:3598, 3680`). When more than 19 share one (NUM-JTIDX-001), `BLDINDEX` most likely does not fail the build: IDCAMS reports the alternate key whose record overflows with a warning, leaves the extra transaction IDs out of the AIX record and goes on, so `STEP30` ends with a warning return code and lookups by that timestamp silently miss transactions. A later write through the upgrade set that would add a 20th ID to a full record is most likely rejected by VSAM. The same limit applies to TRANFILE (DEF-JTRAN-006), but only this job builds the index over a posted file.
 - **Source:** `:27-30, 52-54`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (the limit: reviewed arithmetic; the overflow behaviour of `BLDINDEX` and of upgrade: medium to low confidence)
 
 #### DEF-JTIDX-003 · No CICS close of the transaction file
 - The job relies on CLOSEFIL having closed `TRANSACT`. If CICS has the cluster open when the AIX is defined, the AIX is not part of the upgrade set CICS opened with, so online writes (bill payments, added transactions) until CICS reopens the file are missing from the index; and `BLDINDEX` may read the cluster while CICS changes it.

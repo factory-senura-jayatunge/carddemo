@@ -43,9 +43,9 @@ The job has no business rules. Its items:
 | SE-JGDGB-004 | Define `TCATBALF.BKUP`, `LIMIT(5) SCRATCH`. |
 | SE-JGDGB-005 | Define `SYSTRAN`, `LIMIT(5) SCRATCH`. |
 | SE-JGDGB-006 | Define `TRANSACT.COMBINED`, `LIMIT(5) SCRATCH`. |
-| ERR-JGDGB-001 | A define that fails with condition code 12 is reset to 0; IDCAMS goes on with the next define. |
+| ERR-JGDGB-001 | A define that fails with condition code 12 resets the step's highest code to 0, hiding earlier failures too; IDCAMS goes on with the next define unless a code reaches 16. |
 | NUM-JGDGB-001 | Five generations per base; the IDCAMS defaults give `NOEMPTY`, `LIFO`, `NOPURGE`, `NOEXTENDED`. |
-| DEF-JGDGB-001 | The reset hides every condition-code-12 failure and leaves an existing base's attributes unchanged. |
+| DEF-JGDGB-001 | The reset hides every condition-code-12 failure, and any earlier failure, and leaves an existing base's attributes unchanged. |
 | DEF-JGDGB-002 | [security] The catalog has `TRANSACT.BKUP` and `TRANSACT.DALY` as `NOSCRATCH`, with 71 and 25 rolled-off generations still cataloged. |
 | DEF-JGDGB-003 | REPTFILE defines `TRANREPT` again with other attributes. |
 | DEF-JGDGB-004 | The daily-rejects base `DALYREJS` is not in this job. |
@@ -155,9 +155,9 @@ With `LIMIT(5) SCRATCH`, at most five generations stay cataloged, and when a six
 
 #### ERR-JGDGB-001 · Condition code 12 is reset after each define
 - **When:** a define fails. IDCAMS returns condition code 12 when the name already exists in the catalog, which is the normal case on a rerun.
-- **Then:** `IF LASTCC=12 THEN SET MAXCC=0` checks the condition code of the define just before it and, if it is 12, sets the job's highest condition code back to 0. IDCAMS then runs the next define in any case. A define that fails with another condition code (for example 8) is not reset and raises the step's return code, but the remaining defines still run. The job has one step and no `COND` logic; restart means resubmitting it, which is safe because existing bases are left unchanged (DEF-JGDGB-001).
+- **Then:** `IF LASTCC=12 THEN SET MAXCC=0` checks the condition code of the define just before it and, if it is 12, sets the step's highest condition code (`MAXCC`) back to 0. Because it resets the maximum, not only the last code, it also erases any earlier failure: a define that failed with another code (for example 8) raises `MAXCC` only until a later define returns 12, which is what every define of an existing base returns on a rerun. Only a non-12 failure with no later code-12 define leaves the step's return code non-zero. IDCAMS goes on to the next define after a failed one, unless the condition code reaches 16 (a severe error), after which IDCAMS does not process the remaining commands. The job has one step and no `COND` logic; restart means resubmitting it, which is safe because existing bases are left unchanged (DEF-JGDGB-001).
 - **Source:** `:29, 35, 41, 47, 53, 59`
-- **Fidelity:** incidental · **Confidence:** platform-inferred (IDCAMS condition codes and continuation after a failed command)
+- **Fidelity:** incidental · **Confidence:** platform-inferred (IDCAMS condition codes, `MAXCC` reset and continuation after a failed command; high)
 
 ## 11. Interactions
 
@@ -185,7 +185,7 @@ Who writes and reads each GDG (`(+1)` is the new generation of the running job, 
 ## 13. Known defects and oddities
 
 #### DEF-JGDGB-001 · The reset hides more than "already exists"
-- `IF LASTCC=12 THEN SET MAXCC=0` resets any define failure with condition code 12, not only a duplicate name, so a define that failed for another reason with the same code also ends the job with return code 0. And because a duplicate define changes nothing, a rerun does not correct an existing base whose attributes differ from the JCL (DEF-JGDGB-002, DEF-JGDGB-003); that needs an `ALTER`, which the job does not have.
+- `IF LASTCC=12 THEN SET MAXCC=0` resets any define failure with condition code 12, not only a duplicate name, so a define that failed for another reason with the same code also ends the job with return code 0. Since `SET MAXCC=0` resets the highest code of the step, a later code-12 define also hides an earlier failure with any other code (ERR-JGDGB-001); on a rerun, where the existing bases return 12, the job ends with 0 whenever the last define is one of them, whatever failed before it. And because a duplicate define changes nothing, a rerun does not correct an existing base whose attributes differ from the JCL (DEF-JGDGB-002, DEF-JGDGB-003); that needs an `ALTER`, which the job does not have.
 - **Source:** `:29, 35, 41, 47, 53, 59`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 

@@ -8,7 +8,7 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/CBADMCDJ.jcl, sha256: 364243e503e9, role: job}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd-export, lines: "1-505"}
-  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "173-191"}
+  - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "150-167, 173-193, 213-235, 351-379"}
 entry_points: [{type: manual, job: CBADMCDJ}]
 programs: [DFHCSDUP]
 data_stores:
@@ -22,7 +22,7 @@ spec_status: draft
 
 ## 1. Summary
 
-CBADMCDJ runs the CICS batch utility DFHCSDUP (CICS TS 5.6 libraries) once, in step `STEP1`, to add CardDemo resource definitions to group `CARDDEMO` of the CSD `OEM.CICSTS.DFHCSD`, and then lists the group. Its in-stream input holds 45 `DEFINE` commands: one library (`COM2DOLL`, the CardDemo load library), 20 mapsets, 19 programs and 5 transactions. The list is out of date and does not match the application: only 6 of the 36 distinct resources it names are in the CSD export `app/csd/CARDDEMO.CSD`, none of its mapset names matches a mapset in `app/bms`, 10 of its programs and all 5 of its transactions have no source in the repository, and it defines no file, no queue and not even the sign-on transaction `CC00`. Nine commands define a name that an earlier command in the same run already defined. The job is set-up plumbing; the definitions that the application actually needs are those in the CSD export.
+CBADMCDJ runs the CICS batch utility DFHCSDUP (CICS TS 5.6 libraries) once, in step `STEP1`, to add CardDemo resource definitions to group `CARDDEMO` of the CSD `OEM.CICSTS.DFHCSD`, and then lists the group. Its in-stream input holds 45 `DEFINE` commands: one library (`COM2DOLL`, the CardDemo load library), 20 mapsets, 19 programs and 5 transactions. The list is out of date and does not match the application: only 6 of the 36 distinct resources it names are in the CSD export `app/csd/CARDDEMO.CSD`, none of its mapset names matches a mapset in `app/bms`, 10 of its programs and all 5 of its transactions have no source in the repository, and it defines no file, no queue and not even the sign-on transaction `CC00`. Nine commands define a name that an earlier command in the same run already defined; the first of them (`:53`) may stop DFHCSDUP from executing any later `DEFINE` (ERR-JCSDUP-001). The job is set-up plumbing; the definitions that the application actually needs are those in the CSD export.
 
 ## 2. Rules at a glance
 
@@ -37,19 +37,20 @@ The job has no business rules. Its items:
 | SE-JCSDUP-003 | Define 19 programs (15 distinct names). |
 | SE-JCSDUP-004 | Define 5 transactions. |
 | SE-JCSDUP-005 | List group `CARDDEMO`. |
-| ERR-JCSDUP-001 | A rerun, or a repeated name, makes `DEFINE` commands fail; the job has one step and no `COND`. |
+| ERR-JCSDUP-001 | A rerun, or a repeated name, makes `DEFINE` commands fail, and the failure may stop DFHCSDUP from executing the later commands; the job has one step and no `COND`. |
 | DEF-JCSDUP-001 | No mapset name matches a BMS mapset or a CSD mapset. |
 | DEF-JCSDUP-002 | 10 programs and 5 transactions have no source in the repository. |
 | DEF-JCSDUP-003 | Nine `DEFINE` commands repeat a name, with a different description. |
 | DEF-JCSDUP-004 | The files, 17 mapsets, 13 programs, all 18 transactions, library `CARDDLIB` and queue `JOBS` of the CSD export are missing. |
-| DEF-JCSDUP-005 | The admin menu is `COADM00C` with transactions `CCDM` and `CCAD`, not `COADM01C` and `CA00`. |
+| DEF-JCSDUP-005 | The job's admin menu is program `COADM00C` with transaction `CCDM` (its `TRANSID(CCAD)` defines no transaction); the application's is `COADM01C` with `CA00`. |
 | DEF-JCSDUP-006 | Library `COM2DOLL` is enabled by default here but `DISABLED` in the CSD export. |
 | DEF-JCSDUP-007 | `COTSTP3C` has the description `PGM1 TEST`. |
 | DEF-JCSDUP-008 | The README's preferred CSD set-up does not match this job. |
+| DEF-JCSDUP-009 | Group `CARDDEMO` is not added to a group list, so a cold start does not install it. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** submitted by hand by a CICS system programmer when the application is installed. The README's step "Configure CICS Resources" says `Option 1 (Preferred): Use the DFHCSDUP JCL with the CSD file in the CSD folder` (`./README.md:173-174`), and CBADMCDJ is the only DFHCSDUP job in the repository (`docs/inventory.md:182`), but it does not read that file (DEF-JCSDUP-008). The job is in neither README job table (`./README.md:150-167`, `./README.md:351-379`), neither the CA-7 nor the Control-M schedule runs it, no script submits it, and the local runner cannot run it (no CICS).
+- **Trigger:** submitted by hand by a CICS system programmer when the application is installed. The README's step "Configure CICS Resources" says `Option 1 (Preferred): Use the DFHCSDUP JCL with the CSD file in the CSD folder` (`./README.md:173-174`), and CBADMCDJ is the only DFHCSDUP job in the repository (`docs/inventory.md:182`), but it does not read that file (DEF-JCSDUP-008). The job is in none of the three README job tables (`./README.md:150-167`, `./README.md:213-235`, `./README.md:351-379`), neither the CA-7 nor the Control-M schedule runs it, no script submits it, and the local runner cannot run it (no CICS).
 - **Preconditions:** CICS TS 5.6 libraries under `OEM.CICSTS.V05R06M0`; the CSD `OEM.CICSTS.DFHCSD` exists; group `CARDDEMO` does not yet contain the resources (ERR-JCSDUP-001). After the job, the group still has to be installed in the region (`CEDA IN G(CARDDEMO)`, `:37`; `./README.md:185-191`).
 - **Job card:** `CBADMCDJ JOB (COBOL),'AWSCODR',CLASS=A,MSGCLASS=H,MSGLEVEL=(1,1),NOTIFY=&SYSUID,TIME=1440` (`:1-2`). `TIME=1440` removes the CPU time limit. `SET HLQ=AWS.M2.CARDDEMO` (`:25`) is the only symbol. A null statement (`//`, `:164`) ends the job after `STEP1`.
 
@@ -172,22 +173,22 @@ Totals: 45 commands, 36 distinct resources, 6 of them in the CSD export (library
 - **Fidelity:** incidental (CICS platform) · **Confidence:** reviewed (command); platform-inferred (defaults)
 
 #### SE-JCSDUP-002 · Define 20 mapsets
-- **What:** 20 `DEFINE MAPSET` commands with only a `DESCRIPTION`, for 15 distinct names (table above). Five names are defined twice (DEF-JCSDUP-003), and no name matches a mapset the application has (DEF-JCSDUP-001), so the application's screens are not defined by this job.
+- **What:** 20 `DEFINE MAPSET` commands with only a `DESCRIPTION`, for 15 distinct names (table above). Five names are defined twice (DEF-JCSDUP-003), and no name matches a mapset the application has (DEF-JCSDUP-001), so the application's screens are not defined by this job. The counts here and in SE-JCSDUP-003 and SE-JCSDUP-004 are the commands in the input; if the repeat at `:53` stops DFHCSDUP from executing later commands, only `COSGN00M` is defined (ERR-JCSDUP-001).
 - **Source:** `:50-96`
 - **Fidelity:** incidental · **Confidence:** reviewed
 
 #### SE-JCSDUP-003 · Define 19 programs
-- **What:** 19 `DEFINE PROGRAM` commands, each with `DA(ANY)` and a `DESCRIPTION`, for 15 distinct names; `COSGN00C`, `COADM00C` and `COTSTP1C` to `COTSTP4C` also have a `TRANSID`. On a `PROGRAM` definition, `TRANSID` names the transaction under which the program runs when it is called remotely; it does not define a transaction, so `CCAD` (`:132`) is not defined anywhere. Five of the programs exist (table above); four names are defined twice (DEF-JCSDUP-003).
+- **What:** 19 `DEFINE PROGRAM` commands, each with `DA(ANY)` and a `DESCRIPTION`, for 15 distinct names; `COSGN00C`, `COADM00C` and `COTSTP1C` to `COTSTP4C` also have a `TRANSID`. On a `PROGRAM` definition, `TRANSID` names the transaction under which the program runs when it is called remotely; it does not define a transaction, so `CCAD` (`:132`) is not defined anywhere. Five of the programs exist (table above); four names are defined twice (DEF-JCSDUP-003). None of these commands is executed if DFHCSDUP stopped executing commands after the repeat at `:53` (ERR-JCSDUP-001).
 - **Source:** `:98-145`
 - **Fidelity:** incidental · **Confidence:** reviewed (commands); platform-inferred (meaning of `TRANSID` on a program)
 
 #### SE-JCSDUP-004 · Define 5 transactions
-- **What:** `CCDM` to `COADM00C` and `CCT1` to `CCT4` to `COTSTP1C` to `COTSTP4C`, each with `TASKDATAL(ANY)`. None of the five programs exists, so each transaction would fail when started (program not found).
+- **What:** `CCDM` to `COADM00C` and `CCT1` to `CCT4` to `COTSTP1C` to `COTSTP4C`, each with `TASKDATAL(ANY)`. None of the five programs exists, so each transaction would fail when started (program not found). As for SE-JCSDUP-003, the commands are executed only if DFHCSDUP is still executing commands at this point (ERR-JCSDUP-001).
 - **Source:** `:147-157`
 - **Fidelity:** incidental · **Confidence:** reviewed (commands); platform-inferred (failure at start)
 
 #### SE-JCSDUP-005 · List the group
-- **What:** `LIST GROUP(CARDDEMO)` prints every definition of the group, including any that were there before the job, to `SYSPRINT`. It changes nothing.
+- **What:** `LIST GROUP(CARDDEMO)` prints every definition of the group, including any that were there before the job, to `SYSPRINT`. It changes nothing. DFHCSDUP still executes `LIST` after an error that suppresses the other commands, so the listing shows what the run actually defined (ERR-JCSDUP-001).
 - **Source:** `:159`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
@@ -195,9 +196,16 @@ Totals: 45 commands, 36 distinct resources, 6 of them in the CSD export (library
 
 #### ERR-JCSDUP-001 · Repeated names and reruns
 - **When:** a `DEFINE` names a resource that already exists in group `CARDDEMO`: on every rerun without the commented `DELETE GROUP` (`:38, 42`), and within the first run for the nine repeated names (DEF-JCSDUP-003).
-- **Then:** DFHCSDUP does not replace the existing definition; the command fails with an error message and a non-zero return code, and the definition from the first command stays (so for the repeated names the "account" descriptions win over the "card" ones). Whether DFHCSDUP goes on with the later commands after such an error, and which return code the job ends with, depends on DFHCSDUP rules that the source does not show (Q-JCSDUP-002). The job has one step and no `COND`; there is nothing after it. Restart means uncommenting `DELETE GROUP(CARDDEMO)` and resubmitting, which also removes every definition the group had, including ones not in this job.
-- **Source:** `:38, 42, 53, 65-72, 110-117`
-- **Fidelity:** incidental · **Confidence:** platform-inferred (DFHCSDUP duplicate handling); reviewed (the rerun comment)
+- **Then:** DFHCSDUP does not replace the existing definition; the command fails with an error message and a non-zero return code. What happens to the later commands depends on the severity DFHCSDUP gives that error, which the source does not show (Q-JCSDUP-002). DFHCSDUP's rule is that an error of severity 8 or higher during the execution of a command suppresses the execution of every later command except `LIST`, which are then only checked for syntax:
+
+  | Severity of the duplicate error | First run | Rerun without `DELETE GROUP` |
+  | :-- | :-- | :-- |
+  | below 8 | every command runs; the repeats fail and the first definition stays, so for the repeated names the "account" descriptions win over the "card" ones | every `DEFINE` fails; the group keeps the definitions of the first run |
+  | 8 or higher | only `LIBRARY(COM2DOLL)` (`:44`) and the first `MAPSET(COSGN00M)` (`:50`) are defined; the repeat at `:53` fails and the 42 `DEFINE` commands after it are not executed; `LIST` (`:159`) runs | the first `DEFINE` (`:44`) fails and nothing is defined; `LIST` runs |
+
+  The job ends with the highest return code of the commands. It has one step and no `COND`; there is nothing after it. Restart means uncommenting `DELETE GROUP(CARDDEMO)` and resubmitting, which also removes every definition the group had, including ones not in this job.
+- **Source:** `:38, 42, 44, 50, 53, 65-72, 110-117, 159`
+- **Fidelity:** incidental · **Confidence:** platform-inferred, medium (DFHCSDUP suppresses the execution of later commands after an error of severity 8 or higher; the severity of a duplicate `DEFINE` is not confirmed); reviewed (the rerun comment)
 
 ## 11. Interactions
 
@@ -223,7 +231,7 @@ None. The job holds no data fields; `PAGESIZE(60)` only paginates the listing.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCSDUP-003 · Nine commands repeat a name
-- `MAPSET(COSGN00M)` is defined twice with the same description (`:50, 53`). `COACT00S`, `COACTVWS`, `COACTUPS`, `COACTDES` (mapsets) and `COACT00C`, `COACTVWC`, `COACTUPC`, `COACTDEC` (programs) are defined first as the account functions and then again, under the same names, as the card functions (`:65-72`, `:110-117`). The second definitions are rejected or ignored (ERR-JCSDUP-001), so there is no card menu, card view, card update or card deactivate definition; the application's card programs are `COCRDLIC`, `COCRDSLC` and `COCRDUPC`, which the job does not define.
+- `MAPSET(COSGN00M)` is defined twice with the same description (`:50, 53`). `COACT00S`, `COACTVWS`, `COACTUPS`, `COACTDES` (mapsets) and `COACT00C`, `COACTVWC`, `COACTUPC`, `COACTDEC` (programs) are defined first as the account functions and then again, under the same names, as the card functions (`:65-72`, `:110-117`). The second definitions fail (ERR-JCSDUP-001), so there is no card menu, card view, card update or card deactivate definition (and if the first repeat, at `:53`, stops the execution of later commands, the account definitions are not created either); the application's card programs are `COCRDLIC`, `COCRDSLC` and `COCRDUPC`, which the job does not define.
 - **Source:** `:50-72, 101-117`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (names); platform-inferred (which definition stays)
 
@@ -252,12 +260,17 @@ None. The job holds no data fields; `PAGESIZE(60)` only paginates the listing.
 - **Source:** `:33-163`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
+#### DEF-JCSDUP-009 · The group is not added to a startup group list
+- The input has no `ADD GROUP(CARDDEMO) LIST(...)` command (`:44-159`), and the README's set-up installs resources one by one with `CEDA INSTALL` (`./README.md:185-193`); neither puts `CARDDEMO` into a group list. At a cold or initial start, CICS installs only the groups in the lists named by its `GRPLIST` system initialisation parameter, so after such a start the CardDemo definitions are not installed until someone runs `CEDA INSTALL GROUP(CARDDEMO)` again (the job's comment, `:37`). A warm start restores what was installed before.
+- **Source:** `:37, 44-159`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (no list command); platform-inferred, medium (CICS start-up installs groups from `GRPLIST` only)
+
 ## 14. Open questions
 
 | ID | Question | For |
 | :-- | :-- | :-- |
 | Q-JCSDUP-001 | Is CBADMCDJ still used anywhere, or should it be retired (or its `SYSIN` replaced with the CSD export)? | CICS system programmer |
-| Q-JCSDUP-002 | On CICS TS 5.6, what does DFHCSDUP do with a `DEFINE` for a name that already exists in the group, within one run and on a rerun: message, return code, and does it go on with the later commands? | mainframe team |
+| Q-JCSDUP-002 | On CICS TS 5.6, what does DFHCSDUP do with a `DEFINE` for a name that already exists in the group, within one run and on a rerun: message, severity and return code, and does it go on executing the later commands or only check them for syntax (in which case the first run defines only `COM2DOLL` and `COSGN00M`)? | mainframe team |
 
 ## 15. Equivalence contract
 
@@ -269,4 +282,4 @@ Nothing in this job needs reproducing in the target: it registers CICS resources
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
 | (SET statement) | 25-25 | FLOW-JCSDUP-001 |
-| `STEP1` | 27-163 | FLOW-JCSDUP-001, FLOW-JCSDUP-002, SE-JCSDUP-001..005, ERR-JCSDUP-001, DEF-JCSDUP-001..008 |
+| `STEP1` | 27-163 | FLOW-JCSDUP-001, FLOW-JCSDUP-002, SE-JCSDUP-001..005, ERR-JCSDUP-001, DEF-JCSDUP-001..009 |

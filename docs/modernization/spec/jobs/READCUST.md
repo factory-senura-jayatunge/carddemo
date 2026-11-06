@@ -16,7 +16,7 @@ sources:
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "393-394"}, {type: manual, job: READCUST}]
 programs: [CBCUS01C]
 data_stores:
-  - {dd: STEP05.CUSTFILE, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, access: [read-sequential]}
+  - {dd: STEP05.CUSTFILE, dataset: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, entity: ENT-CUSTOMER, access: [read-sequential]}
 invoked_by: [CA-7, operator]
 spec_status: draft
 ---
@@ -58,7 +58,7 @@ The DD name matches the program's `SELECT ... ASSIGN TO` clause (`app/cbl/CBCUS0
 
 ## 5. Data used
 
-- The customer master record (no entity in `entities.md`; layout `app/cpy/CVCUS01Y.cpy`), 500 bytes, read in ascending key order; nothing is updated.
+- ENT-CUSTOMER, whole 500-byte records (layout `app/cpy/CVCUS01Y.cpy`), read in ascending key order; nothing is updated.
 - Catalog state on 09/01/22: the data component has `KEYLEN 9`, `MAXLRECL 500`, `SHROPTNS(2,3)` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:632-637`), so a run on that file prints 50 records.
 
 ## 6. Processing flow
@@ -88,7 +88,7 @@ None. The job reads and prints; it makes no decision about the data.
 
 ## 8. Validations and messages
 
-None in the job. The program's own messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBCUS01C` and `END OF EXECUTION OF PROGRAM CBCUS01C` around the records, and `ERROR OPENING CUSTFILE`, `ERROR READING CUSTOMER FILE` or `ERROR CLOSING CUSTOMER FILE` followed by the file status on an error (ERR-JRCUST-001).
+None in the job. The program's own messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBCUS01C` and `END OF EXECUTION OF PROGRAM CBCUS01C` around the records, and `ERROR OPENING CUSTFILE`, `ERROR READING CUSTOMER FILE` or `ERROR CLOSING CUSTOMER FILE` followed on an error by the literal text `FILE STATUS IS: NNNN` with the status as four characters appended (`FILE STATUS IS: NNNN0035` for status `35`) and `ABENDING PROGRAM` (`app/cbl/CBCUS01C.cbl:110, 129, 147, 154-174`); see ERR-JRCUST-001.
 
 ## 9. Side effects
 
@@ -98,9 +98,9 @@ None. The job opens its only file for input and writes nothing except the job lo
 
 #### ERR-JRCUST-001 · I/O errors abend the step
 - **When:** opening, reading or closing `CUSTFILE` returns a status other than success (or end of file on the read), for example because the file is missing or not loaded.
-- **Then:** the program displays the error message and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBCUS01C.cbl:154-158`); the step ends with user abend U999. Nothing has been changed, so a rerun is safe. In CA-7 an abend stops the chain at this job, so the later readers, WAITSTEP and OPENFIL do not run until the operator intervenes.
+- **Then:** the program displays the error message and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBCUS01C.cbl:154-158`); the step ends with user abend U999. Nothing has been changed, so a rerun is safe. In CA-7 an abend ends this reader path: CA-7 does not trigger READXREF or this path's WAITSTEP. The other paths that the same CLOSEFIL completion starts still reach WAITSTEP, which triggers OPENFIL (DEF-JCA7-002), so the abend does not by itself keep the CICS files closed.
 - **Source:** `:21-25`
-- **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed (program); platform-inferred (CA-7 does not trigger successors of an abended job)
+- **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed (program); platform-inferred (CA-7 does not trigger successors of an abended job; schedule ID inheritance)
 
 ## 11. Interactions
 
@@ -119,8 +119,8 @@ None. The job prints records as stored; it does not interpret any field.
 - **Status:** open · **Fidelity:** defect-decide (the target must not print these fields) · **Confidence:** reviewed
 
 #### DEF-JRCUST-002 · `NOTIFY=&SYUID` is a typo for `&SYSUID`
-- The job card asks for notification of `&SYUID` (`:2`), not the system symbol `&SYSUID` that every other job uses. `SYUID` is not a defined symbol, so the job is either rejected with a JCL error before it runs or runs without notifying the submitter, depending on how the system treats the unresolved symbol. The typo has been in the member since the first release.
-- **Status:** open · **Fidelity:** defect-fix · **Confidence:** platform-inferred
+- The job card asks for notification of `&SYUID` (`:2`), not the system symbol `&SYSUID` that every other job uses. `SYUID` is not a defined symbol, so the job is either rejected with a JCL error before it runs or runs without notifying the submitter, depending on how the system treats the unresolved symbol. The typo has been in the member since the first release. A JCL error is the more likely outcome; in CA-7 the job then never completes, so it does not trigger READXREF and this reader path ends without reaching WAITSTEP. The other paths of the same CLOSEFIL run still reach WAITSTEP and OPENFIL (DEF-JCA7-002), so the CICS files are reopened all the same, but READXREF does not run until the job is fixed and resubmitted.
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred, medium (handling of an undefined symbol; CA-7 trigger on completion only)
 
 #### DEF-JRCUST-003 · The job has no output except the log
 - The job proves only that the file can be opened and read to the end. It writes no count or total that an operator or a later job could check; the result is 50 printed records and return code 0.

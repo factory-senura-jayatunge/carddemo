@@ -42,10 +42,11 @@ POSTTRAN is the one-step job that runs the posting program `CBTRN02C`. It reads 
 | FLOW-JPOST-001 | One step: run `CBTRN02C` with the six files bound to the cycle datasets. |
 | SE-JPOST-001 | Allocate and catalog a new reject generation `DALYREJS(+1)`, RECFM F, LRECL 430. |
 | SE-JPOST-002 | Update the account, category balance and transaction master files in place (program side effects). |
-| ERR-JPOST-001 | Return code 4 means "some transactions rejected" and is a success; an abend leaves partial updates. |
+| ERR-JPOST-001 | Return code 4 means "some transactions rejected" and is a success; an abend on a checked file error leaves partial updates; some file errors are not checked at all. |
 | NUM-JPOST-001 | Reject generations: LIMIT 5, `SCRATCH`, unblocked 430-byte records. |
 | DEF-JPOST-001 | The `DALYREJS` GDG base is not created by the README initialisation sequence. |
 | DEF-JPOST-002 | The CA-7 chain runs POSTTRAN without emptying `TRANSACT` first and only after an optional-module job. |
+| DEF-JPOST-003 | Nothing prevents the same `DALYTRAN.PS` from being posted twice. |
 
 ## 3. Actors and triggers
 
@@ -118,10 +119,10 @@ None at job level. Validations are VAL-POST-001 and VAL-POST-002 and the console
 
 #### ERR-JPOST-001 · Return code and abend
 - **When:** the step ends.
-- **Then:** return code 0 (nothing rejected) or 4 (at least one reject, BR-POST-008) are both normal ends; the runbook treats 4 as "not a failure" (`docs/runbooks/batch-cycle-restart.md:62`). Any file error abends with U0999 (ERR-POST-008); updates already made stay (DEF-POST-008) and the reject generation is deleted (SE-JPOST-001). There is no `COND`, no checkpoint and no restart step.
+- **Then:** return code 0 (nothing rejected) or 4 (at least one reject, BR-POST-008) are both normal ends; the runbook treats 4 as "not a failure" (`docs/runbooks/batch-cycle-restart.md:62`). A file error that `CBTRN02C` checks (opens and closes, the daily read, the category balance I/O, the transaction and reject writes: ERR-POST-001 to ERR-POST-005) abends with U0999 through `CEE3ABD` (ERR-POST-008, `app/cbl/CBTRN02C.cbl:711-712`); updates already made stay (DEF-POST-008) and the reject generation is deleted (SE-JPOST-001). Not every file error ends the step: a failed account rewrite is not treated as an error (ERR-POST-006, DEF-POST-012), and I/O errors on the cross-reference and account lookups are not checked (DEF-POST-007), so the step can end with return code 0 or 4 after such an error. There is no `COND`, no checkpoint and no restart step.
 - **Restart:** the runbook restores `ACCTDATA` and `TCATBALF`, empties `TRANSACT` with TRANBKP and resubmits (`docs/runbooks/batch-cycle-restart.md:67-85`). A JCL error on `DALYREJS` (missing base) changes nothing (`docs/runbooks/batch-cycle-restart.md:57`).
-- **Source:** `:23, 34`
-- **Fidelity:** must-preserve (RC 4 counts as success for the scheduler) · **Confidence:** platform-inferred
+- **Source:** `:23, 34`, `app/cbl/CBTRN02C.cbl:708-712`
+- **Fidelity:** must-preserve (RC 4 counts as success for the scheduler) · **Confidence:** reviewed (which errors abend); platform-inferred (disposition and scheduler behaviour, high)
 
 ## 11. Interactions
 
@@ -131,8 +132,8 @@ None at job level. Validations are VAL-POST-001 and VAL-POST-002 and the console
 ## 12. Numeric, date and format details
 
 #### NUM-JPOST-001 · Reject generation format and retention
-- `RECFM=F` (fixed, unblocked; `BLKSIZE=0` gives one 430-byte record per block), unlike the other GDGs of the cycle, which are `FB`. The GDG keeps 5 generations and scratches the older ones (`app/jcl/DALYREJS.jcl:26-27`), so rejects are lost after five runs unless they are reviewed or copied.
-- **Source:** `:36`, `app/jcl/DALYREJS.jcl:24-28`
+- `RECFM=F` (fixed, unblocked; `BLKSIZE=0` gives one 430-byte record per block). `SYSTRAN(+1)`, written by INTCALC, is also `RECFM=F` (`app/jcl/INTCALC.jcl:39`); the backup GDGs `TRANSACT.BKUP` and `TCATBALF.BKUP` are `FB` (`app/jcl/TRANBKP.jcl:31`, `app/jcl/PRTCATBL.jcl:37`). The GDG keeps 5 generations and scratches the older ones (`app/jcl/DALYREJS.jcl:26-27`), so rejects are lost after five runs unless they are reviewed or copied.
+- **Source:** `:36`, `app/jcl/DALYREJS.jcl:24-28`, `app/jcl/INTCALC.jcl:39`
 - **Fidelity:** incidental (blocking), must-preserve (430-byte record) · **Confidence:** reviewed
 
 ## 13. Known defects and oddities
@@ -142,10 +143,15 @@ None at job level. Validations are VAL-POST-001 and VAL-POST-002 and the console
 - **Source:** `:38`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
-#### DEF-JPOST-002 · The CA-7 chain does not prepare POSTTRAN's input files
-- In CA-7, POSTTRAN runs after CLOSEFIL and CBPAUP0J only (`app/scheduler/CardDemo.ca7:43, 70`). No job in the CA-7 schedule empties `TRANSACT` (TRANBKP is only in the Control-M folder `DAILY-TransactionBackup`), so unless TRANBKP ran from Control-M or by hand, `TRANSACT` still holds the previous cycle's records and the output open fails (`docs/runbooks/batch-cycle-restart.md:58`). The two schedules are not linked by any condition. CBPAUP0J belongs to the optional authorization module, so a base installation has no job to trigger POSTTRAN. See `SCHED-CA7.md`.
+#### DEF-JPOST-002 · The CA-7 chain does not prepare POSTTRAN's files
+- In CA-7, POSTTRAN runs after CLOSEFIL and CBPAUP0J only (`app/scheduler/CardDemo.ca7:43, 70`). No job in the CA-7 schedule empties `TRANSACT` (TRANBKP is only in the Control-M folder `DAILY-TransactionBackup`), so unless TRANBKP ran from Control-M or by hand, `TRANSACT` (an output file, opened `OUTPUT` at `app/cbl/CBTRN02C.cbl:256`) still holds the previous cycle's records and the output open fails (`docs/runbooks/batch-cycle-restart.md:58`). The two schedules are not linked by any condition. CBPAUP0J belongs to the optional authorization module, so a base installation has no job to trigger POSTTRAN. See `SCHED-CA7.md`.
 - **Source:** `:28-29`, `app/scheduler/CardDemo.ca7:43-97`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
+
+#### DEF-JPOST-003 · No protection against posting the same input twice
+- `DALYTRAN` is allocated `DISP=SHR` to the fixed name `AWS.M2.CARDDEMO.DALYTRAN.PS` (not a generation), and neither the job nor `CBTRN02C` empties, renames or marks it after a successful run. A second POSTTRAN after a successful run is stopped only while `TRANSACT` still holds the posted records, because the output open then fails (DEF-JPOST-002). Once TRANBKP has emptied it, which the README cycle does right after INTCALC (`./README.md:229`), a resubmitted POSTTRAN with the same `DALYTRAN.PS` posts the same transactions again: account balances and category totals are added a second time, and the transactions reach `TRANSACT` and, through COMBTRAN, the master. The target needs an explicit "already posted" control.
+- **Source:** `:28-31`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (JCL); platform-inferred (operator scenarios, high)
 
 ## 14. Open questions
 
@@ -162,4 +168,4 @@ The program-level contract of `programs/CBTRN02C.md` §15 applies. In addition, 
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP15` | 23-42 | FLOW-JPOST-001, SE-JPOST-001, SE-JPOST-002, ERR-JPOST-001, NUM-JPOST-001, DEF-JPOST-001, DEF-JPOST-002 |
+| `STEP15` | 23-42 | FLOW-JPOST-001, SE-JPOST-001, SE-JPOST-002, ERR-JPOST-001, NUM-JPOST-001, DEF-JPOST-001, DEF-JPOST-002, DEF-JPOST-003 |

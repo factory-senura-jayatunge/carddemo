@@ -11,7 +11,7 @@ sources:
   - {path: app/cpy/COSTM01.CPY, sha256: 108170f314aa, role: copybook, lines: "20-36"}
   - {path: app/cpy/CVTRA05Y.cpy, sha256: d7bde0e78ff6, role: copybook, lines: "4-18"}
   - {path: app/jcl/TXT2PDF1.JCL, sha256: a9e9a847c252, role: downstream-job, lines: "33"}
-  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "465-495"}
+  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "465-527"}
   - {path: README.md, sha256: 8e46a80b63ce, role: runbook, lines: "231, 262, 374"}
   - {path: docs/runbooks/batch-cycle-restart.md, sha256: a380604a19e1, role: runbook, lines: "11-21, 40-41, 152-157"}
   - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: policy, lines: "98-99, 171"}
@@ -42,7 +42,7 @@ spec_status: draft
 
 ## 1. Summary
 
-CREASTMT produces one statement per card in the card cross-reference, in two formats: plain text (`STATEMNT.PS`, 80-byte lines) and HTML (`STATEMNT.HTML`, 100-byte lines). The job first builds a work copy of the transaction master re-keyed by card number: `DELDEF01` deletes and redefines the work KSDS `TRXFL.VSAM.KSDS`, `STEP010` sorts `TRANSACT` by card number and transaction ID and moves the card number to the front of each record, and `STEP020` loads the sorted file into the work KSDS. `STEP030` deletes the previous statements, and `STEP040` runs `CBSTM03A`, which reads the cross-reference, customer, account and work files through its subroutine `CBSTM03B` and writes the statements. Every step after the first runs only when all earlier steps ended with return code 0. The statement content and layout belong to the `CBSTM03A` program spec (area d2); this spec covers the job: data preparation, order, conditions, datasets and scheduling.
+CREASTMT produces one statement per card in the card cross-reference, in two formats: plain text (`STATEMNT.PS`, 80-byte lines) and HTML (`STATEMNT.HTML`, 100-byte lines). The job first builds a work copy of the transaction master re-keyed by card number: `DELDEF01` deletes and redefines the work KSDS `TRXFL.VSAM.KSDS`, `STEP010` sorts `TRANSACT` by card number and transaction ID and moves the card number to the front of each record, and `STEP020` loads the sorted file into the work KSDS. `STEP030` deletes the previous statements, and `STEP040` runs `CBSTM03A`, which reads the cross-reference, customer, account and work files through its subroutine `CBSTM03B` and writes the statements. `STEP010` has no `COND` and always runs; `STEP020`, `STEP030` and `STEP040` run only when all earlier steps ended with return code 0. The statement content and layout belong to the `CBSTM03A` program spec (area d2); this spec covers the job: data preparation, order, conditions, datasets and scheduling.
 
 ## 2. Rules at a glance
 
@@ -55,8 +55,8 @@ CREASTMT produces one statement per card in the card cross-reference, in two for
 | SE-JSTMT-004 | Load the sorted file into `TRXFL.VSAM.KSDS`. |
 | SE-JSTMT-005 | Delete the previous `STATEMNT.HTML` and `STATEMNT.PS`. |
 | SE-JSTMT-006 | Run `CBSTM03A` to write the new `STATEMNT.PS` and `STATEMNT.HTML`. |
-| ERR-JSTMT-001 | Any non-zero return code, including 4, skips every later step. |
-| ERR-JSTMT-002 | `CBSTM03A` abends on any file error, including an empty work file; its outputs are then deleted. |
+| ERR-JSTMT-001 | Any non-zero return code, including 4, skips every later step from `STEP020` on; `STEP010` always runs. |
+| ERR-JSTMT-002 | `CBSTM03A` abends on any checked open, read or close error, including an empty work file, with no defined abend code; its outputs are then deleted. |
 | ERR-JSTMT-003 | The work KSDS define fails when the old cluster could not be deleted, and nothing else runs. |
 | NUM-JSTMT-001 | Work record layout: card number at 1-16, then the transaction record, the last 2 bytes of the processed timestamp lost. |
 | DEF-JSTMT-001 | A failed run leaves the previous run's statements in place. |
@@ -185,10 +185,11 @@ In execution order. The job has no rollback; the work files are rebuilt on every
 - **Fidelity:** must-preserve (no statements from incomplete work data) · **Confidence:** reviewed
 
 #### ERR-JSTMT-002 · The statement program abends on any file error
-- **When:** `CBSTM03B` returns anything but `00` or `04` when a file is opened, anything but `00` or `04` on the first work-file read, anything but `00` or `10` on later work-file and cross-reference reads, or anything but `00` on a keyed customer or account read (`app/cbl/CBSTM03A.CBL:345-414, 730-853`).
-- **Then:** the program displays `ERROR ... <DD>` and the return code, then `ABENDING PROGRAM`, and calls `CEE3ABD` (`app/cbl/CBSTM03A.CBL:921-923`). The step abends and `STMTFILE` and `HTMLFILE` are deleted by their abnormal disposition. Cases this covers: an empty `TRANSACT` (the first work-file read returns end of file `10`, which the open paragraph does not accept, `app/cbl/CBSTM03A.CBL:744-754`), and a cross-reference record whose customer or account is missing.
-- **Source:** `:87, 92`, `app/cbl/CBSTM03A.CBL:744-754, 379-386, 403-410, 921-923`
-- **Fidelity:** defect-decide (empty input aborts instead of producing statements with no transactions) · **Confidence:** reviewed (program); platform-inferred (dispositions)
+- **When:** `CBSTM03B` returns anything but `00` or `04` when a file is opened, anything but `00` or `04` on the first work-file read, anything but `00` or `10` on later work-file and cross-reference reads, anything but `00` on a keyed customer or account read (`app/cbl/CBSTM03A.CBL:345-414, 730-853`), or anything but `00` or `04` when one of the four input files is closed (`app/cbl/CBSTM03A.CBL:856-919`, ERR-STMT-005).
+- **Then:** the program displays `ERROR ... <DD>` and the return code, then `ABENDING PROGRAM`, and calls `CEE3ABD` (`app/cbl/CBSTM03A.CBL:921-923`). Unlike `CBTRN02C` and `CBACT04C`, which pass abend code 999 and get U0999, the call has no arguments (`app/cbl/CBSTM03A.CBL:923`), so the abend code and timing come from whatever the parameter registers hold: the code is undefined and operators cannot rely on U0999 (DEF-STMT-009, ERR-STMT-006). The step abends and `STMTFILE` and `HTMLFILE` are deleted by their abnormal disposition. Cases this covers: a cross-reference record whose customer or account is missing, a failed close, and an empty work file (the first work-file read returns end of file `10`, which the open paragraph does not accept, `app/cbl/CBSTM03A.CBL:744-754`, DEF-STMT-010).
+- **Empty `TRANSACT`:** whether the job reaches that abend is platform-dependent. DFSORT normally treats an empty VSAM input as zero records and ends `STEP010` with 0, but the `REPRO` of an empty `TRXFL.SEQ` in `STEP020` can end with a non-zero return code, which skips `STEP040` (ERR-JSTMT-001), and if `STEP040` runs, `CBSTM03B` may already fail to open the never-loaded `TRXFL` KSDS. In each case no new statements are written.
+- **Source:** `:56, 79, 87, 92`, `app/cbl/CBSTM03A.CBL:744-754, 379-386, 403-410, 856-919, 921-923`
+- **Fidelity:** defect-decide (empty input aborts instead of producing statements with no transactions; undefined abend code) · **Confidence:** reviewed (program); platform-inferred (dispositions, high; abend code, high; where an empty `TRANSACT` stops the job, medium)
 
 #### ERR-JSTMT-003 · The work KSDS cannot be redefined
 - **When:** the delete of `TRXFL.VSAM.KSDS` failed (for example the cluster is allocated to another job) and the cluster still exists.
@@ -200,7 +201,7 @@ In execution order. The job has no rollback; the work files are rebuilt on every
 
 - **Upstream:** the transaction master as left by POSTTRAN or COMBTRAN; README order COMBTRAN, CREASTMT, TRANIDX (`./README.md:230-232`). INTCALC updates the account balances printed on the statement. In CA-7, only CLOSEFIL precedes it (DEF-JSTMT-006).
 - **Downstream:** TXT2PDF1 converts `STATEMNT.PS` (DD `INDD`, `app/jcl/TXT2PDF1.JCL:33`) to PDF; CA-7 triggers it after CREASTMT (`app/scheduler/CardDemo.ca7:494-495`).
-- **Shared data:** CREASTMT does not need the transaction alternate index, so it can run before TRANIDX. A TRANBKP run without the following COMBTRAN leaves `TRANSACT` empty, and CREASTMT then abends (ERR-JSTMT-002).
+- **Shared data:** CREASTMT does not need the transaction alternate index, so it can run before TRANIDX. A TRANBKP run without the following COMBTRAN leaves `TRANSACT` empty, and CREASTMT then writes no new statements; whether it stops in `STEP020` or abends in `STEP040` depends on the platform (ERR-JSTMT-002).
 - **Program spec:** statement content, totals, HTML layout and the subroutine interface of `CBSTM03A` and `CBSTM03B` are specified by area d2.
 
 ## 12. Numeric, date and format details
@@ -239,8 +240,8 @@ In execution order. The job has no rollback; the work files are rebuilt on every
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (table sizes); platform-inferred (effect of the overflow)
 
 #### DEF-JSTMT-006 · Schedulers and README disagree on the job's place
-- README and runbook: after COMBTRAN, before TRANIDX (`./README.md:230-232`, `docs/runbooks/batch-cycle-restart.md:18-20`). CA-7: triggered directly by a CLOSEFIL completion, with no dependency on POSTTRAN, INTCALC or COMBTRAN, then TXT2PDF1, WAITSTEP, OPENFIL (`app/scheduler/CardDemo.ca7:465-495`). Control-M and the demo full-batch script do not run it. See `SCHED-CA7.md` and `README.md` in this folder.
-- **Source:** `:1`, `app/scheduler/CardDemo.ca7:465-495`
+- README and runbook: after COMBTRAN, before TRANIDX (`./README.md:230-232`, `docs/runbooks/batch-cycle-restart.md:18-20`). CA-7: triggered directly by a CLOSEFIL completion, with no dependency on POSTTRAN, INTCALC or COMBTRAN, then TXT2PDF1, WAITSTEP, OPENFIL (`app/scheduler/CardDemo.ca7:465-527`; WAITSTEP and OPENFIL at `app/scheduler/CardDemo.ca7:522, 527`). Control-M and the demo full-batch script do not run it. See `SCHED-CA7.md` and `README.md` in this folder.
+- **Source:** `:1`, `app/scheduler/CardDemo.ca7:465-527`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 ## 14. Open questions
@@ -261,7 +262,7 @@ After a successful run: `STATEMNT.PS` and `STATEMNT.HTML` hold one statement per
 | :-- | :-- | :-- |
 | (job card and comments) | 1-21 | §3 |
 | `DELDEF01` | 22-40 | SE-JSTMT-001, SE-JSTMT-002, ERR-JSTMT-003, DEF-JSTMT-002 |
-| `STEP010` | 44-55 | SE-JSTMT-003, NUM-JSTMT-001, BR-JSTMT-001 |
-| `STEP020` | 56-62 | SE-JSTMT-004, ERR-JSTMT-001 |
+| `STEP010` | 44-55 | SE-JSTMT-003, NUM-JSTMT-001, BR-JSTMT-001, ERR-JSTMT-001 |
+| `STEP020` | 56-62 | SE-JSTMT-004, ERR-JSTMT-001, ERR-JSTMT-002 |
 | `STEP030` | 66-75 | SE-JSTMT-005, DEF-JSTMT-001, DEF-JSTMT-004 |
 | `STEP040` | 79-96 | SE-JSTMT-006, BR-JSTMT-001, ERR-JSTMT-002, DEF-JSTMT-003, DEF-JSTMT-005 |

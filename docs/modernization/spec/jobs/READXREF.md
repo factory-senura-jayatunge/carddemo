@@ -87,7 +87,7 @@ None. The job reads and prints; it makes no decision about the data.
 
 ## 8. Validations and messages
 
-None in the job. The program's own messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBACT03C` and `END OF EXECUTION OF PROGRAM CBACT03C` around the records, and `ERROR OPENING XREFFILE`, `ERROR READING XREFFILE` or `ERROR CLOSING XREFFILE` followed by the file status on an error (ERR-JRXREF-001).
+None in the job. The program's own messages go to `SYSOUT`: `START OF EXECUTION OF PROGRAM CBACT03C` and `END OF EXECUTION OF PROGRAM CBACT03C` around the records, and `ERROR OPENING XREFFILE`, `ERROR READING XREFFILE` or `ERROR CLOSING XREFFILE` followed on an error by the literal text `FILE STATUS IS: NNNN` with the status as four characters appended (`FILE STATUS IS: NNNN0035` for status `35`) and `ABENDING PROGRAM` (`app/cbl/CBACT03C.cbl:110, 129, 147, 154-174`); see ERR-JRXREF-001.
 
 ## 9. Side effects
 
@@ -97,9 +97,9 @@ None. The job opens its only file for input and writes nothing except the job lo
 
 #### ERR-JRXREF-001 · I/O errors abend the step
 - **When:** opening, reading or closing `XREFFILE` returns a status other than success (or end of file on the read), for example because the file is missing or not loaded.
-- **Then:** the program displays the error message and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBACT03C.cbl:154-158`); the step ends with user abend U999. Nothing has been changed, so a rerun is safe. In CA-7 an abend stops the chain at this job, so the later readers, WAITSTEP and OPENFIL do not run until the operator intervenes.
+- **Then:** the program displays the error message and the file status and calls `CEE3ABD` with abend code 999 (`app/cbl/CBACT03C.cbl:154-158`); the step ends with user abend U999. Nothing has been changed, so a rerun is safe. In CA-7 an abend ends this reader path: READXREF is the last reader, and CA-7 does not trigger this path's WAITSTEP (`app/scheduler/CardDemo.ca7:447-448`). The other paths that the same CLOSEFIL completion starts still reach WAITSTEP, which triggers OPENFIL (DEF-JCA7-002), so the abend does not by itself keep the CICS files closed.
 - **Source:** `:22-26`
-- **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed (program); platform-inferred (CA-7 does not trigger successors of an abended job)
+- **Fidelity:** must-preserve (fail visibly) · **Confidence:** reviewed (program); platform-inferred (CA-7 does not trigger successors of an abended job; schedule ID inheritance)
 
 ## 11. Interactions
 

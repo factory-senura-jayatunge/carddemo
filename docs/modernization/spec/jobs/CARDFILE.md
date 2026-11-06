@@ -50,11 +50,12 @@ The job has no business rules. Its items:
 | VAL-JCARD-001 | The load rejects records out of key order or with duplicate card numbers (VSAM rule). |
 | ERR-JCARD-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
 | ERR-JCARD-002 | The CICS steps end normally whether or not CICS closed or opened the files. |
+| ERR-JCARD-003 | While CICS still holds the cluster open, the load and the index build fail as well as the delete and define. |
 | NUM-JCARD-001 | Keys, record sizes and the alternate-index capacity of 8 cards per account. |
 | DEF-JCARD-001 | The return-code reset also hides a delete that failed because the file is still open. |
 | DEF-JCARD-002 | The job does not wait for CICS to finish closing the files before it deletes them. |
 | DEF-JCARD-003 | The CICS region name `CICSAWSA` is hard-coded. |
-| DEF-JCARD-004 | The alternate index cannot hold more than 8 cards for one account. |
+| DEF-JCARD-004 | The alternate index cannot hold more than 8 cards for one account; extra ones are most likely left out with a warning. |
 | DEF-JCARD-005 | A null statement (`//`) ends the job before the trailing version comments. |
 
 ## 3. Actors and triggers
@@ -102,7 +103,7 @@ Return code of the job: the highest step return code. Console output is SDSF `IS
 ## 5. Data used
 
 - The card record (`CARD-RECORD`, `app/cpy/CVACT02Y.cpy:4-11`, 150 bytes; no entity in `entities.md` yet), whole records copied unchanged from `CARDDATA.PS` to the KSDS. No field is interpreted. The primary key is bytes 1-16 (`CARD-NUM`); the alternate key is bytes 17-27 (`CARD-ACCT-ID`, `9(11)`), the account that owns the card (ENT-ACCOUNT `ACCT-ID`). The record also holds the card verification code `CARD-CVV-CD` (bytes 28-30), which the job copies as is.
-- Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:164-333`): the cluster data component has `KEYLEN 16`, `RKP 0`, `MAXLRECL 150`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:202-207`). The AIX data component has `KEYLEN 11`, `AXRKP 16`, `MAXLRECL 150`, `SHROPTNS(1,3)`, `SPANNED`, `NONUNIQKEY` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:281-287`), space `CYLINDER` primary 5 secondary 1 (`app/catlg/LISTCAT.txt:295-297`), and the AIX is in the upgrade set (`app/catlg/LISTCAT.txt:265`). The path is `UPDATE` (`app/catlg/LISTCAT.txt:163`). All of this matches the JCL; `SHROPTNS(1,3)` on the AIX is the IDCAMS default, since `STEP40` names no `SHAREOPTIONS`.
+- Catalog state on 09/01/22 (`app/catlg/LISTCAT.txt:150-333`, from the path entry to the end of the AIX): the cluster data component has `KEYLEN 16`, `RKP 0`, `MAXLRECL 150`, `SHROPTNS(2,3)`, `ERASE`, `NOREUSE` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:202-207`). The AIX data component has `KEYLEN 11`, `AXRKP 16`, `MAXLRECL 150`, `SHROPTNS(1,3)`, `SPANNED`, `NONUNIQKEY` and `REC-TOTAL 50` (`app/catlg/LISTCAT.txt:281-287`), space `CYLINDER` primary 5 secondary 1 (`app/catlg/LISTCAT.txt:295-297`), and the AIX is in the upgrade set (`app/catlg/LISTCAT.txt:265`). The path is `UPDATE` (`app/catlg/LISTCAT.txt:163`). All of this matches the JCL except `SPANNED` on the AIX (`app/catlg/LISTCAT.txt:285`), which `STEP40` does not code (its default is non-spanned), so the catalogued AIX was probably defined by another statement than this job's; low confidence, and it does not change the 150-byte maximum. `SHROPTNS(1,3)` on the AIX is the IDCAMS default, since `STEP40` names no `SHAREOPTIONS`.
 - Sample data: `app/data/ASCII/carddata.txt` has 50 records of 150 bytes, card numbers strictly ascending, and 50 distinct account IDs (one card per account). Checked locally with a Python script over the file.
 
 ## 6. Processing flow
@@ -152,7 +153,7 @@ No operator-facing message text is produced by the job itself; all messages are 
 In execution order. There is no rollback: each step's change is permanent.
 
 #### SE-JCARD-001 · Close the card files in CICS
-- **What:** SDSF issues `/F CICSAWSA,'CEMT SET FIL(CARDDAT ) CLO'` and `/F CICSAWSA,'CEMT SET FIL(CARDAIX ) CLO'`, MVS `MODIFY` commands that pass a CEMT request to the CICS region. CICS closes each file when no running task is using it (`docs/runbooks/cics-vsam-files.md:57-58`). While closed, online card and account functions that read these files fail.
+- **What:** SDSF issues `/F CICSAWSA,'CEMT SET FIL(CARDDAT ) CLO'` and `/F CICSAWSA,'CEMT SET FIL(CARDAIX ) CLO'`, MVS `MODIFY` commands that pass a CEMT request to the CICS region. CICS closes each file when no running task is using it (`docs/runbooks/cics-vsam-files.md:57-58`). While closed, the online card functions fail: card list browses `CARDDAT` (`app/cbl/COCRDLIC.cbl:1129-1376`), card view reads `CARDDAT` by card number and `CARDAIX` by account (`app/cbl/COCRDSLC.cbl:743, 784`), and card update reads and rewrites `CARDDAT` (`app/cbl/COCRDUPC.cbl:1383, 1428, 1478`). The account programs are not affected: account view and update declare the two file names but read the account through `CXACAIX`, `ACCTDAT` and `CUSTDAT` (`app/cbl/COACTVWC.cbl:728, 777, 827`).
 - **Source:** `:22-28`, `app/csd/CARDDEMO.CSD:13-14, 25-26`
 - **Fidelity:** must-preserve (batch reload and online use must not overlap); incidental (mechanism) · **Confidence:** platform-inferred
 
@@ -229,7 +230,7 @@ If a later step fails, everything before it has happened: the card files are clo
 
 #### ERR-JCARD-001 · Steps run regardless of earlier failures
 - **When:** a step ends with a non-zero return code without abending.
-- **Then:** the next step still runs, because no `EXEC` has a `COND` parameter. If `STEP10` fails (for example because the delete did not remove the cluster), `STEP15` loads the records into whatever cluster exists, and `STEP40` and `STEP50` fail on the existing AIX and path names (DEF-JCARD-001). An abend in a step skips the remaining steps, including `OPCIFIL`, so the files stay closed in CICS (JES default).
+- **Then:** the next step still runs, because no `EXEC` has a `COND` parameter. If `STEP10` fails (for example because the delete did not remove the cluster), `STEP15` loads the records into whatever cluster exists, unless CICS still holds it open (ERR-JCARD-003), `STEP40` and `STEP50` fail on the existing AIX and path names, and `STEP60` fails on the existing, already built AIX (DEF-JCARD-001). An abend in a step skips the remaining steps, including `OPCIFIL`, so the files stay closed in CICS (JES default).
 - **Restart:** rerun the whole job; every step either recreates its object or is reset. There is no partial restart point.
 - **Source:** `:22, 33, 47, 68, 80, 97, 107, 118`
 - **Fidelity:** defect-decide · **Confidence:** platform-inferred
@@ -240,10 +241,16 @@ If a later step fails, everything before it has happened: the card files are clo
 - **Source:** `:22-28, 118-124`
 - **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
+#### ERR-JCARD-003 · An open file in CICS makes every IDCAMS step fail
+- **When:** CICS still has `CARDDAT` or `CARDAIX` open when `STEP05` runs, because the close was refused or is still waiting for tasks (ERR-JCARD-002, DEF-JCARD-002).
+- **Then:** not only the delete (`STEP05`, reset to 0, DEF-JCARD-001) and the define (`STEP10`, existing name) fail. `STEP15` cannot open the cluster for output: with `SHAREOPTIONS(2 3)` (`:56`) only one region may have it open for update, and CICS does (card update rewrites through `CARDDAT`). `STEP40` and `STEP50` fail on the existing AIX and path names. `STEP60` cannot write the AIX, which CICS has open through `CARDAIX` or as part of the upgrade set and which already holds the old index. Each of these steps ends with return code 8 or 12, the old cluster, AIX and path stay as they were, and `OPCIFIL` reissues an open for files that are already open. The job's return code shows the failure; the data is unchanged.
+- **Source:** `:33, 47, 56, 68, 80, 97, 107`
+- **Fidelity:** defect-decide · **Confidence:** platform-inferred (VSAM share options and CICS upgrade-set opens)
+
 ## 11. Interactions
 
 - **Upstream:** none required; the job closes its own CICS files. CLOSEFIL does not close `CARDDAT` or `CARDAIX` (`docs/runbooks/cics-vsam-files.md:20-21, 72-73`).
-- **Downstream:** every reader of the card master: READCARD (`CBACT02C`), TRANVALD (`CBTRN01C`), CBEXPORT, and the online programs through CICS files `CARDDAT` (by card number) and `CARDAIX` (by account), for example `COACTVWC`, `COACTUPC` and `COCRDUPC`, and the optional authorisation programs `COPAUA0C` and `COPAUS0C`.
+- **Downstream:** every reader of the card master: READCARD (`CBACT02C`), TRANVALD (`CBTRN01C`), CBEXPORT, and the online card programs through CICS files `CARDDAT` (by card number) and `CARDAIX` (by account): `COCRDLIC` (list, `CARDDAT`), `COCRDSLC` (view, `CARDDAT` and the only user of `CARDAIX`) and `COCRDUPC` (update, `CARDDAT`). `COACTVWC`, `COACTUPC` and the optional authorisation programs `COPAUA0C` and `COPAUS0C` only declare the file names; their file requests go to the cross-reference, account and customer files (`app/cbl/COACTVWC.cbl:728, 777, 827`, `app/app-authorization-ims-db2-mq/cbl/COPAUA0C.cbl:478, 526, 574`, `app/app-authorization-ims-db2-mq/cbl/COPAUS0C.cbl:819, 870, 921`).
 - **Shared data:** the account ID in the card record must match ENT-ACCOUNT and the cross-reference ENT-CARD-XREF (loaded by XREFFILE); nothing in this job checks it.
 - **Operations:** the runbook lists CARDFILE among the jobs that must not run while CICS users are signed on (`docs/runbooks/cics-vsam-files.md:89-90`).
 
@@ -260,8 +267,8 @@ If a later step fails, everything before it has happened: the card files are clo
 ## 13. Known defects and oddities
 
 #### DEF-JCARD-001 · The return-code reset hides a failed delete
-- `IF MAXCC LE 08 THEN SET MAXCC = 0` is meant for "not found", but it also hides other delete failures with return code 8, for example when CICS has not yet closed `CARDDAT` (DEF-JCARD-002). Then `STEP10` fails because the name already exists, `STEP15` copies the flat file on top of the old, loaded cluster (records with existing keys are rejected as duplicates), `STEP40` and `STEP50` fail on the existing names, and `STEP60` builds into the existing AIX. The job ends with a non-zero code, but the old data stays.
-- **Source:** `:38, 41, 47, 68, 80, 97`
+- `IF MAXCC LE 08 THEN SET MAXCC = 0` is meant for "not found", but it also hides other delete failures with return code 8, for example when CICS has not yet closed `CARDDAT` (DEF-JCARD-002). Then `STEP10` fails because the name already exists. If CICS still holds the cluster, `STEP15` cannot open it for output either (`SHAREOPTIONS(2 3)`, `:56`; ERR-JCARD-003). If the delete failed for another reason and the cluster is free, `STEP15` copies the flat file on top of the old, loaded cluster: records with existing keys are rejected as duplicates, and after 4 such errors IDCAMS stops the copy (VAL-JCARD-001), so at most the first few new cards are added. `STEP40` and `STEP50` fail on the existing names, and `STEP60` fails too, because `BLDINDEX` cannot write into the existing AIX, which is already built and was defined without `REUSE`. The job ends with a non-zero code, but the old data stays.
+- **Source:** `:38, 41, 47, 56, 68, 75, 80, 97, 110-112`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JCARD-002 · The delete does not wait for the CICS close
@@ -275,12 +282,12 @@ If a later step fails, everything before it has happened: the card files are clo
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCARD-004 · At most 8 cards per account in the alternate index
-- With `RECORDSIZE(150,150)` a non-unique AIX record has room for 8 card numbers (NUM-JCARD-001). An account with a ninth card makes `BLDINDEX` fail for that account, and a later online add of a ninth card through the upgrade set fails. The sample data has one card per account, so this does not show.
+- With `RECORDSIZE(150,150)` a non-unique AIX record has room for 8 card numbers (NUM-JCARD-001). If an account has a ninth card, `BLDINDEX` most likely does not fail the build: IDCAMS reports the alternate key whose record overflows with a warning, leaves the extra card numbers out of the AIX record and goes on, so `STEP60` ends with a warning return code and card view by account (`CARDAIX`) silently misses those cards. No online program adds cards (card update only rewrites, `app/cbl/COCRDUPC.cbl:1478`), so the limit is reached only through this reload. The sample data has one card per account, so this does not show.
 - **Source:** `:85-88`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (the limit: reviewed arithmetic; the overflow behaviour of `BLDINDEX`: medium to low confidence)
 
 #### DEF-JCARD-005 · Null statement before the trailing comments
-- Line 125 is a JCL null statement (`//`), which marks the end of the job; the version comment lines after it (`:126-128`) are not part of the job. CARDFILE is the only job in this group that has it. No effect on processing.
+- Line 125 is a JCL null statement (`//`), which marks the end of the job; the version comment lines after it (`:126-128`) are not part of the job. DUSRSECJ (`app/jcl/DUSRSECJ.jcl:89`), ESDSRRDS (`app/jcl/ESDSRRDS.jcl:122`), TRANREPT (`app/jcl/TRANREPT.jcl:81`), DEFGDGD (`app/jcl/DEFGDGD.jcl:90-91`) and CBADMCDJ (`app/jcl/CBADMCDJ.jcl:164`) also have one. No effect on processing.
 - **Source:** `:125`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
@@ -303,9 +310,9 @@ After a successful run (return code 0), the card store contains exactly the reco
 | `CLCIFIL` | 22-28 | SE-JCARD-001, ERR-JCARD-002, DEF-JCARD-002, DEF-JCARD-003 |
 | `STEP05` | 33-42 | SE-JCARD-002, DEF-JCARD-001 |
 | `STEP10` | 47-64 | SE-JCARD-003, NUM-JCARD-001, ERR-JCARD-001 |
-| `STEP15` | 68-76 | SE-JCARD-004, VAL-JCARD-001, ERR-JCARD-001 |
+| `STEP15` | 68-76 | SE-JCARD-004, VAL-JCARD-001, ERR-JCARD-001, ERR-JCARD-003, DEF-JCARD-001 |
 | `STEP40` | 80-93 | SE-JCARD-005, NUM-JCARD-001, DEF-JCARD-004 |
 | `STEP50` | 97-103 | SE-JCARD-006 |
-| `STEP60` | 107-113 | SE-JCARD-007, DEF-JCARD-004 |
+| `STEP60` | 107-113 | SE-JCARD-007, ERR-JCARD-003, DEF-JCARD-001, DEF-JCARD-004 |
 | `OPCIFIL` | 118-124 | SE-JCARD-008, ERR-JCARD-002, DEF-JCARD-003 |
 | (null statement) | 125 | DEF-JCARD-005 |

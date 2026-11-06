@@ -117,22 +117,22 @@ In execution order. There is no rollback.
 ## 10. Error handling
 
 #### ERR-JIRD1-001 · The submit step runs even after a failed backup
-- **When:** the `IDCAMS` step ends with a non-zero condition code (for example the output is too small for the input).
-- **Then:** `STEP01` still runs, because its `EXEC` has no `COND` parameter, and INTRDRJ2 is submitted (DEF-JIRD1-002). If `IN`, `OUT` or the JCL library member cannot be allocated (not cataloged, member missing), the job ends with a JCL or allocation error and the later step does not run. An abend skips the remaining step (JES default). Restart means resubmitting the whole job; the copy is repeatable.
-- **Source:** `:6, 14`
-- **Fidelity:** defect-decide · **Confidence:** platform-inferred
+- **When:** the `IDCAMS` step ends with a non-zero condition code (for example the input cannot be read, or a record does not fit the output's record length).
+- **Then:** `STEP01` still runs, because its `EXEC` has no `COND` parameter, and INTRDRJ2 is submitted (DEF-JIRD1-002). If `IN` or `OUT` cannot be allocated (not cataloged), the `IDCAMS` step fails with a JCL error and `STEP01` does not run. If the library `AWS.M2.CARDDEMO.JCL` is not cataloged, `STEP01` itself fails allocation after the copy has run. A missing member `INTRDRJ2` is not an allocation error: allocating `DSN=library(member)` with `DISP=SHR` succeeds, and the failure comes when IEBGENER opens `SYSUT1` (typically abend `S013-18`), so nothing is submitted. If the output runs out of space, the step ends with an out-of-space abend (`x37`) rather than a condition code. An abend skips the remaining step (JES default). Restart means resubmitting the whole job; the copy is repeatable.
+- **Source:** `:6-9, 14-17`
+- **Fidelity:** defect-decide · **Confidence:** platform-inferred (allocation, open and abend behaviour, medium)
 
 ## 11. Interactions
 
 - **Downstream:** INTRDRJ2, submitted by `STEP01`, copies `AWS.M2.CARDEMO.FTP.TEST.BKUP` to `AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR` (`app/jcl/INTRDRJ2.JCL:9-12`).
 - **Related:** FTPJCL sends the same input data set to an FTP server (`app/jcl/FTPJCL.JCL:52`); the jobs are not chained to it.
-- **Other internal-reader users:** the online report request CORPT00C submits TRANREPT by writing JCL to the CICS transient-data queue `JOBS`, an extrapartition queue with `DDNAME(INREADER)` (`app/csd/CARDDEMO.CSD:499-505`), not through this job.
+- **Other internal-reader users:** the online report request CORPT00C submits job `TRNRPT00`, which runs the procedure TRANREPT (`app/cbl/CORPT00C.cbl:84, 94`; not the TRANREPT job), by writing JCL to the CICS transient-data queue `JOBS`, an extrapartition queue with `DDNAME(INREADER)` (`app/csd/CARDDEMO.CSD:499-505`), not through this job.
 
 ## 12. Numeric, date and format details
 
 #### NUM-JIRD1-001 · 80-byte card images to the internal reader
-- `SYSUT2` has `DCB=(LRECL=80,BLKSIZE=80)`: one 80-byte JCL statement per record, unblocked, which is the format JES expects from an internal reader. The member must have 80-byte records.
-- **Fidelity:** incidental · **Confidence:** reviewed (DCB); platform-inferred (JES requirement)
+- `SYSUT2` has `DCB=(LRECL=80,BLKSIZE=80)`: one 80-byte JCL statement per record, unblocked. This is one format the JES internal reader accepts; it also accepts blocked 80-byte records, so the unblocked size is a choice, not a requirement. The member must have 80-byte records.
+- **Fidelity:** incidental · **Confidence:** reviewed (DCB); platform-inferred (internal reader record formats, low-medium)
 
 ## 13. Known defects and oddities
 

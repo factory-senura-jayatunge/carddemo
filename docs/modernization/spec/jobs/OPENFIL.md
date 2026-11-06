@@ -8,7 +8,7 @@ source_rev: 8a8a80a
 sources:
   - {path: app/jcl/OPENFIL.jcl, sha256: 1831990c7874, role: job}
   - {path: app/csd/CARDDEMO.CSD, sha256: 28ded93b49e1, role: csd, lines: "1-99"}
-  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "124-148, 452-455, 526-529, 568-571"}
+  - {path: app/scheduler/CardDemo.ca7, sha256: 61d204864a80, role: schedule, lines: "123-148, 452-455, 526-532, 568-571"}
   - {path: app/scheduler/CardDemo.controlm, sha256: 8efe566cd0fb, role: schedule, lines: "20-24, 50-54, 87-91"}
   - {path: docs/runbooks/cics-vsam-files.md, sha256: 263569d29e9a, role: runbook}
 entry_points: [{type: scheduler, file: app/scheduler/CardDemo.ca7, lines: "124-148"}, {type: scheduler, file: app/scheduler/CardDemo.controlm, lines: "20-24"}, {type: manual, job: OPENFIL}]
@@ -27,7 +27,7 @@ spec_status: draft
 
 ## 1. Summary
 
-OPENFIL hands the five files that CLOSEFIL closed back to the online system. Its only step runs the SDSF batch interface, which issues five MVS `MODIFY` commands to the CICS region `CICSAWSA`, each asking CICS to open one file (`CEMT SET FIL(...) OPE`). It is the last job of every chain in both schedules and of the README and demo-script sequences. It contains no business logic.
+OPENFIL hands the five files that CLOSEFIL closed back to the online system. Its only step runs the SDSF batch interface, which issues five MVS `MODIFY` commands to the CICS region `CICSAWSA`, each asking CICS to open one file (`CEMT SET FIL(...) OPE`). It ends most chains in both schedules and the README and demo-script sequences, but not all of them: the Control-M MNTTRDB2 folder and TRANEXTR smart folder have no OPENFIL (`app/scheduler/CardDemo.controlm:26-31, 57-63`), and in CA-7 an OPENFIL that runs under schedule ID 031 triggers CLOSEFIL again (section 3). It contains no business logic.
 
 ## 2. Rules at a glance
 
@@ -42,7 +42,7 @@ OPENFIL hands the five files that CLOSEFIL closed back to the online system. Its
 ## 3. Actors and triggers
 
 - **Triggers:**
-  - CA-7: job `OPENFIL` (`app/scheduler/CardDemo.ca7:126-148`), triggered by WAITSTEP with SCHID 030 (`app/scheduler/CardDemo.ca7:123-124, 452-453, 526-527`) and SCHID 031 (`app/scheduler/CardDemo.ca7:568-569`). Its "COMP TRIGGERS OTHER JOBS" flag is `N` (`app/scheduler/CardDemo.ca7:138`), so it ends a chain. See `SCHED-CA7.md`.
+  - CA-7: job `OPENFIL` (`app/scheduler/CardDemo.ca7:126-148`), triggered by WAITSTEP with SCHID 030 (`app/scheduler/CardDemo.ca7:123-124, 452-453, 526-527`) and SCHID 031 (`app/scheduler/CardDemo.ca7:568-569`). Its full listing has no triggered-jobs section and its "COMP TRIGGERS OTHER JOBS" flag is `N` (`app/scheduler/CardDemo.ca7:126-148`), but a later short listing gives it one trigger, CLOSEFIL with SCHID 031 (`app/scheduler/CardDemo.ca7:529-532`). A trigger fires only when its job runs under that schedule ID, and the triggered job inherits the ID: an OPENFIL triggered under 030 ends its chain, and an OPENFIL triggered under 031 (`app/scheduler/CardDemo.ca7:568-569`) closes the files again (FLOW-JCA7-004, DEF-JCA7-008). See `SCHED-CA7.md`.
   - Control-M: last job of `DAILY-TransactionBackup`, `WEEKLY-DisclosureGroupsRefresh` and `MONTHLY-InterestCalculation` (`app/scheduler/CardDemo.controlm:20-24, 50-54, 87-91`), each time after WAITSTEP. See `SCHED-CONTROLM.md`.
   - By hand: README initialisation (`./README.md:165`), demo script job 16 (`scripts/run_full_batch.sh:65-66`), batch cycle step 9 (`docs/runbooks/batch-cycle-restart.md:21`).
 - **Preconditions:** the batch jobs that use the five files have ended; region `CICSAWSA` is up; the user may issue `MODIFY` through SDSF.
@@ -91,7 +91,7 @@ None. CICS responses go to the console and to `CMDOUT` (incidental).
 - **Fidelity:** incidental · **Confidence:** reviewed
 
 #### SE-JOPEN-001 · CICS opens the five files
-- **What:** CICS opens each named file, so online transactions can read and update it again. The files are defined `OPENTIME(FIRSTREF)` (`app/csd/CARDDEMO.CSD:4`), so without this job CICS would open an enabled file at its first use anyway; the explicit open also makes a file that the close left disabled available again (`docs/runbooks/cics-vsam-files.md:76-83`).
+- **What:** CICS opens each named file, so online transactions can read and update it again. Without this job the files stay unavailable: CLOSEFIL's close leaves each file closed and UNENABLED (SE-JCLOSE-001), and CICS does not open an UNENABLED file at its first use, so requests get "not open" although the files are defined `OPENTIME(FIRSTREF)` (`app/csd/CARDDEMO.CSD:4`). `FIRSTREF` only opens a file that is closed but enabled, for example after a CICS restart. Opening an UNENABLED file by command also enables it; the runbook gives `OPEN ENABLED` for the manual fix (`docs/runbooks/cics-vsam-files.md:76-83`).
 - **Source:** `:26-30`
 - **Fidelity:** must-preserve (online access resumes only after batch has finished) · **Confidence:** platform-inferred
 

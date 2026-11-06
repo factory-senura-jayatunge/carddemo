@@ -157,7 +157,7 @@ If the define fails, the delete has already happened.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JDCUST-004 · Unused and incomplete
-- The job has no load step, no `VOLUMES` (the reload jobs such as CUSTFILE use `AWSHJ1`), and no version comment at the end, unlike CUSTFILE (`app/jcl/CUSTFILE.jcl:84`); nothing triggers it and nothing uses its result. It reads as a leftover from before CUSTFILE.
+- The job has no load step, no `VOLUMES` (the reload jobs such as CUSTFILE use `AWSHJ1`), and no version comment at the end, unlike CUSTFILE (`app/jcl/CUSTFILE.jcl:83`); nothing triggers it and nothing uses its result. It reads as a leftover from before CUSTFILE.
 - **Source:** `:1-47`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 

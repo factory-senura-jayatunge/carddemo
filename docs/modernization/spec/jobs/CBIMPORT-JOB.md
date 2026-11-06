@@ -7,11 +7,11 @@ unit_code: JIMPT
 source_rev: 8a8a80a
 sources:
   - {path: app/jcl/CBIMPORT.jcl, sha256: 83aa49661583, role: job}
-  - {path: app/cbl/CBIMPORT.cbl, sha256: 4b00b31a6d9a, role: program, lines: "37-114, 203-245, 491-494"}
+  - {path: app/cbl/CBIMPORT.cbl, sha256: 4b00b31a6d9a, role: program, lines: "37-114, 203-245, 439-462, 491-494"}
   - {path: app/cpy/CVEXPORT.cpy, sha256: 49d07843c9bd, role: record-layout, lines: "9-19"}
   - {path: app/jcl/CBEXPORT.jcl, sha256: 2af5ab38310c, role: job, lines: "30-38"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "680-688"}
-  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "52, 102-103, 147-150"}
+  - {path: docs/security/data-handling.md, sha256: dd08e1cbc676, role: security, lines: "52, 102-103, 147-150, 173-175"}
 entry_points: [{type: manual, job: CBIMPORT}]
 programs: [CBIMPORT]
 data_stores:
@@ -41,10 +41,11 @@ The job has no business rules. Its items:
 | FLOW-JIMPT-001 | Run the program CBIMPORT once over the whole export file. |
 | SE-JIMPT-001 | Create and catalogue five flat files, one per master type, with the master record lengths. |
 | SE-JIMPT-002 | Create and catalogue the error file, 132-byte records. |
-| ERR-JIMPT-001 | A program error abends the step with no defined code; all six new files are then deleted. |
+| ERR-JIMPT-001 | A program error abends the step with no defined code; all six new files are then deleted. A failed write to the error file is the exception. |
+| ERR-JIMPT-002 | A failed write to the error file is only displayed; the step continues and ends normally. |
 | NUM-JIMPT-001 | Output record lengths equal the master copybooks; the error file is 132-byte text. |
 | DEF-JIMPT-001 | No pre-delete step: a second run fails because the output names exist. |
-| DEF-JIMPT-002 | [security] Six more files hold full customer PII and card CVVs. |
+| DEF-JIMPT-002 | [security] Five more files hold full customer PII, card numbers and CVVs, and no job deletes them. |
 | DEF-JIMPT-003 | The input file is defined by CBEXPORT's JCL with a key offset the program does not use. |
 | DEF-JIMPT-004 | Nothing loads the imported files. |
 
@@ -122,10 +123,16 @@ None in the job. The program's progress messages (for example `CBIMPORT: Startin
 ## 10. Error handling
 
 #### ERR-JIMPT-001 · Program errors abend the step
-- **When:** the program cannot open, read or write a file.
+- **When:** the program cannot open or read a file, or cannot write one of the five data files. A failed write to `ERROUT` does not abend (ERR-JIMPT-002).
 - **Then:** it displays the error and calls `CEE3ABD` without arguments (`app/cbl/CBIMPORT.cbl:491-494`), so the step abends with a code the program does not define. Because every output has `DISP=(NEW,CATLG,DELETE)`, all six new files are deleted, and the export file is unchanged, so after fixing the cause the job can be resubmitted. A JCL error at allocation (for example DEF-JIMPT-001) stops the job before the program runs.
 - **Source:** `:22, 33-65`
 - **Fidelity:** must-preserve (no partial import is left behind) · **Confidence:** platform-inferred
+
+#### ERR-JIMPT-002 · A failed error-file write does not stop the step
+- **When:** the write of an error line to `ERROUT` returns a status other than `00`.
+- **Then:** the program displays `ERROR: Writing error record, Status: ` and the status, still counts the line as written, and carries on (ERR-IMPT-004, DEF-IMPT-002). The step can therefore end with return code 0 while `IMPORT.ERRORS` lacks lines for some unknown-type records; the job's return code alone does not prove that the error file is complete. The program also always displays `CBIMPORT: No validation errors detected`, whatever the error file holds (`app/cbl/CBIMPORT.cbl:459-462`; DEF-IMPT-001).
+- **Source:** `app/cbl/CBIMPORT.cbl:449-456`, `:61-65`
+- **Fidelity:** defect-decide · **Confidence:** reviewed
 
 ## 11. Interactions
 
@@ -137,6 +144,7 @@ None in the job. The program's progress messages (for example `CBIMPORT: Startin
 
 #### NUM-JIMPT-001 · Output record formats
 - The five data files have exactly the record lengths of the master copybooks: 500 (`app/cpy/CVCUS01Y.cpy`), 300 (`app/cpy/CVACT01Y.cpy`), 50 (`app/cpy/CVACT03Y.cpy`), 350 (`app/cpy/CVTRA05Y.cpy`) and 150 (`app/cpy/CVACT02Y.cpy`), matching the program's FDs (`app/cbl/CBIMPORT.cbl:86-109`). Numeric fields that the export record stores in binary or packed form are converted back by the program; that conversion belongs to the program spec. The error file holds 132-byte lines.
+- **Source:** `app/cbl/CBIMPORT.cbl:86-114`, `:33-65`
 - **Fidelity:** must-preserve (if the target keeps flat-file outputs) · **Confidence:** reviewed
 
 ## 13. Known defects and oddities
@@ -146,16 +154,19 @@ None in the job. The program's progress messages (for example `CBIMPORT: Startin
 - **Source:** `:33-65`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
-#### DEF-JIMPT-002 · [security] Six more files with full PII and CVVs
-- The customer file carries SSN, government ID and date of birth, and the card file carries card numbers and CVVs, in plain sequential datasets that no job ever deletes (`docs/security/data-handling.md:102-103`, `docs/security/data-handling.md:147-150`).
+#### DEF-JIMPT-002 · [security] Five more files with full PII, card numbers and CVVs
+- Of the six outputs, the five data files hold sensitive data: the customer file carries names, addresses, phone numbers, SSN, government ID and date of birth; the card file carries card numbers and CVVs; the cross-reference and transaction files carry card numbers (`app/cpy/CVACT03Y.cpy:5`, `app/cpy/CVTRA05Y.cpy:15`). The error file holds only a timestamp, the record type, the sequence number and a fixed message (`app/cbl/CBIMPORT.cbl:439-442`). The five files are plain sequential datasets, not encrypted or masked, that no job deletes; the retention table in `docs/security/data-handling.md:173-175` covers the masters and the export file but has no entry for the import files, and the extract rule in `docs/security/data-handling.md:147-150` asks that CVV and SSN be dropped from extracts that leave the system.
+- **Source:** `:33-57`, `app/cbl/CBIMPORT.cbl:86-109`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-JIMPT-003 · The input's catalogued key offset differs from the program's
 - The program reads `EXPORT.DATA` as an indexed file keyed at offset 27 (`app/cbl/CBIMPORT.cbl:81-84`), but CBEXPORT's JCL defines the cluster with `KEYS(4 28)` (`app/jcl/CBEXPORT.jcl:32`; DEF-JEXPT-001). On z/OS the program's open would most likely fail with a file-status error and the program would abend. Locally the runner uses offset 27 for both programs, so the problem does not show.
-- **Status:** open · **Fidelity:** defect-fix · **Confidence:** platform-inferred
+- **Source:** `:28-29`, `app/cbl/CBIMPORT.cbl:81-84`, `app/jcl/CBEXPORT.jcl:32`
+- **Status:** open · **Fidelity:** defect-decide (Q-JEXPT-001) · **Confidence:** platform-inferred
 
 #### DEF-JIMPT-004 · Nothing loads the imported files
 - The outputs are not loaded into VSAM or read by any CardDemo job; the master reload jobs (for example CUSTFILE) read the `*.PS` sample files, not `*.IMPORT`. The import ends with flat files for a system outside the repository.
+- **Source:** `:33-57`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (repository-wide search for the dataset names)
 
 ## 14. Open questions
@@ -173,4 +184,4 @@ After a successful run (return code 0), every export record appears in exactly o
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP01` | 22-70 | FLOW-JIMPT-001, SE-JIMPT-001, SE-JIMPT-002, ERR-JIMPT-001, NUM-JIMPT-001, DEF-JIMPT-001, DEF-JIMPT-002, DEF-JIMPT-003, DEF-JIMPT-004 |
+| `STEP01` | 22-70 | FLOW-JIMPT-001, SE-JIMPT-001, SE-JIMPT-002, ERR-JIMPT-001, ERR-JIMPT-002, NUM-JIMPT-001, DEF-JIMPT-001, DEF-JIMPT-002, DEF-JIMPT-003, DEF-JIMPT-004 |

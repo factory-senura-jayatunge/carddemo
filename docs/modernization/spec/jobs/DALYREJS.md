@@ -116,6 +116,7 @@ DEFINE GENERATIONDATAGROUP -
 
 #### NUM-JREJS-001 · Five generations, one per POSTTRAN run
 - `LIMIT(5)` keeps the five newest generations. A generation is added by every POSTTRAN run that ends without an abend, so the GDG holds the rejects of the last five runs, which is five days only when POSTTRAN runs exactly once a day (the runbook says "the last five days", `docs/runbooks/daily-rejects.md:22-24`). Each generation is fixed-length 430-byte records (`app/jcl/POSTTRAN.jcl:36`).
+- **Source:** `:26`, `app/jcl/POSTTRAN.jcl:36`
 - **Fidelity:** must-preserve (retention) · **Confidence:** reviewed (limit, record size); platform-inferred (roll-off)
 
 ## 13. Known defects and oddities

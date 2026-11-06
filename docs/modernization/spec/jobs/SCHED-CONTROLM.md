@@ -23,7 +23,7 @@ spec_status: draft
 
 ## 1. Summary
 
-`app/scheduler/CardDemo.controlm` is a Control-M XML definition table (`DEFTABLE`) with five folders: three regular folders (daily, monthly and one for a Db2 maintenance job) and two weekly smart folders. They hold 15 job definitions that run 9 JCL members. `DAILY-TransactionBackup` closes the CICS files, backs up and empties the transaction master (TRANBKP), waits and reopens the files every day (FLOW-JCTLM-001). `WEEKLY-TransactionTypesDBRefresh` runs the Db2 transaction type maintenance MNTTRDB2 (FLOW-JCTLM-002), whose completion releases two Saturday smart folders: the disclosure group reload (FLOW-JCTLM-003) and the Db2 extract TRANEXTR (FLOW-JCTLM-004). `MONTHLY-InterestCalculation` computes interest and rebuilds the transaction master (FLOW-JCTLM-005). Jobs are chained by conditions (FLOW-JCTLM-006). Control-M never runs POSTTRAN, so it has no posting cycle at all, and the daily backup empties the transaction master every day with nothing reloading it (DEF-JCTLM-001). Only the daily folder and the two smart folders have scheduling days; MNTTRDB2 and the monthly folder would never be ordered automatically (DEF-JCTLM-002). The weekly Db2 refresh writes new flat files but never loads them into VSAM (DEF-JCTLM-005). The table was last uploaded on 9 September 2025, so it is much newer than the CA-7 listing, and it disagrees with that listing on almost every job. Which cycle the Airflow DAGs implement is a decision (Q-JCTLM-001).
+`app/scheduler/CardDemo.controlm` is a Control-M XML definition table (`DEFTABLE`) with five folders: three regular folders (daily, monthly and one for a Db2 maintenance job) and two weekly smart folders. They hold 15 job definitions that run 9 JCL members. `DAILY-TransactionBackup` closes the CICS files, backs up and empties the transaction master (TRANBKP), waits and reopens the files every day (FLOW-JCTLM-001). `WEEKLY-TransactionTypesDBRefresh` runs the Db2 transaction type maintenance MNTTRDB2 (FLOW-JCTLM-002), whose completion releases two Saturday smart folders: the disclosure group reload (FLOW-JCTLM-003) and the Db2 extract TRANEXTR (FLOW-JCTLM-004). `MONTHLY-InterestCalculation` computes interest and rebuilds the transaction master (FLOW-JCTLM-005). Jobs are chained by conditions (FLOW-JCTLM-006). Control-M never runs POSTTRAN, so it has no posting cycle at all, and the daily backup empties the transaction master every day with nothing reloading it (DEF-JCTLM-001). Only the daily folder and the two smart folders have scheduling days; MNTTRDB2 and the monthly folder run only when an operator forces them (DEF-JCTLM-002). Because every condition is scoped to its order date, one day's chain does not wait for the previous day's (DEF-JCTLM-009). The weekly Db2 refresh writes new flat files but never loads them into VSAM (DEF-JCTLM-005). The table was last uploaded on 9 September 2025, so it is much newer than the CA-7 listing, and it disagrees with that listing on almost every job. Which cycle the Airflow DAGs implement is a decision (Q-JCTLM-001). Several attributes suggest a distributed Control-M rather than Control-M for z/OS, which changes what the member names and return codes mean (Q-JCTLM-005).
 
 ## 2. Rules at a glance
 
@@ -39,17 +39,18 @@ spec_status: draft
 | ERR-JCTLM-001 | A job that ends not OK sets no condition; its successors wait, and no automatic action is defined. |
 | NUM-JCTLM-001 | Order date conditions, `TIMETO 23:00`, `MAXWAIT 7`, `MAXRERUN 5`, smart-folder interval 5 minutes. |
 | DEF-JCTLM-001 | No POSTTRAN; the daily backup empties the transaction master every day. |
-| DEF-JCTLM-002 | MNTTRDB2 and the monthly folder have no scheduling days; MNTTRDB2 has no in-condition. |
+| DEF-JCTLM-002 | MNTTRDB2 and the monthly folder have no scheduling days and run only when forced; MNTTRDB2 has no in-condition. |
 | DEF-JCTLM-003 | Two folders share one name, and the parent folder attributes point the wrong way. |
 | DEF-JCTLM-004 | Two smart folders consume and delete the same condition. |
 | DEF-JCTLM-005 | The weekly Db2 refresh never reloads the VSAM type and category files; DISCGRP waits for an unrelated Db2 job. |
 | DEF-JCTLM-006 | The monthly folder has no posting, no backup before COMBTRAN and no index rebuild. |
 | DEF-JCTLM-007 | Folder and job attributes contradict each other or are placeholders. |
 | DEF-JCTLM-008 | Folders that run on the same day close and reopen the same files independently. |
+| DEF-JCTLM-009 | Conditions are scoped to the order date, so a new day's chain can run while an earlier day's chain still waits. |
 
 ## 3. Actors and triggers
 
-- **Who uses it:** the Control-M scheduler. At each New Day, Control-M orders the jobs and smart folders whose scheduling criteria match the date; ordered jobs then wait for their in-conditions and their time window. An operator can also order a folder by hand.
+- **Who uses it:** the Control-M scheduler. At each New Day, Control-M orders the jobs and smart folders whose scheduling criteria match the date; ordered jobs then wait for their in-conditions and their time window. An operator can also order a folder by hand, which checks its scheduling criteria for the date, or force it, which ignores them (DEF-JCTLM-002).
 - **Preconditions:** the JCL members exist in the library the data centre uses (the table names no library, SE-JCTLM-001); the user `xuemingh` may submit them; for the weekly folders, the optional Db2 transaction type module is installed (MNTTRDB2, TRANEXTR, `app/app-transaction-type-db2/jcl/`).
 - **Format:** XML `DEFTABLE` (`:1-2`) with `FOLDER` (`TYPE="1"`) and `SMART_FOLDER` (`TYPE="2"`) elements; each `JOB` element carries its attributes on one line, followed by `INCOND`, `OUTCOND` and `RULE_BASED_CALENDARS` elements (`:4-7`).
 
@@ -113,7 +114,7 @@ flowchart TD
 - **Fidelity:** defect-decide (DEF-JCTLM-001) · **Confidence:** reviewed (definition); platform-inferred (ordering)
 
 #### FLOW-JCTLM-002 · Db2 transaction type maintenance
-- **When:** MNTTRDB2 is ordered. Its job has month flags but no `DAYS` attribute (`:27`), so it is not ordered automatically (DEF-JCTLM-002); an operator must order it. It has no `INCOND` (`:27-31`), so once ordered it is submitted at once, with no CLOSEFIL or other job before it.
+- **When:** MNTTRDB2 is ordered. Its job has month flags but no `DAYS` attribute (`:27`), so New Day does not order it and an ordinary order skips it as well; an operator must force it (DEF-JCTLM-002). It has no `INCOND` (`:27-31`), so once forced it is submitted at once, with no CLOSEFIL or other job before it.
 - **Then:** MNTTRDB2 runs program `COBTUPDT` under the TSO terminal monitor against Db2, with input `INPFILE` (`app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:21-30`), and on success sets `WEEKLY-TransactionTypesDBRefresh-MNTTRDB2` (`:28`). It deletes no condition.
 - **Source:** `:26-31`, `app/app-transaction-type-db2/jcl/MNTTRDB2.jcl:21-30`
 - **Fidelity:** incidental · **Confidence:** reviewed
@@ -131,7 +132,7 @@ flowchart TD
 - **Fidelity:** defect-decide (DEF-JCTLM-005) · **Confidence:** reviewed
 
 #### FLOW-JCTLM-005 · Monthly interest calculation
-- **When:** the folder is ordered. Its jobs have month flags but no `DAYS` and no calendar (`:65`), so "monthly" is only in the folder name (DEF-JCTLM-002).
+- **When:** an operator forces the folder. Its jobs have month flags but no `DAYS` and no calendar (`:65`), so New Day never orders them and "monthly" is only in the folder name (DEF-JCTLM-002).
 - **Then:** CLOSEFIL (`:65-68`), INTCALC, which writes interest transactions to `SYSTRAN(+1)` and adds interest to the account balances (`:69-74`), COMBTRAN, which merges `TRANSACT.BKUP(0)` and `SYSTRAN(0)` and loads the result into `TRANSACT` (`:75-80`), WAITSTEP (`:81-86`) and OPENFIL (`:87-91`) run in turn.
 - **Source:** `:64-92`
 - **Fidelity:** defect-decide (DEF-JCTLM-006) · **Confidence:** reviewed
@@ -153,15 +154,15 @@ None.
 ## 9. Side effects
 
 #### SE-JCTLM-001 · Job submission attributes
-- **What:** every job has `APPLICATION="CARD-DEMO"`, `TASKTYPE="Job"`, `APPL_TYPE="OS"`, `MEMNAME` equal to `JOBNAME`, `RUN_AS="xuemingh"`, `CRITICAL="0"`, `CONFIRM="0"` (no manual confirmation), `CYCLIC="0"`, `MAXWAIT="7"`, `MAXRERUN="5"`, `AUTOARCH="1"` and `TIMETO="23:00"` (`:4`). No job names a member library (`MEMLIB`), so the library the members are taken from is not in the table. `SUB_APPLICATION` is `CTRLM` in the regular folders and the smart folder name in the smart folders (`:33, 58`).
-- **Source:** `:4, 33, 58`
+- **What:** every job has `APPLICATION="CARD-DEMO"`, `TASKTYPE="Job"`, `APPL_TYPE="OS"`, `MEMNAME` equal to `JOBNAME`, `RUN_AS="xuemingh"`, `CRITICAL="0"`, `CONFIRM="0"` (no manual confirmation), `CYCLIC="0"`, `MAXWAIT="7"`, `MAXRERUN="5"`, `AUTOARCH="1"` and `TIMETO="23:00"` (`:4`). No job names a member library (`MEMLIB`), so the library the members are taken from is not in the table; on a distributed Control-M, `MEMNAME` without `MEMLIB` names a script on the agent host instead (Q-JCTLM-005). `SUB_APPLICATION` is `CTRLM` in the regular folders; in the smart folders it is the smart folder's `JOBNAME`, `DisclosureGroupsRefresh` and `TransactionTypesDBRefresh`, not its `FOLDER_NAME` (`:32-33, 57-58`).
+- **Source:** `:4, 32-33, 57-58`
 - **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 10. Error handling
 
 #### ERR-JCTLM-001 · A failed job stops its chain
 - **When:** a job ends not OK (abend, JCL error, or a completion that Control-M does not accept).
-- **Then:** its `OUTCOND`s are not performed, so its successor's in-condition never appears and the successor waits. No job has `ON`/`DO` statements, shouts or a rerun interval, so nothing reruns the job, notifies anyone or opens the CICS files again: after a failure before OPENFIL the files stay closed until an operator acts. A waiting job stays in the active environment for `MAXWAIT="7"` days and is then removed. `MAXRERUN="5"` caps the number of reruns but does not by itself cause one. Which return codes count as OK is not defined in the table, so the site default applies; POSTTRAN-style return code 4 (some records rejected) would need an explicit rule if such a job were added.
+- **Then:** its `OUTCOND`s are not performed, so its successor's in-condition never appears and the successor waits. No job has `ON`/`DO` statements, shouts or a rerun interval, so nothing reruns the job, notifies anyone or opens the CICS files again: after a failure before OPENFIL the files stay closed until an operator acts. A waiting job stays in the active environment for `MAXWAIT="7"` days and is then removed. `MAXRERUN="5"` caps the number of reruns but does not by itself cause one. Which return codes count as OK is not defined in the table, so the site default applies; POSTTRAN-style return code 4 (some records rejected) would need an explicit rule if such a job were added. On a distributed Control-M any non-zero exit code ends the job NOTOK, so a return code 4 would stop the chain (Q-JCTLM-005).
 - **Source:** `:4-24`
 - **Fidelity:** must-preserve (stop after a failure) · **Confidence:** platform-inferred
 
@@ -186,9 +187,9 @@ None.
 - **Status:** open · **Fidelity:** defect-decide (Q-JCTLM-001, Q-JCTLM-004) · **Confidence:** reviewed
 
 #### DEF-JCTLM-002 · Jobs without scheduling days
-- MNTTRDB2 (`:27`) and the five jobs of `MONTHLY-InterestCalculation` (`:65, 69, 75, 81, 87`) have month flags but no `DAYS`, `WEEKDAYS`, `DAYSCAL` or rule-based calendar other than `"*"`. Control-M does not order such jobs at New Day, so the monthly interest calculation and the weekly Db2 maintenance run only when ordered by hand; the two Saturday smart folders then wait for an MNTTRDB2 condition that never appears. MNTTRDB2 also has no `INCOND` (`:27-31`). The first CLOSEFIL of the daily and monthly folders has none either (`:4-7, 65-68`), but the daily one is ordered every day; MNTTRDB2, the head of the weekly chain, is tied neither to a day nor to the end of another job.
+- MNTTRDB2 (`:27`) and the five jobs of `MONTHLY-InterestCalculation` (`:65, 69, 75, 81, 87`) have month flags but no `DAYS`, `WEEKDAYS`, `DAYSCAL` or rule-based calendar other than `"*"`. Control-M does not order such jobs at New Day, so the monthly interest calculation and the weekly Db2 maintenance run only when an operator forces them (a forced order ignores the scheduling criteria; an ordinary order checks them and skips these jobs); the two Saturday smart folders then wait for an MNTTRDB2 condition that never appears. MNTTRDB2 also has no `INCOND` (`:27-31`). The first CLOSEFIL of the daily and monthly folders has none either (`:4-7, 65-68`), but the daily one is ordered every day; MNTTRDB2, the head of the weekly chain, is tied neither to a day nor to the end of another job.
 - **Source:** `:27-31, 65, 69, 75, 81, 87`
-- **Status:** open · **Fidelity:** defect-decide (Q-JCTLM-002) · **Confidence:** reviewed (attributes); platform-inferred (ordering)
+- **Status:** open · **Fidelity:** defect-decide (Q-JCTLM-002) · **Confidence:** reviewed (attributes); platform-inferred (ordering and forcing)
 
 #### DEF-JCTLM-003 · Duplicate folder name and inverted parent folders
 - The regular folder at `:26` and the smart folder at `:57` are both named `WEEKLY-TransactionTypesDBRefresh` (`REAL_FOLDER_ID` 2 and 4); Control-M requires folder names to be unique in a data centre. The smart folder `WEEKLY-DisclosureGroupsRefresh` has `PARENT_FOLDER="WEEKLY-TransactionTypesDBRefresh"` (`:32`), while the TRANEXTR job inside the smart folder `WEEKLY-TransactionTypesDBRefresh` has `PARENT_FOLDER="WEEKLY-DisclosureGroupsRefresh"` (`:58`): the parent references point at each other's folder.
@@ -211,7 +212,7 @@ None.
 - **Status:** open · **Fidelity:** defect-decide (Q-JCTLM-001, Q-JINTC-002) · **Confidence:** reviewed
 
 #### DEF-JCTLM-007 · Contradictory and placeholder attributes
-- `JOBS_IN_GROUP="00001"` on the disclosure smart folder, which holds four jobs (`:32-54`); `PLATFORM="UNIX"` on both smart folders (`:32, 57`) while every job is `APPL_TYPE="OS"`; `INTERVAL="00005M"` on non-cyclic folders; WAITSTEP and OPENFIL of the monthly folder both have `JOBISN="4"` (`:81, 87`; the order still follows the conditions); `VERSION_HOST="MY-HOST"` everywhere; jobs run as the personal user `xuemingh`, and `CREATION_USER` is `emuser` for some jobs and `XUEMINGH` for others (`:4, 27`).
+- `JOBS_IN_GROUP="00001"` on the disclosure smart folder, which holds four jobs (`:32-54`); `INTERVAL="00005M"` on non-cyclic folders (`:32, 57`); WAITSTEP and OPENFIL of the monthly folder both have `JOBISN="4"` (`:81, 87`; the order still follows the conditions); `VERSION_HOST="MY-HOST"` everywhere; jobs run as the personal user `xuemingh`, and `CREATION_USER` is `emuser` for some jobs and `XUEMINGH` for others (`:4, 27`).
 - **Source:** `:4, 27, 32, 57, 81, 87`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
@@ -219,6 +220,11 @@ None.
 - The daily folder runs every day, including Saturdays and any day the monthly folder is ordered. Each folder has its own CLOSEFIL, WAITSTEP and OPENFIL with its own conditions, and no condition links the folders. On such a day the daily OPENFIL can reopen the CICS files while the monthly INTCALC or COMBTRAN still update them, and the daily TRANBKP can delete `TRANSACT` while the monthly COMBTRAN loads it. Only data set enqueues would serialise them.
 - **Source:** `:3-25, 64-92`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (definitions); platform-inferred (concurrency)
+
+#### DEF-JCTLM-009 · Order-date scoping lets days overlap
+- Every condition is dated with the job's order date (`ODATE="ODAT"`, FLOW-JCTLM-006), and the first CLOSEFIL of the daily folder has no in-condition (`:4-7`). A day's chain therefore does not wait for the previous day's chain to finish. If a daily job fails or is held, its successors stay in the active environment waiting for a condition of their own order date, for up to `MAXWAIT="7"` days (`:4`), while the next New Day orders a new chain that closes the files, backs up and empties `TRANSACT` and reopens the files. When the earlier chain is released, its TRANBKP or OPENFIL runs in the middle of a later day's chain. Nothing in the table serialises the days.
+- **Source:** `:4-24`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (conditions); platform-inferred (ordering)
 
 ## 14. Open questions
 
@@ -228,6 +234,7 @@ None.
 | Q-JCTLM-002 | How often should interest be calculated and transaction types maintained: monthly and weekly as the folder names say (and on which day), or every cycle as the README runs them? | business |
 | Q-JCTLM-003 | Should a failed job be rerun automatically (the table sets `MAXRERUN="5"` but no rerun rule), or held for an operator with a notification? | operations |
 | Q-JCTLM-004 | Is the daily backup meant to empty the transaction master (DEF-JCTLM-001), or only to save it? | business, operations |
+| Q-JCTLM-005 | Which Control-M runs this table: Control-M for z/OS, or a distributed Control-M server with agents? The table points to a distributed one: `PLATFORM="UNIX"` on the smart folders (`:32, 57`), folder names of up to 32 characters, the lower-case user `xuemingh` in `RUN_AS` (`:4`) and condition names of up to 41 characters (`WEEKLY-TransactionTypesDBRefresh-MNTTRDB2`, `:28`). If it is distributed, `MEMNAME` without `MEMLIB` names a script that the agent runs, not a JCL member, and any non-zero exit code ends the job NOTOK, so a job that ends with return code 4 stops its chain (ERR-JCTLM-001). | mainframe team, operations |
 
 ## 15. Equivalence contract
 
@@ -239,10 +246,10 @@ The table carries no behaviour that a target must copy as is: the posting job is
 | :-- | :-- | :-- |
 | (XML declaration and `DEFTABLE`) | 1-2 | FLOW-JCTLM-006 |
 | (`FOLDER DAILY-TransactionBackup`) | 3-3 | FLOW-JCTLM-001, NUM-JCTLM-001 |
-| (job CLOSEFIL, daily) | 4-7 | FLOW-JCTLM-001, FLOW-JCTLM-006, SE-JCTLM-001, NUM-JCTLM-001 |
-| (job TRANBKP, daily) | 8-13 | FLOW-JCTLM-001, DEF-JCTLM-001 |
+| (job CLOSEFIL, daily) | 4-7 | FLOW-JCTLM-001, FLOW-JCTLM-006, SE-JCTLM-001, NUM-JCTLM-001, DEF-JCTLM-009 |
+| (job TRANBKP, daily) | 8-13 | FLOW-JCTLM-001, DEF-JCTLM-001, DEF-JCTLM-009 |
 | (job WAITSTEP, daily) | 14-19 | FLOW-JCTLM-001 |
-| (job OPENFIL, daily) | 20-25 | FLOW-JCTLM-001, DEF-JCTLM-008 |
+| (job OPENFIL, daily) | 20-25 | FLOW-JCTLM-001, DEF-JCTLM-008, DEF-JCTLM-009 |
 | (`FOLDER WEEKLY-TransactionTypesDBRefresh`) | 26-26 | FLOW-JCTLM-002, DEF-JCTLM-003 |
 | (job MNTTRDB2) | 27-31 | FLOW-JCTLM-002, DEF-JCTLM-002 |
 | (`SMART_FOLDER WEEKLY-DisclosureGroupsRefresh`) | 32-32 | FLOW-JCTLM-003, NUM-JCTLM-001, DEF-JCTLM-003, DEF-JCTLM-007 |

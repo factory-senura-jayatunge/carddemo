@@ -45,15 +45,17 @@ spec_status: draft
 | FLOW-JTRPTP-002 | Run `CBTRN03C` on `TRANSACT.DALY(+1)` with the same range in `DATEPARM`. |
 | SE-JTRPTP-003 | Create the report generation `TRANREPT(+1)`, FB 133. |
 | ERR-JTRPTP-001 | No step has a `COND`; CICS learns nothing about the job's result. |
-| DEF-JTRPTP-001 | The `PROC` statement is labelled `REPROC`, the name of another procedure. |
+| DEF-JTRPTP-001 | The `PROC` statement is labelled `REPROC`, the name of another procedure; harmless for the cataloged member (answers Q-RPTS-005). |
 | DEF-JTRPTP-002 | The procedure carries in-stream data. |
 | DEF-JTRPTP-003 | Each report adds a `TRANSACT.BKUP` generation, the GDG that COMBTRAN reads. |
 | DEF-JTRPTP-004 | [security] The job log prints every selected transaction, card number included. |
+| DEF-JTRPTP-005 | [security] The report job runs under the CICS region's user ID, not the online user's. |
+| DEF-JTRPTP-006 | Concurrent or failed submissions can interleave or leave partial jobs in queue `JOBS`; all jobs are named `TRNRPT00`. |
 
 ## 3. Actors and triggers
 
 - **Trigger:** an online user confirms a report request in CORPT00C (monthly, yearly or custom range; `app/cbl/CORPT00C.cbl:220-255, 429-435`). The program writes the job of FLOW-JTRPTP-001 to the transient data queue `JOBS`, defined as an extrapartition output queue on DD `INREADER`, 80-byte fixed records (`app/csd/CARDDEMO.CSD:499-505`). The CICS region's `INREADER` DD is expected to point at the JES internal reader. No schedule or script runs the procedure.
-- **Preconditions:** the procedure is member `TRANREPT` of `AWS.M2.CARDDEMO.PROC` (the job's `JCLLIB`, `app/cbl/CORPT00C.cbl:90`), with REPROC beside it; the GDG bases `TRANSACT.BKUP`, `TRANSACT.DALY`, `TRANREPT` exist; the job reads `TRANSACT` while CICS may have it open; the cluster's `SHAREOPTIONS(2 3)` lets a batch reader in next to one CICS updater, without read integrity (platform-inferred).
+- **Preconditions:** the procedure is member `TRANREPT` of `AWS.M2.CARDDEMO.PROC` (the job's `JCLLIB`, `app/cbl/CORPT00C.cbl:90`), with REPROC beside it; the GDG bases `TRANSACT.BKUP`, `TRANSACT.DALY`, `TRANREPT` exist; the job reads `TRANSACT` while CICS may have it open; the cluster's `SHAREOPTIONS(2 3)` (`app/jcl/TRANBKP.jcl:60`) lets a batch reader in next to one CICS updater, without read integrity (platform-inferred; see DEF-JTRPT-005, which applies here unchanged).
 - **Header:** `//REPROC PROC` (`:1`, DEF-JTRPTP-001), no symbolic parameters; `// PEND` (`:79`).
 
 ## 4. Interfaces
@@ -110,13 +112,13 @@ flowchart TD
 ```
 
 #### FLOW-JTRPTP-001 · Submission from CICS with the user's window
-- **What:** CORPT00C moves the start and end dates into both places of its job image (`app/cbl/CORPT00C.cbl:220-221, 235-236`), then writes the lines, 80 bytes each, to queue `JOBS` with `EXEC CICS WRITEQ TD`, until it has written the line `/*EOF` or a blank line (`app/cbl/CORPT00C.cbl:498-523`). `/*EOF` ends the job for the internal reader. The step `STEP10` runs the procedure; `//STEP05R.SYMNAMES DD *` replaces the whole procedure `SYMNAMES` (so the job repeats the two field symbols) and `//STEP10R.DATEPARM DD *` replaces the `DATEPARM` dataset by the in-stream range. The override step names match the procedure's `STEP05R` and `STEP10R`.
-- **Source:** `:35, 38, 57, 71`, `app/cbl/CORPT00C.cbl:81-127`
+- **What:** CORPT00C moves the start and end dates into both places of its job image, in each of its three branches: monthly (`app/cbl/CORPT00C.cbl:220-221, 235-236`), yearly (`app/cbl/CORPT00C.cbl:247-248, 252-253`) and custom (`app/cbl/CORPT00C.cbl:429-432`). It then writes the lines, 80 bytes each, to queue `JOBS` with `EXEC CICS WRITEQ TD`, until it has written the line `/*EOF` or a blank line (`app/cbl/CORPT00C.cbl:498-523`). `/*EOF` ends the job for the internal reader. The step `STEP10` runs the procedure; `//STEP05R.SYMNAMES DD *` replaces the whole procedure `SYMNAMES` (so the job repeats the two field symbols) and `//STEP10R.DATEPARM DD *` replaces the `DATEPARM` dataset by the in-stream range. The override step names match the procedure's `STEP05R` and `STEP10R`.
+- **Source:** `:35, 38, 57, 71`, `app/cbl/CORPT00C.cbl:81-127, 220-221, 235-236, 247-248, 252-253, 429-432, 498-523`
 - **Fidelity:** must-preserve (one report per confirmed request, with the requested range used for selection and heading) · **Confidence:** reviewed (job image); platform-inferred (internal reader, override rules)
 
 #### FLOW-JTRPTP-002 · Print the report
-- **What:** `STEP10R` executes `CBTRN03C` on `TRANSACT.DALY(+1)`. With the override, `DATEPARM` carries the same range as the selection, so the program's own date check (`app/cbl/CBTRN03C.cbl:168-175`) keeps every record.
-- **Source:** `:57-78`
+- **What:** `STEP10R` executes `CBTRN03C` on `TRANSACT.DALY(+1)`. With the override, `DATEPARM` carries the same range as the selection, so every record the sort kept passes the program's own date check (`app/cbl/CBTRN03C.cbl:173-178`). That equality matters: the check's "outside" branch is `NEXT SENTENCE`, which leaves the whole read loop (`app/cbl/CBTRN03C.cbl:207`), so a record outside `DATEPARM` would end the report without the later records and without totals (FLOW-TRPT-001, NUM-RPTS-003, DEF-JTRPT-001). Because CORPT00C writes the same two dates into both the `SYMNAMES` override and the `DATEPARM` override (FLOW-JTRPTP-001), the cut-off cannot happen on the online path.
+- **Source:** `:57-78`, `app/cbl/CBTRN03C.cbl:173-178, 207`
 - **Fidelity:** must-preserve · **Confidence:** reviewed
 
 ## 7. Business rules
@@ -152,9 +154,9 @@ None in the procedure. CORPT00C validates the dates before it submits; when the 
 
 #### ERR-JTRPTP-001 · No step conditions and no feedback to the user
 - **When:** a step of the submitted job fails.
-- **Then:** the next steps still run (no `COND`); an abend skips the rest and deletes the failing step's new generation. CORPT00C has already told the user the report was submitted; the result is visible only in the job output and the `NOTIFY=&SYSUID` message.
-- **Source:** `:21, 35, 57`
-- **Fidelity:** defect-decide · **Confidence:** platform-inferred
+- **Then:** the next steps still run (no `COND`); an abend skips the rest and deletes the failing step's new generation. CORPT00C has already told the user the report was submitted; the result is visible only in the job output. The job card's `NOTIFY=&SYSUID` (`app/cbl/CORPT00C.cbl:86`) resolves to the user ID under which the job was submitted. For a job written through an extrapartition queue to the internal reader that is normally the CICS region's user ID, so the end-of-job message goes to that user ID and the online user is not notified (DEF-RPTS-007, DEF-JTRPTP-005).
+- **Source:** `:21, 35, 57`, `app/cbl/CORPT00C.cbl:86`
+- **Fidelity:** defect-decide · **Confidence:** platform-inferred (COND and abend handling; `&SYSUID` resolution for a TDQ-submitted job, medium)
 
 ## 11. Interactions
 
@@ -169,9 +171,10 @@ None beyond `TRANREPT.md` NUM-JTRPT-001, which applies unchanged: card number as
 ## 13. Known defects and oddities
 
 #### DEF-JTRPTP-001 · The PROC statement is labelled REPROC
-- The member starts with `//REPROC PROC` (`:1`) and calls `EXEC PROC=REPROC` (`:21`). A cataloged procedure is found by its member name (`TRANREPT`), so the label has no effect on z/OS, but it misleads readers and breaks tools that index procedures by the `PROC` label. The procedure named `REPROC` thus contains a step that executes a procedure named `REPROC` (the cataloged `app/proc/REPROC.prc`, see `REPROC.md`). Copied into a job as an in-stream procedure, the label would make the in-stream definition the one that `EXEC PROC=REPROC` finds first, so the procedure would call itself and the job would fail with a JCL error. CORPT00C's job calls the member as a cataloged procedure by its member name (`EXEC PROC=TRANREPT`, FLOW-JTRPTP-001), so the online report path works and the defect is latent. The program-spec side (reports, area c) raises the same point.
-- **Source:** `:1, 21`
-- **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred
+- The member starts with `//REPROC PROC` (`:1`) and calls `EXEC PROC=REPROC` (`:21`). A cataloged procedure is found by its member name (`TRANREPT`), so the label has no effect on z/OS, but it misleads readers and breaks tools that index procedures by the `PROC` label.
+- **Answer to Q-RPTS-005** (asked of the batch area by CORPT00C): yes, the job's `EXEC PROC=TRANREPT` (`app/cbl/CORPT00C.cbl:94`) finds this member, `TRANREPT` in `AWS.M2.CARDDEMO.PROC`, through the job's `JCLLIB` (`app/cbl/CORPT00C.cbl:90`); the `REPROC` label on its `PROC` statement is ignored. The nested call works and is intended: `EXEC PROC=REPROC` in `STEP01R` is a second-level call that finds the separate cataloged member `REPROC` (`app/proc/REPROC.prc`) in the same library, and the `PRC001.FILEIN` and `PRC001.FILEOUT` overrides (`:24-31`) address its step, exactly as the batch job TRANREPT does (`app/jcl/TRANREPT.jcl:23-33`). Only the label is misleading; `//TRANREPT PROC`, or no label, would match the member name. The procedure named `REPROC` thus contains a step that executes a procedure named `REPROC` (the cataloged `app/proc/REPROC.prc`, see `REPROC.md`). Copied into a job as an in-stream procedure, the label would make the in-stream definition the one that `EXEC PROC=REPROC` finds first, so the procedure would call itself and the job would fail with a JCL error. CORPT00C's job calls the member as a cataloged procedure by its member name (`EXEC PROC=TRANREPT`, FLOW-JTRPTP-001), so the online report path works and the defect is latent. CORPT00C raises the same point as Q-RPTS-005.
+- **Source:** `:1, 21-31`, `app/cbl/CORPT00C.cbl:90, 94`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** platform-inferred (procedure search and nesting rules, medium-high)
 
 #### DEF-JTRPTP-002 · In-stream data inside the procedure
 - `STEP05R` has `SYMNAMES DD *` and `SYSIN DD *` with data in the procedure (`:38-47`). z/OS accepts in-stream data in cataloged procedures only from z/OS 2.1 on; older systems reject the member. The `SYSIN` data is not overridden by CORPT00C.
@@ -188,6 +191,16 @@ None beyond `TRANREPT.md` NUM-JTRPT-001, which applies unchanged: card number as
 - **Source:** `:60`, `app/cbl/CBTRN03C.cbl:180`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
+#### DEF-JTRPTP-005 · [security] The report job runs with the CICS region's authority
+- CORPT00C writes the job to the extrapartition queue `JOBS` (DD `INREADER`, `app/csd/CARDDEMO.CSD:499-505`) without any user identity in the job card (`app/cbl/CORPT00C.cbl:84-86`). A job submitted this way normally runs under the CICS region's user ID, not under the identity of the person who requested it. So any user who can run transaction `CR00` starts a batch job that copies the whole transaction master and reads the reference files with the region's authority, and the job output and the `NOTIFY` message are tied to the region's user ID, not to the requester (ERR-JTRPTP-001). The program itself checks no user identity (DEF-RPTS-007).
+- **Source:** `app/cbl/CORPT00C.cbl:84-86, 517-523`, `app/csd/CARDDEMO.CSD:499-505`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (security context of jobs submitted through a CICS extrapartition queue, medium)
+
+#### DEF-JTRPTP-006 · Interleaved and partial jobs in queue JOBS, one job name for all
+- CORPT00C writes the 17 lines of a job with 17 separate `WRITEQ TD` commands and no enqueue around them (`app/cbl/CORPT00C.cbl:498-523`). If two users submit at the same moment and CICS switches tasks between writes, the lines of the two jobs can mix in the queue, and the internal reader then sees one malformed job stream (DEF-RPTS-005). If a write fails part way, the lines already written stay in the queue without `/*EOF`, and the next request's lines follow them (DEF-RPTS-004). The queue is defined with `ERROROPTION(IGNORE)` (`app/csd/CARDDEMO.CSD:501`), so some I/O errors may not reach the program's `Unable to Write TDQ (JOBS)...` branch at all (low confidence). Every request uses the job name `TRNRPT00` (`app/cbl/CORPT00C.cbl:84`); by the JES2 default for duplicate job names, a second request waits until the first ends, which also keeps two report jobs from creating the same `(+1)` generations at once.
+- **Source:** `app/cbl/CORPT00C.cbl:84, 498-535`, `app/csd/CARDDEMO.CSD:499-505`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (CICS task switching between writes and JES2 duplicate job name handling, medium; `ERROROPTION(IGNORE)` effect, low)
+
 ## 14. Open questions
 
 | ID | Question | For |
@@ -202,7 +215,7 @@ For a request with start date S and end date E: one report job runs; its report 
 
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
-| (`PROC` statement) | 1 | §3, DEF-JTRPTP-001 |
+| (`PROC` statement) | 1 | §3, DEF-JTRPTP-001, DEF-JTRPTP-005, DEF-JTRPTP-006 |
 | `STEP01R` | 21-31 | SE-JTRPTP-001, DEF-JTRPTP-003 |
 | `STEP05R` | 35-53 | FLOW-JTRPTP-001, BR-JTRPTP-001, SE-JTRPTP-002, DEF-JTRPTP-002 |
 | `STEP10R` | 57-79 | FLOW-JTRPTP-001, FLOW-JTRPTP-002, SE-JTRPTP-003, ERR-JTRPTP-001, DEF-JTRPTP-004 |

@@ -7,7 +7,7 @@ unit_code: JEXPT
 source_rev: 8a8a80a
 sources:
   - {path: app/jcl/CBEXPORT.jcl, sha256: 2af5ab38310c, role: job}
-  - {path: app/cbl/CBEXPORT.cbl, sha256: c8740df22831, role: program, lines: "35-97, 240-245, 581-584"}
+  - {path: app/cbl/CBEXPORT.cbl, sha256: c8740df22831, role: program, lines: "35-97, 240-245, 542, 581-584"}
   - {path: app/cpy/CVEXPORT.cpy, sha256: 49d07843c9bd, role: record-layout, lines: "9-19"}
   - {path: tools/batch-programs.toml, sha256: d5ae722d20fb, role: local-runner, lines: "255-258"}
   - {path: tools/carddemo.py, sha256: 51089b70903a, role: local-runner, lines: "672-679"}
@@ -45,7 +45,7 @@ The job has no business rules. Its items:
 | ERR-JEXPT-001 | `STEP02` runs even if the define failed; a program error ends in an abend with no defined code. |
 | NUM-JEXPT-001 | The export key is a 4-byte binary sequence number. |
 | DEF-JEXPT-001 | The cluster key offset (28) does not match the program's key offset (27). |
-| DEF-JEXPT-002 | [security] The export file holds full customer PII and card CVVs and is never deleted. |
+| DEF-JEXPT-002 | [security] The export file holds full customer PII and card CVVs and stays until the next run deletes it or it is deleted by hand. |
 | DEF-JEXPT-003 | `SET MAXCC = 0` hides a failed delete, and the program then cannot open the old cluster for output. |
 | DEF-JEXPT-004 | The abend call passes no abend code. |
 
@@ -157,6 +157,7 @@ In execution order. There is no rollback.
 
 #### NUM-JEXPT-001 · The export key is a 4-byte binary sequence number
 - `EXPORT-SEQUENCE-NUM` is `PIC 9(9) COMP`, a 4-byte big-endian binary integer on z/OS, at offset 27 of the record (`app/cpy/CVEXPORT.cpy:16`); the program's file key `EXPORT-OUT-SEQUENCE-KEY` is the same 4 bytes as `PIC X(04)` (`app/cbl/CBEXPORT.cbl:94-97`). Because the values are positive and big-endian, the byte order of the key is the numeric order, so records are stored in the order they were written. A target that reads the file on a little-endian platform must convert the field.
+- **Source:** `app/cpy/CVEXPORT.cpy:16`, `app/cbl/CBEXPORT.cbl:94-97`
 - **Fidelity:** must-preserve (if the file format is kept) · **Confidence:** reviewed
 
 ## 13. Known defects and oddities
@@ -164,18 +165,21 @@ In execution order. There is no rollback.
 #### DEF-JEXPT-001 · The cluster key is one byte off the program's key
 - The define says `KEYS(4 28)`, a key at offset 28 (bytes 29-32). The program's record puts the key, `EXPORT-OUT-SEQUENCE-KEY`, after a 27-byte filler, at offset 27 (bytes 28-31), which is where `EXPORT-SEQUENCE-NUM` sits in `app/cpy/CVEXPORT.cpy:9-16` (1-byte type plus 26-byte timestamp). On z/OS, COBOL checks the key position of an indexed file against the catalog when it opens it, so the program's `OPEN OUTPUT` would most likely fail with a file-status error and the program would abend before writing anything. Even if it opened, the cluster would be keyed on the last three bytes of the sequence number and the first byte of the branch ID. The local runner defines the key at offset 27 (`tools/batch-programs.toml:255-258`), so local runs succeed and do not show the problem. CBIMPORT has the same key offset as CBEXPORT (`app/cbl/CBIMPORT.cbl:81-84`).
 - **Source:** `:32`
-- **Status:** open · **Fidelity:** defect-fix (key at offset 27, as in the program and the copybook) · **Confidence:** platform-inferred (no z/OS run; the mismatch itself is reviewed)
+- **Status:** open · **Fidelity:** defect-decide (the program and the copybook put the key at offset 27; whether the target keeps that position is a decision for the file-format owner, Q-JEXPT-001) · **Confidence:** platform-inferred (no z/OS run; the mismatch itself is reviewed)
 
-#### DEF-JEXPT-002 · [security] The export file holds full PII and CVVs and is kept indefinitely
-- Every customer's name, address, phone numbers, Social Security number, government ID and date of birth, and every card's number and CVV, are copied into `EXPORT.DATA` (`docs/security/data-handling.md:102-103`). The file is not encrypted or masked by the job and is kept until deleted by hand (`docs/security/data-handling.md:175`); it is meant to leave the system.
+#### DEF-JEXPT-002 · [security] The export file holds full PII and CVVs and is kept until replaced or deleted by hand
+- Every customer's name, address, phone numbers, Social Security number, government ID and date of birth, and every card's number and CVV, are copied into `EXPORT.DATA` (`docs/security/data-handling.md:102-103`); the CVV is moved at `app/cbl/CBEXPORT.cbl:542`. The file is not encrypted or masked by the job. No job archives or purges it: it stays until the next run of this job deletes and redefines it (SE-JEXPT-001), or until it is deleted by hand (`docs/security/data-handling.md:175`); it is meant to leave the system.
+- **Source:** `app/cbl/CBEXPORT.cbl:542`, `docs/security/data-handling.md:102-103, 175`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-JEXPT-003 · A hidden delete failure makes the export fail
 - Because `SET MAXCC = 0` (`:28`) is unconditional, a delete that fails (for example because CBIMPORT or a user has the file allocated) goes unnoticed; the define then fails on the existing name, and the program tries to open the old, loaded cluster for output. Without `REUSE` that open fails and the program abends, leaving the previous export in place.
+- **Source:** `:27-28`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JEXPT-004 · The abend call passes no abend code
 - The program's abend paragraph calls `CEE3ABD` without the abend-code and timing arguments that the other batch programs pass (`app/cbl/CBEXPORT.cbl:581-584`), so the abend code an operator sees is not defined by the program.
+- **Source:** `app/cbl/CBEXPORT.cbl:581-584`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions

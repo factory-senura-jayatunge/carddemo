@@ -39,7 +39,7 @@ spec_status: draft
 | ID | Rule |
 | :-- | :-- |
 | FLOW-JCSD-001 | 18 transactions, each starting one program. |
-| FLOW-JCSD-002 | 18 program definitions; four carry a `TRANSID` attribute. |
+| FLOW-JCSD-002 | 18 program definitions; eleven name `LANGUAGE(COBOL)`, four carry an inert `TRANSID` attribute. |
 | FLOW-JCSD-003 | 17 mapsets, one for each BMS member in `app/bms`. |
 | SE-JCSD-001 | 8 CICS files, each mapped to one VSAM cluster or path, all allowing read, browse, add, update and delete. |
 | SE-JCSD-002 | Queue `JOBS` writes 80-byte records to DD `INREADER` (the internal reader): job submission from CICS. |
@@ -54,6 +54,8 @@ spec_status: draft
 | DEF-JCSD-005 | Two library definitions for one load library; the README defines the disabled one. |
 | DEF-JCSD-006 | No CICS file for the transaction alternate index. |
 | DEF-JCSD-007 | The README's set-up steps do not install the whole group, and its preferred option does not read this file. |
+| DEF-JCSD-008 | The date routine `CSUTLDTC` that three online programs call has no program definition. |
+| DEF-JCSD-009 | [security] Every transaction has `TRACE(YES)` with `CONFDATA(NO)`: user data is not hidden in CICS traces. |
 
 ## 3. Actors and triggers
 
@@ -136,7 +138,7 @@ flowchart LR
 
 #### FLOW-JCSD-002 · Program definitions
 - **When:** a transaction starts a program, or a program transfers control with `XCTL`.
-- **Then:** CICS loads the program from the enabled library. All 18 programs are `STATUS(ENABLED)`, `DATALOCATION(ANY)`, `EXECKEY(USER)`, `CONCURRENCY(QUASIRENT)`, `API(CICSAPI)`, `RELOAD(NO)`, `RESIDENT(NO)`, `DYNAMIC(NO)`, `CEDF(YES)`. Ten carry `LANGUAGE(COBOL)` (`COADM01C`, `COBIL00C`, `COMEN01C`, `CORPT00C`, `COTRN00C`-`COTRN02C`, `COUSR00C`-`COUSR03C`); the other eight have no `LANGUAGE`, which CICS then determines when it loads the module. Four carry a `TRANSID`: `COACTVWC` `CAVW` (`:185`), `COCRDLIC` `CC00` (`:207`), `COCRDSLC` `CCDL` (`:223`) and `COSGN00C` `CC00` (`:253`). On a program definition, `TRANSID` names the transaction under which the program runs when another region links to it (distributed program link); it does not change local routing.
+- **Then:** CICS loads the program from the enabled library. All 18 programs are `STATUS(ENABLED)`, `DATALOCATION(ANY)`, `EXECKEY(USER)`, `CONCURRENCY(QUASIRENT)`, `API(CICSAPI)`, `RELOAD(NO)`, `RESIDENT(NO)`, `DYNAMIC(NO)`, `CEDF(YES)`. Eleven carry `LANGUAGE(COBOL)` (`COADM01C`, `COBIL00C`, `COMEN01C`, `CORPT00C`, `COTRN00C`-`COTRN02C`, `COUSR00C`-`COUSR03C`; `:190, 197, 236, 243, 258, 265, 272, 279, 286, 293, 300`); the other seven (`COACTUPC`, `COACTVWC`, `COCRDLIC`, `COCRDSEC`, `COCRDSLC`, `COCRDUPC`, `COSGN00C`) have no `LANGUAGE`, which CICS then determines when it loads the module. Four carry a `TRANSID`: `COACTVWC` `CAVW` (`:185`), `COCRDLIC` `CC00` (`:207`), `COCRDSLC` `CCDL` (`:223`) and `COSGN00C` `CC00` (`:253`). On a program definition, `TRANSID` names the mirror transaction that a remote region attaches when this region calls the program by distributed program link; it is used only when the program is also defined with `REMOTESYSTEM`. None of the 18 programs has `REMOTESYSTEM`, so the attribute is inert here and does not change local routing.
 - **Source:** `:173-305`
 - **Fidelity:** must-preserve (the program set); incidental (load attributes) · **Confidence:** reviewed (attributes); platform-inferred (meaning of `TRANSID`, `LANGUAGE` default)
 
@@ -159,12 +161,12 @@ None. CICS validates the definitions when they are defined and installed.
 Installing the group creates the resources in the region; the side effects below are what those resources do at run time.
 
 #### SE-JCSD-001 · CICS files over the VSAM masters
-- **What:** each `FILE` definition gives a CICS file name to one VSAM cluster or path (table in section 5). Every file has `ADD(YES) BROWSE(YES) DELETE(YES) READ(YES) UPDATE(YES)`, `STATUS(ENABLED)`, `OPENTIME(FIRSTREF)`, `DISPOSITION(SHARE)`, `RLSACCESS(NO)`, `READINTEG(UNCOMMITTED)`, `UPDATEMODEL(LOCKING)`, `RECOVERY(NONE)`, `JOURNAL(NO)`. The programs use all eight names: for example `COACTUPC` and `COACTVWC` name `ACCTDAT`, `CUSTDAT`, `CARDDAT`, `CARDAIX` and `CXACAIX` (`app/cbl/COACTUPC.cbl:572-583`), the transaction programs `TRANSACT`, and the sign-on and user programs `USRSEC`. Two files are paths over alternate indexes: `CARDAIX` (cards by account) and `CXACAIX` (cross-reference by account). Batch jobs that reload a master close and reopen its CICS file (see `CLOSEFIL.md`, `OPENFIL.md`).
-- **Source:** `:1-99`, `app/cbl/COACTUPC.cbl:572-583`
+- **What:** each `FILE` definition gives a CICS file name to one VSAM cluster or path (table in section 5). Every file has `ADD(YES) BROWSE(YES) DELETE(YES) READ(YES) UPDATE(YES)`, `STATUS(ENABLED)`, `OPENTIME(FIRSTREF)`, `DISPOSITION(SHARE)`, `RLSACCESS(NO)`, `READINTEG(UNCOMMITTED)`, `UPDATEMODEL(LOCKING)`, `RECOVERY(NONE)`, `JOURNAL(NO)`. The programs use all eight names: for example `COACTUPC` and `COACTVWC` name `ACCTDAT`, `CUSTDAT`, `CARDDAT`, `CARDAIX` and `CXACAIX` (`app/cbl/COACTUPC.cbl:572-583`), the transaction programs `TRANSACT`, and the sign-on and user programs `USRSEC`. Two files are paths over alternate indexes: `CARDAIX` (cards by account) and `CXACAIX` (cross-reference by account). Only three reload jobs close and reopen CICS files themselves: CARDFILE (`CARDDAT`, `CARDAIX`; `app/jcl/CARDFILE.jcl:26-27, 122-123`), CUSTFILE (`CUSTDAT`; `app/jcl/CUSTFILE.jcl:26, 80`) and TRANFILE (`TRANSACT`, `CXACAIX`; `app/jcl/TRANFILE.jcl:26-27, 120-121`). The others rely on CLOSEFIL and OPENFIL (see `CLOSEFIL.md`, `OPENFIL.md`).
+- **Source:** `:1-99`, `app/cbl/COACTUPC.cbl:572-583`, `app/jcl/CARDFILE.jcl:26-27, 122-123`, `app/jcl/CUSTFILE.jcl:26, 80`, `app/jcl/TRANFILE.jcl:26-27, 120-121`
 - **Fidelity:** must-preserve (file-to-store mapping) · **Confidence:** reviewed
 
 #### SE-JCSD-002 · Job submission queue `JOBS`
-- **What:** `TDQUEUE(JOBS)`, `DESCRIPTION(SUBMIT JOBS FROM CICS)`, `TYPE(EXTRA)`, `TYPEFILE(OUTPUT)`, `DDNAME(INREADER)`, `RECORDSIZE(80)`, `RECORDFORMAT(FIXED)`, `BLOCKFORMAT(UNBLOCKED)`, `DISPOSITION(MOD)`, `OPENTIME(INITIAL)`, `ERROROPTION(IGNORE)`, `DATABUFFERS(1)`. An extrapartition queue writes to the dataset on DD `INREADER` of the CICS region job; for jobs to be submitted, that DD must be allocated to the JES internal reader (`SYSOUT=(A,INTRDR)` or similar), which is region JCL and not in the repository. `CORPT00C` writes its job image, 80 bytes per line, one `WRITEQ TD` per line (`app/cbl/CORPT00C.cbl:79-127, 515-523`). `OPENTIME(INITIAL)` opens the queue when CICS starts.
+- **What:** `TDQUEUE(JOBS)`, `DESCRIPTION(SUBMIT JOBS FROM CICS)`, `TYPE(EXTRA)`, `TYPEFILE(OUTPUT)`, `DDNAME(INREADER)`, `RECORDSIZE(80)`, `RECORDFORMAT(FIXED)`, `BLOCKFORMAT(UNBLOCKED)`, `DISPOSITION(MOD)`, `OPENTIME(INITIAL)`, `ERROROPTION(IGNORE)`, `DATABUFFERS(1)`. An extrapartition queue writes to the dataset on DD `INREADER` of the CICS region job; for jobs to be submitted, that DD must be allocated to the JES internal reader (`SYSOUT=(A,INTRDR)` or similar), which is region JCL and not in the repository. `CORPT00C` writes its job image, 80 bytes per line, one `WRITEQ TD` per line (`app/cbl/CORPT00C.cbl:79-127, 515-523`). `OPENTIME(INITIAL)` opens the queue when the definition is installed; that happens at CICS start only if group `CARDDEMO` is in the region's startup group list.
 - **Source:** `:499-505`, `app/cbl/CORPT00C.cbl:515-523`
 - **Fidelity:** must-preserve (online request starts the report job) · **Confidence:** reviewed (definition); platform-inferred (internal reader DD)
 
@@ -197,7 +199,7 @@ Installing the group creates the resources in the region; the side effects below
 ## 12. Numeric, date and format details
 
 #### NUM-JCSD-001 · File access settings
-- Every file: `STRINGS(1)` (one concurrent request per file), `LSRPOOLNUM(1)`, `DATABUFFERS(2)`, `INDEXBUFFERS(1)`, `TABLE(NO)`, `LOAD(NO)`, `MAXNUMRECS(NOLIMIT)`, `RECORDFORMAT(V)`, `DSNSHARING(ALLREQS)`, `BACKUPTYPE(STATIC)`. With one string, a second task that needs the same file while a request or browse holds the string waits. `RECORDFORMAT(V)` is used although every CardDemo record is fixed length; for VSAM this does not change the data.
+- Every file: `STRINGS(1)` (one concurrent request per file), `LSRPOOLNUM(1)`, `DATABUFFERS(2)`, `INDEXBUFFERS(1)`, `TABLE(NO)`, `LOAD(NO)`, `MAXNUMRECS(NOLIMIT)`, `RECORDFORMAT(V)`, `DSNSHARING(ALLREQS)`, `BACKUPTYPE(STATIC)`. With one string, a second task that needs the same file while a request or browse holds the string waits. With `LSRPOOLNUM(1)` the files use the shared buffers of LSR pool 1, so their own `DATABUFFERS` and `INDEXBUFFERS` values do not apply; they would only for non-shared resources. `RECORDFORMAT(V)` is used although every CardDemo record is fixed length; for VSAM this does not change the data.
 - The queue `JOBS`: 80-byte fixed, unblocked records, appended (`DISPOSITION(MOD)`), matching the 80-byte `JCL-RECORD` of `CORPT00C` (`app/cbl/CORPT00C.cbl:79`).
 - **Source:** `:3-6, 501-503`, `app/cbl/CORPT00C.cbl:79`
 - **Fidelity:** incidental · **Confidence:** reviewed (values); platform-inferred (string waits)
@@ -210,12 +212,12 @@ Installing the group creates the resources in the region; the side effects below
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCSD-002 · The card list program carries the sign-on transaction
-- `COCRDLIC` has `TRANSID(CC00)` (`:207`), the code of the sign-on transaction, while its own transaction is `CCLI` (`:357-358`). Locally this has no effect (FLOW-JCSD-002); a distributed program link to `COCRDLIC` would run under `CC00`.
+- `COCRDLIC` has `TRANSID(CC00)` (`:207`), the code of the sign-on transaction, while its own transaction is `CCLI` (`:357-358`). The attribute is inert here: it names the mirror transaction only for a program defined with `REMOTESYSTEM` and called by an outbound distributed program link, and `COCRDLIC` has no `REMOTESYSTEM` (`:203-210`; FLOW-JCSD-002). If a region linked to a remote `COCRDLIC` with this definition, the remote mirror would run under `CC00`.
 - **Source:** `:203-210`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (attribute); platform-inferred (effect)
 
 #### DEF-JCSD-003 · [security] No transaction-level security
-- Every transaction has `RESSEC(NO)` and `CMDSEC(NO)`, and every program `CEDF(YES)`. CICS therefore does not check access to the files and other resources a transaction uses, and any user who can start a transaction can start the administrative ones (`CA00`, `CU00` to `CU03`) by typing the code; the only control is in the programs (sign-on and menu logic, areas a and b). `CEDF(YES)` lets the execution diagnostic facility run against every program.
+- Every transaction has `RESSEC(NO)` and `CMDSEC(NO)`, and every program `CEDF(YES)`. CICS therefore does not check access to the files and other resources a transaction uses, nor to system commands. Whether a user may start a transaction at all is decided at attach time by transaction security (the SIT parameter `XTRAN` and the RACF transaction profiles), which is not a CSD attribute and not in the repository. If it is off, any user who can start a transaction can start the administrative ones (`CA00`, `CU00` to `CU03`) by typing the code, and the only control is in the programs (sign-on and menu logic, areas a and b). `CEDF(YES)` lets the execution diagnostic facility run against every program.
 - **Source:** `:176, 314, 324, 334`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (attributes); platform-inferred (consequence)
 
@@ -235,9 +237,19 @@ Installing the group creates the resources in the region; the side effects below
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JCSD-007 · Set-up instructions do not match this file
-- The README's preferred option uses "the DFHCSDUP JCL with the CSD file in the CSD folder" (`./README.md:174`), but the only DFHCSDUP job (CBADMCDJ) uses in-stream commands. The install step names single resources (`CEDA INSTALL TRANS(CCLI)`, `FILE(CARDDAT)`, `./README.md:189-190`) rather than `CEDA INSTALL GROUP(CARDDEMO)`, so following them literally installs two resources of 64. The file itself carries read-only metadata attributes on every definition (Q-JCSD-003).
+- The README's preferred option uses "the DFHCSDUP JCL with the CSD file in the CSD folder" (`./README.md:174`), but the only DFHCSDUP job (CBADMCDJ) uses in-stream commands. The install step names single resources (`CEDA INSTALL TRANS(CCLI)`, `FILE(CARDDAT)`, `./README.md:189-190`) rather than `CEDA INSTALL GROUP(CARDDEMO)`, so following them literally installs two resources of 64. The file itself carries read-only metadata attributes on every definition (Q-JCSD-003). They also show that the group was built along two paths: 54 definitions were last changed through `CHANGEAGENT(CSDAPI)` (CEDA or the CICS programming interface, for example `:12`) and 10 through `CHANGEAGENT(CSDBATCH)` (DFHCSDUP, for example `:24`).
 - **Source:** `:1-505`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (texts); platform-inferred (DFHCSDUP behaviour)
+
+#### DEF-JCSD-008 · The date routine CSUTLDTC has no program definition
+- `CORPT00C` (`app/cbl/CORPT00C.cbl:392, 412`), `COTRN02C` (`app/cbl/COTRN02C.cbl:393, 413`) and `COACTUPC` (through the copybook `CSUTLDPY`, `app/cbl/COACTUPC.cbl:4232`, `app/cpy/CSUTLDPY.cpy:293`) call the date validation routine `CSUTLDTC` by literal name, but the group has no `PROGRAM(CSUTLDTC)`. A `CALL` of a literal is resolved at link-edit time when the caller is compiled with `NODYNAM`, as the sample online build procedure does (`samples/proc/BUILDONL.prc:40`); CSUTLDTC is then part of each caller's load module and needs no CICS definition, so the omission is most likely harmless. A caller compiled with `DYNAM` would need a definition or program autoinstall. See Q-DTCK-004 in `CSUTLDTC.md`.
+- **Source:** `app/cbl/CORPT00C.cbl:392, 412`, `app/cbl/COTRN02C.cbl:393, 413`, `app/cbl/COACTUPC.cbl:4232`, `samples/proc/BUILDONL.prc:40`
+- **Status:** open · **Fidelity:** incidental (Q-DTCK-004) · **Confidence:** reviewed (calls, compile option); platform-inferred (binding in production)
+
+#### DEF-JCSD-009 · [security] Traced transactions do not hide user data
+- All 18 transactions have `TRACE(YES)` and `CONFDATA(NO)` (`:312-313` for `CAUP`, the same two attributes in every other transaction). With `CONFDATA(NO)` CICS does not suppress user data in the trace entries it writes for the transaction, so when tracing is active the terminal input and output of the sign-on screen (`CC00`, user ID and password) and of the account, card and transaction screens (card numbers, SSNs) can appear in CICS internal or auxiliary trace and in dumps taken from it.
+- **Source:** `:312-313`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed (attributes); platform-inferred (trace content)
 
 ## 14. Open questions
 
@@ -281,7 +293,7 @@ A target must provide one entry point per transaction code in FLOW-JCSD-001, sta
 | (`DEFINE MAPSET(COUSR01)`) | 161-164 | FLOW-JCSD-003 |
 | (`DEFINE MAPSET(COUSR02)`) | 165-168 | FLOW-JCSD-003 |
 | (`DEFINE MAPSET(COUSR03)`) | 169-172 | FLOW-JCSD-003 |
-| (`DEFINE PROGRAM(COACTUPC)`) | 173-180 | FLOW-JCSD-002 |
+| (`DEFINE PROGRAM(COACTUPC)`) | 173-180 | FLOW-JCSD-002, DEF-JCSD-008 |
 | (`DEFINE PROGRAM(COACTVWC)`) | 181-188 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COADM01C)`) | 189-195 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COBIL00C)`) | 196-202 | FLOW-JCSD-002 |
@@ -290,33 +302,33 @@ A target must provide one entry point per transaction code in FLOW-JCSD-001, sta
 | (`DEFINE PROGRAM(COCRDSLC)`) | 219-226 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COCRDUPC)`) | 227-234 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COMEN01C)`) | 235-241 | FLOW-JCSD-002 |
-| (`DEFINE PROGRAM(CORPT00C)`) | 242-248 | FLOW-JCSD-002 |
+| (`DEFINE PROGRAM(CORPT00C)`) | 242-248 | FLOW-JCSD-002, DEF-JCSD-008 |
 | (`DEFINE PROGRAM(COSGN00C)`) | 249-256 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COTRN00C)`) | 257-263 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COTRN01C)`) | 264-270 | FLOW-JCSD-002 |
-| (`DEFINE PROGRAM(COTRN02C)`) | 271-277 | FLOW-JCSD-002 |
+| (`DEFINE PROGRAM(COTRN02C)`) | 271-277 | FLOW-JCSD-002, DEF-JCSD-008 |
 | (`DEFINE PROGRAM(COUSR00C)`) | 278-284 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COUSR01C)`) | 285-291 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COUSR02C)`) | 292-298 | FLOW-JCSD-002 |
 | (`DEFINE PROGRAM(COUSR03C)`) | 299-305 | FLOW-JCSD-002 |
-| (`DEFINE TRANSACTION(CAUP)`) | 306-316 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CAVW)`) | 317-326 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CA00)`) | 327-336 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CB00)`) | 337-346 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CCDL)`) | 347-356 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CCLI)`) | 357-366 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CCUP)`) | 367-377 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CC00)`) | 378-387 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CDV1)`) | 388-398 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-001 |
-| (`DEFINE TRANSACTION(CM00)`) | 399-408 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CR00)`) | 409-418 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CT00)`) | 419-428 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CT01)`) | 429-438 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CT02)`) | 439-448 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CU00)`) | 449-458 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CU01)`) | 459-468 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CU02)`) | 469-478 | FLOW-JCSD-001, DEF-JCSD-003 |
-| (`DEFINE TRANSACTION(CU03)`) | 479-488 | FLOW-JCSD-001, DEF-JCSD-003 |
+| (`DEFINE TRANSACTION(CAUP)`) | 306-316 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CAVW)`) | 317-326 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CA00)`) | 327-336 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CB00)`) | 337-346 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CCDL)`) | 347-356 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CCLI)`) | 357-366 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CCUP)`) | 367-377 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CC00)`) | 378-387 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CDV1)`) | 388-398 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009, DEF-JCSD-001 |
+| (`DEFINE TRANSACTION(CM00)`) | 399-408 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CR00)`) | 409-418 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CT00)`) | 419-428 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CT01)`) | 429-438 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CT02)`) | 439-448 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CU00)`) | 449-458 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CU01)`) | 459-468 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CU02)`) | 469-478 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
+| (`DEFINE TRANSACTION(CU03)`) | 479-488 | FLOW-JCSD-001, DEF-JCSD-003, DEF-JCSD-009 |
 | (`DEFINE LIBRARY(CARDDLIB)`) | 489-493 | SE-JCSD-003, DEF-JCSD-005 |
 | (`DEFINE LIBRARY(COM2DOLL)`) | 494-498 | SE-JCSD-003, DEF-JCSD-005 |
 | (`DEFINE TDQUEUE(JOBS)`) | 499-505 | SE-JCSD-002, ERR-JCSD-002, NUM-JCSD-001 |

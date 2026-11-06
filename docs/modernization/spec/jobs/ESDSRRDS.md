@@ -42,12 +42,13 @@ The job has no business rules. Its items:
 | SE-JESRR-004 | Load the ESDS with every record of `ESDSRRDS.PS`, in file order. |
 | SE-JESRR-005 | Delete and define the RRDS cluster (fixed 80, `REUSE`, `NUMBERED`); any delete failure is reset to 0. |
 | SE-JESRR-006 | Load the RRDS with every record of `ESDSRRDS.PS`, as relative records 1 to 10. |
-| ERR-JESRR-001 | No step has a `COND`, so every step runs even when an earlier one failed. |
-| DEF-JESRR-001 | [security] A third clear-text copy of the seed passwords. |
+| ERR-JESRR-001 | No step has a `COND`, so every step runs after an earlier non-zero return code; an abend or JCL error ends the job. |
+| DEF-JESRR-001 | [security] Three more datasets with the seed passwords in clear text. |
 | DEF-JESRR-002 | `UNIT=SYSAD` is a typo for `SYSDA`. |
 | DEF-JESRR-003 | Two step comments describe the wrong file. |
 | DEF-JESRR-004 | `SET MAXCC = 0` hides every delete failure. |
 | DEF-JESRR-005 | Nothing reads the two clusters. |
+| DEF-JESRR-006 | A null statement (`//`) ends the job before the trailing version comment. |
 
 ## 3. Actors and triggers
 
@@ -127,7 +128,7 @@ In execution order. There is no rollback: each step's change is permanent.
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
 #### SE-JESRR-002 · Write the in-stream users to the flat file
-- **What:** IEBGENER with `SYSIN DD DUMMY` copies the ten in-stream card images unchanged, in order, into a new catalogued dataset `AWS.M2.CARDDEMO.ESDSRRDS.PS`, `LRECL=80,RECFM=FB`. A failed step deletes the new file (`DISP=(NEW,CATLG,DELETE)`).
+- **What:** IEBGENER with `SYSIN DD DUMMY` copies the ten in-stream card images unchanged, in order, into a new catalogued dataset `AWS.M2.CARDDEMO.ESDSRRDS.PS`, `LRECL=80,RECFM=FB`. With `DISP=(NEW,CATLG,DELETE)` only an abend deletes the new file; if IEBGENER ends normally with a non-zero return code, the file stays catalogued with whatever was written (`:48`).
 - **Source:** `:33-53`
 - **Fidelity:** must-preserve (record content and order) · **Confidence:** reviewed
 
@@ -155,8 +156,8 @@ In execution order. There is no rollback: each step's change is permanent.
 
 #### ERR-JESRR-001 · Steps run regardless of earlier failures
 - **When:** a step ends with a non-zero return code without abending.
-- **Then:** the next step still runs, because no `EXEC` has a `COND` parameter. If `STEP01` fails, both clusters are still deleted and defined empty and both loads fail on the missing input. An abend or a JCL allocation error ends the job at that step.
-- **Source:** `:24, 33, 59, 79, 93, 113`
+- **Then:** the next step still runs, because no `EXEC` has a `COND` parameter. If `STEP01` ends with a non-zero return code, `ESDSRRDS.PS` stays catalogued (SE-JESRR-002), so both clusters are still deleted and defined, and both loads copy whatever the flat file holds, possibly nothing. If `STEP01` abends (the flat file is then deleted) or fails allocation with a JCL error such as the unit in DEF-JESRR-002, no later step runs, because without `COND=EVEN` or `COND=ONLY` the system bypasses every step after an abend, and a JCL error ends the job.
+- **Source:** `:24, 33, 48, 59, 79, 93, 113`
 - **Fidelity:** incidental · **Confidence:** platform-inferred
 
 ## 11. Interactions
@@ -173,23 +174,33 @@ None. The job copies bytes; it does not interpret any field.
 
 #### DEF-JESRR-001 · [security] Another clear-text copy of the seed passwords
 - The in-stream data (`:36-45`) carries the ten users' passwords in clear text, and the job writes them into three more datasets. They are the public demo values (`docs/security/secrets.md:27`), but a reader of any of these files learns every seed user's password.
+- **Source:** `:36-45`, `:47-50`, `:82`, `:116`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** reviewed
 
 #### DEF-JESRR-002 · `UNIT=SYSAD` instead of `SYSDA`
 - `STEP01` asks for unit `SYSAD` (`:50`). Without such a unit, allocation fails with a JCL error and the job ends after `PREDEL`; with SMS-managed storage the unit may be ignored. DUSRSECJ and READACCT have the same value.
-- **Status:** open · **Fidelity:** defect-fix · **Confidence:** platform-inferred
+- **Source:** `:50`
+- **Status:** open · **Fidelity:** defect-decide (`SYSDA` is the obvious intent; whether the target needs a unit at all is an operations decision) · **Confidence:** platform-inferred
 
 #### DEF-JESRR-003 · Step comments describe the wrong file
 - The comment before `STEP01` (`:30`) says it creates the user security file, but the step writes `ESDSRRDS.PS`, not `USRSEC.PS`. The comment before `STEP05` (`:110`) says it copies to the ESDS, but the step loads the RRDS (`:116`).
+- **Source:** `:30, 110, 116`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JESRR-004 · `SET MAXCC = 0` hides every delete failure
 - Both delete statements are followed by an unconditional reset (`:64`, `:98`), so a delete that fails for any reason is invisible; the define then fails on the existing name and the load appends to or collides with the old contents (SE-JESRR-004, SE-JESRR-006).
+- **Source:** `:64, 98`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JESRR-005 · Nothing reads the two clusters
 - The job creates two clusters that no program, CICS file or job uses. It is a demonstration of `NONINDEXED` and `NUMBERED` definitions, not part of the application's data flow.
+- **Source:** `:63-120`
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed (repository-wide search for the dataset names)
+
+#### DEF-JESRR-006 · A null statement ends the job before the version comment
+- Line 122 is a JCL null statement (`//`), which marks the end of the job; the version comment lines after it (`:123-124`) are not part of the job. CARDFILE, DUSRSECJ, TRANREPT, DEFGDGD and CBADMCDJ also end with one. No effect on processing.
+- **Source:** `:122`
+- **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 ## 14. Open questions
 
@@ -212,3 +223,4 @@ After a successful run (return code 0 in every step), `ESDSRRDS.PS` holds the te
 | `STEP03` | 79-87 | SE-JESRR-004, ERR-JESRR-001 |
 | `STEP04` | 93-107 | SE-JESRR-005, DEF-JESRR-004 |
 | `STEP05` | 113-121 | SE-JESRR-006, DEF-JESRR-003, ERR-JESRR-001 |
+| (null statement) | 122 | DEF-JESRR-006 |

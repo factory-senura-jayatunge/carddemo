@@ -47,10 +47,11 @@ INTCALC is the one-step job that runs the interest program `CBACT04C`. The progr
 | DEF-JINTC-001 | The `PARM` date is hard-coded, so every run produces the same transaction IDs. |
 | DEF-JINTC-002 | The DD named `TRANSACT` is the interest output `SYSTRAN`, not the transaction master. |
 | DEF-JINTC-003 | The restart runbook still describes the "last account not updated" defect, which the program no longer has. |
+| DEF-JINTC-004 | The `XREFFIL1` path is non-unique while the program declares a unique alternate key, so the job may abend on z/OS. |
 
 ## 3. Actors and triggers
 
-- **Trigger:** submitted by an operator after POSTTRAN in the README "Running Batch Jobs" sequence (`./README.md:228`) and by the demo full-batch script (`scripts/run_full_batch.sh:50-51`). Control-M runs it in folder `MONTHLY-InterestCalculation` after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:69-80`); that folder has no monthly scheduling rule (see `SCHED-CONTROLM.md`). CA-7 does not run it. The local runner passes the same `PARM` (`tools/carddemo.py:657`).
+- **Trigger:** submitted by an operator after POSTTRAN in the README "Running Batch Jobs" sequence (`./README.md:228`) and by the demo full-batch script (`scripts/run_full_batch.sh:50-51`). Control-M runs it in folder `MONTHLY-InterestCalculation` after CLOSEFIL and before COMBTRAN (`app/scheduler/CardDemo.controlm:69-80`); that folder has no monthly scheduling rule (see `SCHED-CONTROLM.md`). CA-7 does not run it. The local runner passes the same `PARM` (`tools/carddemo.py:657`). It differs from the JCL in two bindings (`tools/carddemo.py:657-663`): it has no `XREFFIL1` DD, because GnuCOBOL keeps the alternate key inside the indexed file, and it creates the `TRANSACT` output as `FB` where the JCL says `RECFM=F`; neither changes the records.
 - **Preconditions:** POSTTRAN has posted the cycle's transactions; CICS has closed `ACCTDAT`, `CCXREF` and `CXACAIX` (CLOSEFIL); the alternate index path `CARDXREF.VSAM.AIX.PATH` exists (built by XREFFILE); `DISCGRP` holds a `DEFAULT` group (`docs/runbooks/batch-cycle-restart.md:98`); the GDG base `SYSTRAN` exists (DEFGDGB, `app/jcl/DEFGDGB.jcl:48-53`).
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). Parameter: `PARM='2022071800'` on `STEP15` (`:22`).
 
@@ -155,6 +156,11 @@ None at job level. The program's messages (`DISCLOSURE GROUP RECORD MISSING`, `A
 - **Source:** `app/cbl/CBACT04C.cbl:221-223`
 - **Status:** open (documentation) · **Fidelity:** incidental · **Confidence:** reviewed
 
+#### DEF-JINTC-004 · Non-unique alternate index behind a unique alternate key
+- `XREFFIL1` is bound to the path over `CARDXREF.VSAM.AIX`, which XREFFILE defines with `NONUNIQUEKEY` (`app/jcl/XREFFILE.jcl:72-76`). The program declares `ALTERNATE RECORD KEY IS FD-XREF-ACCT-ID` without `WITH DUPLICATES` (`app/cbl/CBACT04C.cbl:38`) and abends on any status other than `00` after the read by account ID (`app/cbl/CBACT04C.cbl:401-412`). On z/OS the mismatch can surface as open status `39` (alternate key attributes differ from the file) or, once an account has a second card, as read status `02`; either stops the job through ERR-JINTC-001. The sample data has one card per account, so the AS-IS cycle has not shown it. Program side: DEF-INTC-007, Q-INTC-002.
+- **Source:** `:29-32`, `app/jcl/XREFFILE.jcl:72-76`, `app/cbl/CBACT04C.cbl:34-39, 394-414`
+- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred (medium, about 60%: the open status depends on how the COBOL runtime checks alternate key attributes)
+
 ## 14. Open questions
 
 | ID | Question | For |
@@ -171,4 +177,4 @@ For the same input files and `PARM`, the program-level results of `CBACT04C` (in
 | Step | Lines | Covered by |
 | :-- | :-- | :-- |
 | (job card) | 1-2 | §3 |
-| `STEP15` | 22-41 | FLOW-JINTC-001, SE-JINTC-001, SE-JINTC-002, ERR-JINTC-001, NUM-JINTC-001, DEF-JINTC-001, DEF-JINTC-002 |
+| `STEP15` | 22-41 | FLOW-JINTC-001, SE-JINTC-001, SE-JINTC-002, ERR-JINTC-001, NUM-JINTC-001, DEF-JINTC-001, DEF-JINTC-002, DEF-JINTC-004 |

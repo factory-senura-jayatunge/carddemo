@@ -27,7 +27,7 @@ spec_status: draft
 
 ## 1. Summary
 
-WAITSTEP does nothing except wait. Its only step runs COBSWAIT, which reads an eight-digit number from `SYSIN` and passes it to the assembler routine MVSWAIT, which suspends the step for that many hundredths of a second with an MVS timer. The shipped value `00003600` gives a 36-second wait. Both schedules place it between a batch job and the job that hands the files back to CICS (OPENFIL) or takes them away (CLOSEFIL), as a fixed pause rather than a real completion check. It reads and writes no data and has no business logic.
+WAITSTEP does nothing except wait. Its only step runs COBSWAIT, which reads an eight-digit number from `SYSIN` and passes it to the assembler routine MVSWAIT, which suspends the step for that many hundredths of a second with an MVS timer. The shipped value `00003600` gives a 36-second wait. Both schedules place it after a batch job and before the job that hands the files back to CICS (OPENFIL); in CA-7 the same WAITSTEP completion can also trigger a job that takes them away again (CLOSEFIL, `CLOSEFIL1` or `CLOSEFIL2`, depending on the schedule ID, section 3). It is a fixed pause rather than a real completion check. It reads and writes no data and has no business logic.
 
 ## 2. Rules at a glance
 
@@ -39,14 +39,14 @@ The job has no business rules. Its items:
 | ERR-JWAIT-001 | There is no error handling; the step always ends with return code 0 unless it abends. |
 | NUM-JWAIT-001 | The value is eight characters taken as an unsigned whole number of centiseconds. |
 | DEF-JWAIT-001 | The comment says the time is in the `PARM`, but it is read from `SYSIN`. |
-| DEF-JWAIT-002 | A non-numeric or short `SYSIN` value gives an unpredictable wait. |
+| DEF-JWAIT-002 | A non-numeric or short `SYSIN` value gives a platform-dependent wait (`36` and blanks: 0.36 seconds locally, about 100 hours on z/OS). |
 | DEF-JWAIT-003 | A fixed delay stands in for a real synchronisation with CICS. |
 
 ## 3. Actors and triggers
 
 - **Trigger:** both schedules.
-  - CA-7 triggers it after POSTTRAN (`app/scheduler/CardDemo.ca7:96-97`), TRANTYPE (`app/scheduler/CardDemo.ca7:188-189`), TRANCATG (`app/scheduler/CardDemo.ca7:297-298`), TCATBALF (`app/scheduler/CardDemo.ca7:329-330`), READXREF (`app/scheduler/CardDemo.ca7:447-448`), TXT2PDF1 (`app/scheduler/CardDemo.ca7:521-522`) and PRTCATBL (`app/scheduler/CardDemo.ca7:563-564`). Each time WAITSTEP in turn triggers OPENFIL or a CLOSEFIL job (for example `app/scheduler/CardDemo.ca7:123-124`, `app/scheduler/CardDemo.ca7:215-217`).
-  - Control-M runs it after TRANBKP in folder `DAILY-TransactionBackup` (`app/scheduler/CardDemo.controlm:14-19`), after DISCGRP in `WEEKLY DisclosureGroupsRefresh` (`app/scheduler/CardDemo.controlm:44-49`) and after COMBTRAN in the monthly interest calculation (`app/scheduler/CardDemo.controlm:81-86`), each time followed by OPENFIL.
+  - CA-7 triggers it after POSTTRAN (`app/scheduler/CardDemo.ca7:96-97`), TRANTYPE (`app/scheduler/CardDemo.ca7:188-189`), TRANCATG (`app/scheduler/CardDemo.ca7:297-298`), TCATBALF (`app/scheduler/CardDemo.ca7:329-330`), READXREF (`app/scheduler/CardDemo.ca7:447-448`), TXT2PDF1 (`app/scheduler/CardDemo.ca7:521-522`) and PRTCATBL (`app/scheduler/CardDemo.ca7:563-564`). What WAITSTEP then triggers depends on the schedule ID it runs under, which it inherits from the job that triggered it (FLOW-JCA7-005): under 030 (after POSTTRAN, TRANTYPE, READXREF and TXT2PDF1) it triggers both OPENFIL (`app/scheduler/CardDemo.ca7:124, 453, 527`) and CLOSEFIL (`app/scheduler/CardDemo.ca7:303, 335`); under 031 (after TRANCATG and PRTCATBL) OPENFIL and `CLOSEFIL1` (`app/scheduler/CardDemo.ca7:216, 569`); under 032 (after TCATBALF) only `CLOSEFIL2` (`app/scheduler/CardDemo.ca7:217`). See `SCHED-CA7.md` (FLOW-JCA7-006).
+  - Control-M runs it after TRANBKP in folder `DAILY-TransactionBackup` (`app/scheduler/CardDemo.controlm:14-19`), after DISCGRP in `WEEKLY-DisclosureGroupsRefresh` (`app/scheduler/CardDemo.controlm:44-49`) and after COMBTRAN in the monthly interest calculation (`app/scheduler/CardDemo.controlm:81-86`), each time followed by OPENFIL.
   - The README lists it (`./README.md:234`, `./README.md:379`), and the restart runbook says it "can be placed between jobs" (`docs/runbooks/batch-cycle-restart.md:23`).
 - **Preconditions:** none.
 - **Job card:** `CLASS=A,MSGCLASS=0,NOTIFY=&SYSUID` (`:1-2`). No parameters; the wait time is in-stream data.
@@ -80,7 +80,7 @@ flowchart TD
 ```
 
 #### FLOW-JWAIT-001 · Wait the number of centiseconds in `SYSIN`
-- **What:** `EXEC PGM=COBSWAIT`. COBSWAIT reads the wait time and calls MVSWAIT, which loads the binary value and issues `STIMER WAIT,BINTVL=` with it through the ASMWAIT macro (`app/asm/MVSWAIT.asm:20-23`, `app/maclib/ASMWAIT.mac:17-20`). `BINTVL` counts hundredths of a second, so `00003600` suspends the step for 36 seconds. MVSWAIT then clears register 15 and returns (`app/asm/MVSWAIT.asm:26-27`), and COBSWAIT stops the run (`app/cbl/COBSWAIT.cbl:40`).
+- **What:** `EXEC PGM=COBSWAIT`. COBSWAIT reads the wait time and calls MVSWAIT, which loads the binary value and issues `STIMER WAIT,BINTVL=` with it through the ASMWAIT macro (`app/asm/MVSWAIT.asm:20-23`, `app/maclib/ASMWAIT.mac:17-20`). `BINTVL` counts hundredths of a second, so `00003600` suspends the step for 36 seconds. MVSWAIT then restores the registers, sets the byte at offset 12 of COBSWAIT's save area to X'FF' (`app/asm/MVSWAIT.asm:24-25`; the linkage convention's "returned" flag, which nothing reads, DEF-MWAT-001 in `MVSWAIT.md`), clears register 15 and returns (`app/asm/MVSWAIT.asm:26-27`), and COBSWAIT stops the run (`app/cbl/COBSWAIT.cbl:40`).
 - **Source:** `:22-26`
 - **Fidelity:** must-preserve (the length of the pause, if the target keeps the pause at all; see Q-JWAIT-001) · **Confidence:** reviewed; locally runtime-verified with a shorter value (`python3 tools/carddemo.py run WAITSTEP`: RETURN-CODE 0, program step 0.52 seconds, with the runner's `SYSIN` of `00000050`, 0.5 seconds)
 
@@ -100,13 +100,13 @@ None. The job reads and writes no dataset; its only effect is the elapsed time.
 
 #### ERR-JWAIT-001 · No error handling; return code 0
 - **When:** always.
-- **Then:** neither COBSWAIT nor MVSWAIT checks anything. MVSWAIT returns 0 in register 15, so the step's return code is 0. A missing `SYSIN` or a bad value does not fail the step; it changes the length of the wait (DEF-JWAIT-002). Only an abend stops it, and then the scheduler does not trigger the following OPENFIL or CLOSEFIL.
-- **Source:** `:22`
-- **Fidelity:** incidental · **Confidence:** platform-inferred
+- **Then:** neither COBSWAIT nor MVSWAIT checks anything. MVSWAIT returns 0 in register 15 (`app/asm/MVSWAIT.asm:26-27`) and COBSWAIT stops the run without setting a return code (`app/cbl/COBSWAIT.cbl:38-40`), so the step's return code is 0. A bad value does not fail the step unless it causes a data exception on z/OS; otherwise it changes the length of the wait (DEF-JWAIT-002). With a missing or empty `SYSIN` the local run waits 0; what happens on z/OS has not been determined (Q-WAIT-001 in `COBSWAIT.md`). Only an abend stops the step, and then the scheduler does not trigger the following OPENFIL or CLOSEFIL.
+- **Source:** `app/asm/MVSWAIT.asm:26-27`, `app/cbl/COBSWAIT.cbl:38-40`
+- **Fidelity:** incidental · **Confidence:** reviewed (code); platform-inferred (missing `SYSIN` on z/OS)
 
 ## 11. Interactions
 
-- **Upstream and downstream:** the jobs listed in section 3. In CA-7, every WAITSTEP is followed by OPENFIL or a CLOSEFIL job; in Control-M, by OPENFIL.
+- **Upstream and downstream:** the jobs listed in section 3. In CA-7, a WAITSTEP completion triggers OPENFIL, a CLOSEFIL job or both, depending on its schedule ID (section 3); in Control-M, WAITSTEP is followed by OPENFIL.
 - **Schedule detail:** in the Control-M monthly folder, WAITSTEP and OPENFIL both have `JOBISN="4"` (`app/scheduler/CardDemo.controlm:81`, `app/scheduler/CardDemo.controlm:87`); the order is still set by the WAITSTEP condition that OPENFIL waits for (`app/scheduler/CardDemo.controlm:84`, `app/scheduler/CardDemo.controlm:88`).
 - **Local runner:** `tools/carddemo.py:689-690` runs the job with `SYSIN` `00000050` (0.5 seconds) instead of the JCL's `00003600`, and MVSWAIT is replaced by a COBOL shim that sleeps for the value times 10 milliseconds (`tools/shims/MVSWAIT.cbl:13-17`).
 
@@ -123,9 +123,9 @@ None. The job reads and writes no dataset; its only effect is the elapsed time.
 - **Status:** open · **Fidelity:** incidental · **Confidence:** reviewed
 
 #### DEF-JWAIT-002 · A bad `SYSIN` value gives an unpredictable wait
-- The program moves the eight characters to a numeric field without checking them. A value with spaces or letters (for example `36` followed by blanks) or an empty `SYSIN` does not fail the step; the binary value that results, and so the length of the wait, is not defined by the program.
+- The program moves the eight characters to a binary field without checking them, and the result depends on the platform (NUM-WAIT-001 and DEF-WAIT-001 in `COBSWAIT.md`). Locally, GnuCOBOL turns `36` followed by blanks into 36, a wait of 0.36 seconds. On z/OS the conversion most likely ignores the zone bits and counts the blanks as zeros, giving 36,000,000 centiseconds, about 100 hours. A byte whose low-order half is not a digit, such as `.`, can abend the step with S0C7 on z/OS, and the scheduler then stops the chain (ERR-JWAIT-001). An empty or missing `SYSIN` waits 0 locally and is undetermined on z/OS (Q-WAIT-001).
 - **Source:** `app/cbl/COBSWAIT.cbl:36-37`
-- **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
+- **Status:** open · **Fidelity:** defect-decide (Q-WAIT-001) · **Confidence:** runtime-verified (local conversion, NUM-WAIT-001); platform-inferred (z/OS)
 
 #### DEF-JWAIT-003 · A fixed delay instead of real synchronisation
 - WAITSTEP sits between a batch job and OPENFIL or CLOSEFIL in every chain. A fixed 36-second pause does not check that anything has finished, so it is either longer than needed or, under load, too short; nothing in the repository says what it is waiting for.

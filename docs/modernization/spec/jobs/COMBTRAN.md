@@ -92,16 +92,16 @@ None beyond the merge order. The job decides nothing per record; it unites the c
 
 #### VAL-JCOMB-001 · The load requires unique transaction IDs
 - **When:** `STEP10` copies a record whose `TRAN-ID` already exists in the KSDS, either because the KSDS was not empty or because the two inputs share an ID.
-- **Then:** VSAM rejects the record as a duplicate and IDCAMS reports it in `SYSPRINT`; the step ends with return code 8 or higher, and IDCAMS stops after its error limit (4 by default). Records already loaded stay. The sort keeps duplicates (no `SUM` or `EQUALS` statement), so duplicates reach the load.
+- **Then:** VSAM rejects the record as a duplicate and IDCAMS reports it in `SYSPRINT`; the step ends with return code 8 or higher, and IDCAMS stops after its error limit (4 by default). Records already loaded stay. The sort keeps duplicates, so they reach the load: only `SUM FIELDS=NONE` would remove them, and there is none. (`EQUALS` would not remove them either; it only keeps records with equal keys in input order, and without it that order is not guaranteed.)
 - **Source:** `:30, 48`
 - **Fidelity:** must-preserve (no silent overwrite of a transaction) · **Confidence:** platform-inferred
 
 ## 9. Side effects
 
 #### SE-JCOMB-001 · Merge the two transaction sets into a new generation
-- **What:** the sort reads the concatenation `TRANSACT.BKUP(0)` then `SYSTRAN(0)`, sorts all records by `TRAN-ID` ascending (`SYMNAMES` `TRAN-ID,1,16,CH`; `SORT FIELDS=(TRAN-ID,A)`), and writes them unchanged to the new dataset `TRANSACT.COMBINED(+1)`, which takes its DCB from the first `SORTIN` dataset (`DCB=(*.SORTIN)`, FB 350). `DISP=(NEW,CATLG,DELETE)` catalogs it on a normal end and deletes it on an abend.
+- **What:** the sort reads the concatenation `TRANSACT.BKUP(0)` then `SYSTRAN(0)`, sorts all records by `TRAN-ID` ascending (`SYMNAMES` `TRAN-ID,1,16,CH`; `SORT FIELDS=(TRAN-ID,A)`), and writes them unchanged to the new dataset `TRANSACT.COMBINED(+1)`. `DCB=(*.SORTIN)` is a referback to the `SORTIN` DD statement, which codes no DCB subparameters (`:23-26`), so it copies nothing explicit; the output format most likely comes from DFSORT, which takes RECFM and LRECL from the input (the first `SORTIN` dataset, FB 350) when the `SORTOUT` DD does not give them (NUM-JCOMB-001). `DISP=(NEW,CATLG,DELETE)` catalogs it on a normal end and deletes it on an abend.
 - **Source:** `:22-37`
-- **Fidelity:** must-preserve (content: union of both sets, ordered by ID) · **Confidence:** reviewed (statements); platform-inferred (DCB referback on a concatenation)
+- **Fidelity:** must-preserve (content: union of both sets, ordered by ID) · **Confidence:** reviewed (statements); platform-inferred (output DCB, about 65%)
 
 #### SE-JCOMB-002 · Reload the transaction master
 - **What:** `REPRO INFILE(TRANSACT) OUTFILE(TRANVSAM)` copies every record of `TRANSACT.COMBINED(+1)`, in order, into `AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS`. In `STEP10`, `(+1)` refers to the generation created by `STEP05R` of the same job. The job does not empty the KSDS first; it relies on TRANBKP.
@@ -125,15 +125,15 @@ None beyond the merge order. The job decides nothing per record; it unites the c
 ## 12. Numeric, date and format details
 
 #### NUM-JCOMB-001 · Record format of the combined file
-- Both inputs are 350-byte records, but `TRANSACT.BKUP` is FB and `SYSTRAN` is F (unblocked). `DCB=(*.SORTIN)` copies the first dataset's attributes, so `TRANSACT.COMBINED` is FB 350. `TRAN-ID` is compared as characters (`CH`), so the order is the EBCDIC collating order on the mainframe (digits sort after letters), and ASCII order on a workstation.
-- **Source:** `:28, 35`
-- **Fidelity:** must-preserve (key order of the load) · **Confidence:** platform-inferred
+- Both inputs are 350-byte records, but `TRANSACT.BKUP` is FB and `SYSTRAN` is F (unblocked). `DCB=(*.SORTIN)` copies only DCB subparameters coded on the `SORTIN` DD, and none are coded (`:23-26`), so the format of `TRANSACT.COMBINED` is most likely set by DFSORT from the first `SORTIN` dataset: FB 350. The target needs only the 350-byte record; the blocking is incidental. `TRAN-ID` is compared as characters (`CH`), so the order is the EBCDIC collating order on the mainframe (digits sort after letters), and ASCII order on a workstation.
+- **Source:** `:23-28, 35`
+- **Fidelity:** must-preserve (key order of the load); incidental (blocking) · **Confidence:** platform-inferred (key order, high; output DCB, about 65%)
 
 ## 13. Known defects and oddities
 
 #### DEF-JCOMB-001 · The inputs are chosen by relative generation
-- `TRANSACT.BKUP(0)` and `SYSTRAN(0)` mean "the newest generation at the time the job starts". Any job that adds a `TRANSACT.BKUP` generation between TRANBKP and COMBTRAN changes the input: TRANREPT does (its `STEP05R` writes `TRANSACT.BKUP(+1)` from the then empty `TRANSACT`), and it can be submitted from CICS at any time through CORPT00C. COMBTRAN would then combine an empty backup with the interest and lose the cycle's posted transactions. Likewise a rerun of INTCALC adds a `SYSTRAN` generation.
-- **Source:** `:24, 26`
+- `TRANSACT.BKUP(0)` and `SYSTRAN(0)` mean "the newest generation at the time the job starts". Any job that adds a `TRANSACT.BKUP` generation between TRANBKP and COMBTRAN changes the input: TRANREPT does: job step `STEP05R` (`app/jcl/TRANREPT.jcl:23-33`) writes `TRANSACT.BKUP(+1)` from the then empty `TRANSACT`, and so does step `STEP01R` of the procedure TRANREPT (`app/proc/TRANREPT.prc:21-31`), which CORPT00C submits from CICS at any time (`//STEP10 EXEC PROC=TRANREPT`, `app/cbl/CORPT00C.cbl:94`). COMBTRAN would then combine an empty backup with the interest and lose the cycle's posted transactions. Likewise a rerun of INTCALC adds a `SYSTRAN` generation.
+- **Source:** `:24, 26`, `app/jcl/TRANREPT.jcl:23-33`, `app/proc/TRANREPT.prc:21-31`, `app/cbl/CORPT00C.cbl:94`
 - **Status:** open · **Fidelity:** defect-decide · **Confidence:** platform-inferred
 
 #### DEF-JCOMB-002 · The Control-M monthly folder has no TRANBKP before COMBTRAN
