@@ -47,7 +47,7 @@ These are the targets in the order you use them. Every target ends with one line
 | 3 | `load` | Loads the sample data into SQL Server (`dataLoadJob`). | Not yet (Bill Pay slice) |
 | 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). `ONLY=identity-service,web` starts only those components. | Done; services join as they are converted |
 | 5 | `smoke` | Read-only check of the running slice in under 60 s: health of every running service, sign-on as `USER0001` with the seed password, `me`, `features`, a Bill Pay preview for account `00000000001` (needs `load`), the JWKS, the web app when it runs, and sign-off. It counts the rows of every table in `CARDDEMO_DB_NAME` before and after; only `iam.session` and `iam.audit_event` may change. | Done |
-| 6 | `billpay` | Runs the Bill Pay slice end to end. | Not yet (Bill Pay slice) |
+| 6 | `billpay` | Builds identity-service and billpay-service, runs `db-reset` and `load` when `CARDDEMO_DB_NAME` has no accounts, starts the slice (`up` for identity-service, billpay-service and web), then makes one scripted payment through the API (`scripts/billpay_e2e.py`): sign-on, preview, pay with confirm `Y`, and checks the stored transaction and the zero balance. The slice stays up at `http://127.0.0.1:25173/bill-pay`. | Done; needs `load` |
 | 7 | `down` | Stops the web app, the services and the containers; volumes are kept. | Done |
 
 Other targets:
@@ -89,20 +89,20 @@ The containers are shared by every checkout, so the targets that would interrupt
 - `infra-wipe` needs `CONFIRM=1`.
 ## Verification targets
 
-A target whose work has not landed fails with the phase that delivers it. A target whose script or module is missing in the checkout (for example `web/` before the front end is merged) fails with `no modernization/<path> in this checkout`. "Heavy" means it needs the running stack or Testcontainers, takes minutes, and should not run in parallel with other heavy targets on a laptop.
+A target whose work has not landed fails with the phase that delivers it. A target whose script or module is missing in the checkout (for example `web/` before the front end is merged) fails with `no modernization/<path> in this checkout`. "Heavy" means it runs Maven verify, Vitest or Playwright, or needs the running stack or Testcontainers; it takes the heavy lock (below), so two never run at the same time on one machine. Run these commands through the make targets, or through `scripts/heavy.py <name> <command>`, rather than directly.
 
 | Target | Checks | Heavy | Arrives with |
 |:--|:--|:--|:--|
 | `verify-spec` | Natural-language spec format and paragraph coverage (`check_spec.py --require-all`, which also fails when an in-scope program or job has no spec), then every spec-only reimplementation in `docs/modernization/spec/checks/` against the GnuCOBOL build, on sample and stress data. Builds the batch programs first (needs GnuCOBOL 3.2, see the root `AGENTS.md`). | No | Done (Phase 1, NL spec) |
 | `verify-ledger` | Ledger evidence and links (`verify/trace/verify_ledger.py`, Python 3.11 or newer) | No | Done |
 | `test-backend` | `./mvnw -B verify`: unit, integration, contract and ArchUnit tests, against the per-agent test database or Testcontainers | Yes | Done |
-| `test-billpay` | Bill Pay service, API and UI tests | Yes | Phase 3, Bill Pay pilot |
+| `test-billpay` | `scripts/test_billpay.py`: Maven verify of ledger-core and billpay-service, the Bill Pay Vitest file, Playwright `e2e/bill.spec.ts` on the mocked API (Vite on 25174), then `db-reset load`, the slice up and the same spec against it, then the trace gate for BILL. Reports go to `build/test-results/billpay/`. The slice stays up. | Yes | Done; needs `load` |
 | `verify-batch` | Spring Batch against GnuCOBOL, field by field | Yes | Phase 3, batch |
 | `verify-harness` | Self-test of the differential harness | No | Phase 3, batch |
 | `verify-data` | Record counts and checksums after `load` | Yes | Phase 3, data migration |
 | `verify-cycle` | The full batch cycle through Airflow | Yes | Phase 3, Airflow |
 | `test-airflow` | DAG integrity and task order | No | Phase 3, Airflow |
-| `web-build` | `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | No | Done |
+| `web-build` | `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | Yes (Vitest) | Done |
 | `test-e2e` | Playwright against the running stack (`make up` first, `CARDDEMO_E2E_TARGET=stack`); Chromium, or the projects in `E2E_BROWSERS` | Yes | Done |
 | `trace` | Rule-to-test traceability matrix and its gate (`verify/trace/trace_matrix.py`, Python 3.11 or newer) | No | Done |
 
@@ -196,7 +196,7 @@ CARDDEMO_TEST_MSSQL_DB=carddemo_test_backend modernization/scripts/with_env.py .
 
 Never point the tests at `CARDDEMO_DB_NAME` (`carddemo`, the database of `make up` and `load`). CI leaves the URL empty and uses Testcontainers.
 
-Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
+Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
 
 ## CI
 
@@ -206,7 +206,7 @@ Heavy targets (`test-backend`, `test-billpay`, `verify-batch`, `verify-data`, `v
 |:--|:--|:--|
 | `spec` | `verify-spec` in the dev container image (GnuCOBOL 3.2) | |
 | `backend` | `test-backend` (Testcontainers) | |
-| `billpay` | `test-billpay` | |
+| `billpay` | `test-billpay` (skipped until `load` lands, because its stack step needs data) | |
 | `web` | `web-build` | `backend` (runs when it was skipped, not when it failed) |
 | `airflow` | `test-airflow` | |
 | `batch` | `verify-harness verify-batch` | `spec` |

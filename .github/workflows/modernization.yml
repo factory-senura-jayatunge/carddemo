@@ -87,7 +87,7 @@ jobs:
             fi
           }
           job backend test-backend
-          job billpay test-billpay
+          job billpay load test-billpay
           job web web-build
           job airflow test-airflow
           job batch verify-harness verify-batch
