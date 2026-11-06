@@ -1,0 +1,112 @@
+{
+  "acctdata.txt": {
+    "copybook": "CVACT01Y",
+    "count": 50,
+    "distinctKeys": 50,
+    "firstKey": "00000000001",
+    "inKeyOrder": true,
+    "keyLength": 11,
+    "keysCrc32": "8ac60364",
+    "lastKey": "00000000050",
+    "padded": 0,
+    "sums": {
+      "ACCT-CASH-CREDIT-LIMIT": "122148.00",
+      "ACCT-CREDIT-LIMIT": "233711.00",
+      "ACCT-CURR-BAL": "12269.00",
+      "ACCT-CURR-CYC-CREDIT": "0.00",
+      "ACCT-CURR-CYC-DEBIT": "0.00"
+    }
+  },
+  "carddata.txt": {
+    "copybook": "CVACT02Y",
+    "count": 50,
+    "distinctKeys": 50,
+    "inKeyOrder": true,
+    "keyLength": 16,
+    "keysCrc32": "6d9bc0bb",
+    "padded": 0,
+    "sums": {}
+  },
+  "cardxref.txt": {
+    "copybook": "CVACT03Y",
+    "count": 50,
+    "distinctKeys": 50,
+    "inKeyOrder": true,
+    "keyLength": 16,
+    "keysCrc32": "6d9bc0bb",
+    "padded": 50,
+    "sums": {}
+  },
+  "custdata.txt": {
+    "copybook": "CVCUS01Y",
+    "count": 50,
+    "distinctKeys": 50,
+    "firstKey": "000000001",
+    "inKeyOrder": true,
+    "keyLength": 9,
+    "keysCrc32": "6951faaf",
+    "lastKey": "000000050",
+    "padded": 0,
+    "sums": {}
+  },
+  "dailytran.txt": {
+    "copybook": "CVTRA06Y",
+    "count": 300,
+    "padded": 0,
+    "sums": {
+      "DALYTRAN-AMT": "104801.54"
+    }
+  },
+  "discgrp.txt": {
+    "copybook": "CVTRA02Y",
+    "count": 51,
+    "distinctKeys": 51,
+    "firstKey": "A000000000010001",
+    "inKeyOrder": true,
+    "keyLength": 16,
+    "keysCrc32": "28c09048",
+    "lastKey": "ZEROAPR   070001",
+    "padded": 0,
+    "sums": {
+      "DIS-INT-RATE": "375.00"
+    }
+  },
+  "tcatbal.txt": {
+    "copybook": "CVTRA01Y",
+    "count": 50,
+    "distinctKeys": 50,
+    "firstKey": "00000000001010001",
+    "inKeyOrder": true,
+    "keyLength": 17,
+    "keysCrc32": "13a9dfe4",
+    "lastKey": "00000000050010001",
+    "padded": 0,
+    "sums": {
+      "TRAN-CAT-BAL": "0.00"
+    }
+  },
+  "trancatg.txt": {
+    "copybook": "CVTRA04Y",
+    "count": 18,
+    "distinctKeys": 18,
+    "firstKey": "010001",
+    "inKeyOrder": true,
+    "keyLength": 6,
+    "keysCrc32": "b9e3e787",
+    "lastKey": "070001",
+    "padded": 0,
+    "sums": {}
+  },
+  "trantype.txt": {
+    "copybook": "CVTRA03Y",
+    "count": 7,
+    "distinctKeys": 7,
+    "firstKey": "01",
+    "inKeyOrder": true,
+    "keyLength": 2,
+    "keysCrc32": "ca05e3b0",
+    "lastKey": "07",
+    "padded": 0,
+    "sums": {}
+  }
+}

@@ -1,0 +1,729 @@
+{
+  "CSUSR01Y": {
+    "fields": [
+      {
+        "length": 8,
+        "name": "SEC-USR-ID",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 20,
+        "name": "SEC-USR-FNAME",
+        "numeric": false,
+        "offset": 8,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 20,
+        "name": "SEC-USR-LNAME",
+        "numeric": false,
+        "offset": 28,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 8,
+        "name": "SEC-USR-PWD",
+        "numeric": false,
+        "offset": 48,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 1,
+        "name": "SEC-USR-TYPE",
+        "numeric": false,
+        "offset": 56,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 23,
+        "name": "SEC-USR-FILLER",
+        "numeric": false,
+        "offset": 57,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 80
+  },
+  "CVACT01Y": {
+    "fields": [
+      {
+        "length": 11,
+        "name": "ACCT-ID",
+        "numeric": true,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 1,
+        "name": "ACCT-ACTIVE-STATUS",
+        "numeric": false,
+        "offset": 11,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 12,
+        "name": "ACCT-CURR-BAL",
+        "numeric": true,
+        "offset": 12,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 12,
+        "name": "ACCT-CREDIT-LIMIT",
+        "numeric": true,
+        "offset": 24,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 12,
+        "name": "ACCT-CASH-CREDIT-LIMIT",
+        "numeric": true,
+        "offset": 36,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 10,
+        "name": "ACCT-OPEN-DATE",
+        "numeric": false,
+        "offset": 48,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "ACCT-EXPIRAION-DATE",
+        "numeric": false,
+        "offset": 58,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "ACCT-REISSUE-DATE",
+        "numeric": false,
+        "offset": 68,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 12,
+        "name": "ACCT-CURR-CYC-CREDIT",
+        "numeric": true,
+        "offset": 78,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 12,
+        "name": "ACCT-CURR-CYC-DEBIT",
+        "numeric": true,
+        "offset": 90,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 10,
+        "name": "ACCT-ADDR-ZIP",
+        "numeric": false,
+        "offset": 102,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "ACCT-GROUP-ID",
+        "numeric": false,
+        "offset": 112,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 300
+  },
+  "CVACT02Y": {
+    "fields": [
+      {
+        "length": 16,
+        "name": "CARD-NUM",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 11,
+        "name": "CARD-ACCT-ID",
+        "numeric": true,
+        "offset": 16,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 3,
+        "name": "CARD-CVV-CD",
+        "numeric": true,
+        "offset": 27,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "CARD-EMBOSSED-NAME",
+        "numeric": false,
+        "offset": 30,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "CARD-EXPIRAION-DATE",
+        "numeric": false,
+        "offset": 80,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 1,
+        "name": "CARD-ACTIVE-STATUS",
+        "numeric": false,
+        "offset": 90,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 150
+  },
+  "CVACT03Y": {
+    "fields": [
+      {
+        "length": 16,
+        "name": "XREF-CARD-NUM",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 9,
+        "name": "XREF-CUST-ID",
+        "numeric": true,
+        "offset": 16,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 11,
+        "name": "XREF-ACCT-ID",
+        "numeric": true,
+        "offset": 25,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 50
+  },
+  "CVCUS01Y": {
+    "fields": [
+      {
+        "length": 9,
+        "name": "CUST-ID",
+        "numeric": true,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 25,
+        "name": "CUST-FIRST-NAME",
+        "numeric": false,
+        "offset": 9,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 25,
+        "name": "CUST-MIDDLE-NAME",
+        "numeric": false,
+        "offset": 34,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 25,
+        "name": "CUST-LAST-NAME",
+        "numeric": false,
+        "offset": 59,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "CUST-ADDR-LINE-1",
+        "numeric": false,
+        "offset": 84,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "CUST-ADDR-LINE-2",
+        "numeric": false,
+        "offset": 134,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "CUST-ADDR-LINE-3",
+        "numeric": false,
+        "offset": 184,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 2,
+        "name": "CUST-ADDR-STATE-CD",
+        "numeric": false,
+        "offset": 234,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 3,
+        "name": "CUST-ADDR-COUNTRY-CD",
+        "numeric": false,
+        "offset": 236,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "CUST-ADDR-ZIP",
+        "numeric": false,
+        "offset": 239,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 15,
+        "name": "CUST-PHONE-NUM-1",
+        "numeric": false,
+        "offset": 249,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 15,
+        "name": "CUST-PHONE-NUM-2",
+        "numeric": false,
+        "offset": 264,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 9,
+        "name": "CUST-SSN",
+        "numeric": true,
+        "offset": 279,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 20,
+        "name": "CUST-GOVT-ISSUED-ID",
+        "numeric": false,
+        "offset": 288,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "CUST-DOB-YYYY-MM-DD",
+        "numeric": false,
+        "offset": 308,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "CUST-EFT-ACCOUNT-ID",
+        "numeric": false,
+        "offset": 318,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 1,
+        "name": "CUST-PRI-CARD-HOLDER-IND",
+        "numeric": false,
+        "offset": 328,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 3,
+        "name": "CUST-FICO-CREDIT-SCORE",
+        "numeric": true,
+        "offset": 329,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 500
+  },
+  "CVTRA01Y": {
+    "fields": [
+      {
+        "length": 11,
+        "name": "TRANCAT-ACCT-ID",
+        "numeric": true,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 2,
+        "name": "TRANCAT-TYPE-CD",
+        "numeric": false,
+        "offset": 11,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 4,
+        "name": "TRANCAT-CD",
+        "numeric": true,
+        "offset": 13,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 11,
+        "name": "TRAN-CAT-BAL",
+        "numeric": true,
+        "offset": 17,
+        "scale": 2,
+        "signed": true
+      }
+    ],
+    "length": 50
+  },
+  "CVTRA02Y": {
+    "fields": [
+      {
+        "length": 10,
+        "name": "DIS-ACCT-GROUP-ID",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 2,
+        "name": "DIS-TRAN-TYPE-CD",
+        "numeric": false,
+        "offset": 10,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 4,
+        "name": "DIS-TRAN-CAT-CD",
+        "numeric": true,
+        "offset": 12,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 6,
+        "name": "DIS-INT-RATE",
+        "numeric": true,
+        "offset": 16,
+        "scale": 2,
+        "signed": true
+      }
+    ],
+    "length": 50
+  },
+  "CVTRA03Y": {
+    "fields": [
+      {
+        "length": 2,
+        "name": "TRAN-TYPE",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "TRAN-TYPE-DESC",
+        "numeric": false,
+        "offset": 2,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 60
+  },
+  "CVTRA04Y": {
+    "fields": [
+      {
+        "length": 2,
+        "name": "TRAN-TYPE-CD",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 4,
+        "name": "TRAN-CAT-CD",
+        "numeric": true,
+        "offset": 2,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "TRAN-CAT-TYPE-DESC",
+        "numeric": false,
+        "offset": 6,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 60
+  },
+  "CVTRA05Y": {
+    "fields": [
+      {
+        "length": 16,
+        "name": "TRAN-ID",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 2,
+        "name": "TRAN-TYPE-CD",
+        "numeric": false,
+        "offset": 16,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 4,
+        "name": "TRAN-CAT-CD",
+        "numeric": true,
+        "offset": 18,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "TRAN-SOURCE",
+        "numeric": false,
+        "offset": 22,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 100,
+        "name": "TRAN-DESC",
+        "numeric": false,
+        "offset": 32,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 11,
+        "name": "TRAN-AMT",
+        "numeric": true,
+        "offset": 132,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 9,
+        "name": "TRAN-MERCHANT-ID",
+        "numeric": true,
+        "offset": 143,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "TRAN-MERCHANT-NAME",
+        "numeric": false,
+        "offset": 152,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "TRAN-MERCHANT-CITY",
+        "numeric": false,
+        "offset": 202,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "TRAN-MERCHANT-ZIP",
+        "numeric": false,
+        "offset": 252,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 16,
+        "name": "TRAN-CARD-NUM",
+        "numeric": false,
+        "offset": 262,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 26,
+        "name": "TRAN-ORIG-TS",
+        "numeric": false,
+        "offset": 278,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 26,
+        "name": "TRAN-PROC-TS",
+        "numeric": false,
+        "offset": 304,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 350
+  },
+  "CVTRA06Y": {
+    "fields": [
+      {
+        "length": 16,
+        "name": "DALYTRAN-ID",
+        "numeric": false,
+        "offset": 0,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 2,
+        "name": "DALYTRAN-TYPE-CD",
+        "numeric": false,
+        "offset": 16,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 4,
+        "name": "DALYTRAN-CAT-CD",
+        "numeric": true,
+        "offset": 18,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "DALYTRAN-SOURCE",
+        "numeric": false,
+        "offset": 22,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 100,
+        "name": "DALYTRAN-DESC",
+        "numeric": false,
+        "offset": 32,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 11,
+        "name": "DALYTRAN-AMT",
+        "numeric": true,
+        "offset": 132,
+        "scale": 2,
+        "signed": true
+      },
+      {
+        "length": 9,
+        "name": "DALYTRAN-MERCHANT-ID",
+        "numeric": true,
+        "offset": 143,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "DALYTRAN-MERCHANT-NAME",
+        "numeric": false,
+        "offset": 152,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 50,
+        "name": "DALYTRAN-MERCHANT-CITY",
+        "numeric": false,
+        "offset": 202,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 10,
+        "name": "DALYTRAN-MERCHANT-ZIP",
+        "numeric": false,
+        "offset": 252,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 16,
+        "name": "DALYTRAN-CARD-NUM",
+        "numeric": false,
+        "offset": 262,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 26,
+        "name": "DALYTRAN-ORIG-TS",
+        "numeric": false,
+        "offset": 278,
+        "scale": 0,
+        "signed": false
+      },
+      {
+        "length": 26,
+        "name": "DALYTRAN-PROC-TS",
+        "numeric": false,
+        "offset": 304,
+        "scale": 0,
+        "signed": false
+      }
+    ],
+    "length": 350
+  }
+}

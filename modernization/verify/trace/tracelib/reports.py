@@ -9,6 +9,9 @@
 
 The mode of a result is LEGACY or FIXED when the runner records it (the JSONL mode field, a mode
 property, an "@legacy"/"@fixed" tag or a "[LEGACY]"/"[FIXED]" parameter in the name), else None.
+
+An ID written in brackets in a test name or title ("[FLOW-BILL-002]") is not a citation. Such IDs
+are kept in Result.uncounted, so that make trace can report the tests that meant to cite them.
 """
 from __future__ import annotations
 
@@ -23,6 +26,7 @@ from .spec import ID_RE
 
 LOOSE_ID_RE = re.compile(r"(?<![\w-])((?:BR|VAL|FLOW|SE|ERR|NUM|DEF|Q)-[A-Za-z0-9]+-\d+|P?INV-[a-z0-9-]*\d+)(?![\w-])")
 TAG_RE = re.compile(r"@((?:BR|VAL|FLOW|SE|ERR|NUM|DEF|Q)-[A-Za-z0-9]+-\d+|P?INV-[a-z0-9-]*\d+)(?![\w-])")
+BRACKET_RE = re.compile(r"\[([^\[\]]*)\]")
 MODE_RE = re.compile(r"@(legacy|fixed)\b|\[(LEGACY|FIXED)\]|\bmode[=:]\s*(legacy|fixed)\b", re.I)
 PROPERTY_NAMES = {"spec", "spec_item", "specitem", "specitems", "items", "item", "tag", "tags"}
 
@@ -34,6 +38,7 @@ class Result:
     status: str  # passed | failed | skipped
     mode: str | None
     items: list[str] = field(default_factory=list)
+    uncounted: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "source": self.source, "status": self.status, "mode": self.mode}
@@ -62,6 +67,12 @@ def _ids(text: str) -> list[str]:
     return list(dict.fromkeys(LOOSE_ID_RE.findall(text)))
 
 
+def _bracketed(text: str | None, counted: list[str]) -> list[str]:
+    """IDs in brackets in a test name that are not among the IDs the test cites."""
+    found = [i for inner in BRACKET_RE.findall(text or "") for i in LOOSE_ID_RE.findall(inner)]
+    return [i for i in dict.fromkeys(found) if i not in counted]
+
+
 def read_jsonl(path: Path, rel: str) -> tuple[list[Result], list[str]]:
     results, problems = [], []
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -76,8 +87,9 @@ def read_jsonl(path: Path, rel: str) -> tuple[list[Result], list[str]]:
         if row.get("displayName") and row.get("displayName") != f"{row.get('method')}()":
             name += f" {row['displayName']}"
         mode = row.get("mode")
+        items = [i for i in row.get("items", []) if isinstance(i, str)]
         results.append(Result(name, rel, _status(row.get("status")), mode.upper() if isinstance(mode, str) else _mode(row.get("displayName")),
-                              [i for i in row.get("items", []) if isinstance(i, str)]))
+                              items, _bracketed(row.get("displayName"), items)))
     return results, problems
 
 
@@ -99,7 +111,9 @@ def read_junit(path: Path, rel: str) -> tuple[list[Result], list[str]]:
                 items += _ids(value)
             elif pname == "mode" and value.strip().lower() in ("legacy", "fixed"):
                 mode = value.strip().upper()
-        if not items:
+        items = list(dict.fromkeys(items))
+        uncounted = _bracketed(name, items)
+        if not items and not uncounted:
             continue
         if case.find("failure") is not None or case.find("error") is not None:
             status = "failed"
@@ -108,7 +122,7 @@ def read_junit(path: Path, rel: str) -> tuple[list[Result], list[str]]:
         else:
             status = "passed"
         full = f"{classname}#{name}" if classname else name
-        results.append(Result(full, rel, status, mode, list(dict.fromkeys(items))))
+        results.append(Result(full, rel, status, mode, items, uncounted))
     return results, []
 
 
@@ -128,7 +142,8 @@ def read_playwright(data: dict, rel: str) -> list[Result]:
             text = " ".join(titles + [spec.get("title", "")])
             tags = [t.lstrip("@") for t in spec.get("tags", []) if isinstance(t, str)]
             items = list(dict.fromkeys(TAG_RE.findall(text) + [t for t in tags if LOOSE_ID_RE.fullmatch(t)]))
-            if not items:
+            uncounted = _bracketed(text, items)
+            if not items and not uncounted:
                 continue
             mode = _mode(text, " ".join("@" + t for t in tags))
             for test in spec.get("tests", []):
@@ -139,7 +154,7 @@ def read_playwright(data: dict, rel: str) -> list[Result]:
                 status = {"unexpected": "failed", "timedOut": "failed", "interrupted": "failed"}.get(status, status)
                 project = test.get("projectName") or ""
                 name = f"{spec.get('file', '')}: {title}" + (f" [{project}]" if project else "")
-                results.append(Result(name, rel, _status(status), mode, items))
+                results.append(Result(name, rel, _status(status), mode, items, uncounted))
     return results
 
 

@@ -12,5 +12,28 @@
 
   <artifactId>legacy-format</artifactId>
   <name>CardDemo platform: legacy formats</name>
-  <description>Placeholder; owned by the data agent: zoned and packed codecs, legacy number and timestamp edits, fixed-layout export.</description>
+  <description>Zoned, packed and binary codecs, legacy number and timestamp edits, fixed-layout records.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 </project>

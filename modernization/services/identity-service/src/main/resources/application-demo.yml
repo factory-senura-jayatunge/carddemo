@@ -1,0 +1,7 @@
+# make up and CI: plain http on 127.0.0.1, the ten DUSRSECJ users.
+carddemo:
+  identity:
+    seed:
+      demo-users: true
+  security:
+    cookie-secure: false

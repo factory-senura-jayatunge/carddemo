@@ -8,6 +8,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -134,6 +135,25 @@ class GateTest(unittest.TestCase):
     def test_no_scope_only_code_switches(self):
         self.assertEqual(self.gaps(ALL_PASSING, led=make_ledger(units=())), {})
 
+    def test_unit_selection_gates_only_those_units(self):
+        results = [t for t in ALL_PASSING if t.name not in ("a", "d")]
+        m = matrix.build(make_spec(), make_ledger(), results, {"DEF-BILL-001"}, ["BILL"])
+        self.assertEqual(dict(m.gaps), {"BR-BILL-001": "no passing test", "FLOW-BILL-001": "no passing test"})
+        self.assertEqual(dict(m.ungated), {"BR-TRNA-003": "no passing test in legacy or fixed mode"})
+        self.assertEqual(m.gate_units, ["BILL"])
+        m = matrix.build(make_spec(), make_ledger(), results, {"DEF-BILL-001"}, ["MENU"])
+        self.assertTrue(m.ok)
+        self.assertEqual({g for g, _ in m.ungated}, {"BR-BILL-001", "FLOW-BILL-001", "BR-TRNA-003"})
+        self.assertEqual(m.rows["BR-BILL-001"].status, "gap")
+
+    def test_unit_selection_keeps_unknown_ids_of_the_unit(self):
+        results = ALL_PASSING + [r("g", ["BR-BILL-999"]), r("h", ["PINV-001", "BR-BILL-001"]), r("i", ["DEF-POST-999"])]
+        m = matrix.build(make_spec(), make_ledger(), results, {"DEF-BILL-001"}, ["BILL"])
+        self.assertEqual({g for g, _ in m.gaps}, {"BR-BILL-999", "PINV-001"})
+        self.assertEqual({g for g, _ in m.ungated}, {"DEF-POST-999"})
+        m = matrix.build(make_spec(), make_ledger(), results, {"DEF-BILL-001"}, ["MENU"])
+        self.assertEqual(m.gaps, [])
+
 
 class ReportsTest(unittest.TestCase):
     def setUp(self):
@@ -201,6 +221,36 @@ class ReportsTest(unittest.TestCase):
             ("bill-pay.spec.ts: BILL @VAL-BILL-001 › S3 blank [chromium]", "failed", None, ["VAL-BILL-001"]),
         ])
 
+    def test_bracketed_ids_are_not_counted_but_kept(self):
+        p = self.write("web/test-results/vitest-junit.xml", textwrap.dedent('''\
+            <?xml version="1.0" encoding="UTF-8"?>
+            <testsuites>
+              <testsuite name="bill-pay">
+                <testcase classname="BillPay.test.tsx" name="[FLOW-BILL-002] shows the header"/>
+                <testcase classname="BillPay.test.tsx" name="BILL-S5 fixed: locks the ID [DEF-BILL-014, NUM-BILL-001] @DEF-BILL-014"/>
+                <testcase classname="BillPay.test.tsx" name="[1] LEGACY @VAL-BILL-001"/>
+              </testsuite>
+            </testsuites>
+            '''))
+        results, problems = reports.read(p, self.tmp)
+        self.assertEqual(problems, [])
+        self.assertEqual([(x.items, x.uncounted, x.mode) for x in results], [
+            ([], ["FLOW-BILL-002"], None),
+            (["DEF-BILL-014"], ["NUM-BILL-001"], None),
+            (["VAL-BILL-001"], [], None),
+        ])
+        data = {"suites": [{"title": "bill-pay.spec.ts", "file": "bill-pay.spec.ts", "specs": [
+            {"title": "[SE-BILL-001] pays", "file": "bill-pay.spec.ts", "tags": [],
+             "tests": [{"projectName": "chromium", "status": "expected"}]}]}]}
+        p = self.write("web/test-results/playwright.json", json.dumps(data))
+        self.assertEqual([(x.items, x.uncounted) for x in reports.read(p, self.tmp)[0]], [([], ["SE-BILL-001"])])
+        p = self.write("svc/target/spec-items/T.jsonl", json.dumps(
+            {"class": "T", "method": "m", "displayName": "[DEF-BILL-010] pays", "items": ["DEF-BILL-010"], "status": "SUCCESSFUL"}) + "\n")
+        self.assertEqual([(x.items, x.uncounted) for x in reports.read(p, self.tmp)[0]], [(["DEF-BILL-010"], [])])
+        m = matrix.build(make_spec(), make_ledger(), ALL_PASSING + reports.read(
+            self.tmp / "web/test-results/vitest-junit.xml", self.tmp)[0][:1], {"DEF-BILL-001"})
+        self.assertEqual(m.gaps, [])
+
     def test_discover_skips_node_modules_and_other_dirs(self):
         keep = [self.write("a/target/spec-items/T.jsonl", ""), self.write("build/test-results/backend/TEST-x.xml", "<testsuite/>"),
                 self.write("web/test-results/p.json", "{}")]
@@ -223,10 +273,53 @@ class CliTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp)
 
-    def run_cli(self, reports_dir):
+    def run_cli(self, reports_dir, units=None):
         out = io.StringIO()
-        rc = trace_cli.run(REPO, REPO / "modernization/ledger", [reports_dir], self.tmp / "out", out)
+        rc = trace_cli.run(REPO, REPO / "modernization/ledger", [reports_dir], self.tmp / "out", out, units)
         return rc, out.getvalue()
+
+    def test_unit_option_gates_one_unit(self):
+        (self.tmp / "reports").mkdir()
+        _, out_all = self.run_cli(self.tmp / "reports")
+        all_gaps = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))["gate"]["gaps"]
+        out = io.StringIO()
+        argv = ["--root", str(REPO), "--reports", str(self.tmp / "reports"), "--out", str(self.tmp / "out"), "--unit", "BILL"]
+        with unittest.mock.patch("sys.stdout", out):
+            rc = trace_cli.main(argv)
+        self.assertEqual(rc, 1)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["gate"]["units"], ["BILL"])
+        bill = [g["id"] for g in all_gaps if g["id"].split("-")[1] == "BILL"]
+        self.assertEqual([g["id"] for g in data["gate"]["gaps"]], bill)
+        self.assertEqual(len(data["gate"]["gaps"]) + len(data["gate"]["ungated_gaps"]), len(all_gaps))
+        self.assertIn("BR-TRNA-003", {g["id"] for g in data["gate"]["ungated_gaps"]})
+        self.assertEqual(out.getvalue().rstrip().splitlines()[-1], f"trace: FAILED ({len(bill)} gaps)")
+        self.assertIn("for the selected units: BILL", (self.tmp / "out/matrix.md").read_text(encoding="utf-8"))
+        with unittest.mock.patch("sys.stdout", io.StringIO()):
+            self.assertEqual(trace_cli.main(argv + ["--unit", "SGN", "--unit", "MENU"]), 1)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["gate"]["units"], ["BILL", "MENU", "SGN"])
+        self.assertEqual([g["id"] for g in data["gate"]["ungated_gaps"]], ["BR-TRNA-003"])
+
+    def test_unit_option_rejects_a_unit_outside_the_scope(self):
+        (self.tmp / "reports").mkdir()
+        rc, out = self.run_cli(self.tmp / "reports", ["POST"])
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "trace: FAILED (--unit POST not in scope.toml; units in scope: BILL, MENU, SGN)")
+
+    def test_bracketed_ids_are_reported(self):
+        results = self.tmp / "reports/web/test-results"
+        results.mkdir(parents=True)
+        (results / "junit.xml").write_text(
+            '<testsuite><testcase classname="B" name="[FLOW-BILL-002] header"/>'
+            '<testcase classname="B" name="[SE-BILL-001] pays @SE-BILL-001"/></testsuite>', encoding="utf-8")
+        rc, out = self.run_cli(self.tmp / "reports", ["BILL"])
+        self.assertIn("warning: 1 test carries bracketed IDs that are not counted (cite an item as @<ID>):", out)
+        self.assertIn("    B#[FLOW-BILL-002] header: FLOW-BILL-002", out)
+        self.assertIn("FLOW-BILL-002: no passing test", out)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual([x["ids"] for x in data["uncounted_bracketed"]], [["FLOW-BILL-002"]])
+        self.assertIn("## Bracketed IDs not counted", (self.tmp / "out/matrix.md").read_text(encoding="utf-8"))
 
     def test_no_reports_fails_and_writes_the_matrix(self):
         (self.tmp / "reports").mkdir()

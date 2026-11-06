@@ -1,534 +1,481 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "identity-service",
-    "version": "0.1.0",
-    "description": "Snapshot of the identity-service OpenAPI document. The service's OpenApiExportTest fails when its export differs from this file."
+  "openapi" : "3.1.0",
+  "info" : {
+    "description" : "Sign-on, password change, sessions and the JWKS of the CardDemo API.",
+    "title" : "CardDemo identity-service",
+    "version" : "1"
   },
-  "servers": [
-    {
-      "url": "/"
-    }
-  ],
-  "paths": {
-    "/api/auth/sign-on": {
-      "post": {
-        "operationId": "signOn",
-        "tags": [
-          "auth"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SignOnRequest"
+  "servers" : [ {
+    "url" : "/"
+  } ],
+  "paths" : {
+    "/api/auth/.well-known/jwks.json" : {
+      "get" : {
+        "operationId" : "jwks",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : { }
+                }
               }
-            }
+            },
+            "description" : "JWK set (RFC 7517)"
           }
         },
-        "responses": {
-          "200": {
-            "description": "Signed on; sets cd_at, cd_rt and XSRF-TOKEN.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "USER_ID_REQUIRED, PASSWORD_REQUIRED or INVALID_INPUT.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "USER_NOT_FOUND, WRONG_PASSWORD (legacy) or SIGN_ON_FAILED (fixed).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "USER_TYPE_NOT_ALLOWED or PASSWORD_CHANGE_REQUIRED.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "UNABLE_TO_VERIFY.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
+        "summary" : "The public key that signs access tokens",
+        "tags" : [ "auth" ]
       }
     },
-    "/api/auth/password": {
-      "post": {
-        "operationId": "changePassword",
-        "tags": [
-          "auth"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PasswordChangeRequest"
+    "/api/auth/me" : {
+      "get" : {
+        "operationId" : "me",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionView"
+                }
               }
-            }
+            },
+            "description" : "The session's user"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
           }
         },
-        "responses": {
-          "200": {
-            "description": "Password changed; the user is signed on.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Sign-on checks of the current password, then NEW_PASSWORD_REQUIRED, NEW_PASSWORD_LENGTH, NEW_PASSWORD_SAME or NEW_PASSWORD_IS_USER_ID.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Current password wrong or user unknown.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "USER_TYPE_NOT_ALLOWED.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "UNABLE_TO_VERIFY.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
+        "summary" : "The signed-on user",
+        "tags" : [ "auth" ]
       }
     },
-    "/api/auth/refresh": {
-      "post": {
-        "operationId": "refresh",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "New cookies.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionView"
-                }
+    "/api/auth/password" : {
+      "post" : {
+        "operationId" : "changePassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordRequest"
               }
             }
           },
-          "401": {
-            "description": "SESSION_EXPIRED; cookies cleared.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionView"
                 }
               }
-            }
+            },
+            "description" : "Password changed and signed on; sets cd_at, cd_rt and XSRF-TOKEN"
           },
-          "403": {
-            "description": "CSRF token missing or wrong.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
                 }
               }
-            }
+            },
+            "description" : "USER_ID_REQUIRED, PASSWORD_REQUIRED, INVALID_INPUT, USER_ID_MISMATCH or a NEW_PASSWORD_* rule"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_NOT_FOUND, WRONG_PASSWORD or SIGN_ON_FAILED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_TYPE_NOT_ALLOWED"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "TOO_MANY_ATTEMPTS, with Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNABLE_TO_VERIFY"
           }
-        }
+        },
+        "summary" : "Change the password with the current one, then start a session (D-SEC-07)",
+        "tags" : [ "auth" ]
       }
     },
-    "/api/auth/sign-off": {
-      "post": {
-        "operationId": "signOff",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "Session ended, cookies cleared.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SignOffResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "CSRF token missing or wrong.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
+    "/api/auth/refresh" : {
+      "post" : {
+        "operationId" : "refresh",
+        "parameters" : [ {
+          "in" : "cookie",
+          "name" : "cd_rt",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
-        }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description" : "Session extended; new cd_at, cd_rt and XSRF-TOKEN"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "SESSION_EXPIRED; cookies cleared"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "CSRF_REJECTED"
+          }
+        },
+        "summary" : "Use the refresh cookie once and get new cookies",
+        "tags" : [ "auth" ]
       }
     },
-    "/api/auth/me": {
-      "get": {
-        "operationId": "me",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "The current session.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionView"
+    "/api/auth/sign-off" : {
+      "post" : {
+        "operationId" : "signOff",
+        "parameters" : [ {
+          "in" : "cookie",
+          "name" : "cd_rt",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SignOffResult"
                 }
+              }
+            },
+            "description" : "Signed off; cookies cleared"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "CSRF_REJECTED"
+          }
+        },
+        "summary" : "End the session (FLOW-SGN-003)",
+        "tags" : [ "auth" ]
+      }
+    },
+    "/api/auth/sign-on" : {
+      "post" : {
+        "operationId" : "signOn",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignOnRequest"
               }
             }
           },
-          "401": {
-            "description": "UNAUTHENTICATED.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SessionView"
                 }
               }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/.well-known/jwks.json": {
-      "get": {
-        "operationId": "jwks",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "JWKS with the current signing key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Jwks"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/features": {
-      "get": {
-        "operationId": "features",
-        "tags": [
-          "features"
-        ],
-        "responses": {
-          "200": {
-            "description": "Installed modules, converted units and UI switches.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Features"
-                }
-              }
-            }
+            },
+            "description" : "Signed on; sets cd_at, cd_rt and XSRF-TOKEN"
           },
-          "401": {
-            "description": "UNAUTHENTICATED.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
                 }
               }
-            }
+            },
+            "description" : "USER_ID_REQUIRED, PASSWORD_REQUIRED or INVALID_INPUT"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_NOT_FOUND, WRONG_PASSWORD or SIGN_ON_FAILED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_TYPE_NOT_ALLOWED or PASSWORD_CHANGE_REQUIRED (severity info)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "TOO_MANY_ATTEMPTS, with Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNABLE_TO_VERIFY"
           }
-        }
+        },
+        "summary" : "Sign on (COSGN00C) and start a session",
+        "tags" : [ "auth" ]
+      }
+    },
+    "/api/features" : {
+      "get" : {
+        "operationId" : "features",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Features"
+                }
+              }
+            },
+            "description" : "What the web app shows"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          }
+        },
+        "summary" : "Installed modules, converted units and UI switches",
+        "tags" : [ "features" ]
       }
     }
   },
-  "components": {
-    "schemas": {
-      "SignOnRequest": {
-        "type": "object",
-        "required": [
-          "userId",
-          "password"
-        ],
-        "properties": {
-          "userId": {
-            "type": "string",
-            "maxLength": 8
+  "components" : {
+    "schemas" : {
+      "ApiProblem" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
           },
-          "password": {
-            "type": "string",
-            "maxLength": 64
+          "detail" : {
+            "type" : "string"
+          },
+          "field" : {
+            "type" : [ "string", "null" ],
+            "description" : "The field to focus, or null"
+          },
+          "message" : {
+            "type" : "string",
+            "description" : "The exact screen text"
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "error", "success", "info" ]
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
           }
-        }
+        },
+        "required" : [ "code", "detail", "field", "message", "severity", "status", "title", "type" ]
       },
-      "PasswordChangeRequest": {
-        "type": "object",
-        "required": [
-          "currentPassword",
-          "newPassword"
-        ],
-        "properties": {
-          "userId": {
-            "type": "string",
-            "maxLength": 8
-          },
-          "currentPassword": {
-            "type": "string",
-            "maxLength": 64
-          },
-          "newPassword": {
-            "type": "string",
-            "maxLength": 64
-          }
-        }
-      },
-      "SessionView": {
-        "type": "object",
-        "required": [
-          "userId",
-          "userType",
-          "role",
-          "firstName",
-          "lastName",
-          "home",
-          "idleTimeoutSeconds"
-        ],
-        "properties": {
-          "userId": {
-            "type": "string",
-            "examples": [
-              "USER0001"
-            ]
-          },
-          "userType": {
-            "type": "string",
-            "examples": [
-              "U"
-            ]
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "USER",
-              "ADMIN"
-            ]
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "home": {
-            "type": "string",
-            "enum": [
-              "/",
-              "/admin"
-            ]
-          },
-          "idleTimeoutSeconds": {
-            "type": "integer",
-            "format": "int32",
-            "examples": [
-              900
-            ]
-          }
-        }
-      },
-      "SignOffResult": {
-        "type": "object",
-        "required": [
-          "message",
-          "severity"
-        ],
-        "properties": {
-          "message": {
-            "type": "string"
-          },
-          "severity": {
-            "$ref": "#/components/schemas/Severity"
-          }
-        }
-      },
-      "Features": {
-        "type": "object",
-        "required": [
-          "modules",
-          "converted",
-          "uiSwitches"
-        ],
-        "properties": {
-          "modules": {
-            "type": "object",
-            "required": [
-              "authorization",
-              "transactionTypes"
-            ],
-            "properties": {
-              "authorization": {
-                "type": "boolean"
-              },
-              "transactionTypes": {
-                "type": "boolean"
-              }
+      "Features" : {
+        "type" : "object",
+        "properties" : {
+          "converted" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
             }
           },
-          "converted": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "modules" : {
+            "$ref" : "#/components/schemas/Modules"
           },
-          "uiSwitches": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "enum": [
-                "legacy",
-                "fixed"
-              ]
-            }
+          "uiSwitches" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Spec item ID to legacy or fixed"
           }
-        }
+        },
+        "required" : [ "converted", "modules", "uiSwitches" ]
       },
-      "Jwks": {
-        "type": "object",
-        "required": [
-          "keys"
-        ],
-        "properties": {
-          "keys": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
+      "Modules" : {
+        "type" : "object",
+        "properties" : {
+          "authorization" : {
+            "type" : "boolean"
+          },
+          "transactionTypes" : {
+            "type" : "boolean"
           }
-        }
+        },
+        "required" : [ "authorization", "transactionTypes" ]
       },
-      "Severity": {
-        "type": "string",
-        "enum": [
-          "error",
-          "success",
-          "info"
-        ]
-      },
-      "Problem": {
-        "type": "object",
-        "description": "RFC 9457 problem details with the CardDemo fields. message is the exact catalogue text.",
-        "required": [
-          "code",
-          "message",
-          "severity"
-        ],
-        "properties": {
-          "type": {
-            "type": "string"
+      "PasswordRequest" : {
+        "type" : "object",
+        "properties" : {
+          "currentPassword" : {
+            "type" : "string",
+            "maxLength" : 64
           },
-          "title": {
-            "type": "string"
+          "newPassword" : {
+            "type" : "string",
+            "maxLength" : 64
           },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "instance": {
-            "type": "string"
-          },
-          "code": {
-            "type": "string",
-            "examples": [
-              "ACCT_ID_REQUIRED"
-            ]
-          },
-          "message": {
-            "type": "string"
-          },
-          "field": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Field to focus, or null."
-          },
-          "severity": {
-            "$ref": "#/components/schemas/Severity"
+          "userId" : {
+            "type" : "string",
+            "description" : "Required without a session; with one, omitted or the session's user",
+            "maxLength" : 8
           }
-        }
+        },
+        "required" : [ "currentPassword", "newPassword" ]
+      },
+      "SessionView" : {
+        "type" : "object",
+        "properties" : {
+          "firstName" : {
+            "type" : "string"
+          },
+          "home" : {
+            "type" : "string",
+            "enum" : [ "/", "/admin" ]
+          },
+          "idleTimeoutSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lastName" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "USER", "ADMIN" ]
+          },
+          "userId" : {
+            "type" : "string"
+          },
+          "userType" : {
+            "type" : "string",
+            "description" : "The stored legacy type, e.g. A or U"
+          }
+        },
+        "required" : [ "firstName", "home", "idleTimeoutSeconds", "lastName", "role", "userId", "userType" ]
+      },
+      "SignOffResult" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "info" ]
+          }
+        },
+        "required" : [ "message", "severity" ]
+      },
+      "SignOnRequest" : {
+        "type" : "object",
+        "properties" : {
+          "password" : {
+            "type" : "string",
+            "maxLength" : 64
+          },
+          "userId" : {
+            "type" : "string",
+            "maxLength" : 8
+          }
+        },
+        "required" : [ "password", "userId" ]
       }
     }
   }
