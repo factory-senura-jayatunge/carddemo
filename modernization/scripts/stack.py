@@ -80,9 +80,21 @@ class Component:
         return os.path.join(LOG_DIR, f"{self.name}.log")
 
 
+def toolchain(what: str) -> str:
+    """JDK 21 home or Node 24 bin directory from scripts/toolchain.sh, so the
+    stack also uses the pinned versions when stack.py runs outside make."""
+    out = subprocess.run([os.path.join(HERE, "scripts", "toolchain.sh"), what],
+                         capture_output=True, text=True)
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
 def java_bin() -> str:
-    home = os.environ.get("JAVA_HOME")
+    home = os.environ.get("JAVA_HOME") or toolchain("java-home")
     return os.path.join(home, "bin", "java") if home else "java"
+
+
+def node_bin() -> str:
+    return toolchain("node-bin")
 
 
 def find_jar(module_dir: str, artifact: str):
@@ -114,7 +126,9 @@ def components() -> list:
         if not os.path.isdir(os.path.join(web, "node_modules")):
             problem = "dependencies missing: run npm ci in modernization/web"
         # vite.config.ts pins 127.0.0.1:25173 with strictPort.
-        found.append(Component("web", WEB_PORT, web, ["npm", "run", "dev"],
+        node = node_bin()
+        npm = os.path.join(node, "npm") if node else "npm"
+        found.append(Component("web", WEB_PORT, web, [npm, "run", "dev"],
                                f"http://127.0.0.1:{WEB_PORT}/", "vite", problem))
     return found
 
@@ -170,6 +184,11 @@ def child_env() -> dict:
     # Services run with their module as working directory, so a relative
     # default would not find the checkout's ledger.
     env.setdefault("CARDDEMO_LEDGER_DIR", os.path.join(HERE, "ledger"))
+    # npm and vite start "node" from PATH; web's engines field rejects
+    # anything but Node 24, and Homebrew's default node can be newer.
+    node = node_bin()
+    if node:
+        env["PATH"] = node + os.pathsep + env.get("PATH", "")
     return env
 
 
