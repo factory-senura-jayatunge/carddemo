@@ -1,0 +1,419 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "billpay-service",
+    "version": "0.1.0",
+    "description": "Snapshot of the billpay-service OpenAPI document. The service's OpenApiExportTest fails when its export differs from this file."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/billpay/accounts/{acctId}": {
+      "get": {
+        "operationId": "previewBillPayment",
+        "tags": [
+          "billpay"
+        ],
+        "parameters": [
+          {
+            "name": "acctId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance and the confirmation prompt (VAL-BILL-004, VAL-BILL-005).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ACCT_ID_REQUIRED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "ACCOUNT_LOOKUP_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billpay/accounts/{acctId}/payments": {
+      "post": {
+        "operationId": "payBill",
+        "tags": [
+          "billpay"
+        ],
+        "parameters": [
+          {
+            "name": "acctId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Paid, or the stored result of the same key (header Idempotent-Replayed: true).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            },
+            "headers": {
+              "Idempotent-Replayed": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ACCT_ID_REQUIRED, INVALID_CONFIRM or IDEMPOTENCY_KEY_REQUIRED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ACCESS_DENIED or CSRF.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TRAN_ID_EXISTS.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "NOTHING_TO_PAY (with the balance) or IDEMPOTENCY_KEY_REUSED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED, TRAN_LOOKUP_FAILED, TRAN_ADD_FAILED or ACCOUNT_UPDATE_FAILED.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "BATCH_WINDOW.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Preview": {
+        "type": "object",
+        "required": [
+          "acctId",
+          "currentBalance",
+          "currentBalanceDisplay",
+          "payable",
+          "message",
+          "severity",
+          "field"
+        ],
+        "properties": {
+          "acctId": {
+            "type": "string",
+            "examples": [
+              "00000000001"
+            ]
+          },
+          "currentBalance": {
+            "type": "string",
+            "description": "Decimal string.",
+            "examples": [
+              "194.00"
+            ]
+          },
+          "currentBalanceDisplay": {
+            "type": "string",
+            "description": "Legacy edit +9999999999.99 (NUM-BILL-001).",
+            "examples": [
+              "+0000000194.00"
+            ]
+          },
+          "payable": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PaymentRequest": {
+        "type": "object",
+        "required": [
+          "confirm"
+        ],
+        "properties": {
+          "confirm": {
+            "type": "string",
+            "maxLength": 1,
+            "examples": [
+              "Y"
+            ]
+          }
+        }
+      },
+      "PaymentResult": {
+        "type": "object",
+        "required": [
+          "tranId",
+          "amount",
+          "acctId",
+          "message",
+          "severity",
+          "field"
+        ],
+        "properties": {
+          "tranId": {
+            "type": "string",
+            "examples": [
+              "0000000000000001"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "examples": [
+              "194.00"
+            ]
+          },
+          "acctId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PaymentProblem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Problem"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "currentBalance": {
+                "type": "string"
+              },
+              "currentBalanceDisplay": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "error",
+          "success",
+          "info"
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 9457 problem details with the CardDemo fields. message is the exact catalogue text.",
+        "required": [
+          "code",
+          "message",
+          "severity"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "examples": [
+              "ACCT_ID_REQUIRED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Field to focus, or null."
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        }
+      }
+    }
+  }
+}
