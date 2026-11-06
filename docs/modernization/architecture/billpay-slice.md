@@ -477,6 +477,11 @@ approved_on = "2026-11-06"
 
 Entries for this slice: DEF-BILL-001, 003, 005, 006, 007, 008, 011, 012, 013, 015; ERR-BILL-002, 003, 004; FLOW-BILL-007, 008; BR-BILL-004 (fixed by D-59); DEF-SGN-001 (always hashed, D-04), DEF-SGN-004 (password never returned), DEF-SGN-006, DEF-SGN-012, DEF-MENU-003 (C1); DEF-SGN-008 (no underscores in the web field); ERR-SGN-001 for scenario S10 (the window does not cover sign-on); DEF-MENU-004 (the coming-soon text is the target's own); Q-MENU-003 (Back signs off).
 
+Commarea artefacts of SGN and MENU, which no test can reach. Each entry has `source = "docs/modernization/architecture/billpay-slice.md"`, as the Bill Pay entries do, and the sentence it rests on is in [web.md](web.md#session-state): "The commarea becomes three things" (session token, route state, session storage):
+
+- `FLOW-SGN-005`, `FLOW-MENU-006` (return to CICS with the commarea): `kind = "incidental-ui"`, decision `none`, target "replaced by routes", as FLOW-BILL-007 and 008.
+- `DEF-SGN-007` (commarea fields not initialised): `kind = "incidental-ui"` (the ledger has no plain `incidental` kind), decision `none`, target "commarea artefact, dropped: user and role come from the session token, and no other field exists to leave uninitialised", as DEF-BILL-008 and 015. Its note records that the storage half of Q-SGN-006 is moot for the target. The `UCTRAN` half is settled by DEF-SGN-011, so Q-SGN-006 needs no mainframe answer before conversion.
+
 `ledger/scope.toml`:
 
 ```toml
