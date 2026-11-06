@@ -84,6 +84,14 @@ Files in `modernization/db/migrations/`, named `V<3 digits>__<schema>_<change>.s
 | repeatable | `R__grants.sql` (foundation and `billpay_svc`, P1 with P3's grants), `R__grants_iam.sql` (`identity_svc`, P2), `R__grants_batch.sql` (`batch_svc`, P5) | per file |
 
 Database users are `<svc>_svc` (`identity_svc`, `billpay_svc`, `batch_svc`), each mapped to its login `carddemo_<svc>` (`carddemo_identity`, `carddemo_billpay`, `carddemo_batch`).
+
+Because owners hold ranges, a lower-numbered migration can arrive after a higher one is applied (for example V004 after V202). Flyway therefore runs with `outOfOrder(true)`; validation stays on. Three rules keep this safe:
+
+- A migration may depend only on objects created by lower versions that are already merged on `modernization`. It never depends on a higher range.
+- A migration changes another owner's object only from a new, higher version, agreed with that owner.
+- An applied migration is never edited; a change is a new version.
+
+`db-migrate` is checked both ways: on a fresh database in version order, and as an upgrade from the previous `modernization` head.
 ### Tables of the slice
 
 Types follow [data-model.md](data-model.md); changes from the decisions are marked. Key and code columns use `Latin1_General_100_BIN2`.
