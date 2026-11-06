@@ -26,7 +26,8 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smoke  # noqa: E402
-from smoke import BILLPAY, HERE, IDENTITY, SEED_USER, WEB  # noqa: E402
+from smoke import BILLPAY, IDENTITY, SEED_USER, WEB  # noqa: E402
+from with_env import main_modernization  # noqa: E402
 
 ACCOUNT = "00000000001"
 SUCCESS = "Payment successful.  Your Transaction ID is {}."
@@ -55,7 +56,7 @@ class Client(smoke.Client):
 
 def sql(db, query):
     """Rows of a sqlcmd query in db as lists of strings ("|"-separated)."""
-    infra = os.environ.get("CARDDEMO_INFRA_DIR", HERE)
+    infra = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
     cmd = ["docker", "compose", "--project-directory", infra,
            "-f", os.path.join(infra, "docker-compose.yml"),
            "--env-file", os.environ["CARDDEMO_ENV_FILE"],
