@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.1.2</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>org.carddemo</groupId>
+  <artifactId>carddemo-modernization-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>CardDemo modernization</name>
+  <description>Spring Boot services, Spring Batch jobs and shared platform libraries of the modernized CardDemo.</description>
+
+  <modules>
+    <module>platform/fidelity</module>
+    <module>platform/legacy-format</module>
+    <module>platform/validation</module>
+    <module>platform/ledger-core</module>
+    <module>platform/web-support</module>
+    <module>db/db-migrate</module>
+    <module>platform/test-support</module>
+    <module>services/identity-service</module>
+    <module>services/billpay-service</module>
+    <module>batch/batch-service</module>
+  </modules>
+
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!-- Versions the Spring Boot BOM does not manage. -->
+    <archunit.version>1.5.1</archunit.version>
+    <springdoc.version>3.2.0</springdoc.version>
+    <!-- Same image as docker-compose.yml, so Testcontainers and the compose stack run one SQL Server build. -->
+    <carddemo.mssql.image>mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04@sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3</carddemo.mssql.image>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>fidelity</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>legacy-format</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>validation</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>ledger-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>web-support</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>db-migrate</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
+        <artifactId>test-support</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <systemPropertyVariables>
+              <!-- Where SpecItemExtension writes the spec items each test proves (read by make trace). -->
+              <carddemo.specitems.dir>${project.build.directory}/spec-items</carddemo.specitems.dir>
+              <carddemo.mssql.image>${carddemo.mssql.image}</carddemo.mssql.image>
+              <!-- Each module's test JVM gets its own database (TestDatabase). -->
+              <carddemo.test.module>${project.artifactId}</carddemo.test.module>
+              <carddemo.repo.root>${maven.multiModuleProjectDirectory}/..</carddemo.repo.root>
+            </systemPropertyVariables>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <configuration>
+            <!-- Keep the plain jar as the main artifact; the runnable jar gets the exec classifier. -->
+            <classifier>exec</classifier>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,22)</version>
+                  <message>CardDemo builds on JDK 21 only. Run through make -C modernization or source modernization/scripts/toolchain.sh output into JAVA_HOME.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <dependencyConvergence/>
+                <banDuplicatePomDependencyVersions/>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
