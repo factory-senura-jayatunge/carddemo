@@ -17,6 +17,10 @@
   <dependencies>
     <dependency>
       <groupId>org.carddemo</groupId>
+      <artifactId>fidelity</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
       <artifactId>legacy-format</artifactId>
     </dependency>
     <dependency>

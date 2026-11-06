@@ -10,10 +10,13 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.carddemo.batch.BatchSwitches;
 import org.carddemo.batch.data.CoreRows;
 import org.carddemo.db.DatabaseProvisioner;
 import org.carddemo.db.LoginCheck;
 import org.carddemo.db.ServiceLogin;
+import org.carddemo.platform.fidelity.FidelityMode;
+import org.carddemo.platform.fidelity.FidelitySwitches;
 import org.carddemo.platform.legacyformat.layout.Layouts;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader.SourceLine;
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.step.StepExecution;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -29,6 +33,9 @@ import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(properties = "spring.batch.job.enabled=false")
 class DataLoadJobTest extends DataLoadTestBase {
+
+    @Autowired
+    FidelitySwitches switches;
 
     @DynamicPropertySource
     static void sampleData(DynamicPropertyRegistry registry) {
@@ -53,18 +60,15 @@ class DataLoadJobTest extends DataLoadTestBase {
     }
 
     @Test
-    void movesTheGroupIdFromTheZipPosition() throws Exception {
-        assertThat(run().getStatus()).isEqualTo(BatchStatus.COMPLETED);
-
-        List<Map<String, Object>> groups = DB.admin().sql(
-                "SELECT group_id, addr_zip, COUNT(*) AS n FROM core.account GROUP BY group_id, addr_zip").query().listOfRows();
-        assertThat(groups).containsExactly(Map.of("group_id", "A000000000", "addr_zip", "", "n", 50));
+    void theLedgerModeOfTheGroupIdSwitchIsFixed() {
+        assertThat(switches.mode(BatchSwitches.DEF_ACUP_002)).isEqualTo(FidelityMode.FIXED);
     }
 
     @Test
     void reExportEqualsTheSourceFilesByteForByte() throws Exception {
         assertThat(run().getStatus()).isEqualTo(BatchStatus.COMPLETED);
-        CoreRows rows = new CoreRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)));
+        CoreRows rows = new CoreRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)),
+                switches.mode(BatchSwitches.DEF_ACUP_002));
 
         assertSameRecords("acctdata.txt", Layouts.ACCOUNT.length(), rows.accounts(), a -> a.toBytes());
         assertSameRecords("custdata.txt", Layouts.CUSTOMER.length(), rows.customers(), c -> c.toBytes());

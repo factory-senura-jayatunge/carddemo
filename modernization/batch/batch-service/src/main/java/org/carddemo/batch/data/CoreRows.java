@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.legacyformat.LegacyTimestamps;
 import org.carddemo.platform.legacyformat.entity.AccountRecord;
 import org.carddemo.platform.legacyformat.entity.CardRecord;
@@ -19,18 +20,22 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * CBEXPORT) reads with it, so a value the tables cannot hold shows up as a
  * re-export difference.
  *
- * <p>Two rules are applied here. D-11: the group ID that every sample account
- * holds at the ZIP position (INV-039) goes to {@code group_id} and
- * {@code addr_zip} stays empty; the export puts them back. Dates: a blank date
+ * <p>Two rules are applied here. DEF-ACUP-002 (D-11): in fixed mode the group
+ * ID that every sample account holds at the ZIP position (INV-039) goes to
+ * {@code group_id} and {@code addr_zip} stays empty, and the export puts them
+ * back; in legacy mode both positions are stored as read. Dates: a blank date
  * is {@code NULL}; anything else must be a valid {@code YYYY-MM-DD} date (the
  * load checks that before it inserts).
  */
 public final class CoreRows {
 
     private final JdbcClient db;
+    private final boolean moveGroupId;
 
-    public CoreRows(JdbcClient db) {
+    /** @param groupIdMode the mode of DEF-ACUP-002 the account rows were or are to be loaded in */
+    public CoreRows(JdbcClient db, FidelityMode groupIdMode) {
         this.db = db;
+        this.moveGroupId = groupIdMode == FidelityMode.FIXED;
     }
 
     // --- account --------------------------------------------------------------------------
@@ -42,7 +47,7 @@ public final class CoreRows {
                     addr_zip, group_id, legacy_filler)
                 VALUES (:acctId, :activeStatus, :currBal, :creditLimit, :cashCreditLimit,
                     :openDate, :expirationDate, :reissueDate, :currCycCredit, :currCycDebit,
-                    '', :groupId, :legacyFiller)
+                    :addrZip, :groupId, :legacyFiller)
                 """)
                 .param("acctId", a.acctId())
                 .param("activeStatus", a.activeStatus())
@@ -54,7 +59,8 @@ public final class CoreRows {
                 .param("reissueDate", date(a.reissueDate()))
                 .param("currCycCredit", a.currCycCredit())
                 .param("currCycDebit", a.currCycDebit())
-                .param("groupId", a.addrZip())
+                .param("addrZip", moveGroupId ? "" : a.addrZip())
+                .param("groupId", moveGroupId ? a.addrZip() : a.groupId())
                 .param("legacyFiller", a.legacyFiller())
                 .update();
     }
@@ -77,8 +83,8 @@ public final class CoreRows {
                         text(rs, "reissue_date"),
                         rs.getBigDecimal("curr_cyc_credit"),
                         rs.getBigDecimal("curr_cyc_debit"),
-                        rs.getString("group_id"),
-                        rs.getString("addr_zip"),
+                        rs.getString(moveGroupId ? "group_id" : "addr_zip"),
+                        rs.getString(moveGroupId ? "addr_zip" : "group_id"),
                         rs.getString("legacy_filler")))
                 .list();
     }

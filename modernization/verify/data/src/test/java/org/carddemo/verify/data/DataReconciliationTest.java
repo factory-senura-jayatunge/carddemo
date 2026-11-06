@@ -43,13 +43,16 @@ class DataReconciliationTest {
     /** The public demo password of the DUSRSECJ users (README); verify-data never compares passwords. */
     private static final String DEMO_PASSWORD = "PASSWORD";
 
+    /** The mode of DEF-ACUP-002 that dataLoadJob reads from the ledger. */
+    private static final FidelityMode LEDGER_MODE = GroupIdMode.resolve(null, Map.of(), ROOT).mode();
+
     private final JdbcClient admin = DB.admin();
 
     @BeforeEach
     void loadTheSample() {
         DB.fixtures().deleteAll();
-        CoreRows rows = new CoreRows(admin);
-        lines("acctdata.txt", Layouts.ACCOUNT.length()).forEach(l -> rows.insert(AccountRecord.parse(l.record())));
+        CoreRows rows = new CoreRows(admin, LEDGER_MODE);
+        loadAccounts(rows);
         lines("custdata.txt", Layouts.CUSTOMER.length()).forEach(l -> rows.insert(CustomerRecord.parse(l.record())));
         lines("carddata.txt", Layouts.CARD.length()).forEach(l -> rows.insert(CardRecord.parse(l.record())));
         lines("cardxref.txt", Layouts.CARD_XREF.length()).forEach(l -> rows.insert(CardXrefRecord.parse(l.record())));
@@ -74,12 +77,24 @@ class DataReconciliationTest {
         assertThat(added).isEqualTo(10);
     }
 
+    private static void loadAccounts(CoreRows rows) {
+        lines("acctdata.txt", Layouts.ACCOUNT.length()).forEach(l -> rows.insert(AccountRecord.parse(l.record())));
+    }
+
+    private static FidelityMode other(FidelityMode mode) {
+        return mode == FidelityMode.LEGACY ? FidelityMode.FIXED : FidelityMode.LEGACY;
+    }
+
     private static List<SourceLine> lines(String file, int length) {
         return LegacyFileReader.read(SAMPLE.resolve(file), length);
     }
 
     private Report reconcile() {
-        return new DataReconciliation(admin, SAMPLE, USERS).run();
+        return reconcile(LEDGER_MODE);
+    }
+
+    private Report reconcile(FidelityMode groupIdMode) {
+        return new DataReconciliation(admin, SAMPLE, USERS, groupIdMode).run();
     }
 
     private static String failure(Report report, String subject) {
@@ -98,6 +113,39 @@ class DataReconciliationTest {
                         "card has xref", "card account = xref", "tcat_bal account exists", "iam.app_user");
         assertThat(report.lines()).filteredOn(l -> l.subject().equals("core.account"))
                 .extracting(Report.Line::detail).first().asString().contains("50 rows").contains("5 control totals");
+    }
+
+    @Test
+    void theLedgerLoadsTheAccountsWithTheGroupIdMoved() {
+        assertThat(LEDGER_MODE).isEqualTo(FidelityMode.FIXED);
+        assertThat(reconcile().lines()).filteredOn(l -> l.subject().equals("DEF-ACUP-002"))
+                .extracting(Report.Line::detail).first().asString().startsWith("fixed (given)");
+    }
+
+    @Test
+    void accountsLoadedInTheOtherModeReconcileWhenVerifiedInThatMode() {
+        admin.sql("DELETE FROM core.tcat_bal").update();
+        admin.sql("DELETE FROM core.card_xref").update();
+        admin.sql("DELETE FROM core.card").update();
+        admin.sql("DELETE FROM core.account").update();
+        CoreRows rows = new CoreRows(admin, other(LEDGER_MODE));
+        loadAccounts(rows);
+        lines("carddata.txt", Layouts.CARD.length()).forEach(l -> rows.insert(CardRecord.parse(l.record())));
+        lines("cardxref.txt", Layouts.CARD_XREF.length()).forEach(l -> rows.insert(CardXrefRecord.parse(l.record())));
+        lines("tcatbal.txt", Layouts.TCAT_BAL.length()).forEach(l -> rows.insert(TcatBalRecord.parse(l.record())));
+
+        assertThat(reconcile(other(LEDGER_MODE)).failures()).isEmpty();
+        assertThat(failure(reconcile(LEDGER_MODE), "core.account"))
+                .as("verified in the wrong mode").contains("50 records re-export differently")
+                .contains("[ACCT-ADDR-ZIP, ACCT-GROUP-ID]");
+    }
+
+    @Test
+    void theModeComesFromTheOptionThenTheLedger() {
+        assertThat(GroupIdMode.resolve("legacy", Map.of(), ROOT)).isEqualTo(new GroupIdMode(FidelityMode.LEGACY, "--fidelity"));
+        assertThat(GroupIdMode.resolve(null, Map.of("CARDDEMO_FIDELITY_DEF_ACUP_002", "legacy"), ROOT))
+                .as("no environment variable").isEqualTo(new GroupIdMode(LEDGER_MODE, "ledger"));
+        assertThat(GroupIdMode.resolve(null, Map.of(), Path.of("/"))).isEqualTo(new GroupIdMode(FidelityMode.LEGACY, "default"));
     }
 
     @Test
