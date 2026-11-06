@@ -79,10 +79,10 @@ need = [ -e '$(HERE)/$(1)' ] || { echo '$@: FAILED (no modernization/$(1) in thi
 # that delivers it; replace the stub with the real recipe (and drop it from
 # STUBS) when that work lands. Every target ends with "<target>: OK" or
 # "<target>: FAILED (<reason>)".
-STUBS := load verify-batch verify-data verify-harness verify-cycle test-airflow
+STUBS := verify-batch verify-harness verify-cycle test-airflow
 .PHONY: help stubs setup toolchain build up stop down status logs infra-up infra-down \
 	infra-wipe require-env verify-spec db-reset db-migrate smoke verify-ledger \
-	test-backend web-build test-e2e trace billpay test-billpay $(STUBS)
+	test-backend web-build test-e2e trace load verify-data billpay test-billpay $(STUBS)
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -161,8 +161,14 @@ db-migrate: require-env ## Apply new migrations to CARDDEMO_DB_NAME without drop
 	@cd '$(HERE)' && ./mvnw -q -B -pl db/db-migrate -am package -DskipTests || { echo '$@: FAILED (building db-migrate)' >&2; exit 1; }
 	@cd '$(HERE)' && $(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --check-logins \
 	&& echo '$@: OK' || { echo '$@: FAILED (db-migrate, see above)' >&2; exit 1; }
-load: ## Load the sample data into SQL Server [not implemented yet]
-load: PHASE = Phase 3, the data migration (dataLoadJob)
+load: require-env ## Load the sample data into CARDDEMO_DB_NAME with batch-service's dataLoadJob (db-reset first for a reload after payments)
+	@$(call need,batch/batch-service/pom.xml,arrives with the data migration)
+	@$(STACK) ensure-infra $@
+	@cd '$(HERE)' && ./mvnw -q -B -pl batch/batch-service -am package -DskipTests || { echo '$@: FAILED (building batch-service)' >&2; exit 1; }
+	@cd '$(HERE)' && jar=$$(ls batch/batch-service/target/batch-service-*-exec.jar 2>/dev/null | tail -n 1) \
+	&& { [ -n "$$jar" ] || { echo '$@: FAILED (no batch/batch-service/target/batch-service-*-exec.jar after the build)' >&2; exit 1; }; } \
+	&& CARDDEMO_LOAD_SOURCE_DIR='$(HERE)/../app/data/ASCII' $(WITH_ENV) '$(JAVA)' -jar "$$jar" --spring.profiles.active=demo \
+	&& echo '$@: OK' || { echo '$@: FAILED (dataLoadJob, see above; on a foreign-key error run make db-reset first)' >&2; exit 1; }
 smoke: require-env ## Read-only check of the running slice: health, sign-on, me, features, a Bill Pay preview, JWKS, no row changes
 	@$(WITH_ENV) $(PYTHON) '$(HERE)/scripts/smoke.py'
 billpay: require-env ## One scripted payment on the running slice (db-reset and load first when there is no data); leaves it up
@@ -198,8 +204,14 @@ test-billpay: require-env ## Bill Pay: Maven verify, Vitest, Playwright on the m
 	@cd '$(HERE)' && $(WITH_ENV) $(HEAVY) $@ $(PYTHON) scripts/test_billpay.py
 verify-batch: ## GnuCOBOL vs Spring Batch differential tests (heavy) [not implemented yet]
 verify-batch: PHASE = Phase 3, the batch jobs (differential tests against GnuCOBOL)
-verify-data: ## Reconcile record counts and checksums after load (heavy) [not implemented yet]
-verify-data: PHASE = Phase 3, the data migration (reconciliation)
+verify-data: require-env ## Reconcile the loaded tables with the sample files: counts, keys, control totals, re-export, relations, users
+	@$(call need,verify/data/pom.xml,arrives with the data migration)
+	@$(STACK) ensure-infra $@
+	@cd '$(HERE)' && ./mvnw -q -B -pl verify/data -am package -DskipTests || { echo '$@: FAILED (building verify/data)' >&2; exit 1; }
+	@cd '$(HERE)' && jar=$$(ls verify/data/target/verify-data-*-exec.jar 2>/dev/null | tail -n 1) \
+	&& { [ -n "$$jar" ] || { echo '$@: FAILED (no verify/data/target/verify-data-*-exec.jar after the build)' >&2; exit 1; }; } \
+	&& CARDDEMO_LOAD_SOURCE_DIR='$(HERE)/../app/data/ASCII' $(WITH_ENV) '$(JAVA)' -jar "$$jar" --users-jcl '$(HERE)/../app/jcl/DUSRSECJ.jcl' \
+	&& echo '$@: OK' || { echo '$@: FAILED (see the fail lines above)' >&2; exit 1; }
 verify-harness: ## Self-test of the differential test harness [not implemented yet]
 verify-harness: PHASE = Phase 3, the batch jobs (differential harness)
 verify-cycle: ## Full batch cycle through Airflow and Spring Batch (heavy) [not implemented yet]

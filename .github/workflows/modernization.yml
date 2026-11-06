@@ -336,7 +336,8 @@ jobs:
           path: |
             modernization/build/test-results/
             modernization/var/log/
-          if-no-files-found: error
+          # load and verify-data report on stdout; there may be no files.
+          if-no-files-found: warn
           retention-days: 14
 
   e2e:

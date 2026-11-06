@@ -44,7 +44,7 @@ These are the targets in the order you use them. Every target ends with one line
 |:--|:--|:--|:--|
 | 1 | `setup` | Checks JDK 21, Node 24, Docker/Colima (with amd64 emulation on arm64) and the Airflow venv. Creates `.env` from `.env.example`, generates every empty password and the JWT signing key, and validates the compose file. Running it again keeps existing values and only adds keys that are new in the example. | Done |
 | 2 | `db-reset` | Builds `db/db-migrate`, starts the containers if needed, drops and recreates the application database `CARDDEMO_DB_NAME` (it warns first), runs every Flyway migration, creates the service logins and checks their grants (`--reset --check-logins`). | Done |
-| 3 | `load` | Loads the sample data into SQL Server (`dataLoadJob`). | Not yet (Bill Pay slice) |
+| 3 | `load` | Builds `batch/batch-service` and runs its `dataLoadJob` once (a one-shot JVM, profile `demo`) on `app/data/ASCII` (`CARDDEMO_LOAD_SOURCE_DIR`): the core tables of `CARDDEMO_DB_NAME`. A reload after payments exist fails on a foreign key; run `db-reset` first. `up` then seeds the sign-on users (identity-service), after which `verify-data` can run. | Done |
 | 4 | `up` | Starts the infrastructure, then every converted service from its jar (Spring profile `demo`) and the Vite dev server, and waits for their health checks (`UP_TIMEOUT`, default 300 s). `ONLY=identity-service,web` starts only those components. | Done; services join as they are converted |
 | 5 | `smoke` | Read-only check of the running slice in under 60 s: health of every running service, sign-on as `USER0001` with the seed password, `me`, `features`, a Bill Pay preview for account `00000000001` (needs `load`), the JWKS, the web app when it runs, and sign-off. It counts the rows of every table in `CARDDEMO_DB_NAME` before and after; only `iam.session` and `iam.audit_event` may change. | Done |
 | 6 | `billpay` | Builds identity-service and billpay-service, runs `db-reset` and `load` when `CARDDEMO_DB_NAME` has no accounts, starts the slice (`up` for identity-service, billpay-service and web), then makes one scripted payment through the API (`scripts/billpay_e2e.py`): sign-on, preview, pay with confirm `Y`, and checks the stored transaction and the zero balance. The slice stays up at `http://127.0.0.1:25173/bill-pay`. | Done; needs `load` |
@@ -75,7 +75,7 @@ Other targets:
 | `billpay-service` | 28082 | `services/billpay-service/pom.xml` exists | the same pattern, 256 MiB |
 | `account-service`, `transaction-service`, `reference-service`, `authorization-service`, `inquiry-service` | 28083 to 28087 | their module exists | the same pattern (384, 384, 256, 384, 256 MiB) |
 | `web` (Vite) | 25173 | `web/package.json` exists | `npm run dev` in `web/` |
-| `batch-service` | 28090 | not started by `up`; `load` runs its jobs one-shot | |
+| `batch-service` | 28090 | not started by `up`; `load` runs `dataLoadJob` one-shot (server mode comes with the cycle jobs) | |
 | Airflow API server | 28080 | arrives with the batch work | |
 
 A component whose module exists but has no jar (or no `node_modules`) fails `up` with the reason; one whose module does not exist yet is skipped. Health is `GET /actuator/health` for the services and `GET /` for Vite. Every process gets the values of the shared `.env` in its environment (the environment wins), and `CARDDEMO_LEDGER_DIR` set to this checkout's `ledger/`. PIDs are in `$CARDDEMO_VAR_DIR/run/<name>.pid`, logs in `$CARDDEMO_VAR_DIR/log/<name>.log`; both are machine-wide, so a second `up` from another worktree reports the running processes instead of starting copies. `CARDDEMO_SPRING_PROFILE` overrides `demo`.
@@ -99,7 +99,7 @@ A target whose work has not landed fails with the phase that delivers it. A targ
 | `test-billpay` | `scripts/test_billpay.py`: Maven verify of ledger-core and billpay-service, the Bill Pay Vitest file, Playwright `e2e/bill.spec.ts` on the mocked API (Vite on 25174), then `db-reset load`, the slice up and the same spec against it, then the trace gate for BILL. The Vitest report goes to `build/test-results/billpay/`; Playwright's stay in `web/playwright-report/e2e-<target>-<mode>.json`, where `trace` reads them. The slice stays up. | Yes | Done; needs `load` |
 | `verify-batch` | Spring Batch against GnuCOBOL, field by field | Yes | Phase 3, batch |
 | `verify-harness` | Self-test of the differential harness | No | Phase 3, batch |
-| `verify-data` | Record counts and checksums after `load` | Yes | Phase 3, data migration |
+| `verify-data` | Builds `verify/data` and compares each loaded core table with its file in `app/data/ASCII` (row count, keys, control totals, byte-exact re-export), then the relations and the `DUSRSECJ` users against `iam.app_user`. One line per check; it reads as the admin login and prints keys and field names only, never values. Run it after `db-reset load up`. | No (one JVM) | Done |
 | `verify-cycle` | The full batch cycle through Airflow | Yes | Phase 3, Airflow |
 | `test-airflow` | DAG integrity and task order | No | Phase 3, Airflow |
 | `web-build` | Exports the message catalogue (`MessageCatalogTest` writes `platform/web-support/target/messages.json`, passed as `CARDDEMO_MESSAGES_JSON` so the catalogue check runs instead of skipping), then `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | Yes (Maven test, Vitest) | Done |
@@ -196,7 +196,7 @@ CARDDEMO_TEST_MSSQL_DB=carddemo_test_backend modernization/scripts/with_env.py .
 
 Never point the tests at `CARDDEMO_DB_NAME` (`carddemo`, the database of `make up` and `load`). CI leaves the URL empty and uses Testcontainers.
 
-Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `verify-data`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
+Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `verify-cycle`, `test-e2e`) take the machine-wide lock `$CARDDEMO_VAR_DIR/run/heavy.lock` for their whole run. A second heavy target fails at once and names the holder; `HEAVY_WAIT=1` makes it wait instead. The lock is released when the process ends, also when it crashes.
 
 ## CI
 
