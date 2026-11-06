@@ -39,10 +39,21 @@ The target keeps all rows in `core.transaction` and marks the legacy master with
 | POSTTRAN writes the master | inserts with `in_master = 1`, `origin = POSTED`, `cycle_id` |
 | INTCALC writes `SYSTRAN(+1)` | inserts with `in_master = 1`, `origin = INTEREST`, `cycle_id` |
 | TRANBKP backup, then COMBTRAN sort and reload | nothing to do: the master already holds postings plus interest, in key order by `ORDER BY` |
-| Online add and bill payment between cycles | insert with `in_master = 1` and the open cycle |
+| Bill payment between cycles | insert with `in_master = 1`, `origin = BILL_PAY`, posted at once through `ledger-core` (D-28); `cycle_id` NULL until the batch slice settles the stamping rule |
+| Online transaction add between cycles | a `core.daily_tran` row with `origin = ONLINE_ADD`, posted by the next cycle (D-27, [below](#online-writes-between-cycles)) |
 | GDG `LIMIT(5)` retention | `in_master = 0` rows older than five cycles are deleted by the cycle's last task (legacy retention), or kept (D-BAT-04) |
 
 Readers that saw "the master" (online list and view, statements, reports, ID allocation) filter on `in_master = 1`, so they see what they see today. The relative-generation hazard is gone, because nothing selects by "newest generation".
+
+### Online writes between cycles
+
+D-27 (accepted: "feed the posting input; one posting path") fixes DEF-TRNA-001. An online add does not write `core.transaction`; it queues the transaction for the next posting run, so POSTTRAN's rules (validation, over-limit, expiry, balance, cycle totals, category balance) apply to it once, in `batch-service`.
+
+- **The add.** `transaction-service` validates as today, allocates the ID with `ledger-core` `TransactionIds.next()` (switch BR-TRNA-003), and inserts one `core.daily_tran` row: `origin = ONLINE_ADD`, `cycle_id` NULL (waiting), `created_by`, the parsed columns, and `raw_record` built in the 350-byte daily-file layout by `legacy-format`, so a reject reads like a file reject. The success message keeps its text, with the ID (BR-TRNA-005). The add is a write under the batch window: during the window it gets `503 BATCH_WINDOW`, which also keeps it from racing the claim below.
+- **IDs.** In fixed mode the sequence keeps IDs unique. In legacy mode "highest + 1" takes the highest ID among master rows **and** waiting `ONLINE_ADD` rows, under the same app lock, so it gives the value the legacy file would; the filtered unique index `UX_daily_waiting (tran_id) WHERE cycle_id IS NULL` backs it. "Copy latest" (BR-TRNA-006) reads the same union.
+- **The claim.** `ingest_daily_file` stages the file rows, then claims every waiting row: it sets `cycle_id` and gives them `seq` numbers after the file rows, in insert order (`daily_pk`). Posting is single-threaded in `seq` order (BR-POST-007), so a cycle with no online adds posts exactly as before, and the differential checks are unchanged.
+- **Posting.** Online-add rows go through the same `post` step as file rows. Accepted rows become `core.transaction` rows with `in_master = 1`, `origin = ONLINE_ADD`, the cycle's `cycle_id` and `created_by` carried over. Rejected rows go to `core.daily_reject` with reasons 100 to 103 and appear in the reject export and the operations view.
+- **What users see.** An added transaction appears in the transaction list, view and reports after the cycle that posts it, not at once as BR-TRNA-007 describes; a rejected add appears only among the cycle's rejects. Both follow from the accepted D-27 fix and get ledger entries (BR-TRNA-007, PINV-c-05). Bill payments still post at once (D-28), because the user must see the new balance on the confirmation screen.
 
 ## Batch-cycle option
 

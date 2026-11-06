@@ -514,4 +514,4 @@ CI (`.github/workflows/modernization.yml`) runs `backend` (`test-backend`), `bil
 
 - Batch: whether posting keeps the daily file's transaction IDs alongside `core.tran_id_seq` (D-59), and how the sequence is kept above them; the `cycle_id` stamping rule for online writes; `batch-service` posting must call `BalancePosting.post`.
 - D-28 consequence to watch in the batch slice (the user confirmed "same as batch posting" with the over-limit formula kept): with posting's over-limit formula kept (D-19), a payment's negative amount in `curr_cyc_debit` raises `curr_cyc_credit - curr_cyc_debit`, so later charges in the same cycle are more likely to be rejected as over limit (DEF-POST-005). The sample disclosure groups give type 02 a zero rate, so interest does not change (CBACT04C BR-INTC-001).
-- Online transaction add (D-27) writes the posting input, not `core.transaction`.
+- Online transaction add (D-27) writes the posting input, not `core.transaction`; settled in [batch.md](batch.md#online-writes-between-cycles).

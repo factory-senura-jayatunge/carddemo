@@ -26,12 +26,15 @@ Each service connects with its own SQL login. The grants are the enforced versio
 | `core.customer` | account, authorization, batch | batch (load) | account-service | batch (reload) |
 | `core.card` | account, batch | batch (load) | account-service (name, status, expiry; account in legacy mode) | batch (reload) |
 | `core.card_xref` | all services, batch | batch (load) | none | batch (reload) |
-| `core.transaction` | transaction, billpay, inquiry, batch | transaction-service, billpay-service, batch | batch (`in_master` only) | batch (retention purge) |
+| `core.transaction` | transaction, billpay, inquiry, batch | billpay-service, batch; transaction-service only if DEF-TRNA-001's legacy mode is built | batch (`in_master` only) | batch (retention purge) |
 | `core.tcat_bal` | batch, billpay-service | batch, billpay-service | batch, billpay-service (`balance`; DEF-BILL-010 fixed, D-28) | batch (reload) |
-| `core.daily_tran`, `core.daily_reject` | batch, operations view | batch | none | batch (retention) |
+| `core.daily_tran` | batch, transaction-service (waiting `ONLINE_ADD` rows, for legacy IDs and "copy latest") | batch, transaction-service (`ONLINE_ADD`, D-27) | batch (the claim) | batch (retention) |
+| `core.daily_reject` | batch, operations view | batch | none | batch (retention) |
 | `ref.*` | all | reference-service, batch (load, maintenance job) | same | same |
 
 Column-level `GRANT UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` to the Bill Pay login is what keeps Bill Pay standalone yet unable to change anything else in the account (INV-004). The cycle columns are needed because a payment is posted like any other transaction (D-28).
+
+Masking (D-SEC-05): the masked columns (`core.customer` SSN, government ID, DOB, EFT account; `core.card.cvv_cd`; `core.transaction.card_num`) carry dynamic data masking. A service login gets column-level `GRANT UNMASK` only on the masked columns it must use or reveal, for example account_svc on the four customer columns and transaction_svc on `core.transaction.card_num`. No login gets it on `cvv_cd` (D-DATA-04). Dynamic data masking only protects ad-hoc readers; it is not the control for API responses. Each service masks PII in its responses to the last four characters by default. The value is revealed only through an explicit `ADMIN` unmask request, which returns only the fields asked for, with `Cache-Control: no-store`, and writes an `ops.audit` row (subject key and field names, never values). Each service has one login; there is no separate unmask login.
 
 ## Core tables
 
@@ -50,11 +53,11 @@ Column-level `GRANT UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` to the B
 
 ### `core.customer` (ENT-CUSTOMER, `CUSTDATA`, 500 bytes)
 
-`cust_id CHAR(9)` PK; `first_name`, `middle_name`, `last_name VARCHAR(25)`; `addr_line_1` to `_3 VARCHAR(50)` (line 3 is the city); `state_cd CHAR(2)`; `country_cd CHAR(3)`; `zip VARCHAR(10)`; `phone_1`, `phone_2 VARCHAR(15)`; `ssn CHAR(9)`; `govt_issued_id VARCHAR(20)`; `dob DATE`; `eft_account_id CHAR(10)`; `pri_card_holder_ind CHAR(1)`; `fico_score SMALLINT`; `row_version`. SSN, government ID, DOB and EFT account carry SQL Server dynamic data masking for every login except the account-service unmask role; encryption at rest is decision D-NFR-05.
+`cust_id CHAR(9)` PK; `first_name`, `middle_name`, `last_name VARCHAR(25)`; `addr_line_1` to `_3 VARCHAR(50)` (line 3 is the city); `state_cd CHAR(2)`; `country_cd CHAR(3)`; `zip VARCHAR(10)`; `phone_1`, `phone_2 VARCHAR(15)`; `ssn CHAR(9)`; `govt_issued_id VARCHAR(20)`; `dob DATE`; `eft_account_id CHAR(10)`; `pri_card_holder_ind CHAR(1)`; `fico_score SMALLINT`; `row_version`. SSN, government ID, DOB and EFT account carry SQL Server dynamic data masking; account_svc holds column-level `UNMASK` on them and masks responses itself ([grants](#ownership-and-grants)); encryption at rest is decision D-NFR-05.
 
 ### `core.card` (ENT-CARD, `CARDDATA`, 150 bytes)
 
-`card_num CHAR(16)` PK; `card_id BIGINT IDENTITY` unique (used in URLs instead of the PAN); `acct_id CHAR(11)` with index `IX_card_acct` (replaces `CARDAIX`, no 8-per-account cap); `cvv_cd CHAR(3)` masked, never returned by an API (decision D-DATA-04 recommends dropping it); `embossed_name VARCHAR(50)`; `expiration_date CHAR(10)` with a pattern check (kept as text because card update keeps whatever day it read, DEF-CRDU-009); `active_status CHAR(1)`; `legacy_filler CHAR(59)` NULL; `row_version`. No foreign key on `acct_id`, because card update in legacy mode may move a card to any account (DEF-CRDU-001).
+`card_num CHAR(16)` PK; `card_id BIGINT IDENTITY` unique (used in URLs instead of the PAN); `acct_id CHAR(11)` with index `IX_card_acct` (replaces `CARDAIX`, no 8-per-account cap); `cvv_cd CHAR(3)` masked, in no API, DTO, log or export, and no login unmasks it; dropped at cut-over (D-DATA-04 decided: drop); `embossed_name VARCHAR(50)`; `expiration_date CHAR(10)` with a pattern check (kept as text because card update keeps whatever day it read, DEF-CRDU-009); `active_status CHAR(1)`; `legacy_filler CHAR(59)` NULL; `row_version`. No foreign key on `acct_id`, because card update in legacy mode may move a card to any account (DEF-CRDU-001).
 
 ### `core.card_xref` (ENT-CARD-XREF, `CARDXREF`, 50 bytes)
 
@@ -78,7 +81,7 @@ Column-level `GRANT UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` to the B
 | `proc_date` | `AS CAST(proc_ts AS DATE) PERSISTED`, indexed | The report selects on the date (INV-010); replaces the `TRAN-PROC-TS` AIX. |
 | `legacy_filler` | `CHAR(20)` NULL | Inherited by online writers in legacy mode (DEF-BILL-006). |
 | `origin` | `VARCHAR(12)` | `LOADED`, `POSTED`, `INTEREST`, `ONLINE_ADD`, `BILL_PAY`. |
-| `cycle_id` | `INT` NULL, FK `batch.cycle` | The cycle that posted the row, or the open cycle for online writes. |
+| `cycle_id` | `INT` NULL, FK `batch.cycle` | The cycle that posted the row. NULL for bill payments until the batch slice settles the stamping rule. |
 | `in_master` | `BIT` | 1 while the row is in the legacy "transaction master" ([batch.md](batch.md#the-transaction-master-and-cycles)). |
 
 Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, card_num)` for the report. New IDs come from the sequence `core.tran_id_seq` (16 digits, no seed row, D-59) through `ledger-core`; legacy mode allocates "highest + 1" under a lock.
@@ -86,7 +89,7 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, 
 ### Other core tables
 
 - `core.tcat_bal` (ENT-TCAT-BAL): PK `(acct_id, type_cd, cat_cd)`; `balance DECIMAL(11,2)`; `legacy_filler CHAR(22)` NULL; `row_version`.
-- `core.daily_tran` (ENT-DAILY-TRAN): staging for the posting input. PK `(cycle_id, seq)`; the parsed columns plus `raw_record CHAR(350)`, because a reject carries the input as read.
+- `core.daily_tran` (ENT-DAILY-TRAN): staging for the posting input, from the daily file and from online adds (D-27). PK `daily_pk BIGINT IDENTITY`; `cycle_id INT` NULL (NULL = an online add waiting for the next cycle) and `seq INT` NULL, unique `(cycle_id, seq)` once claimed; `origin VARCHAR(12)` (`DAILY_FILE`, `ONLINE_ADD`); `created_by` NULL (the user, for online adds); the parsed columns plus `raw_record CHAR(350)`, because a reject carries the input as read. Filtered unique index `UX_daily_waiting (tran_id) WHERE cycle_id IS NULL`. [batch.md](batch.md#online-writes-between-cycles) describes the claim.
 - `core.daily_reject` (ENT-DAILY-REJECT): PK `(cycle_id, seq)`; `reason_cd CHAR(4)` (100 to 103); `reason_desc VARCHAR(76)`; `raw_record CHAR(350)`. View `core.v_daily_reject` masks the card number for operations users.
 
 ## Reference, identity and module tables

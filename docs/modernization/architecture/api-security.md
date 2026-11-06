@@ -7,7 +7,7 @@
 - **Amounts** travel as decimal strings (`"194.00"`), with the legacy display string next to them where the screen shows an edited value (`"+0000000194.00"`).
 - **Concurrency**: reads return an `ETag` from `row_version`; updates and deletes require `If-Match`. A mismatch returns `409` with the legacy text `Record changed by some one else. Please review` and the fresh values.
 - **Paging**: keyset cursors (`start`, `after`, `before`, `size`) with a look-ahead `hasNext`, matching the legacy read-one-more browse. Page numbers are display state.
-- **PANs** never appear in a URL. Card rows carry a surrogate `cardId`. Responses mask card numbers, SSN, DOB, government ID and EFT account to the last four characters; an `ADMIN` may ask for the unmasked value, and every unmasked view is audited (D-09 under C1, D-SEC-05).
+- **PANs** never appear in a URL. Card rows carry a surrogate `cardId`. Responses mask card numbers, SSN, DOB, government ID and EFT account to the last four characters; an `ADMIN` may ask for the unmasked value, and every unmasked view is audited (D-09 under C1, D-SEC-05). Masking is done in the service. The unmask is an explicit request that returns only the fields asked for, with `Cache-Control: no-store`. Each service keeps one SQL login with column-level `UNMASK` only where it needs the clear value ([data-model.md](data-model.md#ownership-and-grants)). The CVV is never returned (D-DATA-04).
 - **Batch window** (`WRITES_BLOCKED`, D-BAT-05): reads keep working while a window is open; a write to a covered table returns `503` with `Retry-After` and `code: BATCH_WINDOW`, with a message per screen (for Bill Pay, `Bill payment is not available while the batch cycle runs. Try again later...`).
 
 ## Endpoints per service

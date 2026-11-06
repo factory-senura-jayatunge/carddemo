@@ -20,14 +20,14 @@ The user approved this proposal (D10) and answered the decision catalog (`docs/m
 | D-SEC-02 | Local password check in `identity-service`; OIDC later only changes that service. |
 | D-SEC-03 | Salted bcrypt hashes; case-sensitive passwords, case-insensitive user IDs; legacy passwords hashed once at migration and changed at first sign-on (D-04, DEF-SGN-011 fixed). |
 | D-SEC-04 | On: 5 failures lock the user for 15 minutes; one neutral failure message for unknown user, wrong password and locked user; 15-minute idle timeout; explicit sign-off; sign-on audit (D-05). |
-| D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. |
+| D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. Mechanism (ruled 2026-11-06): masking is done in the application, with one SQL login per service. A service gets column-level `GRANT UNMASK` only on the masked columns it must use or reveal; every other login sees SQL Server dynamic data masking. No second unmask login: it would run in the same process with the same secrets, so it would not contain a bug in the service, and it would double the connection setup. Details in [data-model.md](data-model.md#ownership-and-grants). |
 | D-SEC-06 | As proposed (D-07). |
 | D-SEC-07 | New-password rule as in the security table above. |
 | D-28 (catalog) | Payments post like batch postings (user answer): negative amount, POSTTRAN rule, so the amount lands in `curr_cyc_debit` and category balance `02/0002`. With D-19 kept, a payment raises the over-limit figure for later charges in the cycle (DEF-POST-005). |
 | D-DATA-01 | Group ID moved to `group_id` at migration; DEF-ACUP-002 fixed (D-11). |
 | D-DATA-02 | `card_xref` owns the card-to-account link; `card.acct_id` follows it (D-13, D-61). |
 | D-DATA-03 | `legacy_filler` kept until cut-over for the differential checks, then dropped. |
-| D-DATA-04 | CVV never returned; tokenised, or dropped if no converted function reads it (D-10, D-12); the accounts-and-cards slice settles which. |
+| D-DATA-04 | **Dropped** (ruled 2026-11-06 on the recommended value): no converted function reads the CVV. Card list and card view read it but neither show nor use it, card update keeps the stored value (D-12) and checks concurrency with `If-Match` (D-17), and export and reports never output it (D-10). `cvv_cd` is in no API, DTO, log or export. The column stays, masked, with no login holding `UNMASK` on it, until cut-over; then a migration drops it and the loader field. |
 | D-DATA-05 | **Now**, not after cut-over: one SQL Server sequence `core.tran_id_seq`, 16 digits, no seed record (D-59), switch `BR-TRNA-003`. Legacy mode ("highest + 1" under a lock) stays for parity tests. |
 | D-DATA-06 | **Now**: `orig_ts` and `proc_ts` are `DATETIME2(6)`; legacy layouts are produced by the exporter (D-60). |
 | D-DATA-07 | `tran_pk` kept. |
@@ -50,7 +50,7 @@ Answers to the open questions of the table further down:
 | Question | Answer |
 | :-- | :-- |
 | Q-BILL-002 | Yes, confirmed by the user on 2026-11-06 as "same as batch posting", with the over-limit formula of D-19 kept. A payment is stored as a negative amount and applied by `ledger-core`'s posting primitive, the one POSTTRAN uses: balance, cycle total (`curr_cyc_debit`, where posting puts negative amounts) and category balance `02/0002` (D-28). |
-| Q-TRNA-001 | Online adds feed the posting input (D-27). |
+| Q-TRNA-001 | Online adds feed the posting input (D-27): `transaction-service` writes a `core.daily_tran` row, and the next cycle's posting applies POSTTRAN's checks and updates to it, exactly once. Nothing is written to `core.transaction` until then. Path and consequences in [batch.md](batch.md#online-writes-between-cycles). |
 | Q-BILL-004 | No ownership check (C1, D-03); the paying user is recorded. |
 | Q-JINTC-002, Q-JCTLM-002 | Monthly (D-24). |
 | Q-JSTMT-001 | Once per statement period (D-38). |
