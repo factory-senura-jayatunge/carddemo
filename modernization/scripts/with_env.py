@@ -24,19 +24,24 @@ KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def default_env_file() -> str:
-    if os.environ.get("CARDDEMO_ENV_FILE"):
-        return os.environ["CARDDEMO_ENV_FILE"]
+def main_modernization() -> str:
+    """modernization/ of the main checkout (the worktree that owns .git),
+    whose .env, compose file and var/ every checkout shares; this checkout's
+    own directory when there is no such checkout. The Makefile does the same."""
     try:
         common = subprocess.run(
             ["git", "-C", HERE, "rev-parse", "--path-format=absolute", "--git-common-dir"],
             check=True, capture_output=True, text=True).stdout.strip()
         main = os.path.join(os.path.dirname(common.rstrip("/")), "modernization")
         if os.path.exists(os.path.join(main, "docker-compose.yml")):
-            return os.path.join(main, ".env")
+            return main
     except (OSError, subprocess.CalledProcessError):
         pass
-    return os.path.join(HERE, ".env")
+    return HERE
+
+
+def default_env_file() -> str:
+    return os.environ.get("CARDDEMO_ENV_FILE") or os.path.join(main_modernization(), ".env")
 
 
 def read_env(path: str) -> dict:

@@ -19,11 +19,12 @@ import subprocess
 import sys
 import time
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from with_env import main_modernization  # noqa: E402
 
 
 def lock_path() -> str:
-    var_dir = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(HERE, "var")
+    var_dir = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(main_modernization(), "var")
     return os.path.join(var_dir, "run", "heavy.lock")
 
 
