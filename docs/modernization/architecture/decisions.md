@@ -23,6 +23,7 @@ The user approved this proposal (D10) and answered the decision catalog (`docs/m
 | D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. |
 | D-SEC-06 | As proposed (D-07). |
 | D-SEC-07 | New-password rule as in the security table above. |
+| D-28 (catalog) | Payments post like batch postings (user answer): negative amount, POSTTRAN rule, so the amount lands in `curr_cyc_debit` and category balance `02/0002`. With D-19 kept, a payment raises the over-limit figure for later charges in the cycle (DEF-POST-005). |
 | D-DATA-01 | Group ID moved to `group_id` at migration; DEF-ACUP-002 fixed (D-11). |
 | D-DATA-02 | `card_xref` owns the card-to-account link; `card.acct_id` follows it (D-13, D-61). |
 | D-DATA-03 | `legacy_filler` kept until cut-over for the differential checks, then dropped. |
@@ -48,7 +49,7 @@ Answers to the open questions of the table further down:
 
 | Question | Answer |
 | :-- | :-- |
-| Q-BILL-002 | Yes. A payment is stored as a negative amount and applied by `ledger-core`'s posting primitive, the one POSTTRAN uses: balance, cycle total (`curr_cyc_debit`, where posting puts negative amounts) and category balance `02/0002` (D-28). |
+| Q-BILL-002 | Yes, confirmed by the user on 2026-11-06 as "same as batch posting", with the over-limit formula of D-19 kept. A payment is stored as a negative amount and applied by `ledger-core`'s posting primitive, the one POSTTRAN uses: balance, cycle total (`curr_cyc_debit`, where posting puts negative amounts) and category balance `02/0002` (D-28). |
 | Q-TRNA-001 | Online adds feed the posting input (D-27). |
 | Q-BILL-004 | No ownership check (C1, D-03); the paying user is recorded. |
 | Q-JINTC-002, Q-JCTLM-002 | Monthly (D-24). |
