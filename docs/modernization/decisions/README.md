@@ -2,37 +2,39 @@
 
 The natural-language spec (`docs/modernization/spec/`) records what the COBOL does today, defects included. It holds 825 items that ask for a choice: every open question (`Q-` row), every item marked fidelity *defect-decide*, and every `[security]` defect. This catalog merges them into 75 decisions, gives each a recommendation, and lists the items that need no decision with the reason. **Until a decision is taken, the build keeps the reference COBOL behaviour.**
 
+**Status: decided 2026-11-06.** The user accepted every recommendation, D-75 included, with one override: D-18 keeps a batch window in mode WRITES_BLOCKED (reads work, writes are blocked during the cycle). D-03 and D-09 are taken as access model C1: sign-on, roles ADMIN and USER, staff may open any account, masking with unmasking by ADMIN and every view audited; the cardholder model (C2) comes later. The architecture-dependent fixes in `docs/modernization/architecture/decisions.md` were accepted as well. The build records each item's chosen mode in `modernization/ledger/` (`fidelity.toml`, `deviations.toml`), and `make verify-ledger` checks the ledger against this catalog and the spec.
+
 How to use it: read the short list, answer each decision with an option number (or "as recommended"), and the build follows the answer. Each decision names the spec items it settles, so the spec owners can mark them. Decisions in theme S7 apply only if the optional authorization module is built, S17 only if the VSAM-MQ module is built, and the Db2 parts of S15 only if the transaction type module is built.
 
 ## Short list: the decisions to take first
 
-| # | Decision | Question | Recommendation | Priority |
-| --: | :-- | :-- | :-- | :-- |
-| 1 | [D-01](#d-01) Require sign-on for every screen and API | Must every screen and service require an authenticated session, with the user's identity and role taken only from that session? | Fix. Today the menus are reachable without a password, and a web client can send any field. | high |
-| 2 | [D-02](#d-02) Enforce roles on every function | Which roles exist, which functions does each role get, and what happens to a user whose type is not a known role? | Fix with the two existing roles, deny unknown types; add a fraud role only if the authorization module is built. It closes the gap with the least new design. | high |
-| 3 | [D-03](#d-03) Who may see and change which customers' data | Are regular users bank staff who may work on any customer, or cardholders who may see only their own accounts and cards? | Keep the staff model for parity, combined with sign-on, roles, masking and access audit; choose the cardholder model only if cardholders are users, because it needs a new data link. | high |
-| 4 | [D-04](#d-04) Password storage and case rules | How are passwords stored and migrated, and are passwords and user IDs case-sensitive? | Salted hashes (bcrypt or Argon2), case-sensitive passwords, case-insensitive IDs, hash once at migration and force a reset; the current passwords have been readable in clear text. | high |
-| 5 | [D-07](#d-07) Least privilege for services, jobs and the database | Should every service, job and integration client run with only the rights it needs, and must callers of the inquiry services authenticate? | Fix; it is standard for the target platform and has no business trade-off. | high |
-| 6 | [D-08](#d-08) Direct editing of balances on account update | May the account update screen change the current balance and cycle credit and debit totals directly? | Fix. A direct edit bypasses the ledger, so balances and transactions stop agreeing. | high |
-| 7 | [D-09](#d-09) Mask sensitive data on screens | Which sensitive fields are masked on screens, who may reveal them, and may the CVV be held in session state? | Fix as described; full display serves no screen function and is a compliance exposure. | high |
-| 8 | [D-10](#d-10) Sensitive data in reports, logs and files | What may batch reports, job logs, extracts and export files contain? | Fix; logs and reports are the usual leak path, and nothing downstream needs the full values. | high |
-| 9 | [D-11](#d-11) Account update writes the group ID into the ZIP code | Should the target store ZIP and disclosure group ID in their own fields, and how are the already-shifted sample accounts migrated? | Fix and migrate the group ID; the defect silently changes which interest rates apply. | high |
-| 10 | [D-12](#d-12) Card update overwrites the CVV with 000 | Should a card save change only the fields the user edits? | Fix; the as-is save destroys the CVV. | high |
-| 11 | [D-16](#d-16) Save account and customer together | Must an account update save the account and the customer in one transaction? | Fix; a half-saved update cannot be seen or corrected by the user. | high |
-| 12 | [D-18](#d-18) Batch window: online access while batch runs | Must online functions stop while the batch cycle runs, or may they run alongside? | No outage with snapshot reads, if D-17 is accepted; otherwise keep the window. It removes a daily outage. | high |
-| 13 | [D-19](#d-19) Over-limit rule in posting | Keep the over-limit formula (cycle credit minus cycle debit plus amount) or switch to a balance-based check? | Keep for the first release so posting matches the reference run, then change it as a separate business decision. | high |
-| 14 | [D-23](#d-23) Prevent double posting and double interest | Must the target refuse to post the same daily file twice or charge interest twice in one cycle? | Fix; reruns otherwise change customer balances. | high |
-| 15 | [D-24](#d-24) How often interest is charged | Is interest calculated monthly or in every batch cycle? | Monthly on a chosen day; it matches the monthly rate. | high |
-| 16 | [D-27](#d-27) Transactions added online are never posted | Should a transaction added online change the account balance, and through which path? | Feed the posting input; it keeps one posting path and one set of rules. | high |
-| 17 | [D-28](#d-28) Payments update cycle totals and category balances | Should an online payment update the cycle credit total and category balance like posting does, and with which sign? | Fix through the same posting service as D-27, after checking the effect on interest results; payments should count toward interest and statements. | high |
-| 18 | [D-29](#d-29) Payment errors leave partial updates | Should a payment be all-or-nothing and stop at the first error? | Fix, unless operations name a reconciliation that relies on the partial updates. | high |
-| 19 | [D-37](#d-37) Which batch cycle the scheduler runs | Which batch cycle do the Airflow DAGs implement (options A-F of the decision table in `jobs/README.md`)? | Option F; it is the only order consistent with every data hand-off. With monthly interest (D-24) the daily cycle must skip COMBTRAN. It needs D-24, D-38, D-39 and D-40. | high |
-| 20 | [D-41](#d-41) Demo reloads of master data in production | May production run the delete-and-reload jobs that replace accounts, cards, customers, cross-references and category balances with the shipped sample data? | Seed-only; a production reload destroys customer data. | high |
-| 21 | [D-43](#d-43) What a statement covers | Is a statement per account or per card, which period does it cover, and what must it show? | Fix; the as-is output is not a usable billing statement. Keep a parity mode only for the migration check. | high |
-| 22 | [D-49](#d-49) Validate only changed fields on account update | Should account update validate only the fields the user changed, or every field (with migrated data cleaned first)? | Validate changed fields only; otherwise the screen does not work on real data. | high |
-| 23 | [D-57](#d-57) How batch failures are signalled and handled | When a batch job fails or rejects records, what exit status does it give, does it stop the chain, and is it retried? | Fix with that policy; blind reruns and silent successes are the main operational risks. | high |
-| 24 | [D-59](#d-59) Transaction ID scheme | How are transaction IDs generated, and does the key stay the 16-character text ID? | A shared sequence that keeps the 16-digit format, no seed record; add a surrogate key only if the data model team wants it. | high |
-| 25 | [D-75](#d-75) Fix obvious defects in bulk | Approve fixing the defects listed in Appendix A, which no user would want to keep and whose fix does not change business results? | Fix all; review Appendix A for any exception. | medium |
+| # | Decision | Question | Recommendation | Priority | Status |
+| --: | :-- | :-- | :-- | :-- | :-- |
+| 1 | [D-01](#d-01) Require sign-on for every screen and API | Must every screen and service require an authenticated session, with the user's identity and role taken only from that session? | Fix. Today the menus are reachable without a password, and a web client can send any field. | high | accepted |
+| 2 | [D-02](#d-02) Enforce roles on every function | Which roles exist, which functions does each role get, and what happens to a user whose type is not a known role? | Fix with the two existing roles, deny unknown types; add a fraud role only if the authorization module is built. It closes the gap with the least new design. | high | accepted |
+| 3 | [D-03](#d-03) Who may see and change which customers' data | Are regular users bank staff who may work on any customer, or cardholders who may see only their own accounts and cards? | Keep the staff model for parity, combined with sign-on, roles, masking and access audit; choose the cardholder model only if cardholders are users, because it needs a new data link. | high | accepted (C1) |
+| 4 | [D-04](#d-04) Password storage and case rules | How are passwords stored and migrated, and are passwords and user IDs case-sensitive? | Salted hashes (bcrypt or Argon2), case-sensitive passwords, case-insensitive IDs, hash once at migration and force a reset; the current passwords have been readable in clear text. | high | accepted |
+| 5 | [D-07](#d-07) Least privilege for services, jobs and the database | Should every service, job and integration client run with only the rights it needs, and must callers of the inquiry services authenticate? | Fix; it is standard for the target platform and has no business trade-off. | high | accepted |
+| 6 | [D-08](#d-08) Direct editing of balances on account update | May the account update screen change the current balance and cycle credit and debit totals directly? | Fix. A direct edit bypasses the ledger, so balances and transactions stop agreeing. | high | accepted |
+| 7 | [D-09](#d-09) Mask sensitive data on screens | Which sensitive fields are masked on screens, who may reveal them, and may the CVV be held in session state? | Fix as described; full display serves no screen function and is a compliance exposure. | high | accepted (C1) |
+| 8 | [D-10](#d-10) Sensitive data in reports, logs and files | What may batch reports, job logs, extracts and export files contain? | Fix; logs and reports are the usual leak path, and nothing downstream needs the full values. | high | accepted |
+| 9 | [D-11](#d-11) Account update writes the group ID into the ZIP code | Should the target store ZIP and disclosure group ID in their own fields, and how are the already-shifted sample accounts migrated? | Fix and migrate the group ID; the defect silently changes which interest rates apply. | high | accepted |
+| 10 | [D-12](#d-12) Card update overwrites the CVV with 000 | Should a card save change only the fields the user edits? | Fix; the as-is save destroys the CVV. | high | accepted |
+| 11 | [D-16](#d-16) Save account and customer together | Must an account update save the account and the customer in one transaction? | Fix; a half-saved update cannot be seen or corrected by the user. | high | accepted |
+| 12 | [D-18](#d-18) Batch window: online access while batch runs | Must online functions stop while the batch cycle runs, or may they run alongside? | No outage with snapshot reads, if D-17 is accepted; otherwise keep the window. It removes a daily outage. | high | override |
+| 13 | [D-19](#d-19) Over-limit rule in posting | Keep the over-limit formula (cycle credit minus cycle debit plus amount) or switch to a balance-based check? | Keep for the first release so posting matches the reference run, then change it as a separate business decision. | high | accepted |
+| 14 | [D-23](#d-23) Prevent double posting and double interest | Must the target refuse to post the same daily file twice or charge interest twice in one cycle? | Fix; reruns otherwise change customer balances. | high | accepted |
+| 15 | [D-24](#d-24) How often interest is charged | Is interest calculated monthly or in every batch cycle? | Monthly on a chosen day; it matches the monthly rate. | high | accepted |
+| 16 | [D-27](#d-27) Transactions added online are never posted | Should a transaction added online change the account balance, and through which path? | Feed the posting input; it keeps one posting path and one set of rules. | high | accepted |
+| 17 | [D-28](#d-28) Payments update cycle totals and category balances | Should an online payment update the cycle credit total and category balance like posting does, and with which sign? | Fix through the same posting service as D-27, after checking the effect on interest results; payments should count toward interest and statements. | high | accepted |
+| 18 | [D-29](#d-29) Payment errors leave partial updates | Should a payment be all-or-nothing and stop at the first error? | Fix, unless operations name a reconciliation that relies on the partial updates. | high | accepted |
+| 19 | [D-37](#d-37) Which batch cycle the scheduler runs | Which batch cycle do the Airflow DAGs implement (options A-F of the decision table in `jobs/README.md`)? | Option F; it is the only order consistent with every data hand-off. With monthly interest (D-24) the daily cycle must skip COMBTRAN. It needs D-24, D-38, D-39 and D-40. | high | accepted |
+| 20 | [D-41](#d-41) Demo reloads of master data in production | May production run the delete-and-reload jobs that replace accounts, cards, customers, cross-references and category balances with the shipped sample data? | Seed-only; a production reload destroys customer data. | high | accepted |
+| 21 | [D-43](#d-43) What a statement covers | Is a statement per account or per card, which period does it cover, and what must it show? | Fix; the as-is output is not a usable billing statement. Keep a parity mode only for the migration check. | high | accepted |
+| 22 | [D-49](#d-49) Validate only changed fields on account update | Should account update validate only the fields the user changed, or every field (with migrated data cleaned first)? | Validate changed fields only; otherwise the screen does not work on real data. | high | accepted |
+| 23 | [D-57](#d-57) How batch failures are signalled and handled | When a batch job fails or rejects records, what exit status does it give, does it stop the chain, and is it retried? | Fix with that policy; blind reruns and silent successes are the main operational risks. | high | accepted |
+| 24 | [D-59](#d-59) Transaction ID scheme | How are transaction IDs generated, and does the key stay the 16-character text ID? | A shared sequence that keeps the 16-digit format, no seed record; add a surrogate key only if the data model team wants it. | high | accepted |
+| 25 | [D-75](#d-75) Fix obvious defects in bulk | Approve fixing the defects listed in Appendix A, which no user would want to keep and whose fix does not change business results? | Fix all; review Appendix A for any exception. | medium | accepted |
 
 ## Counts
 
@@ -54,83 +56,83 @@ How to use it: read the short list, answer each decision with an option number (
 
 ## All decisions
 
-| ID | Theme | Decision | Recommendation | Priority | Items |
-| :-- | :-- | :-- | :-- | :-- | --: |
-| [D-01](#d-01) | S1 | Require sign-on for every screen and API | Fix. | high | 26 |
-| [D-02](#d-02) | S1 | Enforce roles on every function | Fix with the two existing roles, deny unknown types. | high | 23 |
-| [D-03](#d-03) | S1 | Who may see and change which customers' data | Keep the staff model for parity, combined with sign-on, roles, masking and access audit. | high | 22 |
-| [D-04](#d-04) | S1 | Password storage and case rules | Salted hashes (bcrypt or Argon2), case-sensitive passwords, case-insensitive IDs, hash once at migration and force a reset. | high | 11 |
-| [D-05](#d-05) | S1 | Attempt limits, lockout, timeout, sign-off | Fix with the example values unless your policy sets others. | high | 5 |
-| [D-06](#d-06) | S1 | First administrator, seed users and keeping admin access | Fix. | medium | 4 |
-| [D-07](#d-07) | S1 | Least privilege for services, jobs and the database | Fix. | high | 9 |
-| [D-08](#d-08) | S1 | Direct editing of balances on account update | Fix. | high | 2 |
-| [D-09](#d-09) | S2 | Mask sensitive data on screens | Fix as described. | high | 10 |
-| [D-10](#d-10) | S2 | Sensitive data in reports, logs and files | Fix. | high | 32 |
-| [D-11](#d-11) | S3 | Account update writes the group ID into the ZIP code | Fix and migrate the group ID. | high | 9 |
-| [D-12](#d-12) | S3 | Card update overwrites the CVV with 000 | Fix. | high | 5 |
-| [D-13](#d-13) | S3 | Card update can move a card to another account | Fix with a read-only account. | high | 6 |
-| [D-14](#d-14) | S3 | ZIP+4 and long phone numbers are cut | Fix. | medium | 5 |
-| [D-15](#d-15) | S3 | User update and delete act on the wrong user | Fix. | medium | 4 |
-| [D-16](#d-16) | S4 | Save account and customer together | Fix. | high | 6 |
-| [D-17](#d-17) | S4 | Detect concurrent changes (optimistic locking) | Fix uniformly with version columns. | medium | 9 |
-| [D-18](#d-18) | S4 | Batch window: online access while batch runs | No outage with snapshot reads, if D-17 is accepted. | high | 3 |
-| [D-19](#d-19) | S5 | Over-limit rule in posting | Keep for the first release so posting matches the reference run, then change it as a separate business decision. | high | 3 |
-| [D-20](#d-20) | S5 | Posting when the account update fails | Roll back and reject. | high | 3 |
-| [D-21](#d-21) | S5 | Record every reject reason | Store all reasons alongside the primary one. | low | 1 |
-| [D-22](#d-22) | S5 | Posting transaction boundary | Per-record atomicity inside restartable chunks (Spring Batch). | high | 1 |
-| [D-23](#d-23) | S5 | Prevent double posting and double interest | Fix. | high | 3 |
-| [D-24](#d-24) | S5 | How often interest is charged | Monthly on a chosen day. | high | 3 |
-| [D-25](#d-25) | S5 | Interest on credit balances and rounding | Keep truncation for parity. | medium | 4 |
-| [D-26](#d-26) | S5 | Fees in the interest job | Keep no fees until fee rules are specified. | low | 2 |
-| [D-27](#d-27) | S5 | Transactions added online are never posted | Feed the posting input. | high | 3 |
-| [D-28](#d-28) | S6 | Payments update cycle totals and category balances | Fix through the same posting service as D-27, after checking the effect on interest results. | high | 2 |
-| [D-29](#d-29) | S6 | Payment errors leave partial updates | Fix, unless operations name a reconciliation that relies on the partial updates. | high | 2 |
-| [D-30](#d-30) | S6 | Payment amount and confirmation | Keep full-balance payment and lock the account on confirmation. | medium | 2 |
-| [D-31](#d-31) | S7 | Authorization decisions use another request's data | Fix. | high | 9 |
-| [D-32](#d-32) | S7 | Which checks can decline an authorization | Fix. | high | 6 |
-| [D-33](#d-33) | S7 | Available credit and its release | Fix. | high | 6 |
-| [D-34](#d-34) | S7 | Authorization purge: retention and delete rule | Fix with the 5-day default unless you have a policy. | high | 11 |
-| [D-35](#d-35) | S7 | Reply only after the database commit | Fix. | high | 3 |
-| [D-36](#d-36) | S7 | Fraud record key | Fix. | medium | 3 |
-| [D-37](#d-37) | S8 | Which batch cycle the scheduler runs | Option F. | high | 13 |
-| [D-38](#d-38) | S8 | When statements are produced | After COMBTRAN, once per statement period (see D-48). | medium | 2 |
-| [D-39](#d-39) | S8 | Where the authorization purge runs | After the cycle as its own task that never gates posting. | medium | 3 |
-| [D-40](#d-40) | S8 | How much history to keep | Retention by data class in days, set by your data-handling policy. | medium | 5 |
-| [D-41](#d-41) | S8 | Demo reloads of master data in production | Seed-only. | high | 6 |
-| [D-42](#d-42) | S8 | Which utility and demo jobs to keep | Drop and replace as in the second option, unless operations name a user. | low | 21 |
-| [D-43](#d-43) | S9 | What a statement covers | Fix. | high | 5 |
-| [D-44](#d-44) | S9 | Names and addresses cut on statements | Fix. | medium | 6 |
-| [D-45](#d-45) | S9 | Statement output format | One escaped PDF per statement from a template. | low | 5 |
-| [D-46](#d-46) | S9 | Transaction report date filter and early stop | Fix. | high | 5 |
-| [D-47](#d-47) | S9 | Report totals per account or per card | Per account, as the label promises. | low | 3 |
-| [D-48](#d-48) | S9 | Report request delivery and status | Asynchronous run with status and download. | medium | 4 |
-| [D-49](#d-49) | S10 | Validate only changed fields on account update | Validate changed fields only. | high | 2 |
-| [D-50](#d-50) | S10 | Account update field rules | Fix as in the second option. | medium | 21 |
-| [D-51](#d-51) | S10 | Card update field rules | Fix expiry validation. | medium | 7 |
-| [D-52](#d-52) | S10 | Transaction add and report request input checks | Fix. | medium | 12 |
-| [D-53](#d-53) | S10 | User administration input rules | Fix. | medium | 5 |
-| [D-54](#d-54) | S11 | List paging behaviour | Fix. | low | 20 |
-| [D-55](#d-55) | S11 | Selection marks survive paging | Fix. | medium | 6 |
-| [D-56](#d-56) | S12 | Audit trail | Audit the listed events. | medium | 2 |
-| [D-57](#d-57) | S13 | How batch failures are signalled and handled | Fix with that policy. | high | 19 |
-| [D-58](#d-58) | S13 | Technical codes in user messages | Fix. | low | 4 |
-| [D-59](#d-59) | S14 | Transaction ID scheme | A shared sequence that keeps the 16-digit format, no seed record. | high | 11 |
-| [D-60](#d-60) | S14 | One timestamp format | One typed column. | medium | 4 |
-| [D-61](#d-61) | S14 | Accounts with several cards, or none | Fix. | medium | 11 |
-| [D-62](#d-62) | S14 | Export and import (branch migration) | Replace with a database export/load unless an external receiver of the file is named. | low | 12 |
-| [D-63](#d-63) | S15 | One store for transaction types and categories | One store. | medium | 11 |
-| [D-64](#d-64) | S15 | Deleting a type that has categories | Keep refusing with a clear message. | low | 3 |
-| [D-65](#d-65) | S15 | Transaction type description rules | Fix. | low | 13 |
-| [D-66](#d-66) | S15 | Batch transaction type maintenance | Drop it unless a producer of the input is named. | low | 1 |
-| [D-67](#d-67) | S15 | Who maintains interest rates | Controlled maintenance with the `DEFAULT` check. | medium | 1 |
-| [D-68](#d-68) | S16 | Save and exit semantics | Fix. | low | 4 |
-| [D-69](#d-69) | S16 | Invalid keys | Fix. | low | 5 |
-| [D-70](#d-70) | S16 | Options for modules that are not installed | Fix. | low | 2 |
-| [D-71](#d-71) | S16 | Full transaction details on view | Fix. | low | 2 |
-| [D-72](#d-72) | S17 | Inquiry message contract | Structured reply with a status, after confirming no requester parses the text. | low | 9 |
-| [D-73](#d-73) | S17 | Reply routing and correlation | Fix. | medium | 5 |
-| [D-74](#d-74) | S17 | Inquiry errors | Fix. | low | 3 |
-| [D-75](#d-75) | S18 | Fix obvious defects in bulk | Fix all. | medium | 79 |
+| ID | Theme | Decision | Recommendation | Priority | Items | Status |
+| :-- | :-- | :-- | :-- | :-- | --: | :-- |
+| [D-01](#d-01) | S1 | Require sign-on for every screen and API | Fix. | high | 26 | accepted |
+| [D-02](#d-02) | S1 | Enforce roles on every function | Fix with the two existing roles, deny unknown types. | high | 23 | accepted |
+| [D-03](#d-03) | S1 | Who may see and change which customers' data | Keep the staff model for parity, combined with sign-on, roles, masking and access audit. | high | 22 | accepted (C1) |
+| [D-04](#d-04) | S1 | Password storage and case rules | Salted hashes (bcrypt or Argon2), case-sensitive passwords, case-insensitive IDs, hash once at migration and force a reset. | high | 11 | accepted |
+| [D-05](#d-05) | S1 | Attempt limits, lockout, timeout, sign-off | Fix with the example values unless your policy sets others. | high | 5 | accepted |
+| [D-06](#d-06) | S1 | First administrator, seed users and keeping admin access | Fix. | medium | 4 | accepted |
+| [D-07](#d-07) | S1 | Least privilege for services, jobs and the database | Fix. | high | 9 | accepted |
+| [D-08](#d-08) | S1 | Direct editing of balances on account update | Fix. | high | 2 | accepted |
+| [D-09](#d-09) | S2 | Mask sensitive data on screens | Fix as described. | high | 10 | accepted (C1) |
+| [D-10](#d-10) | S2 | Sensitive data in reports, logs and files | Fix. | high | 32 | accepted |
+| [D-11](#d-11) | S3 | Account update writes the group ID into the ZIP code | Fix and migrate the group ID. | high | 9 | accepted |
+| [D-12](#d-12) | S3 | Card update overwrites the CVV with 000 | Fix. | high | 5 | accepted |
+| [D-13](#d-13) | S3 | Card update can move a card to another account | Fix with a read-only account. | high | 6 | accepted |
+| [D-14](#d-14) | S3 | ZIP+4 and long phone numbers are cut | Fix. | medium | 5 | accepted |
+| [D-15](#d-15) | S3 | User update and delete act on the wrong user | Fix. | medium | 4 | accepted |
+| [D-16](#d-16) | S4 | Save account and customer together | Fix. | high | 6 | accepted |
+| [D-17](#d-17) | S4 | Detect concurrent changes (optimistic locking) | Fix uniformly with version columns. | medium | 9 | accepted |
+| [D-18](#d-18) | S4 | Batch window: online access while batch runs | No outage with snapshot reads, if D-17 is accepted. | high | 3 | override |
+| [D-19](#d-19) | S5 | Over-limit rule in posting | Keep for the first release so posting matches the reference run, then change it as a separate business decision. | high | 3 | accepted |
+| [D-20](#d-20) | S5 | Posting when the account update fails | Roll back and reject. | high | 3 | accepted |
+| [D-21](#d-21) | S5 | Record every reject reason | Store all reasons alongside the primary one. | low | 1 | accepted |
+| [D-22](#d-22) | S5 | Posting transaction boundary | Per-record atomicity inside restartable chunks (Spring Batch). | high | 1 | accepted |
+| [D-23](#d-23) | S5 | Prevent double posting and double interest | Fix. | high | 3 | accepted |
+| [D-24](#d-24) | S5 | How often interest is charged | Monthly on a chosen day. | high | 3 | accepted |
+| [D-25](#d-25) | S5 | Interest on credit balances and rounding | Keep truncation for parity. | medium | 4 | accepted |
+| [D-26](#d-26) | S5 | Fees in the interest job | Keep no fees until fee rules are specified. | low | 2 | accepted |
+| [D-27](#d-27) | S5 | Transactions added online are never posted | Feed the posting input. | high | 3 | accepted |
+| [D-28](#d-28) | S6 | Payments update cycle totals and category balances | Fix through the same posting service as D-27, after checking the effect on interest results. | high | 2 | accepted |
+| [D-29](#d-29) | S6 | Payment errors leave partial updates | Fix, unless operations name a reconciliation that relies on the partial updates. | high | 2 | accepted |
+| [D-30](#d-30) | S6 | Payment amount and confirmation | Keep full-balance payment and lock the account on confirmation. | medium | 2 | accepted |
+| [D-31](#d-31) | S7 | Authorization decisions use another request's data | Fix. | high | 9 | accepted |
+| [D-32](#d-32) | S7 | Which checks can decline an authorization | Fix. | high | 6 | accepted |
+| [D-33](#d-33) | S7 | Available credit and its release | Fix. | high | 6 | accepted |
+| [D-34](#d-34) | S7 | Authorization purge: retention and delete rule | Fix with the 5-day default unless you have a policy. | high | 11 | accepted |
+| [D-35](#d-35) | S7 | Reply only after the database commit | Fix. | high | 3 | accepted |
+| [D-36](#d-36) | S7 | Fraud record key | Fix. | medium | 3 | accepted |
+| [D-37](#d-37) | S8 | Which batch cycle the scheduler runs | Option F. | high | 13 | accepted |
+| [D-38](#d-38) | S8 | When statements are produced | After COMBTRAN, once per statement period (see D-48). | medium | 2 | accepted |
+| [D-39](#d-39) | S8 | Where the authorization purge runs | After the cycle as its own task that never gates posting. | medium | 3 | accepted |
+| [D-40](#d-40) | S8 | How much history to keep | Retention by data class in days, set by your data-handling policy. | medium | 5 | accepted |
+| [D-41](#d-41) | S8 | Demo reloads of master data in production | Seed-only. | high | 6 | accepted |
+| [D-42](#d-42) | S8 | Which utility and demo jobs to keep | Drop and replace as in the second option, unless operations name a user. | low | 21 | accepted |
+| [D-43](#d-43) | S9 | What a statement covers | Fix. | high | 5 | accepted |
+| [D-44](#d-44) | S9 | Names and addresses cut on statements | Fix. | medium | 6 | accepted |
+| [D-45](#d-45) | S9 | Statement output format | One escaped PDF per statement from a template. | low | 5 | accepted |
+| [D-46](#d-46) | S9 | Transaction report date filter and early stop | Fix. | high | 5 | accepted |
+| [D-47](#d-47) | S9 | Report totals per account or per card | Per account, as the label promises. | low | 3 | accepted |
+| [D-48](#d-48) | S9 | Report request delivery and status | Asynchronous run with status and download. | medium | 4 | accepted |
+| [D-49](#d-49) | S10 | Validate only changed fields on account update | Validate changed fields only. | high | 2 | accepted |
+| [D-50](#d-50) | S10 | Account update field rules | Fix as in the second option. | medium | 21 | accepted |
+| [D-51](#d-51) | S10 | Card update field rules | Fix expiry validation. | medium | 7 | accepted |
+| [D-52](#d-52) | S10 | Transaction add and report request input checks | Fix. | medium | 12 | accepted |
+| [D-53](#d-53) | S10 | User administration input rules | Fix. | medium | 5 | accepted |
+| [D-54](#d-54) | S11 | List paging behaviour | Fix. | low | 20 | accepted |
+| [D-55](#d-55) | S11 | Selection marks survive paging | Fix. | medium | 6 | accepted |
+| [D-56](#d-56) | S12 | Audit trail | Audit the listed events. | medium | 2 | accepted |
+| [D-57](#d-57) | S13 | How batch failures are signalled and handled | Fix with that policy. | high | 19 | accepted |
+| [D-58](#d-58) | S13 | Technical codes in user messages | Fix. | low | 4 | accepted |
+| [D-59](#d-59) | S14 | Transaction ID scheme | A shared sequence that keeps the 16-digit format, no seed record. | high | 11 | accepted |
+| [D-60](#d-60) | S14 | One timestamp format | One typed column. | medium | 4 | accepted |
+| [D-61](#d-61) | S14 | Accounts with several cards, or none | Fix. | medium | 11 | accepted |
+| [D-62](#d-62) | S14 | Export and import (branch migration) | Replace with a database export/load unless an external receiver of the file is named. | low | 12 | accepted |
+| [D-63](#d-63) | S15 | One store for transaction types and categories | One store. | medium | 11 | accepted |
+| [D-64](#d-64) | S15 | Deleting a type that has categories | Keep refusing with a clear message. | low | 3 | accepted |
+| [D-65](#d-65) | S15 | Transaction type description rules | Fix. | low | 13 | accepted |
+| [D-66](#d-66) | S15 | Batch transaction type maintenance | Drop it unless a producer of the input is named. | low | 1 | accepted |
+| [D-67](#d-67) | S15 | Who maintains interest rates | Controlled maintenance with the `DEFAULT` check. | medium | 1 | accepted |
+| [D-68](#d-68) | S16 | Save and exit semantics | Fix. | low | 4 | accepted |
+| [D-69](#d-69) | S16 | Invalid keys | Fix. | low | 5 | accepted |
+| [D-70](#d-70) | S16 | Options for modules that are not installed | Fix. | low | 2 | accepted |
+| [D-71](#d-71) | S16 | Full transaction details on view | Fix. | low | 2 | accepted |
+| [D-72](#d-72) | S17 | Inquiry message contract | Structured reply with a status, after confirming no requester parses the text. | low | 9 | accepted |
+| [D-73](#d-73) | S17 | Reply routing and correlation | Fix. | medium | 5 | accepted |
+| [D-74](#d-74) | S17 | Inquiry errors | Fix. | low | 3 | accepted |
+| [D-75](#d-75) | S18 | Fix obvious defects in bulk | Fix all. | medium | 79 | accepted |
 
 ## S1. Sign-on, roles and access control
 
@@ -144,6 +146,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep as-is (not viable on the web: any client could claim any identity).
   2. Fix: server-side authenticated session for every screen and API; identity and role come only from the session; no screen can change them; saves re-read keys from the server and re-validate every field.
 - **Recommendation:** Fix. Today the menus are reachable without a password, and a web client can send any field.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Spring Security configuration, every controller and React route, session design; acceptance tests must assert that each bypass path is refused.
 - **Items:** DEF-ACUP-009, DEF-ACUP-013, Q-ACUP-006, DEF-ACVW-009, DEF-ACVW-011, DEF-AUDT-009, Q-AUDT-005, DEF-AUSM-012, Q-AUSM-005, DEF-CRDL-003, DEF-CRDL-004, DEF-CRDL-005, FLOW-CRDL-001, FLOW-CRDL-008, SE-CRDL-003, Q-CRDL-004, Q-CRDL-008, DEF-CRDU-007, DEF-CRDV-003, DEF-CRDV-004, Q-CRDV-003, DEF-MENU-003, DEF-SGN-006, DEF-SGN-012, DEF-TTLS-017, DEF-TTUP-017
 
@@ -158,6 +161,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix with the two existing roles: admin and regular user, checked on the server for every function; unknown types are refused.
   3. Fix with finer roles (for example admin, operator, fraud analyst, regular user).
 - **Recommendation:** Fix with the two existing roles, deny unknown types; add a fraud role only if the authorization module is built. It closes the gap with the least new design.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Role model, Spring Security method/URL rules, admin and maintenance APIs, user type column constraint.
 - **Items:** DEF-ADMN-001, Q-ADMN-001, DEF-AUDT-006, Q-AUDT-003, DEF-JCSD-003, Q-JCSD-001, DEF-JCSDD-001, BR-MENU-003, DEF-MENU-002, Q-MENU-001, DEF-SGN-005, Q-SGN-005, DEF-TRNA-012, Q-TRNA-002, DEF-TTBU-009, DEF-TTLS-009, Q-TTLS-003, DEF-TTUP-010, Q-TTUP-006, DEF-USRA-005, DEF-USRL-008, DEF-USRL-013, DEF-USRU-006
 
@@ -172,6 +176,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix: cardholder model, regular users limited to their own accounts and cards; needs a new user-to-customer link and changes every list and lookup.
   3. Mixed: staff roles see all, a separate cardholder portal sees own data.
 - **Recommendation:** Keep the staff model for parity, combined with sign-on, roles, masking and access audit; choose the cardholder model only if cardholders are users, because it needs a new data link.
+- **Status:** Decided 2026-11-06: accepted recommendation, as access model C1 for now: sign-on for every screen and API, roles ADMIN and USER, and staff may open any account. The cardholder model (C2) comes later.
 - **Affects:** Authorization filter in every account, card, transaction, payment, report and authorization service; possibly a new user-customer table.
 - **Items:** DEF-ACUP-001, Q-ACUP-004, DEF-ACVW-008, Q-ACVW-001, DEF-AUSM-007, Q-AUSM-002, DEF-BILL-009, Q-BILL-004, BR-CRDL-002, DEF-CRDL-001, Q-CRDL-001, DEF-CRDU-006, Q-CRDU-005, DEF-CRDV-002, Q-CRDV-002, DEF-JCSD2-001, DEF-RPTS-007, Q-RPTS-004, DEF-TRNA-009, BR-TRNL-006, DEF-TRNL-007, Q-TRNL-001
 
@@ -187,6 +192,7 @@ How to use it: read the short list, answer each decision with an option number (
   3. Hash, case-sensitive passwords and case-insensitive IDs; migrate by hashing once and force a reset at first sign-on.
   4. Delegate to an external identity provider.
 - **Recommendation:** Salted hashes (bcrypt or Argon2), case-sensitive passwords, case-insensitive IDs, hash once at migration and force a reset; the current passwords have been readable in clear text.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Identity service, user table (hash column), migration script, user add/update screens (no password display).
 - **Items:** DEF-JUSEC-001, BR-SGN-003, DEF-SGN-001, DEF-SGN-011, Q-SGN-001, Q-SGN-002, DEF-USRA-001, DEF-USRA-003, DEF-USRU-005, DEF-USRU-011, Q-USRU-002
 
@@ -200,6 +206,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep as-is.
   2. Fix with values you choose, for example 5 failures lock for 15 minutes, 15-minute idle timeout, explicit sign-off, one neutral message, sign-on audit records.
 - **Recommendation:** Fix with the example values unless your policy sets others; unlimited guessing is the main gap.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Identity service, session configuration, sign-on screen messages, audit table.
 - **Items:** Q-MENU-003, DEF-SGN-002, DEF-SGN-003, Q-SGN-003, Q-SGN-004
 
@@ -213,6 +220,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep: seed job and unrestricted delete.
   2. Fix: one-time bootstrap admin with forced password change (or the identity provider); demo users only in demo environments; refuse deleting yourself or the last admin; no full user reload.
 - **Recommendation:** Fix. Shared known passwords and a lockable admin function are avoidable risks.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Deployment/provisioning, user admin delete rule, environment seed data.
 - **Items:** Q-JUSEC-001, Q-JUSEC-002, DEF-USRD-004, Q-USRD-002
 
@@ -226,6 +234,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep broad access.
   2. Fix: per-service database logins and roles, report jobs under the requesting user, authenticated RabbitMQ clients with per-client permissions, no FTP or clear-text secrets.
 - **Recommendation:** Fix; it is standard for the target platform and has no business trade-off.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** SQL Server logins, roles and grants; RabbitMQ users and vhost permissions; batch job identity; secrets management.
 - **Items:** DEF-JCRDB-003, Q-JCRDB-003, DEF-JCSD-004, DEF-JCSDM-003, DEF-JESRR-001, DEF-JFTP-004, DEF-JTRPTP-005, DEF-MQAC-004, Q-MQAC-003
 
@@ -239,6 +248,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep editable (parity).
   2. Fix: read-only; balances change only through posted transactions or a privileged, audited adjustment.
 - **Recommendation:** Fix. A direct edit bypasses the ledger, so balances and transactions stop agreeing.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Account update screen and service, adjustment function (if wanted), audit.
 - **Items:** DEF-ACUP-114, Q-ACUP-103
 
@@ -254,6 +264,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep full display.
   2. Fix: mask by default (SSN and card number to the last 4 digits), reveal only for a permitted role and log the reveal; never keep the CVV in client or session state.
 - **Recommendation:** Fix as described; full display serves no screen function and is a compliance exposure.
+- **Status:** Decided 2026-11-06: accepted recommendation under access model C1: sensitive fields are masked by default, ADMIN may unmask them, and every view is audited.
 - **Affects:** React components, API response models (masked fields), role check and access log.
 - **Items:** DEF-ACUP-016, DEF-ACVW-010, Q-ACVW-002, DEF-CRDL-002, Q-CRDL-002, DEF-CRDU-019, DEF-CRDV-011, Q-CRDV-006, DEF-TRNV-004, Q-TRNV-001
 
@@ -267,6 +278,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: card numbers masked to the last 4 in every report and log; never output CVV, SSN or government ID; drop full-record dumps; encrypt export files and backups; remove the FICO score from statements.
 - **Recommendation:** Fix; logs and reports are the usual leak path, and nothing downstream needs the full values.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Report templates, logging configuration (masking), export/import format, backup policy, statement layout.
 - **Items:** DEF-AUPG-008, Q-AUPG-009, DEF-AUTH-011, DEF-CDRD-001, Q-CDRD-001, DEF-CURD-001, Q-CURD-001, DEF-EXPT-009, DEF-EXPT-010, Q-EXPT-003, DEF-IMPT-008, DEF-INTC-011, DEF-JEXPT-002, Q-JEXPT-002, DEF-JGDGB-002, DEF-JIMPT-002, DEF-JPDF-003, DEF-JRACCT-002, DEF-JRCARD-001, DEF-JRCUST-001, DEF-JREJS-003, DEF-JRXREF-001, DEF-JTRPT-004, DEF-JTRPTP-004, DEF-POST-011, DEF-STIO-005, DEF-STMT-008, Q-STMT-004, DEF-TRPT-006, DEF-TVAL-002, DEF-XRRD-001, Q-XRRD-001
 
@@ -283,6 +295,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix the layout and migrate: move `A000000000` into the group ID, leave ZIP empty; interest results change only for accounts whose group has specific rates.
   3. Fix the layout but migrate the data unchanged (group stays blank, interest still uses DEFAULT).
 - **Recommendation:** Fix and migrate the group ID; the defect silently changes which interest rates apply.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Account table schema, data migration of `ACCTDAT`, account update save, interest parity tests.
 - **Items:** BR-ACUP-006, DEF-ACUP-002, DEF-ACUP-020, NUM-ACUP-010, SE-ACUP-006, Q-ACUP-001, Q-ACUP-010, Q-ENT-001, Q-INTC-001
 
@@ -296,6 +309,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep (reproduces the defect).
   2. Fix: update only name, expiry and status; keep the stored CVV.
 - **Recommendation:** Fix; the as-is save destroys the CVV.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Card update service (partial update), card table.
 - **Items:** BR-CRDU-006, DEF-CRDU-002, DEF-CRDU-003, NUM-CRDU-004, Q-CRDU-002
 
@@ -310,6 +324,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix: card must belong to the account; account is read-only in card update.
   3. Fix: allow moving a card, updating card and cross-reference together.
 - **Recommendation:** Fix with a read-only account; moving cards is a new feature nobody has asked for.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Card view/update services and screens; card-to-account relation in the schema.
 - **Items:** BR-CRDU-002, BR-CRDU-007, DEF-CRDU-001, Q-CRDU-001, DEF-CRDV-001, Q-CRDV-001
 
@@ -323,6 +338,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep truncation.
   2. Fix: full ZIP and phone on screen and in storage.
 - **Recommendation:** Fix; every save loses customer data today.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Customer columns, account view and update screens.
 - **Items:** DEF-ACUP-003, NUM-ACUP-005, Q-ACUP-005, DEF-ACVW-017, NUM-ACVW-004
 
@@ -336,6 +352,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: lock the ID after fetch; confirm the displayed user before delete.
 - **Recommendation:** Fix; it overwrites or deletes the wrong user.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** User update and delete screens and services.
 - **Items:** BR-USRD-003, DEF-USRD-001, Q-USRD-001, DEF-USRU-003
 
@@ -351,6 +368,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: one database transaction per save; report failure only when nothing was saved.
 - **Recommendation:** Fix; a half-saved update cannot be seen or corrected by the user.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Account update service transaction boundary and outcome messages.
 - **Items:** DEF-ACUP-005, ERR-ACUP-004, SE-ACUP-007, Q-ACUP-002, ERR-JCSD-001, Q-JCSD-002
 
@@ -364,6 +382,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep per-screen behaviour.
   2. Fix: a version column on every updatable table; a stale save is refused, current values are reloaded and the user's edits kept for review; confirmations bind action, row and key.
 - **Recommendation:** Fix uniformly with version columns; it maps the existing field comparisons onto one mechanism.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Every update service, table schemas (version column), confirmation flows.
 - **Items:** DEF-ACUP-006, Q-ACUP-003, DEF-TTLS-003, DEF-TTLS-014, Q-TTLS-007, DEF-TTUP-003, Q-TTUP-001, DEF-USRU-007, Q-USRU-003
 
@@ -378,6 +397,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix: no outage; short database transactions, version checks (D-17) and snapshot reads for statements, reports and export.
   3. Hybrid: window only for posting and interest.
 - **Recommendation:** No outage with snapshot reads, if D-17 is accepted; otherwise keep the window. It removes a daily outage.
+- **Status:** Decided 2026-11-06: override. Keep a batch window in mode WRITES_BLOCKED: while the cycle runs, reads keep working and writes are blocked. The recommended option (no window) is not taken.
 - **Affects:** Batch isolation level, online availability, DAG design, account update conflict handling.
 - **Items:** DEF-JCLOSE-003, Q-JCLOSE-001, DEF-JTRPT-005
 
@@ -393,6 +413,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep (reproduces the reference rejects on the 300 sample transactions).
   2. Fix: current balance plus amount greater than the credit limit; changes which transactions are rejected.
 - **Recommendation:** Keep for the first release so posting matches the reference run, then change it as a separate business decision.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Posting validation step, reject parity tests.
 - **Items:** BR-POST-001, DEF-POST-005, Q-POST-001
 
@@ -407,6 +428,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix: roll back the record and reject it.
   3. Fix: stop the job.
 - **Recommendation:** Roll back and reject; balances must not disagree with transactions.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Posting writer and transaction boundary, reject table.
 - **Items:** DEF-POST-003, DEF-POST-012, Q-POST-003
 
@@ -420,6 +442,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep one reason.
   2. Fix: keep the as-is primary reason and also store all failing reasons.
 - **Recommendation:** Store all reasons alongside the primary one; it helps operations and keeps parity on the primary code.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Reject table, posting validator.
 - **Items:** Q-POST-002
 
@@ -434,6 +457,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Per chunk with restart, each record atomic.
   3. Per file (all or nothing).
 - **Recommendation:** Per-record atomicity inside restartable chunks (Spring Batch); no record is half posted and a failed run restarts.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Posting Spring Batch step configuration, restart metadata.
 - **Items:** Q-POST-004
 
@@ -447,6 +471,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: a run-control table; refuse a second posting of the same file and a second interest run for the same cycle; reset or age category balances after interest.
 - **Recommendation:** Fix; reruns otherwise change customer balances.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Run-control table, posting and interest steps, category balance handling.
 - **Items:** DEF-INTC-005, Q-INTC-005, DEF-JPOST-003
 
@@ -460,6 +485,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Every cycle (README).
   2. Monthly on a chosen day (Control-M intent).
 - **Recommendation:** Monthly on a chosen day; it matches the monthly rate.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Interest DAG schedule.
 - **Items:** DEF-JCTLM-002, Q-JCTLM-002, Q-JINTC-002
 
@@ -474,6 +500,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix credit interest (charge positive balances only), keep truncation.
   3. Also change to rounding.
 - **Recommendation:** Keep truncation for parity; charge positive balances only unless the product pays interest on credits.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Interest calculation service, interest parity tests.
 - **Items:** BR-INTC-001, DEF-INTC-012, Q-INTC-003, Q-INTC-004
 
@@ -487,6 +514,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep: no fees.
   2. Add fee rules (needs a business specification).
 - **Recommendation:** Keep no fees until fee rules are specified.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Interest step, fee transaction types.
 - **Items:** DEF-INTC-004, Q-INTC-007
 
@@ -501,6 +529,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Post immediately with the posting rules.
   3. Feed the next posting run's input so the batch rules apply once.
 - **Recommendation:** Feed the posting input; it keeps one posting path and one set of rules.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Transaction add service, posting input, reports and statements.
 - **Items:** BR-TRNA-007, DEF-TRNA-001, Q-TRNA-001
 
@@ -516,6 +545,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: post payments like other transactions (negative amount, cycle credit, category balance).
 - **Recommendation:** Fix through the same posting service as D-27, after checking the effect on interest results; payments should count toward interest and statements.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Bill payment service, posting service, interest and statement parity.
 - **Items:** DEF-BILL-010, Q-BILL-002
 
@@ -529,6 +559,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: one transaction for record and balance; stop at the first error.
 - **Recommendation:** Fix, unless operations name a reconciliation that relies on the partial updates.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Bill payment service transaction.
 - **Items:** DEF-BILL-001, Q-BILL-003
 
@@ -543,6 +574,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Add a partial amount (new feature).
   3. Keep everything as-is.
 - **Recommendation:** Keep full-balance payment and lock the account on confirmation; a partial amount is a feature request.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Bill payment screen and service.
 - **Items:** DEF-BILL-014, Q-BILL-001
 
@@ -558,6 +590,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep (reproduces approvals on wrong data).
   2. Fix: per-request state; exactly one reply per request, correlated by ID.
 - **Recommendation:** Fix; approvals on another account's data are a money and privacy defect.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Authorization service (RabbitMQ consumer), reply contract.
 - **Items:** BR-AUTH-003, BR-AUTH-009, DEF-AUTH-001, DEF-AUTH-002, DEF-AUTH-003, DEF-AUTH-004, DEF-AUTH-015, NUM-AUTH-003, Q-AUTH-001
 
@@ -571,6 +604,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: implement the checks with the existing reason codes, reject invalid amounts, generate a unique code.
 - **Recommendation:** Fix; the reason codes already exist and a negative amount should never raise credit.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Authorization decision rules, reason codes, reply.
 - **Items:** BR-AUTH-007, BR-AUTH-008, DEF-AUTH-006, DEF-AUTH-007, Q-AUTH-002, Q-AUTH-004
 
@@ -584,6 +618,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: credit limit minus posted balance minus pending approvals; release approvals when purged or matched.
 - **Recommendation:** Fix; as-is credit only ever shrinks.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Authorization service, purge step, summary table.
 - **Items:** BR-AUPG-003, DEF-AUPG-003, Q-AUPG-002, BR-AUTH-004, DEF-AUTH-005, Q-AUTH-003
 
@@ -597,6 +632,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep expiry 0.
   2. Fix: a real expiry (for example 5 days), fraud-flagged kept at least as long as the fraud record, correct age, delete a summary only when it has no details left.
 - **Recommendation:** Fix with the 5-day default unless you have a policy; expiry 0 erases the data the screens show.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Purge job parameters and rules, retention policy.
 - **Items:** BR-AUPG-001, BR-AUPG-004, DEF-AUPG-001, DEF-AUPG-002, DEF-AUPG-004, DEF-AUPG-009, Q-AUPG-001, Q-AUPG-005, Q-AUPG-006, BR-JAUPG-001, DEF-JAUPG-001
 
@@ -610,6 +646,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: reply only after commit; consume the message in the same unit of work.
 - **Recommendation:** Fix; a requester can otherwise receive an approval that was never recorded.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Authorization consumer transaction handling.
 - **Items:** DEF-AUTH-008, FLOW-AUTH-003, Q-AUTH-005
 
@@ -623,6 +660,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: use the authorization's own key (account, card, processing timestamp) or a surrogate ID.
 - **Recommendation:** Fix; fraud marks must not collide.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Fraud table key, fraud marking service.
 - **Items:** DEF-AUFR-001, NUM-AUFR-002, Q-AUFR-001
 
@@ -640,6 +678,7 @@ How to use it: read the short list, answer each decision with an option number (
   3. F: CLOSE, reset, POSTTRAN, INTCALC at the chosen frequency, backup, COMBTRAN, statements, OPEN; reloads and reports on demand; completion checks replace WAITSTEP; on a cycle without INTCALC, COMBTRAN is skipped or gets an empty interest generation.
   4. B, D, E are not runnable repeatedly as written.
 - **Recommendation:** Option F; it is the only order consistent with every data hand-off. With monthly interest (D-24) the daily cycle must skip COMBTRAN. It needs D-24, D-38, D-39 and D-40.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** All Airflow DAGs, Spring Batch job boundaries.
 - **Items:** DEF-JCA7-005, Q-JCA7-001, DEF-JCOMB-002, DEF-JCTLM-001, DEF-JCTLM-006, Q-JCTLM-001, Q-JCTLM-004, DEF-JPOST-002, DEF-JRACCT-005, DEF-WAIT-001, NUM-WAIT-001, Q-WAIT-001, Q-WAIT-002
 
@@ -654,6 +693,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. After COMBTRAN, once per statement period.
   3. CA-7 position.
 - **Recommendation:** After COMBTRAN, once per statement period (see D-48); statements then include the period's postings and interest.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Statement DAG task.
 - **Items:** DEF-JSTMT-006, Q-JSTMT-001
 
@@ -668,6 +708,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. After the cycle, as its own task (README).
   3. Any time beside online work.
 - **Recommendation:** After the cycle as its own task that never gates posting; a base installation without the module must still post.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Cycle DAG, purge task.
 - **Items:** Q-JAUPG-002, DEF-JCA7-007, Q-JCA7-003
 
@@ -681,6 +722,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep 'last five runs' semantics.
   2. Keep all transactions in the database with a retention period per data class (for example 7 years for transactions, 90 days for rejects and reports).
 - **Recommendation:** Retention by data class in days, set by your data-handling policy; generation counts depend on run frequency.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Database design (no truncate per cycle), archive and purge jobs, backup policy.
 - **Items:** Q-JGDGB-001, Q-JPOST-001, Q-JREJS-001, Q-JREPT-001, Q-JTBKP-002
 
@@ -694,6 +736,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep the reload jobs.
   2. Seed load for new environments only; restore from backup; no production reload.
 - **Recommendation:** Seed-only; a production reload destroys customer data.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Data-load jobs, environment set-up, DAG inventory.
 - **Items:** Q-JACCT-001, Q-JCARD-002, Q-JCUST-001, DEF-JTCAT-002, Q-JTCAT-001, Q-JXREF-002
 
@@ -707,6 +750,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep them all.
   2. Drop the samples, READACCT, TRANIDX and TRANVALD; replace readers with an on-demand load check (counts, key ranges, totals); keep only the on-demand transaction report.
 - **Recommendation:** Drop and replace as in the second option, unless operations name a user; they carry no business result.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Job inventory, DAGs, post-load verification task.
 - **Items:** BR-ACRD-005, BR-ACRD-006, DEF-ACRD-002, Q-ACRD-001, Q-ACRD-002, Q-JCA7-004, Q-JESRR-001, Q-JFTP-001, Q-JIRD1-001, Q-JRACCT-001, Q-JRCARD-001, Q-JRCUST-001, Q-JRXREF-001, DEF-JTIDX-004, Q-JTIDX-001, Q-JTRPT-001, BR-TVAL-005, DEF-TVAL-004, Q-TVAL-001, Q-TVAL-002, Q-TVAL-003
 
@@ -722,6 +766,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep (parity with the reference output).
   2. Fix: one statement per account per period, with date, period, limit, minimum payment and a reconciled total; no size limits.
 - **Recommendation:** Fix; the as-is output is not a usable billing statement. Keep a parity mode only for the migration check.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Statement batch step, template, period definition.
 - **Items:** DEF-JSTMT-005, Q-JSTMT-002, DEF-STMT-005, Q-STMT-001, Q-STMT-002
 
@@ -735,6 +780,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: print full values.
 - **Recommendation:** Fix; customers would see the truncation.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Statement template.
 - **Items:** BR-STMT-005, BR-STMT-006, BR-STMT-008, DEF-STMT-002, DEF-STMT-003, Q-STMT-003
 
@@ -748,6 +794,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Reproduce text and HTML as-is.
   2. One PDF per statement from a defined template, archived per cycle; HTML only if a consumer exists, always escaped.
 - **Recommendation:** One escaped PDF per statement from a template; the original layout is not available anyway.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Statement rendering, archive storage.
 - **Items:** DEF-JPDF-001, Q-JPDF-001, Q-JPDF-002, DEF-STMT-007, Q-STMT-007
 
@@ -761,6 +808,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: one inclusive range from the request; skip out-of-range records; always print totals.
 - **Recommendation:** Fix; the as-is report is silently incomplete.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Report batch step.
 - **Items:** BR-JTRPT-001, DEF-JTRPT-001, DEF-TRPT-001, FLOW-TRPT-001, Q-TRPT-001
 
@@ -774,6 +822,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep per card, relabel 'Card Total'.
   2. Per account, sorted by account.
 - **Recommendation:** Per account, as the label promises; treat the report as downloaded, not printed.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Report query and template.
 - **Items:** DEF-TRPT-004, Q-TRPT-002, Q-TRPT-003
 
@@ -788,6 +837,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Asynchronous run with status, notification and download.
   3. Online query instead of a job.
 - **Recommendation:** Asynchronous run with status and download; it keeps the batch logic and gives feedback.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Report request API, job tracking, React report page.
 - **Items:** ERR-JTRPTP-001, Q-JTRPTP-001, DEF-RPTS-006, Q-RPTS-001
 
@@ -804,6 +854,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Validate changed fields only.
   3. Keep whole-record validation and clean the data during migration.
 - **Recommendation:** Validate changed fields only; otherwise the screen does not work on real data.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Account update validation, data-quality report for migration.
 - **Items:** DEF-ACUP-112, Q-ACUP-101
 
@@ -817,6 +868,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep all edits as-is.
   2. Fix: accept lower case, allow hyphen, apostrophe and full stop, add limit ranges, reject (never cut) overlong values, compare exactly after trimming; decide non-US address support separately.
 - **Recommendation:** Fix as in the second option; the current edits reject valid customer data.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Account update validation rules (shared front end and service).
 - **Items:** BR-ACUP-102, DEF-ACUP-109, DEF-ACUP-110, DEF-ACUP-111, DEF-ACUP-113, DEF-ACUP-115, DEF-ACUP-118, DEF-ACUP-120, NUM-ACUP-101, VAL-ACUP-004, VAL-ACUP-005, VAL-ACUP-019, VAL-ACUP-021, VAL-ACUP-026, VAL-ACUP-033, Q-ACUP-102, Q-ACUP-104, Q-ACUP-105, Q-ACUP-106, Q-ACUP-107, Q-ACUP-108
 
@@ -830,6 +882,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: store the name as typed, require a valid future expiry, accept lower-case y/n.
 - **Recommendation:** Fix expiry validation; keep upper-case names only if embossing requires it.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Card update validation.
 - **Items:** BR-CRDU-008, DEF-CRDU-008, DEF-CRDU-009, NUM-CRDU-003, Q-CRDU-003, Q-CRDU-004, Q-CRDU-008
 
@@ -843,6 +896,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: check codes against reference tables, processing date = today, reject impossible dates and ranges, pad shorter numeric IDs.
 - **Recommendation:** Fix; each as-is case only produces bad records or empty reports.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Transaction add and report request validation, shared date validator.
 - **Items:** DEF-DTCK-004, Q-DTCK-003, DEF-RPTS-001, DEF-RPTS-002, Q-RPTS-002, DEF-TRNA-002, DEF-TRNA-006, DEF-TRNA-007, DEF-TRNA-008, Q-TRNA-005, DEF-TRNL-006, DEF-TRNV-003
 
@@ -856,6 +910,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: defined roles only, upper-case IDs without spaces, password policy.
 - **Recommendation:** Fix; a typo silently changes privileges.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** User admin validation.
 - **Items:** BR-USRA-001, DEF-USRA-002, DEF-USRA-009, Q-USRA-001, DEF-USRU-004
 
@@ -871,6 +926,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Reproduce the quirks.
   2. Fix: server-side paging with stable keys, a changed filter restarts at page 1, case-insensitive prefix search, database collation order.
 - **Recommendation:** Fix; the quirks show wrong or missing rows and serve no purpose.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** List APIs (keyset paging), React list components, collation.
 - **Items:** BR-AUSM-006, DEF-AUSM-002, DEF-AUSM-011, Q-AUSM-001, BR-CRDL-004, DEF-CRDL-006, DEF-CRDL-010, NUM-CRDL-001, Q-CRDL-003, Q-CRDL-006, DEF-TRNL-005, DEF-TRNL-008, Q-TRNL-002, DEF-USRL-002, DEF-USRL-007, DEF-USRL-011, DEF-USRL-014, VAL-USRL-003, Q-USRL-001, Q-USRL-002
 
@@ -884,6 +940,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: clear marks on paging, bind the selection to the record key, show invalid-code errors.
 - **Recommendation:** Fix; a delete can hit the wrong user.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** List screens.
 - **Items:** DEF-CRDL-007, DEF-CRDL-018, Q-CRDL-007, DEF-TRNL-011, DEF-USRL-004, DEF-USRL-012
 
@@ -899,6 +956,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. No audit (parity).
   2. Audit sign-on, user and role changes, account/card/customer changes, fraud marks and sensitive-data reveals; logical delete for users.
 - **Recommendation:** Audit the listed events; they are needed to trace privilege and data changes.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Audit table or event log, all write services, retention policy.
 - **Items:** Q-USRA-002, Q-USRD-003
 
@@ -914,6 +972,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep per-job behaviour.
   2. Fix: failure means non-zero exit and stops dependents; rejects give a warning status and a count; reset only after a verified backup; retries only for idempotent tasks, otherwise hold and alert.
 - **Recommendation:** Fix with that policy; blind reruns and silent successes are the main operational risks.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Every Spring Batch job's exit status, Airflow dependencies, retries and alerting.
 - **Items:** DEF-AUPG-006, Q-AUPG-008, BR-IMPT-011, ERR-IMPT-004, Q-IMPT-002, DEF-JAUPG-003, ERR-JAUPG-001, Q-JAUPG-001, Q-JCTLM-003, ERR-JINTC-001, DEF-JSTMT-001, Q-JSTMT-003, DEF-JTBKP-001, Q-JTBKP-001, DEF-TTBU-001, Q-TTBU-001, Q-TTBU-003, Q-TTBU-004, ERR-TVAL-003
 
@@ -927,6 +986,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep exact texts (parity tests compare them).
   2. Fix: plain messages; log the technical detail.
 - **Recommendation:** Fix; keep the message meaning, drop the codes.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Screen messages, logging, acceptance tests (message texts).
 - **Items:** DEF-ACVW-016, NUM-ACVW-005, VAL-ACVW-003, Q-ACVW-008
 
@@ -943,6 +1003,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. One database sequence shared by all writers, keeping the 16-digit format; no seed record.
   3. Also add a numeric surrogate key and keep the 16-character ID as a unique attribute.
 - **Recommendation:** A shared sequence that keeps the 16-digit format, no seed record; add a surrogate key only if the data model team wants it.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Transaction table key, ID generator, posting, interest, bill payment, transaction add.
 - **Items:** Q-ENT-002, DEF-INTC-010, Q-INTC-006, DEF-JINTC-001, NUM-JINTC-001, Q-JINTC-001, DEF-JTRAN-005, Q-JTRAN-001, BR-TRNA-003, DEF-TRNA-003, Q-TRNA-003
 
@@ -956,6 +1017,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep the text layouts.
   2. One typed `DATETIME2` column; convert during migration; format on output.
 - **Recommendation:** One typed column; it removes the format mix without changing what users see.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Transaction table schema, migration, report selection.
 - **Items:** Q-BILL-006, DEF-EXPT-003, NUM-EXPT-001, Q-EXPT-001
 
@@ -969,6 +1031,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep one card per account.
   2. Fix: look accounts up directly, allow any number of cards, let the user choose the card where needed.
 - **Recommendation:** Fix; the single-card limit is a storage artefact.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Account, card and cross-reference queries; transaction add; authorization summary; schema.
 - **Items:** DEF-ACUP-012, DEF-ACVW-003, DEF-ACVW-004, Q-ACVW-003, Q-ACVW-005, DEF-AUSM-010, Q-AUSM-004, Q-JCARD-001, Q-JXREF-001, DEF-TRNA-004, DEF-TRNA-005
 
@@ -983,6 +1046,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Replace with a database export/load, with counts and validation.
   3. Drop it.
 - **Recommendation:** Replace with a database export/load unless an external receiver of the file is named.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Migration tooling, export/import jobs.
 - **Items:** DEF-EXPT-007, Q-EXPT-004, Q-EXPT-005, DEF-IMPT-001, DEF-IMPT-009, VAL-IMPT-001, Q-IMPT-001, Q-IMPT-004, DEF-JEXPT-001, Q-JEXPT-001, DEF-JIMPT-003, Q-JIMPT-001
 
@@ -998,6 +1062,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep two stores.
   2. One SQL table set, seeded once with the VSAM text (typo fixed), maintained online.
 - **Recommendation:** One store; two copies drift.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Reference data tables, type maintenance, posting and report lookups, DAGs (no extract/reload).
 - **Items:** DEF-JCRDB-005, Q-JCRDB-004, DEF-JCTLM-005, Q-JGDGD-001, Q-JMNTT-001, Q-JMNTT-002, Q-JTCATG-001, DEF-JTREX-001, Q-JTREX-001, Q-JTREX-002, Q-JTTYP-001
 
@@ -1012,6 +1077,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Cascade delete.
   3. Add category maintenance.
 - **Recommendation:** Keep refusing with a clear message; cascading would remove reference data used by posting.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Type maintenance, schema constraint.
 - **Items:** DEF-TTLS-002, Q-TTLS-002, Q-TTUP-005
 
@@ -1025,6 +1091,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: same rules online and batch, case-sensitive change detection, case-insensitive literal filter, trimmed storage.
 - **Recommendation:** Fix; keep the character set unless punctuation is needed.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Type maintenance screens, batch maintenance, table data.
 - **Items:** DEF-TTBU-003, Q-TTBU-002, BR-TTLS-003, BR-TTLS-008, DEF-TTLS-001, DEF-TTLS-004, DEF-TTLS-016, Q-TTLS-001, Q-TTLS-004, Q-TTLS-006, DEF-TTUP-007, Q-TTUP-004, Q-TTUP-007
 
@@ -1038,6 +1105,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep it, with a defined input interface.
   2. Drop it; the online screens suffice.
 - **Recommendation:** Drop it unless a producer of the input is named.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Job inventory, type maintenance.
 - **Items:** Q-TTBU-005
 
@@ -1051,6 +1119,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep file reload.
   2. Admin maintenance function or controlled load that rejects data without `DEFAULT`.
 - **Recommendation:** Controlled maintenance with the `DEFAULT` check; a missing default stops interest.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Disclosure group table, admin function or load job.
 - **Items:** Q-JDISC-001
 
@@ -1066,6 +1135,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep PF3 = save and exit.
   2. Fix: explicit save; leaving with unsaved changes warns; a failed save keeps the entered values.
 - **Recommendation:** Fix; silent saves surprise users in a web UI.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Edit screens (React), save APIs.
 - **Items:** Q-CRDU-007, BR-USRU-005, DEF-USRU-001, Q-USRU-001
 
@@ -1079,6 +1149,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: standard invalid-key message; no state loss.
 - **Recommendation:** Fix; on the web this becomes ordinary button handling.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Card screens.
 - **Items:** Q-CRDL-009, DEF-CRDU-012, DEF-CRDV-005, DEF-CRDV-014, Q-CRDV-004
 
@@ -1092,6 +1163,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: show only installed functions.
 - **Recommendation:** Fix.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Admin menu.
 - **Items:** Q-ADMN-002, Q-ADMN-003
 
@@ -1105,6 +1177,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: show them in full.
 - **Recommendation:** Fix; no business risk.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Transaction view screen.
 - **Items:** DEF-TRNV-006, Q-TRNV-002
 
@@ -1120,6 +1193,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. The code's contract, byte for byte.
   2. A structured reply (JSON, decimal amounts, status), unless an existing requester parses the text.
 - **Recommendation:** Structured reply with a status, after confirming no requester parses the text; the module is optional.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** RabbitMQ message schemas, inquiry services.
 - **Items:** DEF-MQAC-001, DEF-MQAC-014, Q-MQAC-007, Q-MQAC-008, DEF-MQDT-001, DEF-MQDT-004, DEF-MQDT-012, Q-MQDT-002, Q-MQDT-003
 
@@ -1133,6 +1207,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep the shared queue.
   2. Fix: `reply_to` and `correlation_id` = request message ID.
 - **Recommendation:** Fix; the shared queue exposes every requester's replies.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** RabbitMQ request/reply configuration.
 - **Items:** DEF-MQAC-002, DEF-MQAC-003, Q-MQAC-002, DEF-MQDT-002, DEF-MQDT-003
 
@@ -1146,6 +1221,7 @@ How to use it: read the short list, answer each decision with an option number (
   1. Keep.
   2. Fix: error reply plus dead-letter/retry.
 - **Recommendation:** Fix.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Inquiry consumer error path, dead-letter queue.
 - **Items:** DEF-MQAC-007, ERR-MQAC-005, Q-MQAC-006
 
@@ -1162,6 +1238,7 @@ How to use it: read the short list, answer each decision with an option number (
   2. Fix all (with exceptions you name).
   3. Decide one by one.
 - **Recommendation:** Fix all; review Appendix A for any exception.
+- **Status:** Decided 2026-11-06: accepted recommendation.
 - **Affects:** Spread across screens and jobs; each fix gets a regression test.
 - **Items:** the 79 items in Appendix A.
 
