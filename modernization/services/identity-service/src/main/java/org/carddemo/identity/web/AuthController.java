@@ -31,6 +31,7 @@ import org.carddemo.identity.web.Dtos.SignOnRequest;
 import org.carddemo.platform.web.MessageCatalog;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -47,8 +48,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "auth")
-@ApiResponse(responseCode = "4XX", description = "Refused, with the screen message",
-        content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
 class AuthController {
 
     private final SignOnService signOn;
@@ -73,19 +72,39 @@ class AuthController {
         this.props = props;
     }
 
-    @PostMapping("/sign-on")
+    @PostMapping(path = "/sign-on", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "signOn", summary = "Sign on (COSGN00C) and start a session")
     @ApiResponse(responseCode = "200", description = "Signed on; sets cd_at, cd_rt and XSRF-TOKEN")
+    @ApiResponse(responseCode = "400", description = "USER_ID_REQUIRED, PASSWORD_REQUIRED or INVALID_INPUT",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "401", description = "USER_NOT_FOUND, WRONG_PASSWORD or SIGN_ON_FAILED",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "403", description = "USER_TYPE_NOT_ALLOWED or PASSWORD_CHANGE_REQUIRED (severity info)",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "429", description = "TOO_MANY_ATTEMPTS, with Retry-After",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "503", description = "UNABLE_TO_VERIFY",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
     ResponseEntity<SessionView> signOn(@RequestBody SignOnRequest body, HttpServletRequest req,
             HttpServletResponse res) {
         StartedSession s = signOn.signOn(body.userId(), body.password(), req.getRemoteAddr());
         return started(s, req, res);
     }
 
-    @PostMapping("/password")
+    @PostMapping(path = "/password", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "changePassword",
             summary = "Change the password with the current one, then start a session (D-SEC-07)")
     @ApiResponse(responseCode = "200", description = "Password changed and signed on; sets cd_at, cd_rt and XSRF-TOKEN")
+    @ApiResponse(responseCode = "400", description = "USER_ID_REQUIRED, PASSWORD_REQUIRED, INVALID_INPUT, USER_ID_MISMATCH or a NEW_PASSWORD_* rule",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "401", description = "USER_NOT_FOUND, WRONG_PASSWORD or SIGN_ON_FAILED",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "403", description = "USER_TYPE_NOT_ALLOWED",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "429", description = "TOO_MANY_ATTEMPTS, with Retry-After",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "503", description = "UNABLE_TO_VERIFY",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
     ResponseEntity<SessionView> changePassword(@RequestBody PasswordRequest body, HttpServletRequest req,
             HttpServletResponse res) {
         Optional<SignedOn> signedOn = token(req).flatMap(this::signedOn);
@@ -94,9 +113,13 @@ class AuthController {
         return started(s, req, res);
     }
 
-    @PostMapping("/refresh")
+    @PostMapping(path = "/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "refresh", summary = "Use the refresh cookie once and get new cookies")
     @ApiResponse(responseCode = "200", description = "Session extended; new cd_at, cd_rt and XSRF-TOKEN")
+    @ApiResponse(responseCode = "401", description = "SESSION_EXPIRED; cookies cleared",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
+    @ApiResponse(responseCode = "403", description = "CSRF_REJECTED",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
     ResponseEntity<SessionView> refresh(
             @CookieValue(name = AuthCookies.REFRESH, required = false) String refreshToken,
             HttpServletRequest req, HttpServletResponse res) {
@@ -104,9 +127,11 @@ class AuthController {
         return started(s, req, res);
     }
 
-    @PostMapping("/sign-off")
+    @PostMapping(path = "/sign-off", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "signOff", summary = "End the session (FLOW-SGN-003)")
     @ApiResponse(responseCode = "200", description = "Signed off; cookies cleared")
+    @ApiResponse(responseCode = "403", description = "CSRF_REJECTED",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
     ResponseEntity<SignOffResult> signOff(
             @CookieValue(name = AuthCookies.REFRESH, required = false) String refreshToken,
             HttpServletRequest req, HttpServletResponse res) {
@@ -116,9 +141,11 @@ class AuthController {
         return ResponseEntity.ok(new SignOffResult(MessageCatalog.SIGNED_OFF.text(), MessageCatalog.SIGNED_OFF.severity().key()));
     }
 
-    @GetMapping("/me")
+    @GetMapping(path = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "me", summary = "The signed-on user")
     @ApiResponse(responseCode = "200", description = "The session's user")
+    @ApiResponse(responseCode = "401", description = "UNAUTHENTICATED",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class)))
     SessionView me(@AuthenticationPrincipal Jwt jwt) {
         UUID sessionId = UUID.fromString(jwt.getClaimAsString(AccessTokens.CLAIM_SESSION));
         if (sessions.active(sessionId).isEmpty()) {
@@ -128,7 +155,7 @@ class AuthController {
         return view(user, jwt.getClaimAsString(AccessTokens.CLAIM_ROLE));
     }
 
-    @GetMapping("/.well-known/jwks.json")
+    @GetMapping(path = "/.well-known/jwks.json", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(operationId = "jwks", summary = "The public key that signs access tokens")
     @ApiResponse(responseCode = "200", description = "JWK set (RFC 7517)")
     Map<String, Object> jwks() {

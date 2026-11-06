@@ -15,7 +15,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "type" : "object",
                   "additionalProperties" : { }
@@ -23,16 +23,6 @@
               }
             },
             "description" : "JWK set (RFC 7517)"
-          },
-          "4XX" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiProblem"
-                }
-              }
-            },
-            "description" : "Refused, with the screen message"
           }
         },
         "summary" : "The public key that signs access tokens",
@@ -45,7 +35,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SessionView"
                 }
@@ -53,7 +43,7 @@
             },
             "description" : "The session's user"
           },
-          "4XX" : {
+          "401" : {
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -61,7 +51,7 @@
                 }
               }
             },
-            "description" : "Refused, with the screen message"
+            "description" : "UNAUTHENTICATED"
           }
         },
         "summary" : "The signed-on user",
@@ -84,7 +74,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SessionView"
                 }
@@ -92,7 +82,7 @@
             },
             "description" : "Password changed and signed on; sets cd_at, cd_rt and XSRF-TOKEN"
           },
-          "4XX" : {
+          "400" : {
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -100,7 +90,47 @@
                 }
               }
             },
-            "description" : "Refused, with the screen message"
+            "description" : "USER_ID_REQUIRED, PASSWORD_REQUIRED, INVALID_INPUT, USER_ID_MISMATCH or a NEW_PASSWORD_* rule"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_NOT_FOUND, WRONG_PASSWORD or SIGN_ON_FAILED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_TYPE_NOT_ALLOWED"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "TOO_MANY_ATTEMPTS, with Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNABLE_TO_VERIFY"
           }
         },
         "summary" : "Change the password with the current one, then start a session (D-SEC-07)",
@@ -121,7 +151,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SessionView"
                 }
@@ -129,7 +159,7 @@
             },
             "description" : "Session extended; new cd_at, cd_rt and XSRF-TOKEN"
           },
-          "4XX" : {
+          "401" : {
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -137,7 +167,17 @@
                 }
               }
             },
-            "description" : "Refused, with the screen message"
+            "description" : "SESSION_EXPIRED; cookies cleared"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "CSRF_REJECTED"
           }
         },
         "summary" : "Use the refresh cookie once and get new cookies",
@@ -158,7 +198,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SignOffResult"
                 }
@@ -166,7 +206,7 @@
             },
             "description" : "Signed off; cookies cleared"
           },
-          "4XX" : {
+          "403" : {
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -174,7 +214,7 @@
                 }
               }
             },
-            "description" : "Refused, with the screen message"
+            "description" : "CSRF_REJECTED"
           }
         },
         "summary" : "End the session (FLOW-SGN-003)",
@@ -197,7 +237,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/SessionView"
                 }
@@ -205,7 +245,7 @@
             },
             "description" : "Signed on; sets cd_at, cd_rt and XSRF-TOKEN"
           },
-          "4XX" : {
+          "400" : {
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -213,7 +253,47 @@
                 }
               }
             },
-            "description" : "Refused, with the screen message"
+            "description" : "USER_ID_REQUIRED, PASSWORD_REQUIRED or INVALID_INPUT"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_NOT_FOUND, WRONG_PASSWORD or SIGN_ON_FAILED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_TYPE_NOT_ALLOWED or PASSWORD_CHANGE_REQUIRED (severity info)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "TOO_MANY_ATTEMPTS, with Retry-After"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNABLE_TO_VERIFY"
           }
         },
         "summary" : "Sign on (COSGN00C) and start a session",
@@ -226,7 +306,7 @@
         "responses" : {
           "200" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/Features"
                 }
@@ -234,7 +314,7 @@
             },
             "description" : "What the web app shows"
           },
-          "4XX" : {
+          "401" : {
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -242,7 +322,7 @@
                 }
               }
             },
-            "description" : "No session"
+            "description" : "UNAUTHENTICATED"
           }
         },
         "summary" : "Installed modules, converted units and UI switches",
