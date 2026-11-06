@@ -7,7 +7,10 @@ must-preserve or unclassified item that is not excluded has a passing test, ever
 item has passing tests in the ledger's mode (both modes for a code switch or an undecided item) or
 a deviation, every architecture-dependent item has a deviation, no cited item has a failing test,
 and no test cites an ID the spec does not define. Every code switch needs passing tests in both
-modes, whatever its unit. Incidental items and questions need no test.
+modes, whatever its unit. Incidental items and questions need no test. With --unit, only the gaps
+of the named units count for the gate and the exit status; the matrix still shows every unit.
+Tests that write an ID in brackets ("[FLOW-BILL-002]") instead of as a tag ("@FLOW-BILL-002") are
+reported, not counted.
 Ends with "trace: OK" or "trace: FAILED (<reason>)"; exit status 0 or 1.
 """
 from __future__ import annotations
@@ -51,15 +54,43 @@ def _ledger_cell(row: matrix.Row) -> str:
     return "; ".join(parts) or "-"
 
 
+def _citing(m: matrix.Matrix) -> int:
+    return sum(1 for r in m.results if r.items)
+
+
+def _uncounted(m: matrix.Matrix) -> list[reports.Result]:
+    return [r for r in m.results if r.uncounted]
+
+
+def _uncounted_line(n: int) -> str:
+    return f"{n} test{'s carry' if n != 1 else ' carries'} bracketed IDs that are not counted (cite an item as @<ID>)"
+
+
+def _gate_label(m: matrix.Matrix) -> str:
+    if m.selected:
+        return f"for the selected units: {', '.join(m.gate_units)}"
+    return f"for the units in scope: {', '.join(m.scope) or 'none'}"
+
+
 def render_md(m: matrix.Matrix, sources: list[str], generated: str) -> str:
     out = ["# Traceability matrix", "",
            f"Generated {generated} by `make -C modernization trace` from the spec, `ledger/*.toml` and "
-           f"{len(sources)} test report file{'s' if len(sources) != 1 else ''} ({len(m.results)} test results citing items).", ""]
-    out.append(f"**Gate: {'OK' if m.ok else f'FAILED, {len(m.gaps)} gaps'}** for the units in scope: {', '.join(m.scope) or 'none'}.")
+           f"{len(sources)} test report file{'s' if len(sources) != 1 else ''} ({_citing(m)} test results citing items).", ""]
+    out.append(f"**Gate: {'OK' if m.ok else f'FAILED, {len(m.gaps)} gaps'}** {_gate_label(m)}.")
     out.append("")
     if m.gaps:
         out += ["## Gaps", "", "| Item | Reason |", "| :-- | :-- |"]
         out += [f"| {g} | {_md_escape(r)} |" for g, r in m.gaps]
+        out.append("")
+    if m.ungated:
+        out += ["## Gaps of units outside the gate", "", "| Item | Reason |", "| :-- | :-- |"]
+        out += [f"| {g} | {_md_escape(r)} |" for g, r in m.ungated]
+        out.append("")
+    uncounted = _uncounted(m)
+    if uncounted:
+        out += ["## Bracketed IDs not counted", "", _uncounted_line(len(uncounted)) + ".", "",
+                "| Test | Bracketed IDs | Report |", "| :-- | :-- | :-- |"]
+        out += [f"| {_md_escape(r.name)} | {', '.join(r.uncounted)} | `{r.source}` |" for r in uncounted]
         out.append("")
     summary = matrix.unit_summary(m)
     out += ["## Units in scope", "", "| Unit | " + " | ".join(STATUS_ORDER) + " |", "| :-- |" + " --: |" * len(STATUS_ORDER)]
@@ -92,17 +123,21 @@ def render_json(m: matrix.Matrix, sources: list[str], generated: str) -> str:
     data = {
         "schema": 1,
         "generated": generated,
-        "gate": {"ok": m.ok, "gaps": [{"id": g, "reason": r} for g, r in m.gaps]},
+        "gate": {"ok": m.ok, "units": m.gate_units, "gaps": [{"id": g, "reason": r} for g, r in m.gaps],
+                 "ungated_gaps": [{"id": g, "reason": r} for g, r in m.ungated]},
         "scope": m.scope,
         "reports": sources,
         "summary": {u: dict(c) for u, c in sorted(matrix.unit_summary(m).items())},
         "items": [r.as_dict() for r in sorted(m.rows.values(), key=lambda r: (r.unit, r.id))],
         "unknown_citations": {i: [t.as_dict() for t in ts] for i, ts in sorted(m.unknown.items())},
+        "uncounted_bracketed": [dict(r.as_dict(), ids=r.uncounted) for r in _uncounted(m)],
     }
     return json.dumps(data, indent=1, ensure_ascii=False) + "\n"
 
 
-def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, out=sys.stdout) -> int:
+def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, out=None,
+        units: list[str] | None = None) -> int:
+    out = out or sys.stdout
     led = ledger.load(ledger_dir)
     try:
         s = spec.load(root)
@@ -114,6 +149,13 @@ def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, o
             print(f"  {p}", file=out)
         print("trace: FAILED (the ledger does not load; run make verify-ledger)", file=out)
         return 1
+    if units is not None:
+        units = list(dict.fromkeys(u.upper() for u in units))
+        unknown_units = [u for u in units if u not in led.units]
+        if unknown_units:
+            print(f"trace: FAILED (--unit {', '.join(unknown_units)} not in scope.toml; "
+                  f"units in scope: {', '.join(sorted(led.units)) or 'none'})", file=out)
+            return 1
     files: list[Path] = []
     for p in report_paths:
         files += reports.discover(p) if p.is_dir() else [p]
@@ -127,7 +169,7 @@ def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, o
             results += rs
             sources.append(f.relative_to(root).as_posix() if f.is_relative_to(root) else str(f))
     arch = {i for row in catalog.architecture_dependent(root) for i in row}
-    m = matrix.build(s, led, results, arch)
+    m = matrix.build(s, led, results, arch, units)
     m.gaps += [("report", p) for p in read_problems]
     generated = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -137,9 +179,18 @@ def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, o
         print(f"  {ident}: {reason}", file=out)
     if len(m.gaps) > 50:
         print(f"  ... {len(m.gaps) - 50} more in {out_dir / 'matrix.md'}", file=out)
+    if m.ungated:
+        print(f"  ({len(m.ungated)} gap{'s' if len(m.ungated) != 1 else ''} of units outside the gate, listed in {out_dir / 'matrix.md'})", file=out)
+    uncounted = _uncounted(m)
+    if uncounted:
+        print(f"  warning: {_uncounted_line(len(uncounted))}:", file=out)
+        for r in uncounted[:10]:
+            print(f"    {r.name}: {', '.join(r.uncounted)}", file=out)
+        if len(uncounted) > 10:
+            print(f"    ... {len(uncounted) - 10} more in {out_dir / 'matrix.md'}", file=out)
     summary = matrix.unit_summary(m)
-    per_unit = ", ".join(f"{u} {summary[u]['covered']} covered/{summary[u]['gap']} gaps" for u in m.scope)
-    print(f"matrix: {out_dir / 'matrix.md'} ({len(results)} results from {len(sources)} reports; {per_unit})", file=out)
+    per_unit = ", ".join(f"{u} {summary[u]['covered']} covered/{summary[u]['gap']} gaps" for u in m.gate_units)
+    print(f"matrix: {out_dir / 'matrix.md'} ({_citing(m)} results from {len(sources)} reports; {per_unit})", file=out)
     if m.gaps:
         print(f"trace: FAILED ({len(m.gaps)} gap{'s' if len(m.gaps) != 1 else ''})", file=out)
         return 1
@@ -154,11 +205,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reports", type=Path, nargs="*",
                     help="report files or directories to search (default: <root>/modernization)")
     ap.add_argument("--out", type=Path, help="output directory (default: <root>/modernization/build/trace)")
+    ap.add_argument("--unit", action="append", metavar="UNIT",
+                    help="gate only this unit of scope.toml (repeatable; default: every unit in scope and every code switch)")
     args = ap.parse_args(argv)
     root = args.root.resolve()
     return run(root, args.ledger or root / "modernization/ledger",
                args.reports if args.reports else [root / "modernization"],
-               args.out or root / "modernization/build/trace")
+               args.out or root / "modernization/build/trace", units=args.unit)
 
 
 if __name__ == "__main__":
