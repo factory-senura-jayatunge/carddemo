@@ -1,0 +1,10 @@
+# The Airflow venv (AIRFLOW_VENV). make setup installs this file with the
+# official Airflow constraints next to it (constraints-<airflow>-py<python>.txt,
+# downloaded from github.com/apache/airflow, branch constraints-3.3.2), then
+# carddemo_airflow in editable mode.
+apache-airflow==3.3.2
+apache-airflow-providers-postgres
+psycopg2-binary
+setuptools
+# Not in the constraints file.
+pytest==9.2.0
