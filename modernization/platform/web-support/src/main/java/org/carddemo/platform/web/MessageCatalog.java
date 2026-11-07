@@ -22,6 +22,13 @@ public final class MessageCatalog {
     public static final Message METHOD_NOT_ALLOWED = target("METHOD_NOT_ALLOWED", "The request method is not supported ...");
     public static final Message INTERNAL_ERROR = target("INTERNAL_ERROR", "An unexpected error occurred. Please try again later ...");
     public static final Message INVALID_KEY = error("INVALID_KEY", "Invalid key pressed. Please see below...", "CSMSG01Y");
+    public static final Message RECORD_CHANGED = error("RECORD_CHANGED", "Record changed by some one else. Please review", "D-17");
+    public static final Message PRECONDITION_REQUIRED = target("PRECONDITION_REQUIRED", "If-Match header is required");
+    public static final Message INVALID_IF_MATCH = target("INVALID_IF_MATCH", "If-Match header is not a version of this record");
+    public static final Message INVALID_PAGE_REQUEST = target("INVALID_PAGE_REQUEST", "Use only one of start, after and before");
+    public static final Message INVALID_PAGE_SIZE = target("INVALID_PAGE_SIZE", "Page size must be between 1 and {max}");
+    public static final Message INVALID_CURSOR = target("INVALID_CURSOR", "The page position is not valid");
+    public static final Message INVALID_UNMASK_FIELD = target("INVALID_UNMASK_FIELD", "Name one or more of these fields to unmask: {fields}");
 
     // Bill Pay (COBIL00C).
     public static final Message ACCT_ID_REQUIRED = error("ACCT_ID_REQUIRED", "Acct ID can NOT be empty...", "VAL-BILL-001");
@@ -79,7 +86,8 @@ public final class MessageCatalog {
 
     private static final Map<String, Message> BY_KEY = index(List.of(
             UNAUTHENTICATED, ACCESS_DENIED, CSRF_REJECTED, INVALID_REQUEST, NOT_FOUND, METHOD_NOT_ALLOWED, INTERNAL_ERROR,
-            INVALID_KEY,
+            INVALID_KEY, RECORD_CHANGED, PRECONDITION_REQUIRED, INVALID_IF_MATCH, INVALID_PAGE_REQUEST, INVALID_PAGE_SIZE,
+            INVALID_CURSOR, INVALID_UNMASK_FIELD,
             ACCT_ID_REQUIRED, ACCOUNT_NOT_FOUND, ACCOUNT_LOOKUP_FAILED, CONFIRM_PAYMENT, NOTHING_TO_PAY, INVALID_CONFIRM,
             XREF_LOOKUP_FAILED, TRAN_LOOKUP_FAILED, TRAN_ID_EXISTS, TRAN_ADD_FAILED, ACCOUNT_UPDATE_FAILED,
             PAYMENT_SUCCESSFUL, IDEMPOTENCY_KEY_REQUIRED, IDEMPOTENCY_KEY_REUSED, BATCH_WINDOW,

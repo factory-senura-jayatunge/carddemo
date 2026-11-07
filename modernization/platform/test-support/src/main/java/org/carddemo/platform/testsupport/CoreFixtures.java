@@ -12,7 +12,7 @@ public final class CoreFixtures {
 
     private static final String[] DELETE_ORDER = {
         "billpay.payment", "core.[transaction]", "core.tcat_bal", "core.card_xref", "core.card", "core.customer",
-        "core.account", "ops.batch_window",
+        "core.account", "ops.batch_window", "ops.audit",
     };
 
     private final JdbcClient jdbc;
