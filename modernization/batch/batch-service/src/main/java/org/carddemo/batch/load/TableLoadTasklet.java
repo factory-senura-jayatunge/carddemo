@@ -4,7 +4,10 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.function.UnaryOperator;
 
+import org.carddemo.batch.BatchSwitches;
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.platform.fidelity.FidelityMode;
+import org.carddemo.platform.fidelity.FidelitySwitches;
 import org.carddemo.platform.legacyformat.LegacyTimestamps;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader.SourceLine;
 import org.carddemo.platform.legacyformat.record.RecordLayout;
@@ -28,13 +31,19 @@ abstract class TableLoadTasklet implements Tasklet {
     private static final Logger log = LoggerFactory.getLogger(TableLoadTasklet.class);
 
     protected final JdbcClient db;
-    protected final CoreRows rows;
     private final DataLoadProperties properties;
+    private final FidelitySwitches switches;
+    protected CoreRows rows;
 
-    TableLoadTasklet(JdbcClient db, DataLoadProperties properties) {
+    TableLoadTasklet(JdbcClient db, DataLoadProperties properties, FidelitySwitches switches) {
         this.db = db;
-        this.rows = new CoreRows(db);
         this.properties = properties;
+        this.switches = switches;
+    }
+
+    /** The mode of DEF-ACUP-002 for this run, read when the step starts. */
+    FidelityMode groupIdMode() {
+        return switches.mode(BatchSwitches.DEF_ACUP_002);
     }
 
     abstract String stepName();
@@ -62,6 +71,7 @@ abstract class TableLoadTasklet implements Tasklet {
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
+        rows = new CoreRows(db, groupIdMode());
         SourceFile file = SourceFile.read(sourceDir(), fileName(), layout());
         file.requireAscendingKeys(keyLength(), keyDisplay());
         file.requireRepresentable();

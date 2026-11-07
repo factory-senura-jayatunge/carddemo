@@ -19,6 +19,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.legacyformat.Masking;
 import org.carddemo.platform.legacyformat.entity.UserSecurityRecord;
 import org.carddemo.platform.legacyformat.layout.Layouts;
@@ -45,16 +46,24 @@ public final class DataReconciliation {
     private final JdbcClient db;
     private final Path sourceDir;
     private final Path usersJcl;
+    private final GroupIdMode groupIdMode;
 
-    public DataReconciliation(JdbcClient db, Path sourceDir, Path usersJcl) {
+    public DataReconciliation(JdbcClient db, Path sourceDir, Path usersJcl, FidelityMode groupIdMode) {
+        this(db, sourceDir, usersJcl, new GroupIdMode(groupIdMode, "given"));
+    }
+
+    DataReconciliation(JdbcClient db, Path sourceDir, Path usersJcl, GroupIdMode groupIdMode) {
         this.db = db;
         this.sourceDir = sourceDir;
         this.usersJcl = usersJcl;
+        this.groupIdMode = groupIdMode;
     }
 
     public Report run() {
         Report report = new Report();
-        CoreRows rows = new CoreRows(db);
+        // An account loaded in the other mode re-exports differently, so a wrong mode fails core.account.
+        report.info("DEF-ACUP-002", groupIdMode.describe());
+        CoreRows rows = new CoreRows(db, groupIdMode.mode());
         for (CoreTable t : CoreTable.ALL) {
             table(report, t, rows);
         }

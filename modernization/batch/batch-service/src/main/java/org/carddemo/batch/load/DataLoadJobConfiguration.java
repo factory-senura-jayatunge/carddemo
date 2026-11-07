@@ -1,5 +1,6 @@
 package org.carddemo.batch.load;
 
+import org.carddemo.platform.fidelity.FidelitySwitches;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.job.parameters.RunIdIncrementer;
@@ -25,15 +26,15 @@ class DataLoadJobConfiguration {
 
     @Bean
     Job dataLoadJob(JobRepository jobRepository, PlatformTransactionManager tx, JdbcClient db,
-            DataLoadProperties properties) {
+            DataLoadProperties properties, FidelitySwitches switches) {
         return new JobBuilder(JOB_NAME, jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .start(step("clearCoreTables", new ClearCoreTablesTasklet(db, properties), jobRepository, tx))
-                .next(step(new CoreTableLoaders.Accounts(db, properties), jobRepository, tx))
-                .next(step(new CoreTableLoaders.Customers(db, properties), jobRepository, tx))
-                .next(step(new CoreTableLoaders.Cards(db, properties), jobRepository, tx))
-                .next(step(new CoreTableLoaders.CardXrefs(db, properties), jobRepository, tx))
-                .next(step(new CoreTableLoaders.CategoryBalances(db, properties), jobRepository, tx))
+                .next(step(new CoreTableLoaders.Accounts(db, properties, switches), jobRepository, tx))
+                .next(step(new CoreTableLoaders.Customers(db, properties, switches), jobRepository, tx))
+                .next(step(new CoreTableLoaders.Cards(db, properties, switches), jobRepository, tx))
+                .next(step(new CoreTableLoaders.CardXrefs(db, properties, switches), jobRepository, tx))
+                .next(step(new CoreTableLoaders.CategoryBalances(db, properties, switches), jobRepository, tx))
                 .next(step("restartTranIdSequence", new RestartTranIdSequenceTasklet(db), jobRepository, tx))
                 .build();
     }

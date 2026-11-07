@@ -4,6 +4,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 
+import org.carddemo.platform.fidelity.FidelityMode;
+import org.carddemo.platform.fidelity.FidelitySwitches;
 import org.carddemo.platform.legacyformat.Masking;
 import org.carddemo.platform.legacyformat.entity.AccountRecord;
 import org.carddemo.platform.legacyformat.entity.CardRecord;
@@ -21,10 +23,10 @@ final class CoreTableLoaders {
     private CoreTableLoaders() {
     }
 
-    /** ACCTDATA (JACCT) into core.account, with D-11. */
+    /** ACCTDATA (JACCT) into core.account, with DEF-ACUP-002 (D-11). */
     static final class Accounts extends TableLoadTasklet {
-        Accounts(JdbcClient db, DataLoadProperties p) {
-            super(db, p);
+        Accounts(JdbcClient db, DataLoadProperties p, FidelitySwitches s) {
+            super(db, p, s);
         }
 
         @Override String stepName() { return "loadAccounts"; }
@@ -36,9 +38,9 @@ final class CoreTableLoaders {
         @Override
         void insert(SourceFile file, SourceLine line) {
             AccountRecord a = file.convert(line, AccountRecord::parse);
-            // D-11 moves the value at the ZIP position to group_id; a value at the
-            // group position as well would have nowhere to go.
-            if (!a.groupId().isBlank()) {
+            // Fixed mode moves the value at the ZIP position to group_id; a value at
+            // the group position as well would have nowhere to go. Legacy mode stores both as read.
+            if (groupIdMode() == FidelityMode.FIXED && !a.groupId().isBlank()) {
                 throw new DataLoadException(file.where(line) + ": ACCT-GROUP-ID is not blank; D-11 expects the"
                         + " group ID at the ZIP position only");
             }
@@ -51,8 +53,8 @@ final class CoreTableLoaders {
 
     /** CUSTDATA (JCUST) into core.customer. */
     static final class Customers extends TableLoadTasklet {
-        Customers(JdbcClient db, DataLoadProperties p) {
-            super(db, p);
+        Customers(JdbcClient db, DataLoadProperties p, FidelitySwitches s) {
+            super(db, p, s);
         }
 
         @Override String stepName() { return "loadCustomers"; }
@@ -71,8 +73,8 @@ final class CoreTableLoaders {
 
     /** CARDDATA (JCARD) into core.card. */
     static final class Cards extends TableLoadTasklet {
-        Cards(JdbcClient db, DataLoadProperties p) {
-            super(db, p);
+        Cards(JdbcClient db, DataLoadProperties p, FidelitySwitches s) {
+            super(db, p, s);
         }
 
         @Override String stepName() { return "loadCards"; }
@@ -98,8 +100,8 @@ final class CoreTableLoaders {
         private Set<String> accounts = Set.of();
         private Set<String> customers = Set.of();
 
-        CardXrefs(JdbcClient db, DataLoadProperties p) {
-            super(db, p);
+        CardXrefs(JdbcClient db, DataLoadProperties p, FidelitySwitches s) {
+            super(db, p, s);
         }
 
         @Override String stepName() { return "loadCardXref"; }
@@ -135,8 +137,8 @@ final class CoreTableLoaders {
     static final class CategoryBalances extends TableLoadTasklet {
         private Set<String> accounts = Set.of();
 
-        CategoryBalances(JdbcClient db, DataLoadProperties p) {
-            super(db, p);
+        CategoryBalances(JdbcClient db, DataLoadProperties p, FidelitySwitches s) {
+            super(db, p, s);
         }
 
         @Override String stepName() { return "loadCategoryBalances"; }
