@@ -2,13 +2,15 @@
 """Create or complete modernization/.env from .env.example.
 
 Copies the example when .env is missing, adds keys that the example has and
-.env lacks, and fills every empty *_PASSWORD / *_PASS value with a random
-password (CARDDEMO_SEED_USER_PASSWORD: 8 upper-case letters and digits).
+.env lacks, and fills every empty *_PASSWORD, *_PASS, *_SECRET and *_TOKEN
+value with a random one (CARDDEMO_SEED_USER_PASSWORD: 8 upper-case letters
+and digits; AIRFLOW_FERNET_KEY: a Fernet key).
 Existing values are never changed, and no value is printed.
 
 Usage: init_env.py EXAMPLE ENV
 """
 
+import base64
 import os
 import re
 import secrets
@@ -16,7 +18,7 @@ import string
 import sys
 
 KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
-SECRET_RE = re.compile(r"_(PASSWORD|PASS)$")
+SECRET_RE = re.compile(r"_(PASSWORD|PASS|SECRET|TOKEN)$")
 ALPHABET = string.ascii_letters + string.digits
 
 
@@ -40,7 +42,13 @@ def seed_password() -> str:
             return value
 
 
-GENERATORS = {"CARDDEMO_SEED_USER_PASSWORD": seed_password}
+def fernet_key() -> str:
+    # What cryptography's Fernet.generate_key() returns: 32 random bytes,
+    # URL-safe base64.
+    return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+
+
+GENERATORS = {"CARDDEMO_SEED_USER_PASSWORD": seed_password, "AIRFLOW_FERNET_KEY": fernet_key}
 
 
 def main(argv: list) -> int:
@@ -69,7 +77,7 @@ def main(argv: list) -> int:
     filled = []
     for i, line in enumerate(lines):
         m = KEY_RE.match(line)
-        if m and SECRET_RE.search(m.group(1)) and not m.group(2).strip():
+        if m and (SECRET_RE.search(m.group(1)) or m.group(1) in GENERATORS) and not m.group(2).strip():
             lines[i] = f"{m.group(1)}={GENERATORS.get(m.group(1), password)()}"
             filled.append(m.group(1))
 

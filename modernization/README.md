@@ -17,15 +17,14 @@ Run every command from the repository root with `make -C modernization <target>`
 | Airflow venv | Airflow 3.x | See below | See below |
 | Python | 3 | Comes with the Xcode command line tools | `python3` |
 
-The Airflow virtual environment lives outside the repository, by default in `~/.venvs/carddemo-airflow` (set `AIRFLOW_VENV` to use another one). The tested setup is Airflow 3.3.2 on Python 3.14 with the official constraints:
+The Airflow virtual environment lives outside the repository, by default in `~/.venvs/carddemo-airflow` (set `AIRFLOW_VENV` to use another one). The tested setup is Airflow 3.3.2 on Python 3.14. Create the venv once; `make setup` (`scripts/airflow_venv.sh`) then installs `airflow/requirements.txt` with the official constraints file kept next to it (`airflow/constraints-3.3.2-py3.14.txt`) and the `carddemo_airflow` package in editable mode. Requirements that are already satisfied need no network.
 
 ```sh
 python3.14 -m venv ~/.venvs/carddemo-airflow
-~/.venvs/carddemo-airflow/bin/pip install "apache-airflow==3.3.2" \
-  --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.14.txt
+make -C modernization setup
 ```
 
-The Airflow work in Phase 3 adds the Postgres driver and the DAGs.
+A venv on another Python fails `setup` until a `constraints-3.3.2-py<version>.txt` for that Python is added (from the `constraints-3.3.2` branch of `github.com/apache/airflow`).
 
 ## Quick start
 
@@ -77,9 +76,12 @@ Other targets:
 | `account-service`, `transaction-service`, `reference-service`, `authorization-service`, `inquiry-service` | 28083 to 28087 | their module exists | the same pattern (384, 384, 256, 384, 256 MiB) |
 | `web` (Vite) | 25173 | `web/package.json` exists | `npm run dev` in `web/` |
 | `batch-service` | 28090 | not started by `up`; `load` runs `dataLoadJob` one-shot (server mode comes with the cycle jobs) | |
-| Airflow API server | 28080 | arrives with the batch work | |
+| `airflow-api-server` | 28080 | `airflow/dags/` exists | `airflow api-server` from `AIRFLOW_VENV`: UI, REST API and the task execution API; its health endpoint `/api/v2/monitor/health` reports for all four Airflow processes |
+| `airflow-scheduler` | | the same | `airflow scheduler --skip-serve-logs` (LocalExecutor, parallelism 4) |
+| `airflow-dag-processor` | | the same | `airflow dag-processor` (one parsing process) |
+| `airflow-triggerer` | | the same | `airflow triggerer --skip-serve-logs`: the deferred waits for batch-service job executions |
 
-A component whose module exists but has no jar (or no `node_modules`) fails `up` with the reason; one whose module does not exist yet is skipped. Health is `GET /actuator/health` for the services and `GET /` for Vite. Every process gets the values of the shared `.env` in its environment (the environment wins), and `CARDDEMO_LEDGER_DIR` set to this checkout's `ledger/`. PIDs are in `$CARDDEMO_VAR_DIR/run/<name>.pid`, logs in `$CARDDEMO_VAR_DIR/log/<name>.log`; both are machine-wide, so a second `up` from another worktree reports the running processes instead of starting copies. `CARDDEMO_SPRING_PROFILE` overrides `demo`.
+`up ONLY=airflow` starts only the four Airflow processes. Before they start, `up` runs `airflow db migrate` and `airflow pools import airflow/pools.json` (log: `$CARDDEMO_VAR_DIR/log/airflow-prepare.log`). A component whose module exists but has no jar (or no `node_modules`) fails `up` with the reason; one whose module does not exist yet is skipped. Health is `GET /actuator/health` for the services and `GET /` for Vite. Every process gets the values of the shared `.env` in its environment (the environment wins), and `CARDDEMO_LEDGER_DIR` set to this checkout's `ledger/`. PIDs are in `$CARDDEMO_VAR_DIR/run/<name>.pid`, logs in `$CARDDEMO_VAR_DIR/log/<name>.log`; both are machine-wide, so a second `up` from another worktree reports the running processes instead of starting copies. `CARDDEMO_SPRING_PROFILE` overrides `demo`.
 
 ### Protecting the shared containers
 
@@ -88,6 +90,32 @@ The containers are shared by every checkout, so the targets that would interrupt
 - `up` and `infra-up` first do a compose dry run. If it would recreate (restart) a running container, for example after a change to `docker-compose.yml` or `.env`, they stop with `would RECREATE (restart) running shared container(s): ...` and change nothing. `RECREATE=1` lets them go ahead, with a warning.
 - `down` and `infra-down` print which shared containers they stop, and refuse while a heavy target holds the heavy lock; `FORCE=1` overrides.
 - `infra-wipe` needs `CONFIRM=1`.
+## Airflow
+
+Airflow 3 orchestrates the batch jobs; it holds no business rule. The DAGs in `airflow/dags/` import only Airflow and the `carddemo_airflow` package (`airflow/carddemo_airflow/`), whose operators call batch-service's internal API (`/internal/*` on `127.0.0.1:28090`, bearer `CARDDEMO_BATCH_INTERNAL_TOKEN`): register the cycle, open and close the global batch window, launch a job and wait for it in the triggerer. File paths never travel in a request; batch-service resolves them.
+
+| Setting | Value |
+|:--|:--|
+| `AIRFLOW_HOME` | `$CARDDEMO_VAR_DIR/airflow` (shared by every checkout); task logs in `$CARDDEMO_VAR_DIR/log/airflow/` |
+| Metadata | the `airflow-db` Postgres container (`AIRFLOW_DB_*`) |
+| Executor | LocalExecutor; DAGs are paused when they are created, and none catches up |
+| Sign-on | `http://127.0.0.1:28080`, user `AIRFLOW_ADMIN_USER` with `AIRFLOW_ADMIN_PASSWORD` from `.env` (simple auth manager) |
+| Pool | `carddemo_batch`, 1 slot, deferred waits included: one data-changing job at a time |
+
+| DAG | Schedule | Tasks |
+|:--|:--|:--|
+| `carddemo_daily_cycle` | `@daily` | `register_cycle`, `open_batch_window`, [`purge_pending_authorizations_before_posting`], `archive_master`, `ingest_daily_file`, `post_daily_transactions`, `calculate_interest` (when the cycle charges interest), `generate_statements`, `apply_retention`, `close_batch_window`, [`purge_pending_authorizations`]. Params `businessDate`, `interest` (`always`, `month_end`, `never`), `statements`, `purge_position`. |
+| `carddemo_data_load` | manual | `open_batch_window`, `load` (`dataLoadJob`), `close_batch_window`. The reconciliation is not a job: run `verify-data` afterwards. |
+| `carddemo_reference_refresh` | Saturdays 06:00 | transaction types (only when the inbound file was delivered), disclosure groups |
+| `carddemo_transaction_report` | manual (requested online) | the report for a date range |
+| `carddemo_export_masters`, `carddemo_import_migration`, `carddemo_category_balance_listing` | manual | one job each |
+
+A failed task stops the run and leaves the batch window open, so the online services keep refusing writes until an operator has recovered. Retries are off for the tasks that change data. The recovery targets `batch-window-close` and `cycle-rerun CYCLE=<id>` (architecture, make targets) arrive with batch-service's server mode.
+
+To run the cycle for the sample day, unpause `carddemo_daily_cycle` in the UI and trigger it with the parameters `businessDate` 2022-07-06 and `interest` as wanted. Unpausing a DAG without catch-up at once creates a scheduled run for the latest interval as well; with `max_active_runs=1` the two run one after the other.
+
+On a laptop, keep the machine awake during a run (`caffeinate -i`, or on mains power): while macOS sleeps, every Airflow process and batch-service stop, so a task looks "running" for as long as the sleep lasts and carries on after the wake.
+
 ## Verification targets
 
 A target whose work has not landed fails with the phase that delivers it. A target whose script or module is missing in the checkout (for example `web/` before the front end is merged) fails with `no modernization/<path> in this checkout`. "Heavy" means it runs Maven verify, Vitest or Playwright, or needs the running stack or Testcontainers; it takes the heavy lock (below), so two never run at the same time on one machine. Run these commands through the make targets, or through `scripts/heavy.py <name> <command>`, rather than directly.
@@ -102,7 +130,7 @@ A target whose work has not landed fails with the phase that delivers it. A targ
 | `verify-harness` | Self-test of the differential harness | No | Phase 3, batch |
 | `verify-data` | Builds `verify/data` and compares each loaded core table with its file in `app/data/ASCII` (row count, keys, control totals, byte-exact re-export), then the relations and the `DUSRSECJ` users against `iam.app_user`. One line per check; it reads as the admin login and prints keys and field names only, never values. Run it after `db-reset load up`. | No (one JVM) | Done |
 | `verify-cycle` | The full batch cycle through Airflow | Yes | Phase 3, Airflow |
-| `test-airflow` | DAG integrity and task order | No | Phase 3, Airflow |
+| `test-airflow` | pytest in the Airflow venv, without a running Airflow (`airflow/tests/`): DagBag import, the expected DAGs, task order, trigger rules, parameters, pool and retries, the DAG import rule, the operators and the trigger against a stub batch-service, then whole DAG runs with `dag.test()` (SQLite metadata, real XCom) for cycles with and without interest, statements, purge position, a failed job and the data load. JUnit in `build/test-results/airflow/`. | No | Done |
 | `web-build` | Exports the message catalogue (`MessageCatalogTest` writes `platform/web-support/target/messages.json`, passed as `CARDDEMO_MESSAGES_JSON` so the catalogue check runs instead of skipping), then `npm ci` and `npm run verify` in `web/`: API client, tsc, ESLint, Vitest, vite build, bundle budget | Yes (Maven test, Vitest) | Done |
 | `test-e2e` | Playwright against the running stack (`make up` first, `CARDDEMO_E2E_TARGET=stack`); Chromium, or the projects in `E2E_BROWSERS` | Yes | Done |
 | `trace` | Rule-to-test traceability matrix and its gate (`verify/trace/trace_matrix.py`, Python 3.11 or newer) | No | Done |
@@ -209,7 +237,7 @@ Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `ver
 | `backend` | `test-backend` (Testcontainers) | |
 | `billpay` | `test-billpay` (skipped until `load` lands, because its stack step needs data) | |
 | `web` | `web-build` | `backend` (runs when it was skipped, not when it failed) |
-| `airflow` | `test-airflow` | |
+| `airflow` | `test-airflow`, in a venv cached on the hash of `airflow/requirements.txt`, the constraints file and `pyproject.toml` | |
 | `batch` | `verify-harness verify-batch` | `spec` |
 | `data` | `db-reset load up verify-data ONLY=identity-service` (identity-service seeds the users that `verify-data` checks) | |
 | `e2e` | `db-reset load up test-e2e` (Chromium; nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |

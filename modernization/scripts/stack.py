@@ -3,7 +3,8 @@
 
 The compose project (SQL Server, RabbitMQ, Airflow's Postgres) is shared by
 every checkout on the machine. The application processes run on the host:
-each converted service from its executable jar, and the Vite dev server.
+each converted service from its executable jar, Airflow's four processes
+from the Airflow venv, and the Vite dev server.
 A component that has not been converted yet (its directory does not exist)
 is skipped; one that exists but is not built fails, so a missing piece never
 looks like a pass.
@@ -12,6 +13,7 @@ PIDs go to $CARDDEMO_VAR_DIR/run/<name>.pid, logs to $CARDDEMO_VAR_DIR/log/.
 Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 
 Usage: stack.py infra-up | infra-down | up [--only NAME,...] | stop | down | status
+       (--only airflow means the four Airflow processes)
        stack.py ensure-infra TARGET   (infra-up for another target; prints only on failure)
 """
 
@@ -22,8 +24,10 @@ import signal
 import socket
 import subprocess
 import sys
+import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -53,6 +57,23 @@ JVM_SERVICES = [
 ]
 SPRING_PROFILE = os.environ.get("CARDDEMO_SPRING_PROFILE", "demo")
 
+# Airflow (architecture: batch.md, repo-build-ci.md): four processes from the
+# host venv, LocalExecutor, metadata in the compose Postgres. All four report
+# through the API server's health endpoint.
+AIRFLOW_PORT = 28080
+AIRFLOW_URL = f"http://127.0.0.1:{AIRFLOW_PORT}"
+AIRFLOW_HEALTH = f"{AIRFLOW_URL}/api/v2/monitor/health"
+# --skip-serve-logs: Airflow's log servers bind every interface, and on one
+# host the API server reads the task logs from the files directly.
+AIRFLOW_PROCESSES = [
+    ("airflow-api-server", ["api-server"], AIRFLOW_PORT, "metadatabase"),
+    ("airflow-scheduler", ["scheduler", "--skip-serve-logs"], None, "scheduler"),
+    ("airflow-dag-processor", ["dag-processor"], None, "dag_processor"),
+    ("airflow-triggerer", ["triggerer", "--skip-serve-logs"], None, "triggerer"),
+]
+AIRFLOW_SECRETS = ("AIRFLOW_DB_PASSWORD", "AIRFLOW_ADMIN_PASSWORD", "AIRFLOW_API_JWT_SECRET",
+                   "AIRFLOW_API_SECRET", "AIRFLOW_FERNET_KEY", "CARDDEMO_BATCH_INTERNAL_TOKEN")
+
 
 def service_args(name: str) -> list:
     # identity-service reads its signing key from CARDDEMO_JWT_KEY_FILE,
@@ -69,9 +90,21 @@ def say(status: str, name: str, detail: str) -> None:
 class Component:
     """One host process; `problem` says why a converted one can't start."""
 
-    def __init__(self, name, port, cwd, argv, health_url, marker, problem=None):
+    def __init__(self, name, port, cwd, argv, health_url, marker, problem=None, health_key=None):
         self.name, self.port, self.cwd, self.argv = name, port, cwd, argv
         self.health_url, self.marker, self.problem = health_url, marker, problem
+        # Set for the Airflow processes: the part of the health answer
+        # (scheduler, triggerer, ...) that must say "healthy".
+        self.health_key = health_key
+
+    @property
+    def is_airflow(self):
+        return self.health_key is not None
+
+    @property
+    def where(self):
+        return f"port {self.port}" if self.port else "no port"
+
 
     @property
     def pid_file(self):
@@ -104,6 +137,108 @@ def find_jar(module_dir: str, artifact: str):
     return jars[-1] if jars else None
 
 
+def airflow_venv() -> str:
+    return (os.environ.get("AIRFLOW_VENV") or read_env(ENV_FILE).get("AIRFLOW_VENV")
+            or os.path.join(os.path.expanduser("~"), ".venvs", "carddemo-airflow"))
+
+
+def airflow_components() -> list:
+    """The four Airflow processes, when this checkout has DAGs."""
+    airflow_dir = os.path.join(HERE, "airflow")
+    if not os.path.isdir(os.path.join(airflow_dir, "dags")):
+        return []
+    airflow = os.path.join(airflow_venv(), "bin", "airflow")
+    problem = None
+    if not os.access(airflow, os.X_OK):
+        problem = f"no {airflow}; see README.md, Prerequisites (AIRFLOW_VENV)"
+    else:
+        env = read_env(ENV_FILE)
+        missing = [k for k in AIRFLOW_SECRETS if not (os.environ.get(k) or env.get(k))]
+        if missing:
+            problem = f"{', '.join(missing)} not set in {ENV_FILE}; run make setup"
+    return [Component(name, port, airflow_dir, [airflow, *args], AIRFLOW_HEALTH, f"airflow {args[0]}",
+                      problem, health_key=key)
+            for name, args, port, key in AIRFLOW_PROCESSES]
+
+
+def airflow_env(base: dict) -> dict:
+    """The environment of the Airflow processes: home, logs and DAGs under
+    the shared var directory and this checkout, metadata in the compose
+    Postgres, and the shared secrets, so all four processes agree. An
+    AIRFLOW__* variable already in the environment wins."""
+    env = dict(base)
+    home = os.path.join(VAR_DIR, "airflow")
+    db = "postgresql+psycopg2://{}:{}@127.0.0.1:{}/{}".format(
+        urllib.parse.quote(env.get("AIRFLOW_DB_USER", "airflow"), safe=""),
+        urllib.parse.quote(env.get("AIRFLOW_DB_PASSWORD", ""), safe=""),
+        env.get("AIRFLOW_DB_HOST_PORT", "25432"),
+        urllib.parse.quote(env.get("AIRFLOW_DB_NAME", "airflow"), safe=""))
+    settings = {
+        "AIRFLOW__CORE__DAGS_FOLDER": os.path.join(HERE, "airflow", "dags"),
+        "AIRFLOW__CORE__LOAD_EXAMPLES": "False",
+        "AIRFLOW__CORE__EXECUTOR": "LocalExecutor",
+        "AIRFLOW__CORE__PARALLELISM": "4",
+        # The cycle changes data: a DAG runs only after someone unpauses it.
+        "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION": "True",
+        "AIRFLOW__CORE__FERNET_KEY": env.get("AIRFLOW_FERNET_KEY", ""),
+        "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS": f"{env.get('AIRFLOW_ADMIN_USER', 'admin')}:admin",
+        "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE": os.path.join(home, "passwords.json"),
+        "AIRFLOW__CORE__EXECUTION_API_SERVER_URL": f"{AIRFLOW_URL}/execution/",
+        "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN": db,
+        "AIRFLOW__API__HOST": "127.0.0.1",
+        "AIRFLOW__API__PORT": str(AIRFLOW_PORT),
+        "AIRFLOW__API__WORKERS": "1",
+        "AIRFLOW__API__BASE_URL": AIRFLOW_URL,
+        "AIRFLOW__API__SECRET_KEY": env.get("AIRFLOW_API_SECRET", ""),
+        "AIRFLOW__API_AUTH__JWT_SECRET": env.get("AIRFLOW_API_JWT_SECRET", ""),
+        "AIRFLOW__DAG_PROCESSOR__PARSING_PROCESSES": "1",
+        "AIRFLOW__LOGGING__BASE_LOG_FOLDER": os.path.join(LOG_DIR, "airflow"),
+    }
+    for key, value in settings.items():
+        if key not in os.environ:
+            env[key] = value
+    if sys.platform == "darwin":
+        # The DAG processor and the triggerer fork without exec; Apple's
+        # frameworks then abort (Objective-C fork safety) or crash in the
+        # system proxy lookup unless a proxy variable is set.
+        env.setdefault("OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+        env.setdefault("no_proxy", "127.0.0.1,localhost")
+    env["AIRFLOW_HOME"] = home
+    env["CARDDEMO_VAR_DIR"] = VAR_DIR
+    # This checkout's operators, also when the venv's editable install points
+    # at another checkout.
+    env["PYTHONPATH"] = os.pathsep.join(p for p in (os.path.join(HERE, "airflow"), env.get("PYTHONPATH")) if p)
+    return env
+
+
+def prepare_airflow(env: dict):
+    """Migrates the metadata database, writes the admin password file and
+    imports the pools before the processes start; returns an error or None."""
+    home = env["AIRFLOW_HOME"]
+    os.makedirs(home, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
+    passwords = env["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE"]
+    fd = os.open(passwords, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump({env.get("AIRFLOW_ADMIN_USER", "admin"): env.get("AIRFLOW_ADMIN_PASSWORD", "")}, f)
+    os.chmod(passwords, 0o600)
+    airflow = os.path.join(airflow_venv(), "bin", "airflow")
+    log_path = os.path.join(LOG_DIR, "airflow-prepare.log")
+    steps = [("db migrate", [airflow, "db", "migrate"]),
+             ("pools import", [airflow, "pools", "import", os.path.join(HERE, "airflow", "pools.json")])]
+    with open(log_path, "ab") as log:
+        for what, argv in steps:
+            log.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} airflow {what}\n".encode())
+            log.flush()
+            try:
+                rc = subprocess.run(argv, cwd=os.path.join(HERE, "airflow"), env=env, stdin=subprocess.DEVNULL,
+                                    stdout=log, stderr=subprocess.STDOUT, timeout=UP_TIMEOUT).returncode
+            except subprocess.TimeoutExpired:
+                return f"airflow {what} took over {UP_TIMEOUT} s; see {log_path}"
+            if rc != 0:
+                return f"airflow {what} failed; see {log_path}"
+    return None
+
 def components() -> list:
     """Every component whose source exists, in start order."""
     found = []
@@ -122,6 +257,7 @@ def components() -> list:
             problem = f"not built: no {rel}/target/{name}-*-exec.jar (run make build)"
         found.append(Component(name, port, module, argv,
                                f"http://127.0.0.1:{port}{HEALTH_PATH}", jar or name, problem))
+    found.extend(airflow_components())
     web = os.path.join(HERE, "web")
     if os.path.exists(os.path.join(web, "package.json")):
         problem = None
@@ -165,15 +301,27 @@ def alive(pid, marker) -> bool:
     return marker == "vite" and "npm" in out
 
 
-def healthy(url) -> bool:
+def healthy(url, key=None) -> bool:
+    """2xx from url; with key, also {key: {"status": "healthy"}} in the JSON."""
     try:
         with urllib.request.urlopen(url, timeout=3) as r:
-            return 200 <= r.status < 300
-    except (urllib.error.URLError, OSError, ValueError):
+            if not 200 <= r.status < 300:
+                return False
+            if key is None:
+                return True
+            part = json.loads(r.read()).get(key) or {}
+            return part.get("status") == "healthy"
+    except (urllib.error.URLError, OSError, ValueError, AttributeError):
         return False
 
 
+def comp_healthy(c) -> bool:
+    return healthy(c.health_url, c.health_key)
+
+
 def port_busy(port) -> bool:
+    if not port:
+        return False
     with socket.socket() as s:
         s.settimeout(0.5)
         return s.connect_ex(("127.0.0.1", port)) == 0
@@ -352,6 +500,8 @@ def up(only) -> int:
     if infra_up("up") != 0:
         return 1
     comps = components()
+    if "airflow" in only:
+        only = (only - {"airflow"}) | {name for name, *_ in AIRFLOW_PROCESSES}
     if only:
         unknown = only - {c.name for c in comps}
         if unknown:
@@ -367,13 +517,24 @@ def up(only) -> int:
             say("FAIL", c.name, c.problem)
             failures.append(c.name)
     env = child_env()
+    af_env = airflow_env(env)
+    to_start = [c for c in comps if c.is_airflow and not c.problem and not alive(*read_pid_marker(c.name))]
+    if to_start:
+        say("..", "airflow", "db migrate and pools import (first run: about a minute)")
+        error = prepare_airflow(af_env)
+        if error:
+            for c in comps:
+                if c.is_airflow and not c.problem:
+                    c.problem = error
+                    say("FAIL", c.name, error)
+                    failures.append(c.name)
     waiting = []
     for c in comps:
         if c.problem:
             continue
-        result = start(c, env)
+        result = start(c, af_env if c.is_airflow else env)
         if result in ("started", "running") or result.startswith("running from"):
-            say("..", c.name, f"{result}, port {c.port}, log {c.log_file}")
+            say("..", c.name, f"{result}, {c.where}, log {c.log_file}")
             waiting.append(c)
         else:
             say("FAIL", c.name, result)
@@ -381,8 +542,8 @@ def up(only) -> int:
     deadline = time.time() + UP_TIMEOUT
     while waiting and time.time() < deadline:
         for c in list(waiting):
-            if healthy(c.health_url):
-                say("ok", c.name, f"healthy at {c.health_url}")
+            if comp_healthy(c):
+                say("ok", c.name, f"healthy at {c.health_url}" + (f" ({c.health_key})" if c.health_key else ""))
                 waiting.remove(c)
             elif not alive(*read_pid_marker(c.name)):
                 say("FAIL", c.name, f"exited during start; last lines of {c.log_file}:")
@@ -458,11 +619,12 @@ def status() -> int:
         c = comps.get(name)
         pid, marker = pids.get(name, (None, c.marker if c else ""))
         if alive(pid, marker):
-            if c and not healthy(c.health_url):
-                say("FAIL", name, f"pid {pid} running but not healthy at {c.health_url}")
+            if c and not comp_healthy(c):
+                say("FAIL", name, f"pid {pid} running but not healthy at {c.health_url}"
+                    + (f" ({c.health_key})" if c.health_key else ""))
                 problems.append(name)
             else:
-                say("ok", name, f"pid {pid}" + (f", port {c.port}" if c else ""))
+                say("ok", name, f"pid {pid}" + (f", {c.where}" if c else ""))
         elif name in pids:
             say("FAIL", name, f"recorded pid {pid} is gone; see {os.path.join(LOG_DIR, name + '.log')}")
             problems.append(name)
