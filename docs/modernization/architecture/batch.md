@@ -146,9 +146,20 @@ All DAGs that change data share the Airflow pool `carddemo_batch` with one slot,
 | `postDailyTransactionsJob` | Resumes after the last committed chunk. Each chunk commits the account, category balance, transaction and reject rows together with the reader position, so no record is half applied (fixes DEF-POST-008 by construction). | Refused: same `cycleId` is a completed job instance. A deliberate rerun restores the snapshot taken before the step (`batch.snapshot_account`, `batch.snapshot_tcat_bal`) through `make -C modernization cycle-rerun CYCLE=<id>`, which replaces the runbook restore. |
 | `calculateInterestJob` | Resumes at the next account; interest rows and the account update of one account commit together (DEF-INTC-009). | Refused; legacy reruns charge interest twice (DEF-INTC-005), an architecture-dependent item. |
 | `archiveMasterJob` | One statement; rerun is a no-op. | No-op. |
-| `statementJob`, `transactionReportJob`, `categoryBalanceListingJob` | Rerun from the start; outputs go to a temporary folder renamed on success, as z/OS deletes outputs on abend (ERR-STMT-008). | Allowed; a new run folder. |
+| `statementJob`, `transactionReportJob`, `categoryBalanceListingJob` | Rerun from the start; outputs go to a temporary folder renamed on success, as z/OS deletes outputs on abend (ERR-STMT-008). | Same `runId`: refused (`409 JOB_INSTANCE_COMPLETE`). New `runId`: allowed, with a new run folder per `runId`. |
 | `purgePendingAuthorizationsJob` | Resumes after the last chunk; deleted rows stay deleted. | Allowed; nothing left to purge. |
 | `dataLoadJob` steps | Each step truncates and loads in one transaction. | Allowed only inside a batch window. |
+
+**Operator retry contract** (between `SpringBatchJobOperator` and `batch-service`, [api-security.md](api-security.md#batch-service-internal)):
+
+- **Job identity.** Cycle jobs are identified by `cycleId` and `businessDate`. Jobs that may run again for the same cycle add `runId`: `statementJob`, `transactionReportJob` (the `batch.report_run` ID), `categoryBalanceListingJob`, and the non-cycle `dataLoadJob` and reference jobs. In the daily DAG, `runId` defaults to the `cycleId`, so a DAG retry finds the completed instance; an operator rerun passes a new `runId` and writes a new run folder.
+- **Responses.** A launch answers `202 {executionId}`. A `409` problem carries `code`, `jobName`, `executionId`, `executionStatus`, `exitStatus` and `rejectCount`:
+  - `JOB_EXECUTION_RUNNING`: the operator attaches to that execution and polls it.
+  - `JOB_INSTANCE_COMPLETE`: the task succeeds with the stored exit status and reject count (so `COMPLETED_WITH_REJECTS` still reaches XCom), and nothing is posted twice (DEF-JPOST-003).
+- **Restart and retry.** A `FAILED` or `STOPPED` instance is restarted by the same launch (`202`) and resumes as the table above says. An `ABANDONED` one is not restarted: `409`, the task fails, and an operator decides.
+  - `503` (window drain timeout, database unavailable) is retried with Airflow's backoff.
+  - `400` and `404` are not retried.
+- **Cycles.** `POST /internal/cycles` is idempotent per `businessDate`. A repeat with a different `interest` answers `409 CYCLE_PARAMETERS_DIFFER`, not retried. The comparison uses the resolved decision (interest runs in this cycle or not) stored in `batch.cycle`, not the raw DAG parameter.
 
 Posting stays single-threaded in input order, because each record's over-limit check uses the cycle totals that earlier records changed (BR-POST-007). The processor keeps the accounts and category balances touched in the current chunk in a unit-of-work cache that the writer flushes, so later records in the chunk see earlier changes.
 
