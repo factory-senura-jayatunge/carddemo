@@ -9,8 +9,10 @@ export function createScratchHome(parent = tmpdir()): string {
 }
 
 /**
- * chmod -N on dir and the real folders below it. Symbolic links are never followed: listings skip
- * them, and -h makes chmod change a link itself should one take a folder's place after the listing.
+ * chmod -N on dir and the real folders below it. Listings skip symbolic links. -h applies only to
+ * the last component of the path: if a link replaces that component after the listing, chmod
+ * changes the link itself. Such a race needs a writer running as the same user inside the private
+ * root, which is out of scope.
  */
 function removeAcls(dir: string) {
   execFileSync('/bin/chmod', ['-h', '-N', dir], { stdio: 'ignore' });
@@ -23,7 +25,8 @@ function removeAcls(dir: string) {
 /**
  * Removes a folder made by createScratchHome, including the Library and Downloads folders that
  * Firefox creates there with a macOS "deny delete" ACL. Only a real folder of this user with mode 700
- * is touched, so nobody else can have put a link in it. Returns undefined once the folder is gone,
+ * is touched, so no other user can have put a link in it; a hostile writer running as the same user
+ * is not defended against. Returns undefined once the folder is gone,
  * otherwise a one-line warning that names the folder and an error code and nothing else.
  */
 export function removeScratchHome(home: string): string | undefined {
