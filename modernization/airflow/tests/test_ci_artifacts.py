@@ -5,8 +5,13 @@ and the ledger job downloads this run's artifacts into build/ci-results/.
 The upload and download are emulated as actions/upload-artifact and
 actions/download-artifact document them: several paths are rooted at their
 least common ancestor, a directory path takes every file below it, `**`
-matches any number of directories, hidden files are left out, and without
-merge-multiple every artifact lands in a directory of its own name."""
+matches any number of directories, a path starting with `!` leaves out what
+it matches without moving that root, hidden files are left out, and without
+merge-multiple every artifact lands in a directory of its own name.
+
+The jobs that upload Playwright's output leave out its trace archives and
+HARs, which record request headers and so the sign-on token, and keep the
+JSON and JUnit reports that make trace reads."""
 
 from __future__ import annotations
 
@@ -70,13 +75,15 @@ def _match(segs: tuple[str, ...], pat: tuple[str, ...]) -> bool:
 
 def emulate_artifact(workspace: Path, paths: list[str]) -> dict[str, Path]:
     """Path in the artifact -> file in the workspace, as upload-artifact builds it."""
-    roots = [_search_root(p) for p in paths]
+    includes = [p for p in paths if not p.startswith("!")]
+    roots = [_search_root(p) for p in includes]
     common = []
     for segs in zip(*roots):
         if len(set(segs)) != 1:
             break
         common.append(segs[0])
-    patterns = [tuple(p.rstrip("/").split("/")) for p in paths]
+    patterns = [tuple(p.rstrip("/").split("/")) for p in includes]
+    excludes = [tuple(p[1:].rstrip("/").split("/")) for p in paths if p.startswith("!")]
     found = {}
     for dirpath, _dirs, files in os.walk(workspace):
         for name in files:
@@ -84,7 +91,9 @@ def emulate_artifact(workspace: Path, paths: list[str]) -> dict[str, Path]:
             if any(part.startswith(".") for part in rel):
                 continue
             # A pattern names a file or a directory; a directory takes every file below it.
-            if any(_match(rel[:n], pat) for pat in patterns for n in range(1, len(rel) + 1)):
+            def hit(pats):
+                return any(_match(rel[:n], pat) for pat in pats for n in range(1, len(rel) + 1))
+            if hit(patterns) and not hit(excludes):
                 found["/".join(rel[len(common):])] = Path(dirpath, name)
     return found
 
@@ -197,3 +206,56 @@ def test_spec_items_add_only_the_citation_files_and_nothing_private(job, workspa
         assert not any(part.startswith(".") for part in rel.split("/")), rel
         assert "secrets" not in rel.split("/") and "classes" not in rel.split("/"), rel
         assert not rel.endswith((".jar", ".java", ".pem")), rel
+
+
+PLAYWRIGHT_JOBS = ("billpay", "web", "e2e")
+NO_TRACES = {"!modernization/web/**/*.zip", "!modernization/web/**/*.har"}
+
+
+@pytest.fixture
+def playwright_output(workspace):
+    """Playwright's output after a failed test with trace: 'retain-on-failure'."""
+    files = {
+        "modernization/web/playwright-report/e2e-stack-fixed.json": '{"suites": []}\n',
+        "modernization/web/playwright-report/html/index.html": "<html></html>\n",
+        "modernization/web/playwright-report/html/trace/index.html": "<html></html>\n",
+        "modernization/web/playwright-report/html/data/0a1b2c.zip": "trace\n",
+        "modernization/web/playwright-report/html/data/0a1b2c.png": "png\n",
+        "modernization/web/test-results/vitest-junit.xml": "<testsuites/>\n",
+        "modernization/web/test-results/e2e/bill-pays-chromium/trace.zip": "trace\n",
+        "modernization/web/test-results/e2e/bill-pays-chromium/error-context.md": "# error\n",
+        "modernization/web/test-results/e2e/bill-pays-chromium/network.har": "{}\n",
+        "modernization/web/playwright-report/session.har": "{}\n",
+    }
+    for rel, body in files.items():
+        p = workspace / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body, encoding="utf-8")
+    return workspace
+
+
+@pytest.mark.parametrize("job", PLAYWRIGHT_JOBS)
+def test_playwright_uploads_leave_out_trace_archives_and_hars(job, playwright_output):
+    _name, paths = upload(job)
+    # The last matching pattern decides, so the exclusions come after every path.
+    assert set(paths[-len(NO_TRACES):]) == NO_TRACES
+    files = emulate_artifact(playwright_output, paths)
+    assert not [rel for rel in files if rel.endswith((".zip", ".har"))]
+    # Only those: the reports, the HTML report and its other attachments stay,
+    # at the same place in the artifact as without the exclusions.
+    unfiltered = emulate_artifact(playwright_output, [p for p in paths if p not in NO_TRACES])
+    assert files == {rel: src for rel, src in unfiltered.items() if not rel.endswith((".zip", ".har"))}
+    assert any(rel.endswith("playwright-report/html/index.html") for rel in files)
+
+
+@pytest.mark.parametrize("job", PLAYWRIGHT_JOBS)
+def test_make_trace_still_finds_the_playwright_and_vitest_reports(job, playwright_output, tmp_path):
+    name, paths = upload(job)
+    ci_results = tmp_path / "ci-results"
+    download({name: emulate_artifact(playwright_output, paths)}, ci_results)
+    found = {str(p.relative_to(ci_results / name)) for p in reports.discover(ci_results)}
+    expected = {"web/playwright-report/e2e-stack-fixed.json", "web/playwright-report/e2e-mock-fixed.json"}
+    if job == "web":
+        expected = {"playwright-report/e2e-stack-fixed.json", "playwright-report/e2e-mock-fixed.json",
+                    "test-results/vitest-junit.xml"}
+    assert expected <= found
