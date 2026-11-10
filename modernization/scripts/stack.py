@@ -18,6 +18,9 @@ Each service also records the database it was started against
 (<name>.db, CARDDEMO_DB_NAME); up refuses to reuse a running service that
 uses another database, so changing CARDDEMO_DB_NAME never leaves a service on
 the old one.
+While scripts/e2e_stack.py runs the slice on its own database it holds
+~/.cache/carddemo/slice.lock (machine-wide, CARDDEMO_SLICE_LOCK overrides);
+up, stop and down then fail (see guard_slice).
 Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 
 Usage: stack.py infra-up | infra-down | up [--only NAME,...] | stop | down | status
@@ -482,8 +485,9 @@ def infra_up(target: str) -> int:
     return 0
 
 
-def heavy_holder():
-    path = os.path.join(RUN_DIR, "heavy.lock")
+def lock_holder(path):
+    """The first line an exclusive holder of the lock file wrote, or None when
+    nobody holds it exclusively."""
     if not os.path.exists(path):
         return None
     fd = os.open(path, os.O_RDONLY)
@@ -491,9 +495,48 @@ def heavy_holder():
         fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
         return None
     except BlockingIOError:
-        return os.pread(fd, 512, 0).decode("utf-8", "replace").strip() or "unknown"
+        text = os.pread(fd, 512, 0).decode("utf-8", "replace").strip()
+        return text.splitlines()[0] if text else "unknown"
     finally:
         os.close(fd)
+
+
+def heavy_holder():
+    return lock_holder(os.path.join(RUN_DIR, "heavy.lock"))
+
+
+# scripts/e2e_stack.py holds this lock exclusively while it runs the slice on
+# its own database. up, stop and down hold it shared for their whole run, so
+# they never start or stop slice processes under an isolated run, and an
+# isolated run never begins while one of them is half done. The isolated run's
+# own calls pass its token in CARDDEMO_E2E_SESSION and skip the lock.
+# The slice ports are machine-wide, so the lock is too: one file in the
+# user's home, not in var/, which a separate clone (its own .git) does not
+# share with the worktrees.
+SLICE_LOCK = os.environ.get("CARDDEMO_SLICE_LOCK") or os.path.join(
+    os.path.expanduser("~"), ".cache", "carddemo", "slice.lock")
+_slice_fd = None
+
+
+def guard_slice(target: str) -> bool:
+    global _slice_fd
+    token = os.environ.get("CARDDEMO_E2E_SESSION")
+    os.makedirs(os.path.dirname(SLICE_LOCK), exist_ok=True)
+    fd = os.open(SLICE_LOCK, os.O_RDWR | os.O_CREAT, 0o644)
+    if token and f"token {token}" in os.pread(fd, 512, 0).decode("utf-8", "replace").split("\n"):
+        os.close(fd)
+        return True
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except BlockingIOError:
+        text = os.pread(fd, 512, 0).decode("utf-8", "replace").strip()
+        os.close(fd)
+        holder = text.splitlines()[0] if text else "unknown"
+        print(f"{target}: FAILED (an isolated browser run owns the slice: {holder}; "
+              f"rerun when it has ended, it restores what ran before)")
+        return False
+    _slice_fd = fd
+    return True
 
 
 def infra_down(target: str, force: bool = False) -> int:
@@ -804,6 +847,8 @@ def main(argv) -> int:
         return infra_up(argv[2])
     if cmd == "infra-down":
         return infra_down("infra-down")
+    if cmd in ("up", "stop", "down") and not guard_slice(cmd):
+        return 1
     if cmd == "up":
         only = set()
         if len(argv) == 4 and argv[2] == "--only":

@@ -242,12 +242,11 @@ web-build: ## Message catalogue export, npm ci, API client, tsc, ESLint, Vitest,
 		if [ -f "$(MESSAGES_JSON)" ]; then export CARDDEMO_MESSAGES_JSON="$(MESSAGES_JSON)"; fi; \
 		cd web && npm ci && npm run verify' \
 	&& echo '$@: OK' || { echo '$@: FAILED (see above)' >&2; exit 1; }
-test-e2e: require-env ## Playwright against the running stack (make up first); E2E_BROWSERS="chromium firefox webkit" (heavy)
+test-e2e: require-env ## Playwright on a slice on its own database (CARDDEMO_E2E_DB_NAME, fresh per browser), then restores the stack; E2E_BROWSERS, E2E_SPEC, E2E_RELOAD=0 (heavy)
 	@$(call need,web/playwright.config.ts,arrives with the web app)
-	@cd '$(HERE)/web' && browsers='$(or $(E2E_BROWSERS),chromium)' \
-	&& npx playwright install $$browsers \
-	&& $(HEAVY) $@ env CARDDEMO_E2E_TARGET=stack npx playwright test $$(for b in $$browsers; do printf -- '--project=%s ' $$b; done) \
-	&& echo '$@: OK' || { echo '$@: FAILED (see above)' >&2; exit 1; }
+	@cd '$(HERE)/web' && { [ -f node_modules/.package-lock.json ] || npm ci; } && npx playwright install $(or $(E2E_BROWSERS),chromium) || { echo '$@: FAILED (npx playwright install)' >&2; exit 1; }
+	@cd '$(HERE)' && $(HEAVY) $@ $(PYTHON) scripts/e2e_stack.py --name $@ --browsers '$(or $(E2E_BROWSERS),chromium)' \
+		$(if $(filter 0,$(E2E_RELOAD)),--no-reload) -- $(E2E_SPEC)
 trace: ## Rule-to-test traceability matrix and its gate (build/trace/matrix.md)
 	@$(PY311)
 	@$(call need,verify/trace/trace_matrix.py,arrives with the ledger)

@@ -92,7 +92,7 @@ jobs:
           job airflow test-airflow
           job batch verify-harness verify-batch
           job data db-reset load up verify-data
-          job e2e db-reset load up test-e2e
+          job e2e load test-e2e
           job cycle db-reset load up verify-cycle
           job ledger verify-ledger trace
 
@@ -394,8 +394,8 @@ jobs:
           npm ci
           # shellcheck disable=SC2086 # one argument per browser
           npx playwright install --with-deps $E2E_BROWSERS
-      - name: make db-reset load up test-e2e (fresh data, Playwright, axe)
-        run: make -C modernization db-reset load up test-e2e
+      - name: make test-e2e (its own database, fresh data per browser, Playwright, axe)
+        run: make -C modernization test-e2e
       - name: make status
         if: ${{ failure() }}
         run: make -C modernization status
