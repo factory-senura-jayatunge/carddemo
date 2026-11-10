@@ -144,6 +144,28 @@ export function trackApi(page: Page): () => Promise<string[]> {
       : [...seen];
 }
 
+/**
+ * Runs `action` and waits until the API has answered the one `call` ("POST /path") it makes.
+ * The message line cannot tell repeated answers apart, since each attempt shows the same text.
+ */
+export async function whenAnswered(page: Page, call: string, action: () => Promise<void>) {
+  const [method, path] = call.split(' ');
+  if (target === 'stack') {
+    const response = page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === path);
+    await action();
+    await response;
+    return;
+  }
+  const count = () =>
+    page.evaluate(
+      (c) => (window as unknown as { carddemoMock: { answered: string[] } }).carddemoMock.answered.filter((a) => a.startsWith(`${c} `)).length,
+      call,
+    );
+  const before = await count();
+  await action();
+  await expect.poll(count).toBe(before + 1);
+}
+
 /** The calls made while `action` ran. */
 export async function callsDuring(page: Page, calls: () => Promise<string[]>, action: () => Promise<void>): Promise<string[]> {
   const before = (await calls()).length;

@@ -37,12 +37,18 @@ export function installMock(): void {
   // The API calls of this page load, for tests that check a step made no call
   // (the browser's network log never sees these requests).
   const calls: string[] = [];
+  // The calls answered so far, with the status, for tests that wait for an answer.
+  const answered: string[] = [];
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     const url = new URL(request.url, window.location.origin);
     if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) return network(input, init);
-    calls.push(`${request.method} ${url.pathname}`);
-    return server.handle(request);
+    const call = `${request.method} ${url.pathname}`;
+    calls.push(call);
+    return server.handle(request).then((response) => {
+      answered.push(`${call} ${response.status}`);
+      return response;
+    });
   };
-  Object.assign(window, { carddemoMock: { reset: () => server.reset(), calls } });
+  Object.assign(window, { carddemoMock: { reset: () => server.reset(), calls, answered } });
 }

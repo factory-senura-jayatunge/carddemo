@@ -12,6 +12,7 @@ import {
   target,
   test,
   turnOnFunctionKeys,
+  whenAnswered,
 } from './fixtures';
 
 /** SGN scenarios of the slice contract (COSGN00C section 15). */
@@ -20,6 +21,8 @@ const userId = (page: Page) => page.getByLabel('User ID');
 const password = (page: Page) => page.getByLabel('Password', { exact: true });
 const NEUTRAL = 'Wrong User ID or Password. Try again ...';
 const SESSION_ENDED = 'Your session has ended. Please sign on again ...';
+/** Enter in Password, once sign-on has answered it; every failed attempt shows the same message. */
+const submitPassword = (page: Page) => whenAnswered(page, 'POST /api/auth/sign-on', () => password(page).press('Enter'));
 
 test.beforeEach(async ({ mock }) => mock({ latency: 0 }));
 
@@ -140,11 +143,11 @@ test('@DEF-SGN-002 SGN-S12 @fixed: five wrong passwords lock the user for 15 min
   await userId(page).fill('USER0003');
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     await password(page).fill(`WRONG00${attempt}`);
-    await password(page).press('Enter');
+    await submitPassword(page);
     await expectMessage(page, NEUTRAL, 'error');
   }
   await password(page).fill(PASSWORD);
-  await password(page).press('Enter');
+  await submitPassword(page);
   await expectMessage(page, NEUTRAL, 'error');
   await page.clock.fastForward('16:00');
   await password(page).fill(PASSWORD);
@@ -234,23 +237,23 @@ test('@DEF-SGN-002 SGN-S19 @fixed: failed attempts over the per-address limit ge
   // identity-service's default: 30 failed attempts per client address per minute.
   for (let attempt = 1; attempt <= 30; attempt += 1) {
     await password(page).fill(`WRONG${String(attempt).padStart(3, '0')}`);
-    await password(page).press('Enter');
+    await submitPassword(page);
     await expectMessage(page, NEUTRAL, 'error');
   }
   await password(page).fill(PASSWORD);
-  await password(page).press('Enter');
+  await submitPassword(page);
   await expectMessage(page, 'Too many sign-on attempts. Try again later ...', 'error');
   await expect(userId(page)).toBeFocused();
   await expect(page.getByTestId('retry-at')).toHaveText(/^Try again after \d{2}:\d{2}\.$/);
   await expectAccessible(page);
   // The limit is per address, not per user.
   await userId(page).fill('USER0001');
-  await password(page).press('Enter');
+  await submitPassword(page);
   await expectMessage(page, 'Too many sign-on attempts. Try again later ...', 'error');
   // A minute later the limit is lifted; the five failures have locked USER0003 meanwhile.
   await page.clock.fastForward('01:01');
   await userId(page).fill('USER0003');
-  await password(page).press('Enter');
+  await submitPassword(page);
   await expectMessage(page, NEUTRAL, 'error');
   await expect(page.getByTestId('retry-at')).toHaveCount(0);
   await userId(page).fill('USER0001');
@@ -263,7 +266,7 @@ test('@DEF-SGN-002 SGN-S19 @legacy: there is no limit on failed attempts', async
   await userId(page).fill('USER0003');
   for (let attempt = 1; attempt <= 31; attempt += 1) {
     await password(page).fill(`WRONG${String(attempt).padStart(3, '0')}`);
-    await password(page).press('Enter');
+    await submitPassword(page);
     await expectMessage(page, 'Wrong Password. Try again ...', 'error');
   }
   await password(page).fill(PASSWORD);
