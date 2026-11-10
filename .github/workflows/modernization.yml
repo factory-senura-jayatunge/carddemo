@@ -253,16 +253,17 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .venvs/carddemo-airflow
-          key: airflow-venv-${{ runner.os }}-py3.14-${{ hashFiles('modernization/airflow/requirements*.txt', 'modernization/airflow/pyproject.toml') }}
-      - name: Create the Airflow venv (Airflow 3.3.2 with the official constraints)
+          key: airflow-venv-${{ runner.os }}-py3.14-${{ hashFiles('modernization/airflow/requirements*.txt', 'modernization/airflow/constraints-*.txt', 'modernization/airflow/pyproject.toml') }}
+      - name: Create the Airflow venv (airflow/requirements.txt with the official constraints)
         if: ${{ steps.venv.outputs.cache-hit != 'true' }}
+        working-directory: modernization/airflow
         run: |
           python -m venv "$AIRFLOW_VENV"
-          "$AIRFLOW_VENV/bin/pip" install "apache-airflow==3.3.2" apache-airflow-providers-postgres pytest \
-            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.14.txt
+          "$AIRFLOW_VENV/bin/pip" install --disable-pip-version-check -r requirements.txt \
+            -c constraints-3.3.2-py3.14.txt
       - name: make setup
         run: make -C modernization setup
-      - name: make test-airflow (DagBag import, task order, parameters, operator against a stub)
+      - name: make test-airflow (DagBag import, task order, parameters, operators and dag.test() runs against a stub)
         run: make -C modernization test-airflow
       - name: Upload test results
         if: ${{ !cancelled() }}
@@ -422,13 +423,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .venvs/carddemo-airflow
-          key: airflow-venv-${{ runner.os }}-py3.14-${{ hashFiles('modernization/airflow/requirements*.txt', 'modernization/airflow/pyproject.toml') }}
-      - name: Create the Airflow venv (Airflow 3.3.2 with the official constraints)
+          key: airflow-venv-${{ runner.os }}-py3.14-${{ hashFiles('modernization/airflow/requirements*.txt', 'modernization/airflow/constraints-*.txt', 'modernization/airflow/pyproject.toml') }}
+      - name: Create the Airflow venv (airflow/requirements.txt with the official constraints)
         if: ${{ steps.venv.outputs.cache-hit != 'true' }}
+        working-directory: modernization/airflow
         run: |
           python -m venv "$AIRFLOW_VENV"
-          "$AIRFLOW_VENV/bin/pip" install "apache-airflow==3.3.2" apache-airflow-providers-postgres pytest \
-            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.14.txt
+          "$AIRFLOW_VENV/bin/pip" install --disable-pip-version-check -r requirements.txt \
+            -c constraints-3.3.2-py3.14.txt
       - name: make setup build
         run: make -C modernization setup build
       - name: make db-reset load up verify-cycle (daily cycle through Airflow for 2022-07-06)

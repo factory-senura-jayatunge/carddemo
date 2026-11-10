@@ -1,0 +1,7 @@
+{
+  "carddemo_batch": {
+    "slots": 1,
+    "description": "CardDemo jobs that change data: one at a time, deferred waits included",
+    "include_deferred": true
+  }
+}

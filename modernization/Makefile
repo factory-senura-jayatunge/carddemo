@@ -79,10 +79,10 @@ need = [ -e '$(HERE)/$(1)' ] || { echo '$@: FAILED (no modernization/$(1) in thi
 # that delivers it; replace the stub with the real recipe (and drop it from
 # STUBS) when that work lands. Every target ends with "<target>: OK" or
 # "<target>: FAILED (<reason>)".
-STUBS := verify-batch verify-harness verify-cycle test-airflow
+STUBS := verify-batch verify-harness verify-cycle
 .PHONY: help stubs setup toolchain build up stop down status logs infra-up infra-down \
 	infra-wipe require-env verify-spec db-reset db-migrate smoke verify-ledger \
-	test-backend web-build test-e2e trace load verify-data billpay test-billpay $(STUBS)
+	test-backend web-build test-e2e trace load verify-data billpay test-billpay test-airflow $(STUBS)
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -90,11 +90,12 @@ help: ## List the targets
 stubs: ## List the targets that are not implemented yet (CI skips their jobs)
 	@echo $(STUBS)
 
-setup: ## Check JDK 21, Node 24, Docker/Colima and the Airflow venv; create .env and the JWT key with generated secrets
+setup: ## Check JDK 21, Node 24, Docker/Colima and the Airflow venv; create .env and the JWT key with generated secrets; install carddemo_airflow
 	@rc=0; \
 	'$(TOOLCHAIN)' check || rc=1; \
 	$(PYTHON) '$(HERE)/scripts/init_env.py' '$(HERE)/.env.example' '$(ENV_FILE)' || rc=1; \
 	'$(HERE)/scripts/init_jwt_key.sh' '$(CARDDEMO_JWT_KEY_FILE)' || rc=1; \
+	'$(HERE)/scripts/airflow_venv.sh' || rc=1; \
 	if [ '$(ENV_FILE)' != '$(HERE)/.env' ] && [ -f '$(HERE)/.env' ] && [ ! '$(HERE)/.env' -ef '$(ENV_FILE)' ]; then \
 		printf 'warn  %-16s %s\n' .env '$(HERE)/.env is ignored; this checkout uses $(ENV_FILE)'; fi; \
 	if $(COMPOSE) config --quiet; then \
@@ -220,8 +221,12 @@ verify-harness: ## Self-test of the differential test harness [not implemented y
 verify-harness: PHASE = Phase 3, the batch jobs (differential harness)
 verify-cycle: ## Full batch cycle through Airflow and Spring Batch (heavy) [not implemented yet]
 verify-cycle: PHASE = Phase 3, Airflow (end-to-end batch cycle run)
-test-airflow: ## Airflow DAG integrity and ordering tests [not implemented yet]
-test-airflow: PHASE = Phase 3, Airflow (DAG tests)
+test-airflow: ## pytest without a running Airflow: DagBag import, task order, parameters, pool, the import rule, the operators against a stub batch-service
+	@[ -x '$(AIRFLOW_VENV)/bin/python' ] || { echo '$@: FAILED (no Airflow venv at $(AIRFLOW_VENV); see README.md, Prerequisites)' >&2; exit 1; }
+	@mkdir -p '$(HERE)/build/test-results/airflow'
+	@cd '$(HERE)/airflow' && '$(AIRFLOW_VENV)/bin/python' -m pytest -q -p no:cacheprovider \
+		--junitxml='$(HERE)/build/test-results/airflow/junit.xml' tests \
+	&& echo '$@: OK' || { echo '$@: FAILED (pytest, see above)' >&2; exit 1; }
 # The message catalogue check compares web/src/messages.ts with the export
 # that MessageCatalogTest writes; without the file it would only be skipped.
 MESSAGES_JSON = $(HERE)/platform/web-support/target/messages.json
