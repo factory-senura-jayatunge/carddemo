@@ -6,9 +6,12 @@ build/trace/matrix.md and matrix.json, and passes when, for the units in scope.t
 must-preserve or unclassified item that is not excluded has a passing test, every defect-decide
 item has passing tests in the ledger's mode (both modes for a code switch or an undecided item) or
 a deviation, every architecture-dependent item has a deviation, no cited item has a failing test,
-and no test cites an ID the spec does not define. Every code switch needs passing tests in both
-modes, whatever its unit. Incidental items and questions need no test. With --unit, only the gaps
-of the named units count for the gate and the exit status; the matrix still shows every unit.
+and no test cites an ID the spec does not define. A code switch of another unit, and an item it
+covers, needs passing tests in both modes too once the main code declares or reads that switch or
+a test cites it; until then it is listed as planned (not gated, not delivered) and gates as soon
+as that happens or its unit enters scope.toml. Incidental items and questions need no test. With
+--unit, only the gaps of the named units count for the gate and the exit status; the matrix still
+shows every unit.
 Tests that write an ID in brackets ("[FLOW-BILL-002]") instead of as a tag ("@FLOW-BILL-002") are
 reported, not counted. With --manifest, only the reports that one run wrote are read (see
 tracelib/manifest.py); a missing, stale or empty required report is a gap.
@@ -25,7 +28,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from tracelib import catalog, ledger, matrix, reports, spec  # noqa: E402
+from tracelib import catalog, code, ledger, matrix, reports, spec  # noqa: E402
 from tracelib import manifest as run_manifest  # noqa: E402
 
 REPO = HERE.parents[2]
@@ -71,7 +74,7 @@ def _uncounted_line(n: int) -> str:
 def _gate_label(m: matrix.Matrix) -> str:
     if m.selected:
         return f"for the selected units: {', '.join(m.gate_units)}"
-    return f"for the units in scope: {', '.join(m.scope) or 'none'}"
+    return f"for the units in scope: {', '.join(m.scope) or 'none'}, and the code switches the code declares"
 
 
 def _rel(p: Path, root: Path) -> str:
@@ -124,6 +127,14 @@ def render_md(m: matrix.Matrix, sources: list[str], generated: str, run_info: di
         out += ["## Gaps of units outside the gate", "", "| Item | Reason |", "| :-- | :-- |"]
         out += [f"| {g} | {_md_escape(r)} |" for g, r in m.ungated]
         out.append("")
+    if m.planned:
+        out += ["## Planned code switches (not gated, not delivered)", "",
+                "Code switches of units outside scope.toml, and items covered by one, that no main code declares or "
+                "reads and no test cites yet. Nothing implements them, so they are not part of this gate and not "
+                "delivered. Each one gates as soon as the code declares the switch (or the switch that covers the "
+                "item), a test cites either, or its unit enters scope.toml.", "", "| Item | Unit | Switch | Missing |", "| :-- | :-- | :-- | :-- |"]
+        out += [f"| {g} | {m.rows[g].unit} | {', '.join(matrix.switch_ids(m.rows[g]))} | {_md_escape(r)} |" for g, r in m.planned]
+        out.append("")
     if run_info:
         out += _run_md(run_info)
     uncounted = _uncounted(m)
@@ -148,7 +159,7 @@ def render_md(m: matrix.Matrix, sources: list[str], generated: str, run_info: di
     switches = sorted((r for r in m.rows.values() if r.switch and r.switch.get("code_switch") is True), key=lambda r: r.id)
     if switches:
         out += ["## Code switches", "", "| Switch | Ledger | Tests | Status |", "| :-- | :-- | :-- | :-- |"]
-        out += [f"| {r.id} | {_md_escape(_ledger_cell(r))} | {_tests_cell(r)} | {r.status}{': ' + _md_escape(r.reason) if r.reason and r.status == 'gap' else ''} |" for r in switches]
+        out += [f"| {r.id} | {_md_escape(_ledger_cell(r))} | {_tests_cell(r)} | {r.status}{': ' + _md_escape(r.reason) if r.reason and r.status in ('gap', 'planned') else ''} |" for r in switches]
         out.append("")
     cited_out = sorted({r.unit for r in m.rows.values() if not r.in_scope and r.tests})
     if cited_out:
@@ -164,7 +175,9 @@ def render_json(m: matrix.Matrix, sources: list[str], generated: str, run_info: 
         "schema": 1,
         "generated": generated,
         "gate": {"ok": m.ok, "units": m.gate_units, "gaps": [{"id": g, "reason": r} for g, r in m.gaps],
-                 "ungated_gaps": [{"id": g, "reason": r} for g, r in m.ungated]},
+                 "ungated_gaps": [{"id": g, "reason": r} for g, r in m.ungated],
+                 "planned": [{"id": g, "reason": r} for g, r in m.planned],
+                 "declared_switches": m.declared},
         "scope": m.scope,
         "reports": sources,
         "summary": {u: dict(c) for u, c in sorted(matrix.unit_summary(m).items())},
@@ -238,7 +251,10 @@ def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, o
             outside.append({"path": _rel(f, root), "results": sum(1 for x in rs if x.items),
                             "failed": sum(1 for x in rs if x.items and x.status == "failed"), "unreadable": bool(probs)})
     arch = {i for row in catalog.architecture_dependent(root) for i in row}
-    m = matrix.build(s, led, results, arch, units)
+    scanned = code.scan(root / "modernization", root)
+    # No main Java at all means the code was not found, not that it declares nothing: gate every switch.
+    declared = set(scanned.switches) if scanned.files else None
+    m = matrix.build(s, led, results, arch, units, declared)
     m.gaps += [("report", p) for p in read_problems + run_gaps]
     run_info = _run_info(man, outside, root) if man is not None else None
     generated = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -251,6 +267,10 @@ def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, o
         print(f"  ... {len(m.gaps) - 50} more in {out_dir / 'matrix.md'}", file=out)
     if m.ungated:
         print(f"  ({len(m.ungated)} gap{'s' if len(m.ungated) != 1 else ''} of units outside the gate, listed in {out_dir / 'matrix.md'})", file=out)
+    if m.planned:
+        n = len(m.planned)
+        print(f"  ({n} planned code switch{'es' if n != 1 else ''} or covered item{'s' if n != 1 else ''} outside scope.toml "
+              f"that no code declares and no test cites yet: not gated, not delivered, listed in {out_dir / 'matrix.md'})", file=out)
     failing_outside = [o for o in (run_info or {}).get("outside", []) if o["failed"] or o["unreadable"]]
     if failing_outside:
         n = len(failing_outside)
@@ -285,7 +305,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="report files or directories to search (default: <root>/modernization)")
     ap.add_argument("--out", type=Path, help="output directory (default: <root>/modernization/build/trace)")
     ap.add_argument("--unit", action="append", metavar="UNIT",
-                    help="gate only this unit of scope.toml (repeatable; default: every unit in scope and every code switch)")
+                    help="gate only this unit of scope.toml (repeatable; default: every unit in scope and every code "
+                         "switch the code declares)")
     ap.add_argument("--manifest", type=Path, metavar="FILE",
                     help="read only the reports this run manifest lists and the run wrote (see tracelib/manifest.py); "
                          "a missing, stale or empty required report is a gap")
