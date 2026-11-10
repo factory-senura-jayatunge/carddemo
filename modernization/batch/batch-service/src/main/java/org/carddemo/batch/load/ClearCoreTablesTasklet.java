@@ -15,9 +15,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
- * First step of dataLoadJob: the core tables must be empty, or emptied when a
- * reload is allowed (D-41: seed load only, except in local and demo
- * environments). Children go first because of the foreign keys. The
+ * First step of dataLoadJob: the core and reference tables must be empty, or
+ * emptied when a reload is allowed (D-41: seed load only, except in local and
+ * demo environments). Children go first because of the foreign keys. The
  * transaction table is emptied too: the load starts it empty (TRANFILE's dummy
  * row is not carried over).
  */
@@ -26,7 +26,9 @@ final class ClearCoreTablesTasklet implements Tasklet {
     private static final Logger log = LoggerFactory.getLogger(ClearCoreTablesTasklet.class);
 
     static final List<String> CHILDREN_FIRST = List.of(
-            "core.[transaction]", "core.tcat_bal", "core.card_xref", "core.card", "core.customer", "core.account");
+            "core.[transaction]", "core.tcat_bal", "core.card_xref", "core.card", "core.customer", "core.account",
+            "ref.disclosure_group", "ref.tran_category", "ref.tran_type",
+            "ref.us_state_zip_prefix", "ref.us_state", "ref.nanp_area_code");
 
     private final JdbcClient db;
     private final DataLoadProperties properties;
@@ -45,11 +47,11 @@ final class ClearCoreTablesTasklet implements Tasklet {
         Map<String, Long> nonEmpty = counts.entrySet().stream().filter(e -> e.getValue() > 0)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
         if (nonEmpty.isEmpty()) {
-            log.info("clearCoreTables: the core tables are empty");
+            log.info("clearCoreTables: the core and reference tables are empty");
             return RepeatStatus.FINISHED;
         }
         if (!properties.reloadAllowed()) {
-            throw new DataLoadException("the core tables already hold rows " + nonEmpty
+            throw new DataLoadException("the core and reference tables already hold rows " + nonEmpty
                     + "; a reload is allowed only in a local or demo environment (D-41)");
         }
         for (String table : CHILDREN_FIRST) {

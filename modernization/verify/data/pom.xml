@@ -12,12 +12,16 @@
 
   <artifactId>verify-data</artifactId>
   <name>CardDemo data reconciliation</name>
-  <description>make verify-data: reconciles the loaded core tables and users with the legacy sample files.</description>
+  <description>make verify-data: reconciles the loaded core and reference tables and users with the legacy sample files and lookup lists.</description>
 
   <dependencies>
     <dependency>
       <groupId>org.carddemo</groupId>
       <artifactId>legacy-format</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>validation</artifactId>
     </dependency>
     <dependency>
       <groupId>org.carddemo</groupId>

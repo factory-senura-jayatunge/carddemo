@@ -1,6 +1,7 @@
 package org.carddemo.batch.load;
 
 import org.carddemo.platform.fidelity.FidelitySwitches;
+import org.carddemo.platform.validation.RuleTable;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.job.parameters.RunIdIncrementer;
@@ -15,7 +16,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * {@code dataLoadJob}: the sample files of {@code app/data/ASCII} into the core
- * tables (data-model.md, sample-data migration). One step per file, each in one
+ * and reference tables, and the lookup lists of the account edits into theirs
+ * (data-model.md, sample-data migration). One step per file, each in one
  * transaction; the first failing step fails the job. Users are not loaded:
  * identity-service seeds them (D-06).
  */
@@ -35,6 +37,10 @@ class DataLoadJobConfiguration {
                 .next(step(new CoreTableLoaders.Cards(db, properties, switches), jobRepository, tx))
                 .next(step(new CoreTableLoaders.CardXrefs(db, properties, switches), jobRepository, tx))
                 .next(step(new CoreTableLoaders.CategoryBalances(db, properties, switches), jobRepository, tx))
+                .next(step(new RefTableLoaders.TransactionTypes(db, properties, switches), jobRepository, tx))
+                .next(step(new RefTableLoaders.Categories(db, properties, switches), jobRepository, tx))
+                .next(step(new RefTableLoaders.DisclosureGroups(db, properties, switches), jobRepository, tx))
+                .next(step("loadLookups", new LoadLookupsTasklet(db, RuleTable.standard()), jobRepository, tx))
                 .next(step("restartTranIdSequence", new RestartTranIdSequenceTasklet(db), jobRepository, tx))
                 .build();
     }

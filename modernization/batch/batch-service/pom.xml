@@ -12,7 +12,7 @@
 
   <artifactId>batch-service</artifactId>
   <name>CardDemo batch service</name>
-  <description>Spring Batch jobs of the modernized CardDemo; in this slice dataLoadJob, the sample-data load of the core tables.</description>
+  <description>Spring Batch jobs of the modernized CardDemo; in this slice dataLoadJob, the sample-data load of the core and reference tables.</description>
 
   <dependencies>
     <dependency>
@@ -22,6 +22,10 @@
     <dependency>
       <groupId>org.carddemo</groupId>
       <artifactId>legacy-format</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>validation</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

@@ -29,6 +29,8 @@ abstract class DataLoadTestBase {
             .toAbsolutePath().normalize();
     static final List<String> CORE_TABLES = List.of(
             "core.account", "core.customer", "core.card", "core.card_xref", "core.tcat_bal");
+    static final List<String> SAMPLE_FILES = List.of("acctdata.txt", "custdata.txt", "carddata.txt", "cardxref.txt",
+            "tcatbal.txt", "trantype.txt", "trancatg.txt", "discgrp.txt");
 
     @Autowired
     JobOperator jobOperator;
@@ -44,6 +46,11 @@ abstract class DataLoadTestBase {
     @BeforeEach
     void emptyTables() {
         DB.fixtures().deleteAll();
+        for (String table : ClearCoreTablesTasklet.CHILDREN_FIRST) {
+            if (table.startsWith("ref.")) {
+                DB.admin().sql("DELETE FROM " + table).update();
+            }
+        }
     }
 
     /** One run, as the application runner starts it: the next instance of the incrementer. */
@@ -63,7 +70,7 @@ abstract class DataLoadTestBase {
     /** Fills dir with a copy of the sample files in which one file's lines are changed. */
     static Path sampleWith(Path dir, String file, UnaryOperator<List<String>> change) {
         try {
-            for (String name : List.of("acctdata.txt", "custdata.txt", "carddata.txt", "cardxref.txt", "tcatbal.txt")) {
+            for (String name : SAMPLE_FILES) {
                 Files.copy(SAMPLE_DIR.resolve(name), dir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
             }
             List<String> lines = new ArrayList<>(Files.readAllLines(dir.resolve(file), StandardCharsets.ISO_8859_1));

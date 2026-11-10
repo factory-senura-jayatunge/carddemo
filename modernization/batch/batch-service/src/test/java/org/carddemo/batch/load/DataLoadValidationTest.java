@@ -105,6 +105,37 @@ class DataLoadValidationTest extends DataLoadTestBase {
     }
 
     @Test
+    void aCategoryOfATypeThatIsNotLoadedFails() throws Exception {
+        sampleWith(WORK_DIR, "trancatg.txt", lines -> {
+            lines.add("09" + lines.getLast().substring(2));
+            return lines;
+        });
+
+        JobExecution execution = run();
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(failedStep(execution)).isEqualTo("loadCategories");
+        assertThat(failures(execution)).contains("trancatg.txt line 19: transaction type 09 is not loaded");
+        assertThat(count("ref.tran_category")).isZero();
+        assertThat(count("ref.tran_type")).isEqualTo(7);
+    }
+
+    @Test
+    void disclosureGroupsWithoutTheDefaultGroupFail() throws Exception {
+        sampleWith(WORK_DIR, "discgrp.txt", lines -> {
+            lines.removeIf(l -> l.startsWith("DEFAULT   "));
+            return lines;
+        });
+
+        JobExecution execution = run();
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(failedStep(execution)).isEqualTo("loadDisclosureGroups");
+        assertThat(failures(execution)).contains("discgrp.txt: no DEFAULT group");
+        assertThat(count("ref.disclosure_group")).isZero();
+    }
+
+    @Test
     void missingSourceFileFailsBeforeAnyRowIsWritten() throws Exception {
         sampleWith(WORK_DIR, "acctdata.txt", lines -> lines);
         Files.delete(WORK_DIR.resolve("acctdata.txt"));
