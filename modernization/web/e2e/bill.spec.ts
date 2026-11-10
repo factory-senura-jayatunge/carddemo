@@ -10,6 +10,7 @@ import {
   expectReadOnly,
   mode,
   signOnAsUser,
+  target,
   test,
   trackApi,
   turnOnFunctionKeys,
@@ -20,6 +21,16 @@ import {
  * come last, so on a stack (one worker, in order) the earlier ones still see
  * account 00000000001 at 194.00.
  */
+
+/**
+ * The start data the stack scenarios need: the contract's 00000000001 at 194.00 and, for S16,
+ * 00000000002 at its sample-data balance of 158.00. Payments use them up (make billpay, this
+ * file's S9 and S16), so each browser's run needs its own fresh db-reset and load.
+ */
+const START_DATA = [
+  { acctId: '00000000001', display: '+0000000194.00' },
+  { acctId: '00000000002', display: '+0000000158.00' },
+];
 
 const PAID = /^Payment successful\. {2}Your Transaction ID is \d+\.$/;
 
@@ -41,6 +52,33 @@ async function preview(page: Page, acctId: string) {
 }
 
 test.beforeEach(async ({ mock }) => mock({ latency: 0 }));
+
+if (target === 'stack') {
+  // Read-only previews, as make smoke does; a stack without the start data stops here with the
+  // reason instead of failing scenario by scenario. Nothing is reset.
+  test.beforeAll(async ({ browser }, testInfo) => {
+    const page = await browser.newPage({ baseURL: testInfo.project.use.baseURL });
+    try {
+      await signOnAsUser(page);
+      const found: string[] = [];
+      for (const { acctId, display } of START_DATA) {
+        const answer = await callApi(page, 'GET', `/api/billpay/accounts/${acctId}`);
+        const shown = answer.status === 200 ? String(answer.body?.currentBalanceDisplay) : `HTTP ${answer.status} ${String(answer.body?.code)}`;
+        if (shown !== display) found.push(`${acctId} shows ${shown}, the scenarios need ${display}`);
+      }
+      await callApi(page, 'POST', '/api/auth/sign-off');
+      if (found.length > 0) {
+        throw new Error(
+          `The stack is not at the BILL start data: ${found.join('; ')}. A payment since the last load ` +
+            '(make billpay, or an earlier BILL run in this or another browser) uses it up. ' +
+            'Run each browser on a freshly reset and loaded database (make db-reset load drops and reloads CARDDEMO_DB_NAME).',
+        );
+      }
+    } finally {
+      await page.close();
+    }
+  });
+}
 
 test('@FLOW-BILL-001 BILL-S1: without a session the page and both APIs refuse', async ({ page }) => {
   await page.goto('/bill-pay');

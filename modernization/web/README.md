@@ -29,6 +29,8 @@ npm run screenshots  # review screens into test-results/screens (CARDDEMO_SCREEN
 
 On a stack, `CARDDEMO_E2E_MODE=legacy` runs the legacy-mode expectations instead of the fixed ones; tests tagged `@mock-only` (batch window, zero balances, scenario users, screenshots) are skipped there.
 
+The BILL scenarios on a stack need the contract's start data: account 00000000001 at 194.00 and 00000000002 at 158.00, as `make db-reset load` leaves them. They pay both, and so does `make billpay` for 00000000001, so every browser's run needs a freshly loaded database. `e2e/bill.spec.ts` checks the two balances with read-only previews first and stops with the reason when they differ; it never resets anything.
+
 ## Generated inputs
 
 - `src/api/generated/` comes from the OpenAPI snapshots in `openapi/` (`npm run gen:api`, also run by `verify`). `CARDDEMO_OPENAPI_DIR` points it at another folder.
