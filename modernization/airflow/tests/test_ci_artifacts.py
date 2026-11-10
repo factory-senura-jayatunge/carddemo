@@ -137,6 +137,15 @@ def test_java_jobs_upload_spec_items_with_their_reports(job):
     assert REPORTS[job] <= set(paths)
 
 
+def test_the_ledger_job_runs_the_make_scripts_unit_tests():
+    """The step runs every test in modernization/scripts/tests; it is no
+    conditional skip, and the folder holds tests, so discover never passes empty."""
+    (step,) = [s for s in workflow()["jobs"]["ledger"]["steps"]
+               if s.get("run") == "python3 -m unittest discover -s modernization/scripts/tests"]
+    assert not {"if", "continue-on-error"} & set(step)
+    assert sorted((MODERNIZATION / "scripts" / "tests").glob("test_*.py"))
+
+
 def test_ledger_downloads_only_this_runs_artifacts_one_directory_each():
     (step,) = steps("ledger", "actions/download-artifact")
     w = step["with"]
