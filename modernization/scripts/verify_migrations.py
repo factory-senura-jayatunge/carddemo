@@ -24,7 +24,11 @@ origin/modernization, or HEAD^ when HEAD is that commit. It is built in a
 detached worktree under build/migrate-check/ that is removed afterwards.
 
 Run it through with_env.py (make -C modernization verify-migrations).
-Usage: verify_migrations.py [--base REF] [--keep]
+--require-base (CI) fails when the base has no db-migrate instead of
+running the fresh half only; a BASE that is not a commit in the clone
+always fails.
+
+Usage: verify_migrations.py [--base REF] [--keep] [--require-base]
 """
 
 from __future__ import annotations
@@ -144,7 +148,10 @@ def git(*args, check=True) -> str:
 def resolve_base(ref: str | None) -> str:
     head = git("rev-parse", "HEAD")
     if ref:
-        return git("rev-parse", "--verify", f"{ref}^{{commit}}")
+        resolved = git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", check=False)
+        if not resolved:
+            raise RuntimeError(f"BASE {ref} is not a commit in this clone; fetch it first (CI needs fetch-depth 0)")
+        return resolved
     upstream = os.environ.get("VERIFY_MIGRATIONS_UPSTREAM", "origin/modernization")
     base = git("merge-base", "HEAD", upstream, check=False)
     if not base:
@@ -207,6 +214,8 @@ def main(argv) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--base", help="commit to upgrade from (default: merge base with origin/modernization)")
     ap.add_argument("--keep", action="store_true", help="keep the scratch databases")
+    ap.add_argument("--require-base", action="store_true",
+                    help="fail instead of skipping the upgrade when the base has no db-migrate")
     args = ap.parse_args(argv)
 
     db = os.environ.get("CARDDEMO_DB_NAME") or "carddemo"
@@ -231,8 +240,15 @@ def main(argv) -> int:
     head = git("rev-parse", "HEAD")
     say("ok", "base", f"{base[:12]} -> HEAD {head[:12]} (scratch {upgrade_db}, {fresh_db})")
     if not git("ls-tree", "--name-only", base, "modernization/db/db-migrate/pom.xml", check=False):
+        if args.require_base:
+            return fail(f"the base {base[:12]} has no db-migrate, so there is nothing to upgrade from")
         say("skip", "upgrade", f"{base[:12]} has no db-migrate; nothing to upgrade from")
         base = None
+    else:
+        if subprocess.run(["git", "-C", REPO, "merge-base", "--is-ancestor", base, head]).returncode != 0:
+            say("warn", "base", f"{base[:12]} is not an ancestor of HEAD")
+        if not git("diff", "--name-only", base, head, "--", "modernization/db/", check=False):
+            say("note", "base", "no change under modernization/db/ since the base; the upgrade repeats the same migrations")
 
     tree = os.path.join(work, f"base-{base[:12]}") if base else None
     try:
@@ -284,7 +300,7 @@ def main(argv) -> int:
                     drop(name)
                 except RuntimeError as e:
                     say("warn", "drop", str(e))
-    print(f"{NAME}: OK", flush=True)
+    print(f"{NAME}: OK" + ("" if base else " (fresh only: no base with db-migrate)"), flush=True)
     return 0
 
 
