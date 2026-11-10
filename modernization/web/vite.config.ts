@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'jsdom',
     globals: false,
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'e2e/**/*.test.ts'],
     css: false,
     restoreMocks: true,
     // Room for a loaded machine (CI, Maven builds alongside): fewer workers, longer limits.

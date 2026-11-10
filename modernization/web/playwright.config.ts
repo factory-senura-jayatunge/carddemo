@@ -1,8 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { createScratchHome, removeScratchHome } from './e2e/firefox-home';
 
 /**
  * Two targets:
@@ -34,14 +31,6 @@ named.forEach((name) => asked.add(name));
 process.env.CARDDEMO_E2E_PROJECTS = [...asked].filter(Boolean).join(' ');
 const desktop = { viewport: { width: 1280, height: 860 } };
 
-/** chmod -N on dir and the folders below it; symbolic links are neither followed nor changed. */
-function removeAcls(dir: string) {
-  execFileSync('/bin/chmod', ['-N', dir], { stdio: 'ignore' });
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) removeAcls(join(dir, entry.name));
-  }
-}
-
 /**
  * On macOS 27, Playwright's Firefox can exit at launch with "Could not find profile folder". Reported
  * cause: besides the profile Playwright passes, Gecko looks in ~/Library/Application Support/Firefox,
@@ -52,18 +41,11 @@ function removeAcls(dir: string) {
  */
 function firefoxLaunchEnv(): Record<string, string> | undefined {
   if (process.platform !== 'darwin') return undefined;
-  const home = mkdtempSync(join(tmpdir(), 'carddemo-pw-firefox-home-'));
+  const home = createScratchHome();
+  // A folder left behind must not change the run's exit code.
   process.on('exit', () => {
-    // macOS gives the Library and Downloads folders Firefox creates there a "deny delete" ACL.
-    // chmod -R would change the targets of symbolic links, so the folders are walked one by one;
-    // rmSync removes links, not their targets. A folder left behind must not change the exit code.
-    try {
-      removeAcls(home);
-      rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    } catch (error) {
-      const reason = (error as NodeJS.ErrnoException).code ?? 'chmod failed';
-      console.warn(`playwright.config: Firefox's scratch home ${home} was left behind (${reason})`);
-    }
+    const warning = removeScratchHome(home);
+    if (warning) console.warn(`playwright.config: ${warning}`);
   });
   const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
   return { ...env, CFFIXED_USER_HOME: home };
@@ -86,6 +68,8 @@ const reportSuffix = covered.every((name) => name === 'chromium') ? '' : `-${cov
 
 export default defineConfig({
   testDir: 'e2e',
+  // e2e/*.test.ts are Vitest tests of the helpers here.
+  testMatch: '**/*.spec.ts',
   // Playwright empties its output folder on every run; a subfolder keeps Vitest's report beside it.
   outputDir: 'test-results/e2e',
   fullyParallel: target === 'mock',
