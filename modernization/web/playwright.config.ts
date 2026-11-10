@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,7 +45,16 @@ const desktop = { viewport: { width: 1280, height: 860 } };
 function firefoxLaunchEnv(): Record<string, string> | undefined {
   if (process.platform !== 'darwin') return undefined;
   const home = mkdtempSync(join(tmpdir(), 'carddemo-pw-firefox-home-'));
-  process.on('exit', () => rmSync(home, { recursive: true, force: true }));
+  process.on('exit', () => {
+    // macOS gives the Library and Downloads folders Firefox creates there a "deny delete" ACL;
+    // chmod -N lifts it. A folder left behind must not change the run's exit code.
+    try {
+      execFileSync('/bin/chmod', ['-R', '-N', home], { stdio: 'ignore' });
+      rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // Left in the temp folder; macOS clears it.
+    }
+  });
   const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
   return { ...env, CFFIXED_USER_HOME: home };
 }
