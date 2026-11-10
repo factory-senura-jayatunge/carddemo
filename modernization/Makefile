@@ -82,7 +82,7 @@ need = [ -e '$(HERE)/$(1)' ] || { echo '$@: FAILED (no modernization/$(1) in thi
 STUBS := verify-batch verify-harness verify-cycle
 .PHONY: help stubs setup toolchain build up stop down status logs infra-up infra-down \
 	infra-wipe require-env verify-spec db-reset db-migrate smoke verify-ledger \
-	test-backend web-build test-e2e trace load verify-data billpay test-billpay test-airflow $(STUBS)
+	test-backend web-build test-e2e trace load verify-data verify-migrations billpay test-billpay test-airflow $(STUBS)
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -162,6 +162,10 @@ db-migrate: require-env ## Apply new migrations to CARDDEMO_DB_NAME without drop
 	@cd '$(HERE)' && ./mvnw -q -B -pl db/db-migrate -am package -DskipTests || { echo '$@: FAILED (building db-migrate)' >&2; exit 1; }
 	@cd '$(HERE)' && $(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --check-logins \
 	&& echo '$@: OK' || { echo '$@: FAILED (db-migrate, see above)' >&2; exit 1; }
+verify-migrations: require-env ## Migrations both ways on scratch databases: from BASE (default: merge base with origin/modernization) up to this checkout, and fresh; same schema at the end
+	@$(call need,mvnw,arrives with the backend)
+	@$(STACK) ensure-infra $@
+	@cd '$(HERE)' && $(WITH_ENV) $(PYTHON) '$(HERE)/scripts/verify_migrations.py' $(if $(BASE),--base '$(BASE)') $(if $(KEEP),--keep)
 load: require-env ## Load the sample data into CARDDEMO_DB_NAME with batch-service's dataLoadJob (db-reset first for a reload after payments)
 	@$(call need,batch/batch-service/pom.xml,arrives with the data migration)
 	@$(STACK) ensure-infra $@

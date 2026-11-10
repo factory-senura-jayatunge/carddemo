@@ -323,6 +323,9 @@ jobs:
       CARDDEMO_SETUP_SKIP: node airflow
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # verify-migrations builds the base commit's db-migrate.
+          fetch-depth: 0
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
@@ -334,6 +337,17 @@ jobs:
       # identity-service seeds the sign-on users that verify-data checks.
       - name: make db-reset load up verify-data (migrations, sample load, identity-service, reconciliation)
         run: make -C modernization db-reset load up verify-data ONLY=identity-service
+      # Flyway runs out of order, so a migration numbered below the applied
+      # version must still apply to an existing database: migrate a scratch
+      # database to the previous head (the pull request's base, or the
+      # commit before the push), then to this commit, and compare it with a
+      # fresh one.
+      - name: make verify-migrations (upgrade from the previous head, and fresh)
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          case "$BASE" in *[!0]*) ;; *) BASE= ;; esac
+          make -C modernization verify-migrations BASE="$BASE"
       - name: Upload results and logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
