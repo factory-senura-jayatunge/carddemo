@@ -6,10 +6,18 @@ every checkout on the machine. The application processes run on the host:
 each converted service from its executable jar, Airflow's four processes
 from the Airflow venv, and the Vite dev server.
 A component that has not been converted yet (its directory does not exist)
-is skipped; one that exists but is not built fails, so a missing piece never
+is skipped. up prepares the others first: it builds the service jars that
+are missing or older than their sources (Maven, tests skipped) and runs npm
+ci when web/node_modules is missing or older than package-lock.json, except
+for a component that is already running, whose files are left alone. A
+component whose preparation fails does not start, so a missing piece never
 looks like a pass.
 
 PIDs go to $CARDDEMO_VAR_DIR/run/<name>.pid, logs to $CARDDEMO_VAR_DIR/log/.
+Each service also records the database it was started against
+(<name>.db, CARDDEMO_DB_NAME); up refuses to reuse a running service that
+uses another database, so changing CARDDEMO_DB_NAME never leaves a service on
+the old one.
 Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 
 Usage: stack.py infra-up | infra-down | up [--only NAME,...] | stop | down | status
@@ -88,14 +96,19 @@ def say(status: str, name: str, detail: str) -> None:
 
 
 class Component:
-    """One host process; `problem` says why a converted one can't start."""
+    """One host process; `problem` says why a converted one can't start,
+    `prepare` what up must do first (build or npm ci) and why."""
 
-    def __init__(self, name, port, cwd, argv, health_url, marker, problem=None, health_key=None):
+    def __init__(self, name, port, cwd, argv, health_url, marker, problem=None, health_key=None,
+                 prepare=None, module=None):
         self.name, self.port, self.cwd, self.argv = name, port, cwd, argv
         self.health_url, self.marker, self.problem = health_url, marker, problem
         # Set for the Airflow processes: the part of the health answer
         # (scheduler, triggerer, ...) that must say "healthy".
         self.health_key = health_key
+        self.prepare = prepare
+        # The Maven module (relative to modernization/) of a service.
+        self.module = module
 
     @property
     def is_airflow(self):
@@ -135,6 +148,68 @@ def node_bin() -> str:
 def find_jar(module_dir: str, artifact: str):
     jars = sorted(glob.glob(os.path.join(module_dir, "target", f"{artifact}-*-exec.jar")))
     return jars[-1] if jars else None
+
+
+# What a service jar is built from, besides its own module: the reactor's
+# poms and the platform libraries every service depends on.
+BUILD_INPUTS = ("pom.xml", ".mvn", "platform")
+SKIP_DIRS = {"target", "node_modules", ".git", "__pycache__"}
+
+
+def newest_source(paths) -> float:
+    newest = 0.0
+    for path in paths:
+        if os.path.isfile(path):
+            newest = max(newest, os.path.getmtime(path))
+            continue
+        for root, dirs, files in os.walk(path):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            for f in files:
+                try:
+                    newest = max(newest, os.path.getmtime(os.path.join(root, f)))
+                except OSError:
+                    pass
+    return newest
+
+
+def jar_problem(module: str, jar):
+    """Why the service jar must be built first, or None when it is current."""
+    if not jar:
+        return "no jar"
+    inputs = [os.path.join(HERE, p) for p in BUILD_INPUTS] + [module]
+    if newest_source(inputs) > os.path.getmtime(jar):
+        return "jar older than its sources"
+    return None
+
+
+def web_problem(web: str):
+    """Why npm ci must run first, or None when node_modules matches the lock file."""
+    installed = os.path.join(web, "node_modules", ".package-lock.json")
+    if not os.path.exists(installed):
+        return "no node_modules"
+    lock = os.path.join(web, "package-lock.json")
+    if os.path.exists(lock) and os.path.getmtime(lock) > os.path.getmtime(installed):
+        return "node_modules older than package-lock.json"
+    return None
+
+
+def db_name(env=None) -> str:
+    """The application database the services use: CARDDEMO_DB_NAME from the
+    environment, else .env, else carddemo (as in the services' settings)."""
+    env = os.environ if env is None else env
+    return env.get("CARDDEMO_DB_NAME") or read_env(ENV_FILE).get("CARDDEMO_DB_NAME") or "carddemo"
+
+
+def db_file(name: str) -> str:
+    return os.path.join(RUN_DIR, f"{name}.db")
+
+
+def recorded_db(name: str):
+    try:
+        with open(db_file(name), encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
 
 
 def airflow_venv() -> str:
@@ -256,7 +331,8 @@ def components() -> list:
         else:
             problem = f"not built: no {rel}/target/{name}-*-exec.jar (run make build)"
         found.append(Component(name, port, module, argv,
-                               f"http://127.0.0.1:{port}{HEALTH_PATH}", jar or name, problem))
+                               f"http://127.0.0.1:{port}{HEALTH_PATH}", jar or name, problem,
+                               prepare=jar_problem(module, jar), module=rel))
     found.extend(airflow_components())
     web = os.path.join(HERE, "web")
     if os.path.exists(os.path.join(web, "package.json")):
@@ -267,7 +343,7 @@ def components() -> list:
         node = node_bin()
         npm = os.path.join(node, "npm") if node else "npm"
         found.append(Component("web", WEB_PORT, web, [npm, "run", "dev"],
-                               f"http://127.0.0.1:{WEB_PORT}/", "vite", problem))
+                               f"http://127.0.0.1:{WEB_PORT}/", "vite", problem, prepare=web_problem(web)))
     return found
 
 
@@ -460,14 +536,18 @@ def start(comp, env) -> str:
         log.close()
     with open(comp.pid_file, "w", encoding="utf-8") as f:
         f.write(f"{proc.pid} {comp.marker}\n")
+    if comp.module:
+        with open(db_file(comp.name), "w", encoding="utf-8") as f:
+            f.write(db_name(env) + "\n")
     return "started"
 
 
 def stop(comp_name, pid, marker) -> bool:
     pid_file = os.path.join(RUN_DIR, f"{comp_name}.pid")
     if not alive(pid, marker):
-        if os.path.exists(pid_file):
-            os.remove(pid_file)
+        for path in (pid_file, db_file(comp_name)):
+            if os.path.exists(path):
+                os.remove(path)
         return True
     try:
         os.killpg(pid, signal.SIGTERM)
@@ -486,6 +566,8 @@ def stop(comp_name, pid, marker) -> bool:
     if alive(pid, marker):
         return False
     os.remove(pid_file)
+    if os.path.exists(db_file(comp_name)):
+        os.remove(db_file(comp_name))
     return True
 
 
@@ -494,6 +576,67 @@ def recorded() -> list:
     exist in this checkout."""
     names = (os.path.basename(p)[:-4] for p in sorted(glob.glob(os.path.join(RUN_DIR, "*.pid"))))
     return [(name, *read_pid_marker(name)) for name in names]
+
+
+def own_process_runs(c) -> bool:
+    """c runs from this checkout's files (its jar, or a web dev server)."""
+    pid, marker = read_pid_marker(c.name)
+    return alive(pid, marker) and (marker == c.marker or c.module is None)
+
+
+def run_logged(argv, cwd, env, log_name, what) -> bool:
+    log_path = os.path.join(LOG_DIR, log_name)
+    os.makedirs(LOG_DIR, exist_ok=True)
+    with open(log_path, "ab") as log:
+        log.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} {what} in {cwd}\n".encode())
+        log.flush()
+        rc = subprocess.run(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=log,
+                            stderr=subprocess.STDOUT).returncode
+    if rc != 0:
+        say("FAIL", what.split()[0], f"exited {rc}; last lines of {log_path}:")
+        print(tail(log_path, 20), flush=True)
+    return rc == 0
+
+
+def prepare(comps, env) -> list:
+    """Builds the missing or stale service jars and installs the web
+    dependencies, for the components that are not running; returns the
+    components after preparation."""
+    names = [c.name for c in comps]
+    todo = [c for c in comps if c.prepare]
+    for c in todo:
+        if own_process_runs(c):
+            say("warn", c.name, f"running, so left as it is ({c.prepare}); make stop, then make up, "
+                                f"restarts it on a fresh build")
+    todo = [c for c in todo if not own_process_runs(c)]
+    builds = [c for c in todo if c.module]
+    failed = set()
+    if builds:
+        modules = ",".join(c.module for c in builds)
+        say("..", "build", f"{modules} ({'; '.join(sorted({c.prepare for c in builds}))}): "
+                           f"Maven package, tests skipped")
+        build_env = dict(env)
+        build_env.setdefault("JAVA_HOME", toolchain("java-home"))
+        argv = [os.path.join(HERE, "mvnw"), "-q", "-B", "-pl", modules, "-am", "package", "-DskipTests"]
+        if run_logged(argv, HERE, build_env, "up-build.log", "build " + modules):
+            say("ok", "build", modules)
+        else:
+            failed |= {c.name for c in builds}
+    web = next((c for c in todo if c.name == "web"), None)
+    if web:
+        say("..", "web", f"npm ci ({web.prepare})")
+        if run_logged([web.argv[0], "ci"], web.cwd, env, "up-npm-ci.log", "npm ci"):
+            say("ok", "web", "npm ci")
+        else:
+            failed.add("web")
+    fresh = {c.name: c for c in components()}
+    result = []
+    for name in names:
+        c = fresh.get(name) or next(x for x in comps if x.name == name)
+        if name in failed:
+            c.problem = "preparation failed, see above"
+        result.append(c)
+    return result
 
 
 def up(only) -> int:
@@ -511,12 +654,23 @@ def up(only) -> int:
     if not comps:
         print("up: OK (infrastructure only; no application component is converted yet)")
         return 0
+    env = child_env()
+    comps = prepare(comps, env)
+    database = db_name(env)
     failures = []
     for c in comps:
         if c.problem:
             say("FAIL", c.name, c.problem)
             failures.append(c.name)
-    env = child_env()
+        elif c.module and alive(*read_pid_marker(c.name)):
+            used = recorded_db(c.name)
+            if used and used != database:
+                c.problem = f"running against database {used}, not {database}; make stop first"
+                say("FAIL", c.name, c.problem)
+                failures.append(c.name)
+            elif not used:
+                say("warn", c.name, f"running, database not recorded; make stop, then make up, to be sure it "
+                                    f"uses {database}")
     af_env = airflow_env(env)
     to_start = [c for c in comps if c.is_airflow and not c.problem and not alive(*read_pid_marker(c.name))]
     if to_start:
@@ -534,7 +688,8 @@ def up(only) -> int:
             continue
         result = start(c, af_env if c.is_airflow else env)
         if result in ("started", "running") or result.startswith("running from"):
-            say("..", c.name, f"{result}, {c.where}, log {c.log_file}")
+            db = f", database {recorded_db(c.name)}" if c.module and recorded_db(c.name) else ""
+            say("..", c.name, f"{result}, {c.where}{db}, log {c.log_file}")
             waiting.append(c)
         else:
             say("FAIL", c.name, result)
@@ -624,7 +779,8 @@ def status() -> int:
                     + (f" ({c.health_key})" if c.health_key else ""))
                 problems.append(name)
             else:
-                say("ok", name, f"pid {pid}" + (f", {c.where}" if c else ""))
+                db = recorded_db(name)
+                say("ok", name, f"pid {pid}" + (f", {c.where}" if c else "") + (f", database {db}" if db else ""))
         elif name in pids:
             say("FAIL", name, f"recorded pid {pid} is gone; see {os.path.join(LOG_DIR, name + '.log')}")
             problems.append(name)
