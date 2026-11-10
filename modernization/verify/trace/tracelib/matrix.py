@@ -48,6 +48,8 @@ class Matrix:
     gate_units: list[str] = field(default_factory=list)
     ungated: list[tuple[str, str]] = field(default_factory=list)
     selected: bool = False
+    planned: list[tuple[str, str]] = field(default_factory=list)
+    declared: list[str] | None = None
 
     @property
     def ok(self) -> bool:
@@ -108,11 +110,24 @@ def _id_unit(ident: str) -> str:
     return parts[1] if len(parts) == 3 else ""
 
 
+def switch_ids(row: Row) -> list[str]:
+    """The switch a row stands for: its own (code_switch = true) and the one that covers it."""
+    ids = [row.id] if row.switch is not None and row.switch.get("code_switch") is True else []
+    cover = covering_switch(row.switch)
+    return ids + ([cover] if cover else [])
+
+
 def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str],
-          units: list[str] | None = None) -> Matrix:
+          units: list[str] | None = None, declared: set[str] | None = None) -> Matrix:
     """units: gate only the gaps of these units (a subset of scope.toml); None gates every unit in
-    scope plus the code switches of any unit. An undefined ID counts for a selected unit when it
-    looks like one of its IDs or when a test that cites it also cites an item of the unit."""
+    scope plus the code switches outside it that are live (see declared). An undefined ID counts for
+    a selected unit when it looks like one of its IDs or when a test that cites it also cites an
+    item of the unit.
+
+    declared: the switch IDs the main code declares or reads (tracelib/code.py). A code switch of a
+    unit outside scope.toml, or an item covered by one, is live when the code declares that switch,
+    the switch's unit is in scope or a test cites either; otherwise its gap is listed as planned and
+    not gated. None treats every switch as live."""
     scope = sorted(ledger.units)
     selected = None if units is None else set(units)
     cited: dict[str, list[Result]] = defaultdict(list)
@@ -137,6 +152,20 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
                               ledger.switches.get(ident), ledger.deviations.get(ident), None, cited.get(ident, []))
     gaps: list[tuple[str, str]] = []
     ungated: list[tuple[str, str]] = []
+    planned: list[tuple[str, str]] = []
+
+    def unit_of(ident: str) -> str:
+        return rows[ident].unit if ident in rows else _id_unit(ident)
+
+    def live(row: Row) -> bool:
+        # A switch that no code declares has nothing to test yet. It is live once its unit is in
+        # scope, the code declares it, or a test cites it (code may read it by a non-literal ID),
+        # so a switch that exists anywhere cannot drop out of the gate.
+        if row.in_scope or declared is None or row.tests:
+            return True
+        return any(i in declared or unit_of(i) in ledger.units or (i in rows and rows[i].tests)
+                   for i in switch_ids(row))
+
     for ident, row in sorted(rows.items(), key=lambda kv: (kv[1].unit, kv[0])):
         # An item covered by a switch is tested by that switch's tests, so it is gated wherever the switch is.
         code_switch = row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch) is not None)
@@ -150,6 +179,10 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
         if row.in_scope and ident in arch_items and row.deviation is None:
             row.status, row.reason = "gap", "architecture-dependent item without a deviation"
         if row.status == "gap":
+            if not live(row):
+                row.status = "planned"
+                planned.append((ident, row.reason))
+                continue
             (gaps if selected is None or row.unit in selected else ungated).append((ident, row.reason))
 
     def touches_selection(ident: str, rs: list[Result]) -> bool:
@@ -161,7 +194,7 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
         gap = (ident, f"cited by {len(rs)} test{'s' if len(rs) > 1 else ''} but not defined by the spec ({rs[0].name})")
         (gaps if selected is None or touches_selection(ident, rs) else ungated).append(gap)
     return Matrix(rows, gaps, dict(unknown), results, scope, sorted(selected) if selected is not None else scope, ungated,
-                  selected is not None)
+                  selected is not None, planned, sorted(declared) if declared is not None else None)
 
 
 def unit_summary(matrix: Matrix) -> dict[str, Counter]:

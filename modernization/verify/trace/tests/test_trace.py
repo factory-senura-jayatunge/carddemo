@@ -17,7 +17,7 @@ TRACE = HERE.parent
 sys.path.insert(0, str(TRACE))
 
 import trace_matrix as trace_cli  # noqa: E402
-from tracelib import ledger, matrix, reports, spec  # noqa: E402
+from tracelib import code, ledger, matrix, reports, spec  # noqa: E402
 from tracelib import manifest as run_manifest  # noqa: E402
 
 REPO = TRACE.parents[2]
@@ -76,8 +76,8 @@ ALL_PASSING = [
 
 
 class GateTest(unittest.TestCase):
-    def build(self, results, arch=frozenset({"DEF-BILL-001"}), led=None):
-        return matrix.build(make_spec(), led or make_ledger(), results, set(arch))
+    def build(self, results, arch=frozenset({"DEF-BILL-001"}), led=None, declared=None):
+        return matrix.build(make_spec(), led or make_ledger(), results, set(arch), declared=declared)
 
     def gaps(self, results, **kw):
         return dict(self.build(results, **kw).gaps)
@@ -158,6 +158,106 @@ class GateTest(unittest.TestCase):
         results = [t for t in ALL_PASSING if t.name != "b"] + [r("b", ["DEF-BILL-009"], mode="FIXED")]
         self.assertEqual(self.gaps(results, led=led), {})
         self.assertEqual(self.build(results, led=led).rows["DEF-BILL-009"].requirement, "ledger-mode:FIXED")
+
+    @staticmethod
+    def with_future_switch(units=("BILL", "MENU")):
+        """A switch of an unconverted unit (STMT), an item it covers, and a must-preserve STMT item."""
+        s = make_spec()
+        for ident, fidelity in (("DEF-STMT-001", "defect-decide"), ("DEF-JSTMT-005", "defect-decide"),
+                                ("BR-STMT-001", "must-preserve")):
+            kind, unit, _ = ident.split("-")
+            s.items[ident] = spec.Item(ident, kind, unit, "X", f"{unit}.md", 1, "t", fidelity, spec.classes_of(fidelity))
+        s.units.update({"STMT": "s", "JSTMT": "j"})
+        led = make_ledger(units)
+        led.switches["DEF-STMT-001"] = {"value": "fixed", "code_switch": True}
+        led.switches["DEF-JSTMT-005"] = {"value": "fixed", "code_switch": False, "note": "Covered by the switch DEF-STMT-001."}
+        return s, led
+
+    DECLARED = frozenset({"DEF-BILL-010", "BR-TRNA-003"})
+
+    def test_switch_no_code_declares_is_planned_not_gated(self):
+        s, led = self.with_future_switch()
+        m = matrix.build(s, led, ALL_PASSING, {"DEF-BILL-001"}, declared=set(self.DECLARED))
+        self.assertTrue(m.ok, m.gaps)
+        self.assertEqual(dict(m.planned), {"DEF-STMT-001": "no passing test in legacy or fixed mode",
+                                           "DEF-JSTMT-005": "no passing test in legacy or fixed mode (covered by the switch "
+                                                            "DEF-STMT-001: its tests must cite this item too)"})
+        self.assertEqual(m.ungated, [])
+        self.assertEqual((m.rows["DEF-STMT-001"].status, m.rows["DEF-JSTMT-005"].status), ("planned", "planned"))
+        self.assertEqual(m.rows["BR-STMT-001"].status, "out-of-scope")
+        self.assertEqual(m.declared, sorted(self.DECLARED))
+        # Without the code scan every switch stays gated, as before.
+        gaps = dict(matrix.build(s, led, ALL_PASSING, {"DEF-BILL-001"}).gaps)
+        self.assertEqual(set(gaps), {"DEF-STMT-001", "DEF-JSTMT-005"})
+
+    def test_declared_switch_of_another_unit_is_gated_with_the_items_it_covers(self):
+        s, led = self.with_future_switch()
+        declared = set(self.DECLARED) | {"DEF-STMT-001"}
+        m = matrix.build(s, led, ALL_PASSING, {"DEF-BILL-001"}, declared=declared)
+        self.assertEqual(set(dict(m.gaps)), {"DEF-STMT-001", "DEF-JSTMT-005"})
+        self.assertEqual(m.planned, [])
+        both = ALL_PASSING + [r("s", ["DEF-STMT-001", "DEF-JSTMT-005"], mode=x) for x in ("LEGACY", "FIXED")]
+        self.assertTrue(matrix.build(s, led, both, {"DEF-BILL-001"}, declared=declared).ok)
+        # Only the covered item's own switch counts: a test of the switch that leaves the item out is not enough.
+        switch_only = ALL_PASSING + [r("s", ["DEF-STMT-001"], mode=x) for x in ("LEGACY", "FIXED")]
+        self.assertEqual(set(dict(matrix.build(s, led, switch_only, {"DEF-BILL-001"}, declared=declared).gaps)),
+                         {"DEF-JSTMT-005"})
+
+    def test_mixed_binding_of_another_unit_needs_both_modes_and_passing_tests(self):
+        """BR-TRNA-003: a switch of TRNA that BILL code declares and BILL tests exercise."""
+        declared = set(self.DECLARED)
+        no_trna = [t for t in ALL_PASSING if t.name != "d"]
+        self.assertEqual(dict(self.build(no_trna, declared=declared).gaps), {"BR-TRNA-003": "no passing test in legacy or fixed mode"})
+        fixed_only = no_trna + [r("d", ["BR-TRNA-003", "BR-BILL-001"], mode="FIXED")]
+        self.assertEqual(dict(self.build(fixed_only, declared=declared).gaps), {"BR-TRNA-003": "no passing test in legacy mode"})
+        failing = ALL_PASSING + [r("e", ["BR-TRNA-003", "BR-BILL-001"], status="failed", mode="LEGACY")]
+        self.assertEqual(dict(self.build(failing, declared=declared).gaps), {"BR-TRNA-003": "1 failing test", "BR-BILL-001": "1 failing test"})
+        # With no declaration and no test citing it, the same switch is planned.
+        m = self.build(no_trna, declared={"DEF-BILL-010"})
+        self.assertTrue(m.ok)
+        self.assertEqual([g for g, _ in m.planned], ["BR-TRNA-003"])
+
+    def test_test_citing_a_switch_makes_it_live(self):
+        s, led = self.with_future_switch()
+        fixed_only = ALL_PASSING + [r("s", ["DEF-STMT-001"], mode="FIXED")]
+        gaps = dict(matrix.build(s, led, fixed_only, {"DEF-BILL-001"}, declared=set(self.DECLARED)).gaps)
+        self.assertEqual(gaps, {"DEF-STMT-001": "no passing test in legacy mode",
+                                "DEF-JSTMT-005": "no passing test in legacy or fixed mode (covered by the switch "
+                                                 "DEF-STMT-001: its tests must cite this item too)"})
+        failing = ALL_PASSING + [r("s", ["DEF-JSTMT-005"], status="failed")]
+        gaps = dict(matrix.build(s, led, failing, {"DEF-BILL-001"}, declared=set(self.DECLARED)).gaps)
+        self.assertEqual(gaps, {"DEF-JSTMT-005": "1 failing test"})
+
+    def test_unit_entering_scope_gates_its_missing_items(self):
+        s, led = self.with_future_switch(units=("BILL", "MENU", "STMT"))
+        m = matrix.build(s, led, ALL_PASSING, {"DEF-BILL-001"}, declared=set(self.DECLARED))
+        self.assertEqual(dict(m.gaps), {
+            "BR-STMT-001": "no passing test",
+            "DEF-STMT-001": "no passing test in legacy or fixed mode",
+            # Covered by a switch of a unit in scope, so gated although its own unit is not.
+            "DEF-JSTMT-005": "no passing test in legacy or fixed mode (covered by the switch DEF-STMT-001: its tests must cite this item too)",
+        })
+        self.assertEqual(m.planned, [])
+
+    def test_switch_in_scope_is_gated_even_when_no_code_declares_it(self):
+        gaps = dict(self.build([t for t in ALL_PASSING if t.name != "c"], declared=set()).gaps)
+        self.assertEqual(gaps, {"DEF-BILL-010": "no passing test in legacy or fixed mode"})
+
+    def test_in_scope_failures_and_missing_citations_still_gate_with_the_code_scan(self):
+        declared = set(self.DECLARED)
+        self.assertEqual(dict(self.build(ALL_PASSING + [r("e", ["FLOW-BILL-001"], status="failed")], declared=declared).gaps),
+                         {"FLOW-BILL-001": "1 failing test"})
+        self.assertEqual(dict(self.build(ALL_PASSING[1:], declared=declared).gaps),
+                         {"BR-BILL-001": "no passing test", "FLOW-BILL-001": "no passing test"})
+        self.assertEqual(dict(self.build(ALL_PASSING[1:], declared=declared, led=make_ledger(("MENU",))).gaps), {})
+
+    def test_unit_selection_lists_planned_switches_apart(self):
+        s, led = self.with_future_switch()
+        results = [t for t in ALL_PASSING if t.name not in ("a", "d")]
+        m = matrix.build(s, led, results, {"DEF-BILL-001"}, ["MENU"], declared=set(self.DECLARED))
+        self.assertTrue(m.ok)
+        self.assertEqual({g for g, _ in m.ungated}, {"BR-BILL-001", "FLOW-BILL-001", "BR-TRNA-003"})
+        self.assertEqual({g for g, _ in m.planned}, {"DEF-STMT-001", "DEF-JSTMT-005"})
 
     def test_unit_selection_gates_only_those_units(self):
         results = [t for t in ALL_PASSING if t.name not in ("a", "d")]
@@ -330,7 +430,53 @@ class CliTest(unittest.TestCase):
         other_switches = {i for i, e in led.switches.items()
                           if (e.get("code_switch") is True or ledger.covering_switch(e)) and i.split("-")[1] not in led.units}
         self.assertIn("BR-TRNA-003", other_switches)
-        self.assertEqual({g["id"] for g in data["gate"]["ungated_gaps"]}, other_switches)
+        ungated = {g["id"] for g in data["gate"]["ungated_gaps"]}
+        planned = {g["id"] for g in data["gate"]["planned"]}
+        self.assertEqual(ungated | planned, other_switches)
+        self.assertEqual(ungated & planned, set())
+        self.assertIn("BR-TRNA-003", ungated)
+
+    def test_every_other_unit_switch_is_gated_or_planned_by_the_code(self):
+        """One rule for every code switch outside scope.toml: gated when the code declares it, else planned."""
+        (self.tmp / "reports").mkdir()
+        rc, out = self.run_cli(self.tmp / "reports")
+        self.assertEqual(rc, 1)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        led = ledger.load(REPO / "modernization/ledger")
+        scanned = code.scan(REPO / "modernization", REPO)
+        # A checkout without the Java code (a ledger-only branch) takes the fail-closed path.
+        declared = set(scanned.switches) if scanned.files else None
+        self.assertEqual(data["gate"]["declared_switches"], sorted(declared) if declared is not None else None)
+        gaps = {g["id"] for g in data["gate"]["gaps"]}
+        planned = {g["id"] for g in data["gate"]["planned"]}
+        self.assertEqual(gaps & planned, set())
+        for ident, e in led.switches.items():
+            if ident.split("-")[1] in led.units or not (e.get("code_switch") is True or ledger.covering_switch(e)):
+                continue
+            owner = ident if e.get("code_switch") is True else ledger.covering_switch(e)
+            with self.subTest(ident):
+                self.assertIn(ident, gaps if declared is None or owner in declared else planned)
+        self.assertLessEqual({"BR-TRNA-003", "DEF-ACUP-002"}, gaps)
+        if declared is None:
+            self.assertEqual(planned, set())
+            return
+        self.assertLessEqual({"BR-TRNA-003", "DEF-ACUP-002"}, declared)
+        for g in gaps:
+            owner = ledger.covering_switch(led.switches.get(g)) or g
+            self.assertTrue(g.split("-")[1] in led.units or owner in declared or g.startswith(("INV-", "PINV-")), g)
+        self.assertIn("planned code switch", out)
+        md = (self.tmp / "out/matrix.md").read_text(encoding="utf-8")
+        self.assertIn("## Planned code switches (not gated, not delivered)", md)
+
+    def test_no_java_found_gates_every_switch(self):
+        (self.tmp / "reports").mkdir()
+        with unittest.mock.patch.object(trace_cli.code, "scan", return_value=code.Code()):
+            rc, _ = self.run_cli(self.tmp / "reports")
+        self.assertEqual(rc, 1)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["gate"]["planned"], [])
+        self.assertIsNone(data["gate"]["declared_switches"])
+        self.assertIn("DEF-STMT-001", {g["id"] for g in data["gate"]["gaps"]})
 
     def test_unit_option_rejects_a_unit_outside_the_scope(self):
         (self.tmp / "reports").mkdir()
@@ -385,6 +531,10 @@ class CliTest(unittest.TestCase):
         self.assertEqual(statuses["DEF-BILL-001"], "deviation")
         self.assertEqual(statuses["BR-MENU-002"], "excluded")
         self.assertEqual(statuses["DEF-BILL-010"], "covered")
+        # A green gate still lists the planned switches, and never as covered.
+        planned = {g["id"] for g in data["gate"]["planned"]}
+        self.assertEqual(bool(planned), data["gate"]["declared_switches"] is not None)
+        self.assertEqual({statuses[i] for i in planned}, {"planned"} if planned else set())
 
 
 class ManifestTest(unittest.TestCase):
