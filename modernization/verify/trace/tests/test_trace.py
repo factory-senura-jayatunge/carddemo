@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -17,6 +18,7 @@ sys.path.insert(0, str(TRACE))
 
 import trace_matrix as trace_cli  # noqa: E402
 from tracelib import ledger, matrix, reports, spec  # noqa: E402
+from tracelib import manifest as run_manifest  # noqa: E402
 
 REPO = TRACE.parents[2]
 
@@ -280,6 +282,9 @@ class ReportsTest(unittest.TestCase):
         self.write("a/target/classes/z.json", "{}")
         self.write("var/run/test-results/v.xml", "<testsuite/>")
         self.assertEqual(sorted(reports.discover(self.tmp)), sorted(keep))
+        # A report directory given itself, as a run manifest or --reports names it.
+        self.assertEqual(reports.discover(self.tmp / "a/target/spec-items"), [keep[0]])
+        self.assertEqual(reports.discover(self.tmp / "a/target"), [keep[0]])
 
     def test_broken_reports_are_problems(self):
         p = self.write("build/test-results/x.xml", "<testsuite>")
@@ -380,6 +385,197 @@ class CliTest(unittest.TestCase):
         self.assertEqual(statuses["DEF-BILL-001"], "deviation")
         self.assertEqual(statuses["BR-MENU-002"], "excluded")
         self.assertEqual(statuses["DEF-BILL-010"], "covered")
+
+
+class ManifestTest(unittest.TestCase):
+    """trace --manifest: only the reports one run wrote count for its gate."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.reports = self.tmp / "reports"
+        self.reports.mkdir()
+        self.items = self.reports / "billpay/target/spec-items"
+        self.manifest = self.tmp / "run/manifest.json"
+
+    def run_cli(self, manifest=True, units=("BILL",)):
+        out = io.StringIO()
+        rc = trace_cli.run(REPO, REPO / "modernization/ledger", [self.reports], self.tmp / "out", out,
+                           list(units) if units else None, self.manifest if manifest else None)
+        return rc, out.getvalue()
+
+    def bill_lines(self, status="SUCCESSFUL"):
+        """A spec-items report that closes every BILL gap of the committed spec and ledger."""
+        rc = trace_cli.run(REPO, REPO / "modernization/ledger", [self.tmp / "none"], self.tmp / "probe",
+                           io.StringIO(), ["BILL"])
+        self.assertEqual(rc, 1)
+        gaps = json.loads((self.tmp / "probe/matrix.json").read_text(encoding="utf-8"))["gate"]["gaps"]
+        return "\n".join(json.dumps({"class": "T", "method": g["id"], "displayName": mode, "items": [g["id"]],
+                                     "status": status, "mode": mode})
+                         for g in gaps for mode in ("LEGACY", "FIXED")) + "\n"
+
+    def write(self, path, body, after_ns=None):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        if after_ns is not None:
+            # Set explicitly: some kernels stamp files from a coarse clock that can lag time.time_ns().
+            os.utime(path, ns=(after_ns, after_ns))
+        return path
+
+    def begin(self, entries):
+        return run_manifest.begin(self.manifest, self.tmp, "test-billpay",
+                                  [(str(p), req) for p, req in entries], base="reports")
+
+    def started(self):
+        return json.loads(self.manifest.read_text(encoding="utf-8"))["started_ns"]
+
+    def failing_firefox_report(self):
+        data = {"suites": [{"title": "bill.spec.ts", "file": "bill.spec.ts", "specs": [
+            {"title": "@BR-BILL-001 BILL-S5 pays", "file": "bill.spec.ts", "tags": [],
+             "tests": [{"projectName": "firefox", "status": "unexpected", "results": [{"status": "failed"}]}]}]}]}
+        return self.write(self.reports / "web/playwright-report/e2e-stack-fixed-firefox.json", json.dumps(data))
+
+    def test_run_reads_only_its_reports_and_lists_the_others(self):
+        lines = self.bill_lines()
+        firefox = self.failing_firefox_report()
+        self.begin([(self.items, True)])
+        self.write(self.items / "T.jsonl", lines, self.started() + 10**9)
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("warning: 1 report outside this run has failing or unreadable results", out)
+        self.assertIn("web/playwright-report/e2e-stack-fixed-firefox.json: 1 failed", out)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["reports"], [str(self.items / "T.jsonl")])
+        self.assertEqual([(o["path"], o["failed"]) for o in data["run"]["outside"]], [(str(firefox), 1)])
+        md = (self.tmp / "out/matrix.md").read_text(encoding="utf-8")
+        self.assertIn("## Reports of this run", md)
+        self.assertIn("## Reports outside this run (not read)", md)
+        # Without a manifest every report counts, so the failing browser run keeps the gate red.
+        rc, out = self.run_cli(manifest=False)
+        self.assertEqual(rc, 1)
+        self.assertIn("BR-BILL-001: 1 failing test", out)
+
+    def test_failing_test_in_a_current_report_is_a_gap(self):
+        lines = self.bill_lines()
+        self.begin([(self.items, True)])
+        self.write(self.items / "T.jsonl", lines, self.started() + 10**9)
+        self.write(self.items / "U.jsonl", json.dumps({"class": "U", "method": "m", "displayName": "m()",
+                                                       "items": ["BR-BILL-001"], "status": "FAILED"}) + "\n",
+                   self.started() + 10**9)
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 1)
+        self.assertIn("BR-BILL-001: 1 failing test", out)
+
+    def test_stale_file_from_the_same_second_is_not_current(self):
+        lines = self.bill_lines()
+        report = self.write(self.items / "T.jsonl", lines)
+        self.begin([(self.items, True)])
+        data = json.loads(self.manifest.read_text(encoding="utf-8"))
+        started = (data["started_ns"] // 10**9) * 10**9 + 500_000_000
+        data["started_ns"] = started
+        self.manifest.write_text(json.dumps(data), encoding="utf-8")
+        # Written 1 ns before the run began, in the same second, and changed since the fingerprint:
+        # a whole-second comparison would take it for the run's own report.
+        self.write(report, lines + "\n", started - 1)
+        self.assertEqual(report.stat().st_mtime_ns // 10**9, started // 10**9)
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 1)
+        self.assertIn("report: required report", out)
+        self.assertIn("is stale", out)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["reports"], [])
+        self.assertEqual(data["run"]["reports"][0]["stale"], [str(report)])
+
+    def test_unchanged_file_is_stale_even_when_its_time_looks_current(self):
+        lines = self.bill_lines()
+        report = self.write(self.items / "T.jsonl", lines)
+        self.begin([(self.items, True)])
+        data = json.loads(self.manifest.read_text(encoding="utf-8"))
+        # A clock that runs behind the file server: the file looks newer than the start, but it is
+        # exactly the file the run found when it began.
+        data["started_ns"] = report.stat().st_mtime_ns - 1
+        self.manifest.write_text(json.dumps(data), encoding="utf-8")
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 1)
+        self.assertIn("is stale", out)
+        self.write(report, lines, report.stat().st_mtime_ns)
+        self.write(report, lines + "\n", report.stat().st_mtime_ns + 1)
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 0, out)
+
+    def test_mixed_directory_reads_only_the_files_the_run_wrote(self):
+        lines = self.bill_lines()
+        old = self.write(self.items / "Old.jsonl", json.dumps({"class": "Old", "method": "m", "displayName": "m()",
+                                                               "items": ["BR-BILL-001"], "status": "FAILED"}) + "\n")
+        self.begin([(self.items, True)])
+        new = self.write(self.items / "T.jsonl", lines, self.started() + 10**9)
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 0, out)
+        data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["reports"], [str(new)])
+        self.assertEqual(data["run"]["reports"][0]["stale"], [str(old)])
+        self.assertEqual(data["run"]["outside"], [])
+
+    def test_missing_empty_and_uncited_required_reports_are_gaps(self):
+        lines = self.bill_lines()
+        empty_dir = self.reports / "vitest/test-results"
+        empty_dir.mkdir(parents=True)
+        uncited = self.reports / "web/playwright-report/e2e-mock-fixed.json"
+        self.begin([(self.items, True), (self.reports / "web/playwright-report/e2e-stack-fixed.json", True),
+                    (empty_dir, True), (uncited, True), (self.reports / "optional/spec-items", False)])
+        self.write(self.items / "T.jsonl", lines, self.started() + 10**9)
+        self.write(uncited, json.dumps({"suites": []}), self.started() + 10**9)
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 1)
+        self.assertIn("e2e-stack-fixed.json of test-billpay is missing", out)
+        self.assertIn("vitest/test-results of test-billpay holds no report file", out)
+        self.assertIn("e2e-mock-fixed.json of test-billpay has no test result citing an item", out)
+        self.assertNotIn("optional", out)
+        self.assertEqual(out.rstrip().splitlines()[-1], "trace: FAILED (3 gaps)")
+
+    def test_invalid_manifest_fails_closed(self):
+        cases = [
+            ("{", "not JSON"),
+            ("[]", "not a JSON object"),
+            (json.dumps({"schema": 1, "run": "r", "started_ns": 1.5, "reports": [{"path": "x", "required": True}]}),
+             "started_ns must be"),
+            (json.dumps({"schema": 1, "run": "r", "started_ns": 5, "reports": []}), "reports must be a non-empty list"),
+            (json.dumps({"schema": 1, "run": "r", "started_ns": 5, "reports": [{"path": "x", "required": "yes"}]}),
+             "required must be true or false"),
+            (json.dumps({"schema": 1, "run": "r", "started_ns": 5, "extra": 1, "reports": [{"path": "x", "required": True}]}),
+             "unknown field 'extra'"),
+            (json.dumps({"schema": 1, "run": "r", "started_ns": 5,
+                         "reports": [{"path": "x", "required": True, "before": [{"file": "a"}]}]}),
+             "before[1] must have exactly file, mtime_ns, size and sha256"),
+        ]
+        self.manifest.parent.mkdir(parents=True)
+        for body, message in cases:
+            with self.subTest(message):
+                self.manifest.write_text(body, encoding="utf-8")
+                rc, out = self.run_cli()
+                self.assertEqual(rc, 1)
+                self.assertIn(message, out)
+                self.assertEqual(out.rstrip().splitlines()[-1], "trace: FAILED (the run manifest is not valid)")
+        self.manifest.unlink()
+        rc, out = self.run_cli()
+        self.assertEqual(rc, 1)
+        self.assertIn("cannot read", out)
+
+    def test_manifest_and_reports_cannot_be_combined(self):
+        with unittest.mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit) as cm:
+            trace_cli.main(["--root", str(REPO), "--manifest", str(self.manifest), "--reports", str(self.reports)])
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_begin_records_the_files_already_there(self):
+        report = self.write(self.items / "T.jsonl", "x\n")
+        data = self.begin([(self.items, True), (self.reports / "web/none.json", False)])
+        self.assertEqual(data["reports"][0]["before"][0]["file"], "T.jsonl")
+        self.assertEqual(data["reports"][0]["before"][0]["mtime_ns"], report.stat().st_mtime_ns)
+        self.assertEqual(data["reports"][1]["before"], [])
+        self.assertGreaterEqual(data["started_ns"], report.stat().st_mtime_ns)
+        m, problems = run_manifest.load(self.manifest, self.tmp)
+        self.assertEqual(problems, [])
+        self.assertEqual(list(m.entries[0].before), [report])
 
 
 if __name__ == "__main__":

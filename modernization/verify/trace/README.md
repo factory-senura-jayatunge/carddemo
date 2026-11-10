@@ -95,11 +95,37 @@ excluded = { "BR-MENU-002" = "options 1-9 and 11 not converted" }
 python3 modernization/verify/trace/trace_matrix.py                         # what make trace runs
 python3 modernization/verify/trace/trace_matrix.py --unit BILL             # gate only Bill Pay (repeatable)
 python3 modernization/verify/trace/trace_matrix.py --reports path/to/dir-or-file ... --out /tmp/trace
+python3 modernization/verify/trace/trace_matrix.py --unit BILL --manifest build/test-billpay/manifest.json --out build/test-billpay/trace
 ```
 
 `--unit` takes a unit of `scope.toml` (any other unit fails) and can be given more than once. Only the gaps of the named units count for the gate and the exit status: code switches of other units, and undefined IDs that neither look like an ID of the unit nor share a test with one of its items, are listed under "Gaps of units outside the gate" instead. An unreadable report is a gap whatever the selection, because it may hold the unit's results.
 
-**Reports.** Files under any `spec-items`, `test-results`, `playwright-report`, `surefire-reports` or `failsafe-reports` directory (`node_modules`, `.git` and `var` are skipped):
+**Run manifest.** A runner that gates its own tests, such as `make test-billpay`, passes `--manifest FILE` (not combinable with `--reports`). The trace then reads only the report files the run wrote, so a report left on disk by an earlier, unrelated run (for example another browser's Playwright run) neither covers nor breaks the run's gate. Without a manifest, `make trace` still reads every report on disk, so such a report keeps the top-level gate red until a valid run replaces it.
+
+```json
+{"schema": 1, "run": "test-billpay", "started_ns": 1762795547123456789,
+ "reports": [
+  {"path": "services/billpay-service/target/spec-items", "required": true,
+   "before": [{"file": "org.carddemo.billpay.BillPayApiTest.jsonl", "mtime_ns": 1762795001000000000, "size": 18234, "sha256": "…"}]},
+  {"path": "web/playwright-report/e2e-mock-fixed.json", "required": true, "before": []},
+  {"path": "platform/test-support/target/spec-items", "required": false, "before": []}]}
+```
+
+| Field | Meaning |
+| :-- | :-- |
+| `started_ns` | When the run began, `time.time_ns()`, taken before its first test step. |
+| `base` | Optional; the directory that relative paths start from, relative to the repository root (default `modernization`). |
+| `reports[].path` | A report file, or a directory searched like any report directory (it may itself be a `spec-items` or `test-results` directory). |
+| `reports[].required` | `true` when the run must have produced it. |
+| `reports[].before` | The report files already at the path when the run began: `file` (relative to a directory path, or the file's own name), `mtime_ns`, `size`, `sha256`. |
+
+`tracelib/manifest.py`'s `begin(manifest_path, repo_root, run, [(path, required), ...])` takes `started_ns` and the `before` fingerprints and writes the file; a runner may also write the same JSON itself.
+
+A file at a listed path is **current** when its modification time is at or after `started_ns`, compared in nanoseconds, and it differs from its `before` fingerprint. Only current files are read; the others are **stale**, not read, and listed in the matrix. The gate fails closed: an invalid or unreadable manifest ends with `trace: FAILED (the run manifest is not valid)`, and a required path that is missing, holds no current file, or whose current files carry no test result citing an item is a gap (`report: required report … is missing`, `… is stale`, `… holds no report file`, `… has no test result citing an item`). A failing test in a current report is a gap as always. Every other report file under `modernization/` is listed under "Reports outside this run (not read)" with its failed count, and trace prints a warning naming the ones with failing or unreadable results.
+
+Limits: freshness trusts the file system's modification times and the runner's clock. A file system with coarse times (HFS+, FAT, some network mounts), or a kernel that stamps files from a coarse clock, can date a file the run wrote before `started_ns`; it then counts as stale and the gate fails, which errs on the safe side. A file server whose clock runs ahead of the runner's can make an older file look current; the `before` fingerprint still marks it stale while its content and time are unchanged. Output paths that are new for each invocation avoid both; where a path is fixed (Maven's `target/spec-items`), the fingerprint is what tells an old file from a new one.
+
+**Reports.** Files under any `spec-items`, `test-results`, `playwright-report`, `surefire-reports` or `failsafe-reports` directory, including a `--reports` or manifest path that is itself such a directory (`node_modules`, `.git` and `var` are skipped):
 
 | Format | Items | Mode |
 | :-- | :-- | :-- |
