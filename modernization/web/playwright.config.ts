@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /**
  * Two targets:
@@ -29,8 +32,30 @@ process.argv.forEach((arg, i) => {
 named.forEach((name) => asked.add(name));
 process.env.CARDDEMO_E2E_PROJECTS = [...asked].filter(Boolean).join(' ');
 const desktop = { viewport: { width: 1280, height: 860 } };
+
+/**
+ * On macOS 27, Playwright's Firefox can exit at launch with "Could not find profile folder". Reported
+ * cause: besides the profile Playwright passes, Gecko looks in ~/Library/Application Support/Firefox,
+ * which macOS can protect (https://github.com/microsoft/playwright/issues/42768, closed for 1.65; 1.65.0
+ * still fails on macOS 27.2, https://github.com/n9d0g/fcc/pull/477). CFFIXED_USER_HOME points that
+ * lookup at an empty private folder that this process creates and removes, so the user's own Firefox
+ * folder is never read or changed. Linux and Windows get nothing. Try without it on each upgrade.
+ */
+function firefoxLaunchEnv(): Record<string, string> | undefined {
+  if (process.platform !== 'darwin') return undefined;
+  const home = mkdtempSync(join(tmpdir(), 'carddemo-pw-firefox-home-'));
+  process.on('exit', () => rmSync(home, { recursive: true, force: true }));
+  const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
+  return { ...env, CFFIXED_USER_HOME: home };
+}
+const firefoxEnv = asked.has('firefox') ? firefoxLaunchEnv() : undefined;
+
 const others = [
-  { name: 'firefox', use: { ...devices['Desktop Firefox'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
+  {
+    name: 'firefox',
+    use: { ...devices['Desktop Firefox'], ...desktop, ...(firefoxEnv ? { launchOptions: { env: firefoxEnv } } : {}) },
+    testIgnore: /screenshots\.spec\.ts/,
+  },
   { name: 'webkit', use: { ...devices['Desktop Safari'], ...desktop }, testIgnore: /screenshots\.spec\.ts/ },
 ].filter((project) => asked.has(project.name));
 // The projects this run covers name its report, so that a run of another browser (one that fails
