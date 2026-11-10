@@ -81,6 +81,7 @@ export function SignOnPage() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    // The fields are read-only while busy, so the answer always belongs to the values on screen.
     if (busy) return;
     const problem = checkSignOn(userId, password);
     if (problem) {
@@ -127,6 +128,7 @@ export function SignOnPage() {
                 value={userId}
                 onChange={(event) => setUserId(event.currentTarget.value)}
                 maxLength={8}
+                readOnly={busy}
                 autoComplete="username"
                 autoCapitalize="characters"
                 spellCheck={false}
@@ -143,6 +145,7 @@ export function SignOnPage() {
                 value={password}
                 onChange={(event) => setPassword(event.currentTarget.value)}
                 maxLength={64}
+                readOnly={busy}
                 autoComplete="current-password"
                 description="Upper and lower case count."
                 error={invalid('password')}

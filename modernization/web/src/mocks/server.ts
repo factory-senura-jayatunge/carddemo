@@ -262,15 +262,23 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     return problem(404, 'NOT_FOUND', null);
   }
 
+  // Each request loads the whole state, awaits its body and saves the state again; overlapping
+  // requests would overwrite each other's changes (a failed attempt, a payment), so they take turns.
+  let turn: Promise<unknown> = Promise.resolve();
+
   return {
     async handle(request: Request): Promise<Response> {
       const { latencyMs } = settings();
       if (latencyMs > 0) await new Promise((resolve) => setTimeout(resolve, latencyMs));
-      const state = store.load() ?? fresh();
-      const response = await route(request, state);
-      store.save(state);
-      document.cookie = `XSRF-TOKEN=${state.csrf}; path=/; SameSite=Strict`;
-      return response;
+      const answer = turn.then(async () => {
+        const state = store.load() ?? fresh();
+        const response = await route(request, state);
+        store.save(state);
+        document.cookie = `XSRF-TOKEN=${state.csrf}; path=/; SameSite=Strict`;
+        return response;
+      });
+      turn = answer.catch(() => undefined);
+      return answer;
     },
     reset() {
       store.save(fresh());

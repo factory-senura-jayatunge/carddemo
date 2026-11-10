@@ -94,6 +94,22 @@ describe('Sign-on page (COSGN00C)', () => {
     await waitFor(() => expect(app.router.state.location.pathname).toBe('/'));
   });
 
+  it('@VAL-SGN-004 SGN-S7b: the fields are read-only while sign-on checks them, so the answer belongs to what is on screen', async () => {
+    const app = await openSignOn({ settings: { latencyMs: 300 } });
+    await app.user.type(userId(), 'USER0001');
+    await app.user.type(password(), 'WRONGPWD{Enter}');
+    expect(app.apiCalls('/api/auth/sign-on')).toHaveLength(1);
+    expect(userId()).toHaveAttribute('readonly');
+    expect(password()).toHaveAttribute('readonly');
+    await app.user.type(password(), 'X{Enter}');
+    await waitFor(() => expect(messageText()).toBe('Wrong User ID or Password. Try again ...'));
+    expect(password()).toHaveValue('WRONGPWD');
+    expect(password()).not.toHaveAttribute('readonly');
+    const sent = app.apiCalls('/api/auth/sign-on');
+    expect(sent).toHaveLength(1);
+    expect(await sent[0]?.json()).toMatchObject({ userId: 'USER0001', password: 'WRONGPWD' });
+  });
+
   it('@DEF-SGN-005 SGN-S13 @fixed: an unknown user type is refused', async () => {
     const app = await openSignOn();
     await signOn(app, 'TYPEX001', 'PASSWORD');
