@@ -26,7 +26,7 @@ Order after that: data migration, batch and the daily cycle, the online account,
 ## Fidelity: the COBOL behaviour by default
 
 - Every observable behaviour in the spec is reproduced: data changes, message texts, the order of field checks, report and statement layouts.
-- Each defect the spec marks *defect-decide* keeps its COBOL behaviour by default and gets a switch (`carddemo.fidelity.<item ID>: legacy | fixed`). Choices are recorded in a ledger file, and `make verify-ledger` checks the code against it.
+- Each defect the spec marks *defect-decide* is built in its decided behaviour. Only where a real alternative is needed (batch output parity, external wire contracts) does it get a switch (`carddemo.fidelity.<item ID>: legacy | fixed`), listed in [switches.md](switches.md). Choices are recorded in a ledger file, and `make verify-ledger` checks the code against it.
 - About two dozen defects cannot be kept, because the mechanism behind them is gone (state shared between MQ messages in one CICS task, files without rollback). They are listed in [decisions.md](decisions.md#architecture-dependent-fidelity-items) for an explicit "accept the fix".
 - Proof: batch jobs are compared byte for byte with the GnuCOBOL build on the sample and stress data (`make verify-batch`). Every test names the spec items it proves, and `make trace` fails CI when a converted unit has an untested item.
 

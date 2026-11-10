@@ -19,21 +19,21 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 | COUSR03C · USRD (CU03) | `DELETE /api/users/{userId}` with `If-Match`; route `/admin/users/:userId/delete` | Confirmation step stays in the UI. |
 | COBIL00C · BILL (CB00) | service `billpay-service` `GET /api/billpay/accounts/{acctId}`, `POST /api/billpay/accounts/{acctId}/payments`; route `/bill-pay` | First slice. One DB transaction (SE-BILL-001 to 005). See [overview.md](overview.md#the-bill-pay-first-slice). |
 | COACTVWC · ACVW (CAVW) | service `account-service` `GET /api/accounts/{acctId}`; route `/accounts/view` | Lookup chain cross-reference, account, customer (SE-ACVW-*); multi-card policy DEF-ACVW-003. PII masked by default. |
-| COACTUPC · ACUP (CAUP) | `POST /api/accounts/{acctId}/validate`, `PUT /api/accounts/{acctId}` with `If-Match`; route `/accounts/edit` | Validate then save (FLOW-ACUP-102 edit order); account and customer in one transaction (DEF-ACUP-005); group-ID-in-ZIP switch (DEF-ACUP-002, INV-039). |
+| COACTUPC · ACUP (CAUP) | `POST /api/accounts/{acctId}/validate`, `PUT /api/accounts/{acctId}` with `If-Match`; route `/accounts/edit` | Validate then save (FLOW-ACUP-102 edit order); account and customer in one transaction (DEF-ACUP-005); group ID saved in its own field (DEF-ACUP-002 fixed-only here; the switch lives in the account load, [switches.md](switches.md)). |
 | COCRDLIC · CRDL (CCLI) | `GET /api/cards?acctId=&cardNum=&after=&before=&size=7`; route `/cards` | Keyset paging, 7 rows (BR-CRDL-*); rows carry `cardId`, never the PAN in a URL. |
 | COCRDSLC · CRDV (CCDL) | `POST /api/cards/lookup` (typed account and card), `GET /api/cards/{cardId}`; route `/cards/:cardId`, `/cards/lookup` | Reads by card number only (BR-CRDV-001); account check per Q-CRDV-*. |
-| COCRDUPC · CRDU (CCUP) | `PUT /api/cards/{cardId}` with `If-Match`; route `/cards/:cardId/edit` | Four editable fields; CVV overwrite (DEF-CRDU-002) and account move (DEF-CRDU-001) are switches. |
+| COCRDUPC · CRDU (CCUP) | `PUT /api/cards/{cardId}` with `If-Match`; route `/cards/:cardId/edit` | Four editable fields; the CVV is never written (DEF-CRDU-002) and the account never changes (DEF-CRDU-001), both fixed-only. |
 | COTRN00C · TRNL (CT00) | service `transaction-service` `GET /api/transactions?start=&after=&before=&size=10`; route `/transactions` | "Equal or greater" start, look-ahead for next page. |
 | COTRN01C · TRNV (CT01) | `GET /api/transactions/{tranId}`; route `/transactions/:tranId` | No lock (DEF-TRNV-001 is incidental). |
 | COTRN02C · TRNA (CT02) | `POST /api/transactions/validate`, `POST /api/transactions`, `GET /api/transactions/latest`; route `/transactions/new` | ID from `ledger-core` (shared with Bill Pay, DEF-TRNA-003); writes only the transaction row (BR-TRNA-007) unless Q-TRNA-001 says post. |
 | CORPT00C · RPTS (CR00) | `POST /api/reports/transactions` (202 with run ID), `GET /api/reports/transactions/{runId}`, `GET .../{runId}/file`; route `/reports/transactions` | Triggers DAG `carddemo_transaction_report`; replaces the 17-record JOBS stream (ENT-REPORT-JOB). |
-| CSUTLDTC · DTCK | library `platform/validation` `LegacyDateCheck` (Java and TypeScript) | Returns severity and message number as CEEDAYS would (2507 to 2521); the 2513 acceptance is a switch (DEF-DTCK-004, Q-DTCK-003). |
+| CSUTLDTC · DTCK | library `platform/validation` `LegacyDateCheck` (Java and TypeScript) | Returns severity and message number as CEEDAYS would (2507 to 2521); the callers treat 2513 as invalid (DEF-DTCK-004 fixed-only, D-52); `LegacyDateCheck` itself has no switch. |
 
 ### Batch, core
 
 | Spec | Target | Notes |
 | :-- | :-- | :-- |
-| CBTRN02C · POST | job `postDailyTransactionsJob` steps `ingestDailyFile`, `post`; DAG `carddemo_daily_cycle` task `post_daily_transactions` | Single-threaded in input order (BR-POST-007); exit status `COMPLETED_WITH_REJECTS` for legacy RC 4. |
+| CBTRN02C · POST | jobs `ingestDailyFileJob` (steps `stage`, `claimOnlineAdds`) and `postDailyTransactionsJob` (steps `post`, `exportRejects`); DAG `carddemo_daily_cycle` tasks `ingest_daily_file`, `post_daily_transactions` | Single-threaded in input order (BR-POST-007); exit status `COMPLETED_WITH_REJECTS` for legacy RC 4. |
 | CBACT04C · INTC | job `calculateInterestJob` step `interest`; DAG task `calculate_interest` | Item = one account with its category balances; truncation toward zero (BR-INTC-001); ID prefix from the cycle date (BR-INTC-005). |
 | CBTRN03C · TRPT | job `transactionReportJob` steps `select`, `print`; DAG `carddemo_transaction_report` | 133-byte report writer with BR-TRPT-005 paging and NUM-TRPT-002 edits. |
 | CBTRN01C · TVAL | dropped | No job and no output; its card and account checks are part of posting (BR-POST-*). |
@@ -72,7 +72,7 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 | COPAUS0C · AUSM (CPVS) | `GET /api/accounts/{acctId}/authorizations/summary`, `GET /api/accounts/{acctId}/authorizations?after=&size=5`; route `/authorizations` | Main menu option 11; newest first. |
 | COPAUS1C · AUDT (CPVD) | `GET /api/authorizations/{authId}`, `POST /api/authorizations/{authId}/fraud`; route `/authorizations/:authId` | Detail update and fraud row in one transaction (PINV-e-authorization-03). |
 | COPAUS2C · AUFR | absorbed into `authorization-service` `FraudService` | Insert or update of `pauth.auth_fraud`; no XA needed. |
-| CBPAUP0C · AUPG | job `purgePendingAuthorizationsJob`; DAG task `purge_pending_authorizations` | Expiry days, commit interval as job parameters; defects AUPG-001 to 009 are switches. |
+| CBPAUP0C · AUPG | job `purgePendingAuthorizationsJob`; DAG task `purge_pending_authorizations` | Expiry days, commit interval as job parameters; the decided AUPG fixes are built fixed-only (CBPAUP0C cannot run locally, so nothing compares with it). |
 | DBUNLDGS · DBUL | dropped | IMS unload to GSAM; SQL Server backup replaces it. |
 | PAUDBUNL · PDUL | dropped | IMS unload; its 100- and 206-byte layouts define the input of the one-time loader step `loadPendingAuthorizations`. |
 | PAUDBLOD · PDLD | dropped | IMS reload; replaced by the loader step and SQL Server restore. |
@@ -86,7 +86,7 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 | CLOSEFIL · JCLOSE | DAG `carddemo_daily_cycle` task `open_batch_window` | Batch-window row instead of `CEMT SET FIL CLO` (INV-002, Q-JCLOSE-001). |
 | OPENFIL · JOPEN | DAG task `close_batch_window` | Runs only after success; on failure the window stays open as legacy (ERR-JCA7-001). |
 | TRANBKP · JTBKP | DAG task `archive_master` (job `archiveMasterJob`) | The reset becomes "end the previous master window" on the rows; the backup copy is dropped because the rows stay in the table ([batch.md](batch.md#the-transaction-master-and-cycles)). |
-| POSTTRAN · JPOST | DAG tasks `ingest_daily_file`, `post_daily_transactions` | Job `postDailyTransactionsJob`; RC 4 maps to success with warnings. |
+| POSTTRAN · JPOST | DAG tasks `ingest_daily_file`, `post_daily_transactions` | Jobs `ingestDailyFileJob`, `postDailyTransactionsJob`; RC 4 maps to success with warnings. |
 | INTCALC · JINTC | DAG task `calculate_interest` behind branch `interest_due` | PARM `2022071800` derived from the cycle date (Q-INTC-006); frequency per Q-JINTC-002. |
 | COMBTRAN · JCOMB | dropped as a step | Posting and interest insert straight into the master tagged with the cycle; the sort is an `ORDER BY`. Removes the relative-generation hazard (INV-052, Q-JCOMB-001). |
 | CREASTMT · JSTMT | DAG task `generate_statements` (job `statementJob`) | Work KSDS and re-key sort replaced by an `ORDER BY card_num, tran_id`. Runs after interest (INV-054). |
@@ -113,7 +113,7 @@ Target kinds: **service** (endpoint), **route** (React), **job** (Spring Batch j
 | TRANCATG · JTCATG | schema `ref.tran_category` with foreign key and seed | Reload dropped: one store. |
 | DISCGRP · JDISC | schema `ref.disclosure_group`; step `loadDisclosureGroups`; job `disclosureGroupReloadJob` on DAG `carddemo_reference_refresh` | Weekly reload kept, with a check that the `DEFAULT` group exists. |
 | TCATBALF · JTCAT | schema `core.tcat_bal`; step `loadCategoryBalances` for new environments only | Running balances, not reference data: no scheduled reload. |
-| DUSRSECJ · JUSEC | schema `iam.app_user`; demo seed from `.env` secrets via `make load` | Clear-text passwords dropped. |
+| DUSRSECJ · JUSEC | schema `iam.app_user`; demo seed users from `.env` (`CARDDEMO_SEED_USER_PASSWORD`), seeded by `identity-service` in the `demo` profile only (D-06) | Clear-text passwords dropped. |
 | ESDSRRDS · JESRR | dropped | ESDS and RRDS copies of the user file with no consumer in the repository (Q-JESRR-001). |
 | DEFGDGB · JGDGB | dropped | GDG bases; replaced by cycle tags and per-run output folders with retention 5. |
 | DEFGDGD · JGDGD | dropped | Reference-data backup GDGs; SQL Server backups (or temporal tables if required). |

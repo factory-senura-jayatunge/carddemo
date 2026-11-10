@@ -7,7 +7,69 @@ This list has four parts:
 3. **Open questions that change the architecture.** Only the Q-items whose answer changes a table, a service, a DAG or a queue. Every other Q-item and defect-decide item is a fidelity switch or a ledger entry and leaves the architecture as it is.
 4. **Architecture-dependent fidelity items.** Defects that the new platform cannot reproduce, so they need an explicit "accept the fix".
 
-Until a default is answered, the build keeps the COBOL behaviour (legacy mode). Security is the exception described in D-SEC-01.
+Until a default is answered, the build keeps the COBOL behaviour (legacy mode). Security is the exception described in D-SEC-01. Which decided items keep a code switch is in [switches.md](switches.md).
+
+## Decided values
+
+The user approved this proposal (D10) and answered the decision catalog (`docs/modernization/decisions/README.md`) on 2026-11-06: every catalog recommendation is accepted, including the bulk fix D-75 and the architecture-dependent fixes below, and every default here takes its recommended value, except D-SEC-01 (C1) and D-BAT-05 (`WRITES_BLOCKED`). Where the catalog and these answers differ, these answers win. `ledger/fidelity.toml` records the decided value of every item. Under the targeted switch policy (user decision, 2026-11-06), only the items in [switches.md](switches.md) keep a legacy mode in code. They default to `legacy` and are tested in both modes; every other decided fix is built and tested in its decided mode only.
+
+| ID | Decided value |
+| :-- | :-- |
+| D-ARCH-01 to D-ARCH-16 | As proposed. |
+| D-SEC-01 | **C1**: sign-on for every screen and API, roles `ADMIN` and `USER`, staff model (D-01, D-02, D-03). Unknown user types are refused (DEF-SGN-005 fixed). Masking applies under C1 as in D-SEC-05. |
+| D-SEC-02 | Local password check in `identity-service`; OIDC later only changes that service. |
+| D-SEC-03 | Salted bcrypt hashes; case-sensitive passwords, case-insensitive user IDs; legacy passwords hashed once at migration and changed at first sign-on (D-04, DEF-SGN-011 fixed). |
+| D-SEC-04 | On: 5 failures lock the user for 15 minutes; one neutral failure message for unknown user, wrong password and locked user; 15-minute idle timeout; explicit sign-off; sign-on audit (D-05). |
+| D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. Mechanism (ruled 2026-11-06): masking is done in the application, with one SQL login per service. A service gets column-level `GRANT UNMASK` only on the masked columns it must use or reveal; every other login sees SQL Server dynamic data masking. No second unmask login: it would run in the same process with the same secrets, so it would not contain a bug in the service, and it would double the connection setup. Details in [data-model.md](data-model.md#ownership-and-grants). |
+| D-SEC-06 | As proposed (D-07). |
+| D-SEC-07 | New-password rule as in the security table above. |
+| D-28 (catalog) | Payments post like batch postings (user answer): negative amount, POSTTRAN rule, so the amount lands in `curr_cyc_debit` and category balance `02/0002`. With D-19 kept, a payment raises the over-limit figure for later charges in the cycle (DEF-POST-005). |
+| D-DATA-01 | Group ID moved to `group_id` at migration; DEF-ACUP-002 fixed (D-11). |
+| D-DATA-02 | `card_xref` owns the card-to-account link; `card.acct_id` follows it (D-13, D-61). |
+| D-DATA-03 | `legacy_filler` kept until cut-over for the differential checks, then dropped. |
+| D-DATA-04 | **Dropped** (ruled 2026-11-06 on the recommended value): no converted function reads the CVV. Card list and card view read it but neither show nor use it, card update keeps the stored value (D-12) and checks concurrency with `If-Match` (D-17), and export and reports never output it (D-10). `cvv_cd` is in no API, DTO, log or export. The column stays, masked, with no login holding `UNMASK` on it, until cut-over; then a migration drops it and the loader field. |
+| D-DATA-05 | **Now**, not after cut-over: one SQL Server sequence `core.tran_id_seq`, 16 digits, no seed record (D-59), switch `BR-TRNA-003`. Legacy mode ("highest + 1" under a lock) stays for parity tests. |
+| D-DATA-06 | **Now**: `orig_ts` and `proc_ts` are `DATETIME2(6)`; legacy layouts are produced by the exporter (D-60). |
+| D-DATA-07 | `tran_pk` kept. |
+| D-BAT-01 | Interest monthly on a chosen day (D-24). |
+| D-BAT-02 | Statements once per statement period, on the interest day (D-38). |
+| D-BAT-03 | Purge after the cycle (D-39). |
+| D-BAT-04 | All history kept, retention per data class from the data-handling policy (D-40). |
+| D-BAT-05 | **`WRITES_BLOCKED`** (the user's answer, which overrides catalog D-18): reads work during the window, writes return 503. Sign-on, refresh and sign-off stay available. |
+| D-BAT-06 to D-BAT-10 | As proposed (D-57, D-66, D-41, D-62, D-23). |
+| D-MSG-01 | Structured JSON replies once no requester parses the text (D-72). |
+| D-MSG-02 | As proposed. |
+| D-MSG-03 | Outbox: commit, reply, acknowledge (D-35). |
+| D-MSG-04 | Replies to the request's `reply_to` (D-73). |
+| D-WEB-01 to D-WEB-03 | As proposed. |
+| D-WEB-04 | Hidden: admin options 5 and 6 when the transaction type module is absent (D-70). Main menu option 11 keeps its must-preserve "not installed" message (BR-MENU-004), because no catalog item makes it defect-decide. |
+| D-NFR-01 to D-NFR-10 | As proposed; D-NFR-10 audit follows D-56. |
+
+Answers to the open questions of the table further down:
+
+| Question | Answer |
+| :-- | :-- |
+| Q-BILL-002 | Yes, confirmed by the user on 2026-11-06 as "same as batch posting", with the over-limit formula of D-19 kept. A payment is stored as a negative amount and applied by `ledger-core`'s posting primitive, the one POSTTRAN uses: balance, cycle total (`curr_cyc_debit`, where posting puts negative amounts) and category balance `02/0002` (D-28). |
+| Q-TRNA-001 | Online adds feed the posting input (D-27): `transaction-service` writes a `core.daily_tran` row, and the next cycle's posting applies POSTTRAN's checks and updates to it, exactly once. Nothing is written to `core.transaction` until then. Path and consequences in [batch.md](batch.md#online-writes-between-cycles). |
+| Q-BILL-004 | No ownership check (C1, D-03); the paying user is recorded. |
+| Q-JINTC-002, Q-JCTLM-002 | Monthly (D-24). |
+| Q-JSTMT-001 | Once per statement period (D-38). |
+| Q-JCA7-003 | After the cycle (D-39). |
+| Q-JGDGB-001, Q-JREPT-001 | Keep all history, retention by data class (D-40). |
+| Q-JEXPT-001, Q-JIMPT-001 | Database export and load instead, unless a receiver is named (D-62). |
+| Q-JPDF-001 | One PDF per statement from a template (D-45). |
+| Q-AUTH-005 | Outbox (D-35). |
+| Q-AUTH-004 | Requests are validated and declined with the existing reason codes (D-32). |
+| Q-MQAC-002 | `reply_to` (D-73). |
+| Q-ENT-001 | Moved at migration (D-11). |
+| Q-ENT-002 | Surrogate key kept (D-59, D-DATA-07). |
+| Q-USRL-002 | Standard server-side paging and order (D-54): the `ebcdic_sort_key` column stays only for the legacy mode. |
+| Q-SGN-003, Q-SGN-004 | Lockout and neutral message (D-05). |
+| Q-JTTYP-001 | One reference store (D-63). |
+| Q-JCLOSE-001 | The window covers the same tables, with `WRITES_BLOCKED` (D-BAT-05). |
+| Q-RPTS-001 | Asynchronous run with status and download (D-48). |
+
+The Bill Pay slice applies these values in [billpay-slice.md](billpay-slice.md).
 
 ## Architecture decisions
 
@@ -41,6 +103,7 @@ Until a default is answered, the build keeps the COBOL behaviour (legacy mode). 
 | D-SEC-03 | Password storage and case | bcrypt hash of the upper-cased password; user IDs and passwords case-insensitive, as today | Case-sensitive passwords with a forced reset at migration | D-04 (same) | DEF-SGN-001, INV-007, BR-SGN-001 |
 | D-SEC-04 | Lockout, rate limit, failure message | Off; the two legacy messages stay | On, with a neutral message | D-05 (same) | Q-SGN-003, Q-SGN-004 |
 | D-SEC-05 | PII on screens | Shown as today, every view audited | Masked unless the user holds `PII_VIEWER` | D-09 (same) | DEF-ACVW-010, DEF-CRDL-002 |
+| D-SEC-07 | New-password rule | Legacy mode: 1 to 8 characters, upper-cased before hashing, different from the current one | Fixed mode (with D-04): 8 to 64 characters, case-sensitive, any printable character, different from the current one, not the user ID; the user-admin screens use the same rule ([billpay-slice.md](billpay-slice.md#new-password-rules-d-sec-07)) | D-04, D-53 (decided: fixed) | DEF-SGN-011 |
 | D-SEC-06 | Least privilege for services and jobs | Always on: per-service SQL logins and RabbitMQ users (no legacy mode) | same | D-07 (same) | DEF-JCRDB-003, DEF-MQAC-004 |
 
 ### Data

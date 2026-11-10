@@ -22,16 +22,20 @@ Each service connects with its own SQL login. The grants are the enforced versio
 
 | Table | Read | Insert | Update | Delete |
 | :-- | :-- | :-- | :-- | :-- |
-| `core.account` | all services, batch | batch (load) | account-service (profile columns); billpay-service (`curr_bal` only); batch (balances, cycle totals) | batch (reload) |
+| `core.account` | all services, batch | batch (load) | account-service (profile columns); billpay-service (`curr_bal`, `curr_cyc_credit`, `curr_cyc_debit`); batch (balances, cycle totals) | batch (reload) |
 | `core.customer` | account, authorization, batch | batch (load) | account-service | batch (reload) |
-| `core.card` | account, batch | batch (load) | account-service (name, status, expiry; account in legacy mode) | batch (reload) |
+| `core.card` | account, authorization (status and expiry columns, D-32), batch | batch (load) | account-service (name, status, expiry; account in legacy mode) | batch (reload) |
 | `core.card_xref` | all services, batch | batch (load) | none | batch (reload) |
-| `core.transaction` | transaction, billpay, inquiry, batch | transaction-service, billpay-service, batch | batch (`in_master` only) | batch (retention purge) |
-| `core.tcat_bal` | batch | batch | batch (and billpay-service if DEF-BILL-010 is fixed) | batch (reload) |
-| `core.daily_tran`, `core.daily_reject` | batch, operations view | batch | none | batch (retention) |
+| `core.transaction` | transaction, billpay, inquiry, batch | billpay-service, batch (online adds arrive through `core.daily_tran`, D-27) | batch (`in_master` only) | batch (retention purge) |
+| `core.tcat_bal` | batch, billpay-service | batch, billpay-service | batch, billpay-service (`balance`; DEF-BILL-010 fixed, D-28) | batch (reload) |
+| `core.daily_tran` | batch, transaction-service (waiting `ONLINE_ADD` rows, for legacy IDs and "copy latest") | batch, transaction-service (`ONLINE_ADD`, D-27) | batch (the claim) | batch (retention) |
+| `core.daily_reject` | batch, operations view | batch | none | batch (retention) |
 | `ref.*` | all | reference-service, batch (load, maintenance job) | same | same |
+| `pauth.*` | authorization-service, batch | authorization-service, batch (load) | authorization-service; batch (summary totals on purge) | batch (purge, reload); `auth_fraud` never |
 
-Column-level `GRANT UPDATE (curr_bal)` to the Bill Pay login is what keeps Bill Pay standalone yet unable to change anything else in the account (INV-004).
+Column-level `GRANT UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` to the Bill Pay login is what keeps Bill Pay standalone yet unable to change anything else in the account (INV-004). The cycle columns are needed because a payment is posted like any other transaction (D-28).
+
+Masking (D-SEC-05): the masked columns (`core.customer` SSN, government ID, DOB, EFT account; `core.card.cvv_cd`; `core.transaction.card_num`) carry dynamic data masking. A service login gets column-level `GRANT UNMASK` only on the masked columns it must use or reveal, for example account_svc on the four customer columns and transaction_svc on `core.transaction.card_num`. No login gets it on `cvv_cd` (D-DATA-04). Dynamic data masking only protects ad-hoc readers; it is not the control for API responses. Each service masks PII in its responses to the last four characters by default. The value is revealed only through an explicit `ADMIN` unmask request, which returns only the fields asked for, with `Cache-Control: no-store`, and writes an `ops.audit` row (subject key and field names, never values). Each service has one login; there is no separate unmask login.
 
 ## Core tables
 
@@ -50,11 +54,11 @@ Column-level `GRANT UPDATE (curr_bal)` to the Bill Pay login is what keeps Bill 
 
 ### `core.customer` (ENT-CUSTOMER, `CUSTDATA`, 500 bytes)
 
-`cust_id CHAR(9)` PK; `first_name`, `middle_name`, `last_name VARCHAR(25)`; `addr_line_1` to `_3 VARCHAR(50)` (line 3 is the city); `state_cd CHAR(2)`; `country_cd CHAR(3)`; `zip VARCHAR(10)`; `phone_1`, `phone_2 VARCHAR(15)`; `ssn CHAR(9)`; `govt_issued_id VARCHAR(20)`; `dob DATE`; `eft_account_id CHAR(10)`; `pri_card_holder_ind CHAR(1)`; `fico_score SMALLINT`; `row_version`. SSN, government ID, DOB and EFT account carry SQL Server dynamic data masking for every login except the account-service unmask role; encryption at rest is decision D-NFR-05.
+`cust_id CHAR(9)` PK; `first_name`, `middle_name`, `last_name VARCHAR(25)`; `addr_line_1` to `_3 VARCHAR(50)` (line 3 is the city); `state_cd CHAR(2)`; `country_cd CHAR(3)`; `zip VARCHAR(10)`; `phone_1`, `phone_2 VARCHAR(15)`; `ssn CHAR(9)`; `govt_issued_id VARCHAR(20)`; `dob DATE`; `eft_account_id CHAR(10)`; `pri_card_holder_ind CHAR(1)`; `fico_score SMALLINT`; `row_version`. SSN, government ID, DOB and EFT account carry SQL Server dynamic data masking; account_svc holds column-level `UNMASK` on them and masks responses itself ([grants](#ownership-and-grants)); encryption at rest is decision D-NFR-05.
 
 ### `core.card` (ENT-CARD, `CARDDATA`, 150 bytes)
 
-`card_num CHAR(16)` PK; `card_id BIGINT IDENTITY` unique (used in URLs instead of the PAN); `acct_id CHAR(11)` with index `IX_card_acct` (replaces `CARDAIX`, no 8-per-account cap); `cvv_cd CHAR(3)` masked, never returned by an API (decision D-DATA-04 recommends dropping it); `embossed_name VARCHAR(50)`; `expiration_date CHAR(10)` with a pattern check (kept as text because card update keeps whatever day it read, DEF-CRDU-009); `active_status CHAR(1)`; `legacy_filler CHAR(59)` NULL; `row_version`. No foreign key on `acct_id`, because card update in legacy mode may move a card to any account (DEF-CRDU-001).
+`card_num CHAR(16)` PK; `card_id BIGINT IDENTITY` unique (used in URLs instead of the PAN); `acct_id CHAR(11)` with index `IX_card_acct` (replaces `CARDAIX`, no 8-per-account cap); `cvv_cd CHAR(3)` masked, in no API, DTO, log or export, and no login unmasks it; dropped at cut-over (D-DATA-04 decided: drop); `embossed_name VARCHAR(50)`; `expiration_date CHAR(10)` with a pattern check (kept as text because card update keeps whatever day it read, DEF-CRDU-009); `active_status CHAR(1)`; `legacy_filler CHAR(59)` NULL; `row_version`. No foreign key on `acct_id` yet. Card update never changes it (DEF-CRDU-001 fixed-only), so the accounts slice may add one once the loader confirms every card's account exists.
 
 ### `core.card_xref` (ENT-CARD-XREF, `CARDXREF`, 50 bytes)
 
@@ -69,24 +73,24 @@ Column-level `GRANT UPDATE (curr_bal)` to the Bill Pay login is what keeps Bill 
 | `type_cd`, `cat_cd` | `CHAR(2)`, `CHAR(4)` BIN2 | No foreign key: transaction add does not check them (BR-TRNA-007). |
 | `source` | `VARCHAR(10)` | |
 | `description` | `VARCHAR(100)` | |
-| `amount` | `DECIMAL(11,2)` | Bill payments are stored positive (DEF-BILL-010). |
+| `amount` | `DECIMAL(11,2)` | Bill payments are stored negative (DEF-BILL-010 fixed, D-28); positive in legacy mode. |
 | `merchant_id` | `CHAR(9)` | |
 | `merchant_name`, `merchant_city` | `VARCHAR(50)` | |
 | `merchant_zip` | `VARCHAR(10)` | |
 | `card_num` | `CHAR(16)` | Masked for logins outside the core services. |
-| `orig_ts`, `proc_ts` | `CHAR(26)` | Stored as each writer writes them: five layouts today (Q-BILL-006). |
-| `proc_date_text` | `AS CAST(LEFT(proc_ts,10) AS CHAR(10)) PERSISTED`, indexed | The report compares this text (INV-010); replaces the `TRAN-PROC-TS` AIX. |
+| `orig_ts`, `proc_ts` | `DATETIME2(6)` | One typed column (D-60, Q-BILL-006); the exporter writes each origin's legacy layout for the differential checks. |
+| `proc_date` | `AS CAST(proc_ts AS DATE) PERSISTED`, indexed | The report selects on the date (INV-010); replaces the `TRAN-PROC-TS` AIX. |
 | `legacy_filler` | `CHAR(20)` NULL | Inherited by online writers in legacy mode (DEF-BILL-006). |
 | `origin` | `VARCHAR(12)` | `LOADED`, `POSTED`, `INTEREST`, `ONLINE_ADD`, `BILL_PAY`. |
-| `cycle_id` | `INT` NULL, FK `batch.cycle` | The cycle that posted the row, or the open cycle for online writes. |
+| `cycle_id` | `INT` NULL, FK `batch.cycle` | The cycle that posted the row. NULL for bill payments until the batch slice settles the stamping rule. |
 | `in_master` | `BIT` | 1 while the row is in the legacy "transaction master" ([batch.md](batch.md#the-transaction-master-and-cycles)). |
 
-Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date_text, card_num)` for the report.
+Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, card_num)` for the report. New IDs come from the sequence `core.tran_id_seq` (16 digits, no seed row, D-59) through `ledger-core`; legacy mode allocates "highest + 1" under a lock.
 
 ### Other core tables
 
 - `core.tcat_bal` (ENT-TCAT-BAL): PK `(acct_id, type_cd, cat_cd)`; `balance DECIMAL(11,2)`; `legacy_filler CHAR(22)` NULL; `row_version`.
-- `core.daily_tran` (ENT-DAILY-TRAN): staging for the posting input. PK `(cycle_id, seq)`; the parsed columns plus `raw_record CHAR(350)`, because a reject carries the input as read.
+- `core.daily_tran` (ENT-DAILY-TRAN): staging for the posting input, from the daily file and from online adds (D-27). PK `daily_pk BIGINT IDENTITY`; `cycle_id INT` NULL (NULL = an online add waiting for the next cycle) and `seq INT` NULL, unique `(cycle_id, seq)` once claimed; `origin VARCHAR(12)` (`DAILY_FILE`, `ONLINE_ADD`); `created_by` NULL (the user, for online adds); the parsed columns plus `raw_record CHAR(350)`, because a reject carries the input as read. Filtered unique index `UX_daily_waiting (tran_id) WHERE cycle_id IS NULL`. [batch.md](batch.md#online-writes-between-cycles) describes the claim.
 - `core.daily_reject` (ENT-DAILY-REJECT): PK `(cycle_id, seq)`; `reason_cd CHAR(4)` (100 to 103); `reason_desc VARCHAR(76)`; `raw_record CHAR(350)`. View `core.v_daily_reject` masks the card number for operations users.
 
 ## Reference, identity and module tables
@@ -97,17 +101,38 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date_t
 | `ref.tran_category` (ENT-TRAN-CATEGORY, ENT-DB2-TRAN-TYPE-CAT) | `(type_cd, cat_cd CHAR(4))` | FK to `tran_type` `ON DELETE NO ACTION` (Db2 RESTRICT, BR-TTLS-009). |
 | `ref.disclosure_group` (ENT-DISC-GROUP) | `(group_id CHAR(10), type_cd, cat_cd)` | `int_rate DECIMAL(6,2)`, annual percent; the `DEFAULT` group must exist. |
 | `ref.us_state`, `ref.us_state_zip_prefix`, `ref.nanp_area_code` | code | The 56 states, 240 state and ZIP-prefix pairs and 410 area codes the account update edits use; exposed read-only so Java and TypeScript validators share them. |
-| `iam.app_user` (ENT-USER-SECURITY) | `user_id CHAR(8)` BIN2 | `first_name`, `last_name VARCHAR(20)`, `password_hash VARCHAR(100)`, `user_type CHAR(1)`, `ebcdic_sort_key BINARY(8)` (list order, Q-USRL-002), audit columns, `row_version`. Lockout columns exist but stay unused in legacy mode (Q-SGN-003). |
-| `iam.refresh_token`, `iam.audit_event` | id | Audit rows never hold PII values, only IDs and field names. |
+| `iam.app_user` (ENT-USER-SECURITY) | `user_id CHAR(8)` BIN2 | `first_name`, `last_name VARCHAR(20)`, `password_hash VARCHAR(100)`, `user_type CHAR(1)`, `ebcdic_sort_key BINARY(8)` (list order, Q-USRL-002), `must_change_password`, `failed_attempts`, `locked_until`, `last_sign_on_at` (lockout and forced change, decided by D-04 and D-05), audit columns, `row_version`. |
+| `iam.session`, `iam.audit_event` | id | Sessions hold the hash of the current and previous refresh token. Audit rows never hold PII values, only IDs and field names. |
 | `billpay.payment` | `tran_pk` | `tran_id`, `acct_id`, `paid_by CHAR(8)`, `idempotency_key UNIQUEIDENTIFIER` unique, `amount`, `created_at`. |
-| `pauth.auth_summary` (ENT-AUTH-SUMMARY, IMS root `PAUTSUM0`) | `acct_id CHAR(11)` | Limits, balances, approved and declined counts and amounts as `DECIMAL(11,2)` and `SMALLINT` (the IMS domain); `row_version`. |
-| `pauth.auth_detail` (ENT-AUTH-DETAIL, IMS child `PAUTDTL1`) | `auth_id BIGINT IDENTITY` | FK `acct_id` to the summary `ON DELETE CASCADE` (the purge deletes a summary with its details). `processed_at DATETIME2(3)` indexed descending replaces the 9-complement key; `auth_date_9c` and `auth_time_9c` are kept as columns, unique per account, because the fraud key derives from them (Q-AUFR-001). |
-| `pauth.auth_fraud` (ENT-AUTH-FRAUD, Db2 `AUTHFRDS`) | `(card_num, auth_ts)` | The 26 Db2 columns; nullable `auth_id` without FK, so the row survives the purge. |
+| `pauth.auth_summary` (ENT-AUTH-SUMMARY, IMS root `PAUTSUM0`) | `acct_id CHAR(11)` | FK to `core.account`. Limits and balances `DECIMAL(11,2)`; approved and declined counts `INT` and amounts `DECIMAL(15,2)` ([below](#pending-authorizations-pauth)); no status fields; `row_version`. |
+| `pauth.auth_detail` (ENT-AUTH-DETAIL, IMS child `PAUTDTL1`) | `auth_id BIGINT IDENTITY` | FK `acct_id` to the summary `ON DELETE CASCADE` (the purge deletes a summary with its details). `processed_at DATETIME2(3)` indexed descending replaces the 9-complement key; `auth_date_9c` and `auth_time_9c` are kept as columns, unique per account, which reproduces the IMS duplicate-key rule; the loader carries them. IDs are never reused. |
+| `pauth.auth_fraud` (ENT-AUTH-FRAUD, Db2 `AUTHFRDS`) | `auth_id` (D-36) | The 26 Db2 columns plus `reported_by` (DEF-AUDT-006 deviation); non-unique index `(card_num, auth_ts)`; no FK, so the row survives the purge. |
 | `pauth.processed_message`, `pauth.outbox` | message key | Idempotency and reply outbox for the fixed mode of the authorization listener ([messaging.md](messaging.md)). |
-| `batch.cycle` | `cycle_id` | `business_date DATE` unique, `interest_parm CHAR(10)`, status, timestamps. |
+| `batch.cycle` | `cycle_id` | `business_date DATE` unique, `attempt`, `interest_parm CHAR(10)`, status (`OPEN`, `COMPLETED`), the inbound file's name and SHA-256, timestamps. |
 | `batch.report_run`, `batch.statement_run` | run ID | Parameters, requester, status, output paths. |
 | `batch.BATCH_*` | Spring Batch | Job repository; Spring Batch's SQL Server schema. |
-| `ops.batch_window` | `window_id` | `cycle_id`, `mode`, `opened_at`, `closed_at`. |
+| `ops.batch_window` | `window_id` | `cycle_id` or `run_key` (exactly one), `mode`, `opened_at`, `closed_at`. |
+| `batch.execution_lease`, `batch.export_run` | job execution ID; `export_id` | Execution ownership and exports ([batch-execution-contract.md](batch-execution-contract.md)). |
+
+### Pending authorizations (`pauth`)
+
+Rulings on the V500 to V502 DDL review (2026-11-06):
+
+- **Fraud key (D-36).** `pauth.auth_fraud` is keyed by `auth_id`, the detail's surrogate ID, one of the options D-36 accepted. Two authorizations can no longer share a fraud row (DEF-AUFR-001). `(card_num, auth_ts)` stays as a non-unique index in the Db2 order. There is no FK, so the fraud row outlives the detail.
+- **IDs are never reused.** Fraud rows keep `auth_id` after the detail is gone, so `pauth.auth_detail` is never truncated or reseeded. The loader deletes rows, which does not reset `IDENTITY`. `batch_svc` gets no `ALTER` on `pauth`.
+- **Summary to account.** The FK `auth_summary.acct_id` → `core.account` stays. As in the other referential checks, a summary for a missing account fails `loadPendingAuthorizations`. A reload deletes `pauth` before `core.account` and loads it afterwards.
+- **Unused summary fields.** `PA-AUTH-STATUS` and `PA-ACCOUNT-STATUS` get no columns. No program reads them, and online-created summaries hold leftover bytes in them (DEF-AUTH-013). The loader skips their bytes.
+- **Authorization code (D-32, BR-AUTH-008).** The service sets the code to the six rightmost digits of `auth_id`, zero-padded. There is no sequence and no unique constraint. The code is unique among any 1,000,000 consecutive authorizations, so it is unique among retained details while fewer than that arrive within one purge expiry. Loaded rows keep their legacy code. Nothing looks a row up by its code.
+- **Running totals.** The summary's approved and declined counts are `INT`, and its approved and declined amounts are `DECIMAL(15,2)`. The IMS domain (`S9(4) COMP`, `S9(9)V99`) is not kept for these totals. The declined totals grow with every decline. One declined request at the largest valid amount (`DECIMAL(12,2)`) already overflows `S9(9)V99`, and capping the count would decline every request of a busy account. Limits and balances keep `DECIMAL(11,2)`. How the screen shows the counts and amounts (NUM-AUSM-001, NUM-AUSM-002) belongs to the web contract.
+- **Purge (D-33, D-34).** Purging a detail subtracts it from the summary's totals: approved count and amount plus `credit_balance` for an approval, declined count and amount for anything else. A summary is deleted only when it has no details left. Details flagged `F` are not purged, because fraud rows are kept with no expiry. `processed_message` rows and sent `outbox` rows older than the same expiry are deleted.
+- **Matching (D-33), open.** D-33 also releases a pending approval "when matched", and that obligation stands. No input shares a key with the posted transaction, so the match rule is waiting for the user ([d33-matching-brief.md](d33-matching-brief.md)). Until the user decides, no automatic match is built. The purge release is built either way.
+- **Loader source.** The only sample is the EBCDIC IMS HD unload `AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat` (ENT-AUTH-HD-UNLOAD): `RECFM=VB`, 226 records, each with a 4-byte record descriptor. The first and last records (88 bytes) are utility header and trailer records and are skipped. The 22 records of 140 bytes are `PAUTSUM0` segments (an IMS prefix, then the 100-byte summary), and the 202 records of 240 bytes are `PAUTDTL1` segments (an IMS prefix, then the 200-byte detail). The loader takes the segment data as the last 100 or 200 bytes of the record, and decodes it with the EBCDIC code page and packed decimal through `platform/legacy-format`. A detail belongs to the summary before it in the file, because the HD unload writes each root followed by its children. The root whose key is all `X'40'` is skipped with its details, as PAUDBUNL BR-PDUL-002 does. Any other record length or segment name fails the step. The PAUDBUNL and DBUNLDGS file layouts are not loaded, because the repository contains no sample in those layouts.
+- **Loader mapping.** `processed_at` is derived from the 9-complement parts, with years `20YY`. `PA-FRAUD-RPT-DATE` is mapped to `DATE`: blank becomes NULL, and text that does not parse fails the step.
+
+| Login | Grants on `pauth` and for authorization |
+| :-- | :-- |
+| `authorization_svc` | `SELECT` on `core.card_xref`, `core.account`, `core.customer`. On `core.card`, column-level `SELECT` on the card number, account, active status and expiry only, never `cvv_cd` (D-DATA-04). `SELECT, INSERT, UPDATE` on `auth_summary` and `auth_fraud`. `SELECT, INSERT` on `auth_detail`, plus `UPDATE` on its fraud columns. `SELECT, INSERT` on `processed_message`. `SELECT, INSERT` on `outbox`, plus `UPDATE (attempts, sent_at)`. `INSERT` on `ops.audit`. `UNMASK` on `auth_detail.card_num` (the fraud copy), `processed_message.reply_body` and `outbox.body` (the resent replies). |
+| `batch_svc` | `SELECT, INSERT, DELETE` on `auth_summary` and `auth_detail` (load and purge). `UPDATE` on `auth_summary (credit_balance, approved_auth_cnt, approved_auth_amt, declined_auth_cnt, declined_auth_amt)`. `SELECT, DELETE` on `processed_message` and `outbox`. Nothing on `auth_fraud`, and no `UNMASK`. |
 
 ## How the legacy stores map
 
@@ -117,7 +142,7 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date_t
 | `CARDDATA` KSDS + `CARDAIX` | `KEYS(16 0)`; AIX `KEYS(11 16)` non-unique | `core.card` PK + `IX_card_acct` |
 | `CARDXREF` KSDS + `CXACAIX` | `KEYS(16 0)`; AIX `KEYS(11 25)` non-unique | `core.card_xref` PK + `IX_xref_acct` |
 | `CUSTDATA` KSDS | `KEYS(9 0)` | `core.customer` PK |
-| `TRANSACT` KSDS + timestamp AIX | `KEYS(16 0)`; AIX `KEYS(26 304)` non-unique | `core.transaction` filtered unique index + `proc_date_text` index |
+| `TRANSACT` KSDS + timestamp AIX | `KEYS(16 0)`; AIX `KEYS(26 304)` non-unique | `core.transaction` filtered unique index + `proc_date` index |
 | `TCATBALF` KSDS | `KEYS(17 0)` | `core.tcat_bal` composite PK |
 | `TRANTYPE`, `TRANCATG` KSDS and Db2 `TRANSACTION_TYPE`, `TRANSACTION_TYPE_CATEGORY` | `KEYS(2 0)`, `KEYS(6 0)`; Db2 PK and FK | `ref.tran_type`, `ref.tran_category` |
 | `DISCGRP` KSDS | `KEYS(16 0)` | `ref.disclosure_group` composite PK |
@@ -126,7 +151,7 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date_t
 | `DALYREJS` GDG | sequential | `core.daily_reject` |
 | `TRANSACT.BKUP`, `SYSTRAN`, `TRANSACT.COMBINED`, `TRANSACT.DALY` GDGs | relative generations | rows tagged by `cycle_id` and `in_master` |
 | IMS `PAUTSUM0` / `PAUTDTL1` / `PAUTINDX` | packed account key; 9-complement date and time key | `pauth.auth_summary` / `pauth.auth_detail` / PK |
-| Db2 `AUTHFRDS` | `(CARD_NUM, AUTH_TS)` | `pauth.auth_fraud` |
+| Db2 `AUTHFRDS` | `(CARD_NUM, AUTH_TS)` | `pauth.auth_fraud` PK `auth_id`, index `(card_num, auth_ts)` |
 
 ## Numeric and text types
 
@@ -134,11 +159,11 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date_t
 | :-- | :-- | :-- |
 | `9(n)` used as an identifier | `CHAR(n)` BIN2 with a digits check | Keeps leading zeros, exact match and byte order. |
 | `S9(10)V99`, `S9(09)V99`, `S9(04)V99` zoned | `DECIMAL(12,2)`, `DECIMAL(11,2)`, `DECIMAL(6,2)` | Java `BigDecimal`, never floating point. |
-| `9(03)` score, `S9(4) COMP` counts | `SMALLINT` | |
+| `9(03)` score, `S9(4) COMP` counts | `SMALLINT` | Except the authorization summary's running totals ([above](#pending-authorizations-pauth)). |
 | `COMP-3` (IMS segments, export file) | `DECIMAL(p,s)` | Decoded by `platform/legacy-format`. |
 | Binary fields in the export file | `INT` / `BIGINT` | |
 | `X(10)` dates | `DATE` where every writer guarantees a valid date, else `CHAR(10)` | Account dates and DOB are `DATE`; card expiry stays text. |
-| `X(26)` timestamps | `CHAR(26)` | Five layouts, kept as written in legacy mode. |
+| `X(26)` timestamps | `DATETIME2(6)` | Parsed on load; legacy layouts written back only by the exporter (D-60). |
 | `X(n)` text | `VARCHAR(n)`, trailing spaces trimmed | Exporters pad back to `n`; leading spaces are kept. |
 
 **Overflow.** No COBOL program checks size errors, so high-order digits are lost silently (NUM-BILL-002, NUM-POST-003). `platform/legacy-format` offers `LegacyNumbers.truncate(value, intDigits)`, used only where the item's switch is `legacy`; the fixed mode raises a validation error. With `DECIMAL` columns, an overflow that reaches the database fails the statement instead of wrapping.
@@ -149,10 +174,10 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date_t
 
 - **FILLER** is not modelled, with one exception: `legacy_filler` on account, card, transaction and category balance. These are the records batch rewrites and the differential checks compare byte for byte (inherited FILLER, DEF-POST-010, DEF-BILL-006, DEF-CRDU-003). The columns are nullable and are dropped after cut-over (D-DATA-03).
 - **Group ID at the ZIP position (INV-039, Q-ENT-001, DEF-ACUP-002, DEF-ACUP-020).** Every sample account holds `A000000000` at positions 103-112 (`ACCT-ADDR-ZIP` in the main layout) and spaces at 113-122 (`ACCT-GROUP-ID`). The loader loads them as they are: `addr_zip = 'A000000000'`, `group_id` blank, so interest uses `DEFAULT`, as today. Switch `DEF-ACUP-002`: legacy writes the screen's group ID into `addr_zip` and blanks `group_id` (a fixed stand-in for the bytes the program never sets); fixed writes `group_id` and keeps `addr_zip`. Data decision D-DATA-01 chooses whether migration moves the value into `group_id`; on the sample this changes no interest amount, because the two groups differ only for 07/0001 (DEF-INTC-006).
-- **ZIP cut to 5 characters on save (INV-044, DEF-ACUP-003)**: switch on account update.
+- **ZIP cut to 5 characters on save (INV-044, DEF-ACUP-003)**: fixed-only, ZIP+4 kept (D-14).
 - **Card-to-account link held twice (INV-030)**: `card.acct_id` and `card_xref.acct_id` both stay, as the legacy programs read different copies. A `verify-data` check reports rows where they differ. Single ownership is decision D-DATA-02.
-- **Several cards per account**: the schema allows it; the behaviour of each program is a switch (DEF-BILL-002, DEF-ACVW-003, DEF-INTC-007, DEF-TRPT-004).
-- **Two timestamp layouts in one column (DEF-BILL-007)**: kept, so on one day online payments still sort before batch postings in the processing-date order.
+- **Several cards per account**: the schema allows it; each program's behaviour is in [switches.md](switches.md): DEF-TRPT-004 is a switch, DEF-ACVW-003 is fixed-only (D-61), and DEF-BILL-002 and DEF-INTC-007 keep the COBOL behaviour.
+- **Two timestamp layouts in one column (DEF-BILL-007)**: gone with the typed column (D-60); processing-date order is now time order.
 - **User list order (NUM-USRL-002)**: `ebcdic_sort_key` reproduces EBCDIC order (lower case, upper case, digits); fixed mode orders by `user_id`.
 - **Sample-file quirks**: cross-reference lines are 36 bytes (padded to 50); `tcatbal.txt` mixes CRLF and LF; the loader accepts both.
 
@@ -170,8 +195,7 @@ The loader is a Spring Batch job, `dataLoadJob`, run by `make load` (direct laun
 | `loadTransactionTypes` / `loadCategories` | `trantype.txt` / `trancatg.txt` | `ref.tran_type` / `ref.tran_category` | 7 / 18 |
 | `loadDisclosureGroups` | `discgrp.txt` | `ref.disclosure_group` | 51 |
 | `loadLookups` | the state, ZIP-prefix and area-code lists from the account update spec | `ref.us_*`, `ref.nanp_area_code` | 56 / 240 / 410 |
-| `seedUsers` | the 10 DUSRSECJ seed users; passwords from `.env` | `iam.app_user` | 10 |
-| `loadPendingAuthorizations` | the module's sample unload files (PAUDBUNL layout) | `pauth.*` | 21 summaries / 202 details (one all-spaces root skipped) |
+| `loadPendingAuthorizations` | `app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat`, the module's only sample data: an EBCDIC IMS HD unload (ENT-AUTH-HD-UNLOAD), not the PAUDBUNL files | `pauth.auth_summary`, `pauth.auth_detail` | 21 summaries / 202 details (one all-spaces root skipped) |
 | `stageDailyFile` | `dailytran.txt` | `core.daily_tran` | 300 (in the cycle, not in `load`) |
 
 Rules, all from the reload specs: a duplicate or out-of-order key fails the step (VAL-JACCT-001 and its siblings); referential checks (cross-reference to account and customer, category balance to account) fail the step; nothing is printed except counts and keys. The transaction table starts empty (TRANFILE's dummy row is dropped).

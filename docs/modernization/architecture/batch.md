@@ -4,27 +4,27 @@
 
 - **Spring Batch holds the batch rules.** All jobs live in one Spring Boot application, `batch-service` (`modernization/batch/`), with its job repository in the `batch` schema.
 - **Airflow only orchestrates.** DAGs in `modernization/airflow/dags/` open and close the batch window, launch jobs through `batch-service`, wait for their exit status, branch and retry. They contain no business rule; `make test-airflow` fails if a DAG file imports anything but Airflow and the shared operator package.
-- **One cycle date.** Each cycle run has a `cycle_id` and a `businessDate` (Airflow's logical date, or a `conf` override). Every job takes them as identifying job parameters. INTCALC's `PARM` (`2022071800`) is derived as `yyyyMMdd` + `00`, and the timestamps the jobs write take their date from `businessDate` and their time from the clock, as `CARDDEMO_BUSINESS_DATE` does locally. This replaces the three date sources in use today (D1 cross-cutting finding 5).
+- **One cycle date.** Each cycle run has a `cycle_id` and a `businessDate` (Airflow's logical date, or a `conf` override). The DAG's first call, `POST /internal/cycles {businessDate, interest}`, creates the `batch.cycle` row, or returns the existing one for that date, and gives the `INT` `cycleId`. Every job takes them as identifying job parameters. INTCALC's `PARM` (`2022071800`) is derived as `yyyyMMdd` + `00`, and the timestamps the jobs write take their date from `businessDate` and their time from the clock, as `CARDDEMO_BUSINESS_DATE` does locally. This replaces the three date sources in use today (D1 cross-cutting finding 5).
 - **Exit statuses replace return codes and abends.**
 
 | Legacy | Spring Batch exit status | Airflow |
 | :-- | :-- | :-- |
 | RC 0 | `COMPLETED` | task success |
-| RC 4 (POSTTRAN rejects, COBTUPDT record errors) | `COMPLETED_WITH_REJECTS` | task success; the reject count goes to XCom and the DAG run note |
+| RC 4 (POSTTRAN rejects, COBTUPDT record errors) | `COMPLETED_WITH_REJECTS` | task success; the reject count goes to XCom and the task log (a DAG run note is optional) |
 | U0999, CEE3ABD, RC 12 or 16 | `FAILED` | task failure; the DAG stops; the window stays open |
 
 ## Batch window
 
 CLOSEFIL closes five CICS files (`ACCTDAT`, `CCXREF`, `CXACAIX`, `TRANSACT`, `USRSEC`) before batch, OPENFIL reopens them, and a job that changes them must not overlap online updates (INV-002).
 
-- DAG task `open_batch_window` calls `POST /internal/batch-window/open {cycleId, mode}`. It records a row in `ops.batch_window` and then waits until no online transaction on the covered tables is still running (services hold a short shared lock on the window row for each write transaction; opening takes it exclusively). This replaces both SDSF `CEMT` and WAITSTEP's fixed 36-second sleep.
+- DAG task `open_batch_window` calls `POST /internal/batch-window/open {cycleId}` on `batch-service`, which owns the window ([api-security.md](api-security.md#batch-service-internal)). There is one global window in mode `WRITES_BLOCKED` (D-BAT-05), with one application lock. Each online write transaction holds the shared side of the lock; opening takes the exclusive side, waits until running writes have drained, records the row in `ops.batch_window` and returns. If they do not drain in time it answers `503 WINDOW_DRAIN_TIMEOUT` and leaves the window closed, and the DAG task retries. Opening again for the same holder is a no-op; while another holder (another cycle, or a reload keyed by `<dag_id>/<run_id>`) has it open, the open answers `503 WINDOW_BUSY` with `Retry-After` and the task waits ([contract](batch-execution-contract.md#6-batch-window)). This replaces both SDSF `CEMT` and WAITSTEP's fixed 36-second sleep.
 - Services check the window before using a covered table ([api-security.md](api-security.md#api-conventions)).
-- `close_batch_window` clears it. It runs only when every task before it succeeded. After a failure the window stays open, as the files stay closed today (ERR-JCA7-001), until an operator closes it with `make -C modernization batch-window-close` after recovery.
+- `close_batch_window` clears it. It runs only when every task before it succeeded. After a failure the window stays open, as the files stay closed today (ERR-JCA7-001), until an operator closes it with `make -C modernization batch-window-close` after recovery; that close leaves the cycle `OPEN`, so the next DAG run resumes it. Only the DAG's own close marks the cycle `COMPLETED`.
 
 | Window mode | Covered tables | Online effect | Default |
 | :-- | :-- | :-- | :-- |
-| `CLOSED_FILES` | account, card cross-reference, transaction, user | every read and write on them fails, including sign-on, as with closed CICS files | **default (legacy)** |
-| `WRITES_BLOCKED` | same | reads work (snapshot isolation), writes return 503 | recommended (D-BAT-05) |
+| `CLOSED_FILES` | account, card cross-reference, transaction, user | every read and write on them fails, including sign-on, as with closed CICS files | legacy behaviour, not built |
+| `WRITES_BLOCKED` | every business table the cycle or a reload writes: `core.*` (including online adds to `core.daily_tran`), `ref.*`, user maintenance | reads work (snapshot isolation), writes return 503; sign-on, refresh and sign-off stay available | **decided (D-BAT-05)**; one global window for the daily cycle, the reference refresh and the data load |
 | `NONE` | - | no window; row locks only | not recommended: posting reads running totals (BR-POST-007) |
 
 ## The transaction master and cycles
@@ -39,10 +39,21 @@ The target keeps all rows in `core.transaction` and marks the legacy master with
 | POSTTRAN writes the master | inserts with `in_master = 1`, `origin = POSTED`, `cycle_id` |
 | INTCALC writes `SYSTRAN(+1)` | inserts with `in_master = 1`, `origin = INTEREST`, `cycle_id` |
 | TRANBKP backup, then COMBTRAN sort and reload | nothing to do: the master already holds postings plus interest, in key order by `ORDER BY` |
-| Online add and bill payment between cycles | insert with `in_master = 1` and the open cycle |
+| Bill payment between cycles | insert with `in_master = 1`, `origin = BILL_PAY`, posted at once through `ledger-core` (D-28); `cycle_id` NULL until the batch slice settles the stamping rule |
+| Online transaction add between cycles | a `core.daily_tran` row with `origin = ONLINE_ADD`, posted by the next cycle (D-27, [below](#online-writes-between-cycles)) |
 | GDG `LIMIT(5)` retention | `in_master = 0` rows older than five cycles are deleted by the cycle's last task (legacy retention), or kept (D-BAT-04) |
 
 Readers that saw "the master" (online list and view, statements, reports, ID allocation) filter on `in_master = 1`, so they see what they see today. The relative-generation hazard is gone, because nothing selects by "newest generation".
+
+### Online writes between cycles
+
+D-27 (accepted: "feed the posting input; one posting path") fixes DEF-TRNA-001. An online add does not write `core.transaction`; it queues the transaction for the next posting run, so POSTTRAN's rules (validation, over-limit, expiry, balance, cycle totals, category balance) apply to it once, in `batch-service`.
+
+- **The add.** `transaction-service` validates as today, allocates the ID with `ledger-core` `TransactionIds.next()` (switch BR-TRNA-003), and inserts one `core.daily_tran` row: `origin = ONLINE_ADD`, `cycle_id` NULL (waiting), `created_by`, the parsed columns, and `raw_record` built in the 350-byte daily-file layout by `legacy-format`, so a reject reads like a file reject. The success message keeps its text, with the ID (BR-TRNA-005). The add is a write under the batch window: during the window it gets `503 BATCH_WINDOW`, which also keeps it from racing the claim below.
+- **IDs.** In fixed mode the sequence keeps IDs unique. In legacy mode "highest + 1" takes the highest ID among master rows **and** waiting `ONLINE_ADD` rows, under the same app lock, so it gives the value the legacy file would; the filtered unique index `UX_daily_waiting (tran_id) WHERE cycle_id IS NULL` backs it. "Copy latest" (BR-TRNA-006) reads the same union.
+- **The claim.** `ingestDailyFileJob` stages the file rows (step `stage`), then claims every waiting row (step `claimOnlineAdds`): it sets `cycle_id` and gives them `seq` numbers after the file rows, in insert order (`daily_pk`). Posting is single-threaded in `seq` order (BR-POST-007), so a cycle with no online adds posts exactly as before, and the differential checks are unchanged.
+- **Posting.** Online-add rows go through the same `post` step as file rows. Accepted rows become `core.transaction` rows with `in_master = 1`, `origin = ONLINE_ADD`, the cycle's `cycle_id` and `created_by` carried over. Rejected rows go to `core.daily_reject` with reasons 100 to 103 and appear in the reject export and the operations view.
+- **What users see.** An added transaction appears in the transaction list, view and reports after the cycle that posts it, not at once as BR-TRNA-007 describes; a rejected add appears only among the cycle's rejects. Both follow from the accepted D-27 fix and get ledger entries (BR-TRNA-007, PINV-c-05). Bill payments still post at once (D-28), because the user must see the new balance on the confirmation screen.
 
 ## Batch-cycle option
 
@@ -98,7 +109,7 @@ Decisions that go with F, with the defaults this proposal uses:
 | CLOSEFIL (JCLOSE) | SDSF `CEMT SET FIL CLO` | none (REST call) | `carddemo_daily_cycle.open_batch_window` |
 | CBPAUP0J (JAUPG) | STEP01 CBPAUP0C (IMS BMP) | `purgePendingAuthorizationsJob`: `purge` chunk step over `pauth.auth_summary` | `purge_pending_authorizations` |
 | TRANBKP (JTBKP) | REPRO backup, IDCAMS delete, define | `archiveMasterJob`: `archive` tasklet | `archive_master` |
-| POSTTRAN (JPOST) | STEP15 CBTRN02C | `postDailyTransactionsJob`: `ingestDailyFile` (file to `core.daily_tran`), `post` (chunk, single thread, input order), `exportRejects` (430-byte file) | `ingest_daily_file`, `post_daily_transactions` |
+| POSTTRAN (JPOST) | STEP15 CBTRN02C | `ingestDailyFileJob`: `stage` (the configured inbound file to `core.daily_tran`, chunked), `claimOnlineAdds` (one statement: waiting `ONLINE_ADD` rows get the `cycleId` and `seq` after the file rows, [above](#online-writes-between-cycles)); `postDailyTransactionsJob`: `post` (chunk, single thread, `seq` order), `exportRejects` (430-byte file) | `ingest_daily_file`, `post_daily_transactions` |
 | INTCALC (JINTC) | STEP15 CBACT04C with PARM | `calculateInterestJob`: `interest` (item = account with its category balances) | `calculate_interest` |
 | COMBTRAN (JCOMB) | SORT, REPRO | none | none |
 | CREASTMT (JSTMT) | delete/define work file, SORT, REPRO, IEFBR14, STEP040 CBSTM03A | `statementJob`: `render` (text, HTML, optional PDF writers) | `generate_statements` |
@@ -121,23 +132,45 @@ Every other job in [mapping.md](mapping.md) is dropped.
 | `carddemo_daily_cycle` | daily, `catchup=False`, `max_active_runs=1`; params `interest` (`always`, `month_end`, `never`), `statements` (`every_cycle`, `with_interest`), `purge_position` (`after_cycle`, `before_posting`) | as in the diagram above |
 | `carddemo_transaction_report` | none; triggered by `transaction-service` through the Airflow REST API with `conf {runId, startDate, endDate, requestedBy}` | `run_report` |
 | `carddemo_category_balance_listing` | manual | `run_listing` |
-| `carddemo_reference_refresh` | weekly, Saturday | `open_batch_window` (mode for `ref` tables), `maintain_transaction_types` (skipped without input file), `reload_disclosure_groups`, `close_batch_window` |
+| `carddemo_reference_refresh` | weekly, Saturday | `open_batch_window` (the same global window), `maintain_transaction_types` (skipped without input file), `reload_disclosure_groups`, `close_batch_window` |
 | `carddemo_data_load` | manual | `open_batch_window`, `load`, `verify`, `close_batch_window` |
 | `carddemo_export_masters`, `carddemo_import_migration` | manual | one job each |
 
-All DAGs that change data share the Airflow pool `carddemo_batch` with one slot, so a reload never overlaps the cycle. Tasks use one shared operator, `SpringBatchJobOperator` (launch, then a deferrable trigger that polls the execution, so a waiting task holds no worker slot). Airflow runs from the host venv with its metadata in the compose Postgres on 25432.
+The one global window keeps the cycle, the reference refresh, the data load and the import apart; the Airflow pool `carddemo_batch` (one slot) only limits concurrent job tasks. `carddemo_import_migration` opens and closes the window around its job. Tasks use one shared operator, `SpringBatchJobOperator` (launch, then a deferrable trigger that polls the execution, so a waiting task holds no worker slot). Airflow runs from the host venv with its metadata in the compose Postgres on 25432.
 
 ## Restart and idempotency
 
 | Job | Restart after a failure | Second run of a completed cycle |
 | :-- | :-- | :-- |
-| `postDailyTransactionsJob` | Resumes after the last committed chunk. Each chunk commits the account, category balance, transaction and reject rows together with the reader position, so no record is half applied (fixes DEF-POST-008 by construction). | Refused: same `cycleId` is a completed job instance. A deliberate rerun restores the snapshot taken before the step (`batch.snapshot_account`, `batch.snapshot_tcat_bal`) through `make -C modernization cycle-rerun CYCLE=<id>`, which replaces the runbook restore. |
+| `ingestDailyFileJob` | `stage` resumes after the last committed chunk; `claimOnlineAdds` claims only rows still waiting, so a rerun claims nothing twice. | Refused (`409 JOB_INSTANCE_COMPLETE`). |
+| `postDailyTransactionsJob` | Resumes after the last committed chunk. Each chunk commits the account, category balance, transaction and reject rows together with the reader position, so no record is half applied (fixes DEF-POST-008 by construction). | Refused: same `cycleId` and `attempt` is a completed job instance. A deliberate rerun goes through `make -C modernization cycle-rerun CYCLE=<id>` (below), which replaces the runbook restore. |
 | `calculateInterestJob` | Resumes at the next account; interest rows and the account update of one account commit together (DEF-INTC-009). | Refused; legacy reruns charge interest twice (DEF-INTC-005), an architecture-dependent item. |
 | `archiveMasterJob` | One statement; rerun is a no-op. | No-op. |
-| `statementJob`, `transactionReportJob`, `categoryBalanceListingJob` | Rerun from the start; outputs go to a temporary folder renamed on success, as z/OS deletes outputs on abend (ERR-STMT-008). | Allowed; a new run folder. |
+| `statementJob`, `transactionReportJob`, `categoryBalanceListingJob` | Rerun from the start; outputs go to a temporary folder renamed after the commit, as z/OS deletes outputs on abend (ERR-STMT-008). | Same identity: refused (`409 JOB_INSTANCE_COMPLETE`). A new report run or DAG run: allowed, with a new run folder. |
 | `purgePendingAuthorizationsJob` | Resumes after the last chunk; deleted rows stay deleted. | Allowed; nothing left to purge. |
 | `dataLoadJob` steps | Each step truncates and loads in one transaction. | Allowed only inside a batch window. |
 
+**Operator retry contract.** The approved contract is [batch-execution-contract.md](batch-execution-contract.md); this summary does not override it.
+
+- **Job identity.** Cycle jobs are identified by `cycleId`, `businessDate` and `attempt` (`batch.cycle.attempt`, 1 unless a deliberate rerun raised it); `statementJob` writes to the folder `cycleId`-`attempt`. `transactionReportJob` is identified by its `batch.report_run` ID. `categoryBalanceListingJob`, `dataLoadJob`, the reference jobs, the export and the import are identified by `runKey` = `<dag_id>/<run_id>/<task_id>`. A task retry therefore finds the same instance, and a new DAG run or report request makes a new one. No caller-supplied key is used in a file name; output folders are named by IDs batch-service generates.
+- **Responses.** A launch answers `202 {executionId}`. Every job `409` carries `executionId`, `executionStatus`, `exitStatus` and `rejectCount`:
+  - `JOB_EXECUTION_RUNNING`: the operator attaches to that execution and polls it.
+  - `JOB_INSTANCE_COMPLETE`: the task succeeds only if `exitStatus` is `COMPLETED` or `COMPLETED_WITH_REJECTS`; nothing is posted twice (DEF-JPOST-003). Clearing a completed task never reruns the job.
+  - `JOB_INSTANCE_NOT_RESTARTABLE` and `BATCH_WINDOW_REQUIRED`: terminal; the task fails and an operator decides.
+- **Restart and retry.** A `FAILED` or `STOPPED` instance is restarted by the same launch (`202`) and resumes as the table above says. `503` and connection errors are retried within the task's `execution_timeout`; `503 WINDOW_BUSY` waits do not use task retries. `400` and `404` are not retried.
+- **Ownership and crash recovery.** Each execution has a lease in `batch.execution_lease`, renewed every 10 s on the database clock. Every job transaction ends with a fence that fails when the lease has been revoked or not renewed for TTL + grace (120 s by default), so an owner that lost its lease commits nothing. Only a launch recovers an execution: it revokes the lease and marks the execution `FAILED` (`OWNER_LOST`) in one transaction, then restarts it. A poll only reports the lease (`recoverable: true`), and the operator then fails the attempt as retryable so the retry re-launches. Nothing is recovered at startup, and several batch-service processes may share one database.
+- **Cycles.** `POST /internal/cycles` is idempotent per `businessDate` and answers the stored `{cycleId, businessDate, attempt, interest, interestParm, status, ...}`. A different resolved `interest` gets `409 CYCLE_PARAMETERS_DIFFER`. An `OPEN` cycle is returned as is and the DAG resumes it. A `COMPLETED` cycle gets `409 CYCLE_COMPLETED`, terminal, before `open_batch_window`, so a re-triggered run for a finished date never blocks online writes.
+- **Deliberate rerun.** `make -C modernization cycle-rerun CYCLE=<id>` refuses while an execution of the cycle is live. Otherwise it runs inside the cycle's window, restores `batch.snapshot_account` and `batch.snapshot_tcat_bal`, deletes the cycle's `POSTED` and `INTEREST` transactions, its rejects and its staged file rows, and returns its `ONLINE_ADD` rows to waiting (`cycle_id`, `seq` NULL). It then raises `attempt` and sets the cycle back to `OPEN`, so the next DAG run creates fresh job instances.
+
+**Crash-recovery checks** (`make verify-cycle`, against a real Airflow and `batch-service`):
+
+1. Kill `batch-service` during `post` at a chunk boundary and inside a chunk, then start it again. Polls report the lease expiring and then recoverable; the task retry's launch recovers and restarts it, and the exported results equal an uninterrupted run.
+2. Start a second `batch-service` while the first runs a job: the running execution continues unchanged. Pause the owner (`SIGSTOP`) past TTL + grace and launch: one recovery, the resumed owner's next commit fails, and the results equal an uninterrupted run.
+3. A task retry after `COMPLETED_WITH_REJECTS` gets `JOB_INSTANCE_COMPLETE` with the same reject count and posts nothing again.
+4. Registering a `COMPLETED` cycle gets `409 CYCLE_COMPLETED`, and `ops.batch_window` is unchanged.
+5. `cycle-rerun` followed by the DAG gives the same results as the first clean run, including online adds that were waiting.
+6. An `ABANDONED` instance gets `JOB_INSTANCE_NOT_RESTARTABLE`, and the task fails without retrying.
+7. The reference refresh triggered while the cycle holds the window waits on `503 WINDOW_BUSY` and runs after the cycle closes it.
 Posting stays single-threaded in input order, because each record's over-limit check uses the cycle totals that earlier records changed (BR-POST-007). The processor keeps the accounts and category balances touched in the current chunk in a unit-of-work cache that the writer flushes, so later records in the chunk see earlier changes.
 
 ## Files and tables
@@ -159,7 +192,7 @@ Posting stays single-threaded in input order, because each record's over-limit c
 
 | Output | How the content is reproduced | Checked by |
 | :-- | :-- | :-- |
-| TRANREPT (CBTRN03C) | Rows with `in_master = 1` and `proc_date_text` between the two dates (inclusive, text compare, INV-010), `ORDER BY card_num, tran_id` (the legacy sort input is the master in key order). Left joins to cross-reference, type and category; a missing code fails the job, as the program abends (INV-016). A custom writer reproduces the headers, the page break counter that also counts total lines (BR-TRPT-005), the card-break "account" totals (DEF-TRPT-004, legacy mode), page and grand totals and the edit masks (NUM-TRPT-002). One date pair feeds both selection and heading (DEF-TRPT-002 cannot occur). | `verify-batch` against the GnuCOBOL TRANREPT on sample and stress data |
+| TRANREPT (CBTRN03C) | Rows with `in_master = 1` and `proc_date` between the two dates (inclusive, INV-010), `ORDER BY card_num, tran_id` (the legacy sort input is the master in key order). Left joins to cross-reference, type and category; a missing code fails the job, as the program abends (INV-016). A custom writer reproduces the headers, the page break counter that also counts total lines (BR-TRPT-005), the card-break "account" totals (DEF-TRPT-004, legacy mode), page and grand totals and the edit masks (NUM-TRPT-002). One date pair feeds both selection and heading (DEF-TRPT-002 cannot occur). | `verify-batch` against the GnuCOBOL TRANREPT on sample and stress data |
 | PRTCATBL | `ORDER BY acct_id, type_cd, cat_cd`; 40-byte lines; balance edited `TTTTTTTTT.TT` without sign (Q-JPCAT-001, legacy). | An oracle test written from the PRTCATBL spec (the job is a SORT, with no program to run) |
 | CREASTMT (CBSTM03A) | One statement per cross-reference card in card order, with its customer and account and every master transaction of the card in ID order. The legacy renderer writes the 80-byte text and 100-byte HTML lines (NUM-STMT-001 to 003); the 51-card, 10-transaction table limit (DEF-STMT-001) and the unescaped HTML (DEF-STMT-007) are switches. | `verify-batch` against `checks/cbstm03a_harness` (CBSTM03A does not run off z/OS) |
 | POSTTRAN rejects, account and category balance after the run | 430-byte rejects file; exported 300- and 50-byte records with zoned signs and `legacy_filler` | `verify-batch` against the GnuCOBOL POSTTRAN |
