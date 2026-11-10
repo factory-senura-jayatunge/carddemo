@@ -108,10 +108,11 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, 
 | `pauth.auth_detail` (ENT-AUTH-DETAIL, IMS child `PAUTDTL1`) | `auth_id BIGINT IDENTITY` | FK `acct_id` to the summary `ON DELETE CASCADE` (the purge deletes a summary with its details). `processed_at DATETIME2(3)` indexed descending replaces the 9-complement key; `auth_date_9c` and `auth_time_9c` are kept as columns, unique per account, which reproduces the IMS duplicate-key rule; the loader carries them. IDs are never reused. |
 | `pauth.auth_fraud` (ENT-AUTH-FRAUD, Db2 `AUTHFRDS`) | `auth_id` (D-36) | The 26 Db2 columns plus `reported_by` (DEF-AUDT-006 deviation); non-unique index `(card_num, auth_ts)`; no FK, so the row survives the purge. |
 | `pauth.processed_message`, `pauth.outbox` | message key | Idempotency and reply outbox for the fixed mode of the authorization listener ([messaging.md](messaging.md)). |
-| `batch.cycle` | `cycle_id` | `business_date DATE` unique, `interest_parm CHAR(10)`, status, timestamps. |
+| `batch.cycle` | `cycle_id` | `business_date DATE` unique, `attempt`, `interest_parm CHAR(10)`, status (`OPEN`, `COMPLETED`), the inbound file's name and SHA-256, timestamps. |
 | `batch.report_run`, `batch.statement_run` | run ID | Parameters, requester, status, output paths. |
 | `batch.BATCH_*` | Spring Batch | Job repository; Spring Batch's SQL Server schema. |
-| `ops.batch_window` | `window_id` | `cycle_id`, `mode`, `opened_at`, `closed_at`. |
+| `ops.batch_window` | `window_id` | `cycle_id` or `run_key` (exactly one), `mode`, `opened_at`, `closed_at`. |
+| `batch.execution_lease`, `batch.export_run` | job execution ID; `export_id` | Execution ownership and exports ([batch-execution-contract.md](batch-execution-contract.md)). |
 
 ### Pending authorizations (`pauth`)
 

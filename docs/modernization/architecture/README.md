@@ -29,6 +29,7 @@ The proposal is derived **only** from these inputs. No COBOL, copybook, BMS, JCL
 | [make-targets.md](make-targets.md) | Each `make -C modernization` target in one line: what it does and when it passes. |
 | [decisions.md](decisions.md) | Every decision this proposal needs, with the recommended default. |
 | [switches.md](switches.md) | The authoritative list of fidelity switches under the targeted policy, with the reason for each and the items that are fixed-only. |
+| [batch-execution-contract.md](batch-execution-contract.md) | The approved contract between Airflow and `batch-service`: cycles, job launch and poll, run identity, execution leases, fencing and recovery, operator rules, the batch window. |
 | [billpay-slice.md](billpay-slice.md) | The build contract for the first slice (sign-on, main menu, Bill Pay): modules, Flyway ranges, tables, endpoints, tokens, switches, scenarios in both modes, and when each make target is done. |
 
 ## Terms

@@ -84,12 +84,12 @@ The listener for authorization requests is in [messaging.md](messaging.md).
 
 | Method and path | Caller | Purpose |
 | :-- | :-- | :-- |
-| `POST /internal/cycles` `{businessDate, interest}` | Airflow | Create the cycle, or return the existing one for that date (idempotent per date); returns the `INT` `cycleId` |
-| `POST /internal/jobs/{jobName}/executions` `{params}` | Airflow | Launch a job named in [batch.md](batch.md#jobs-per-jcl-job-and-step): `202` with the execution ID; `409 JOB_INSTANCE_COMPLETE`, `409 JOB_EXECUTION_RUNNING`, `400 INVALID_JOB_PARAMETERS`, `404` for an unknown job |
-| `GET /internal/jobs/executions/{id}` | Airflow (polls every 10 s) | Status and exit status (`COMPLETED`, `COMPLETED_WITH_REJECTS`, `FAILED`) |
-| `POST /internal/batch-window/open` `{cycleId}`, `.../close` | Airflow; the close also from `make batch-window-close` | Open (idempotent per cycle; returns once online writes have drained, or `503 WINDOW_DRAIN_TIMEOUT` with the window left closed) and close the one global window ([batch.md](batch.md#batch-window)) |
+| `POST /internal/cycles` `{businessDate, interest}` | Airflow | Create the cycle, or return the existing one for that date (idempotent per date); returns the `INT` `cycleId` and `attempt`; `409 CYCLE_COMPLETED`, `409 CYCLE_PARAMETERS_DIFFER` |
+| `POST /internal/jobs/{jobName}/executions` `{params}` | Airflow | Launch a job named in [batch.md](batch.md#jobs-per-jcl-job-and-step): `202` with the execution ID; `409 JOB_INSTANCE_COMPLETE`, `JOB_EXECUTION_RUNNING`, `JOB_INSTANCE_NOT_RESTARTABLE`, `BATCH_WINDOW_REQUIRED`; `400 INVALID_JOB_PARAMETERS`; `404` for an unknown job |
+| `GET /internal/jobs/executions/{id}` | Airflow (polls every 10 s) | Status, exit status (`COMPLETED`, `COMPLETED_WITH_REJECTS`, `FAILED`), lease state and outputs; never changes the execution |
+| `POST /internal/batch-window/open` `{cycleId \| windowRunKey}`, `.../close` `{..., complete}` | Airflow; the close also from `make batch-window-close` (`complete: false`) | Open (idempotent per holder; returns once online writes have drained, `503 WINDOW_DRAIN_TIMEOUT` with the window left closed, or `503 WINDOW_BUSY` while another holder has it) and close the one global window ([batch.md](batch.md#batch-window)) |
 
-`batch-service` owns the window: only it writes `ops.batch_window`. Services never call `/internal/*`; they check the window through `ledger-core`'s `BatchWindowGuard`, which takes the shared side of the same application lock. No request carries a file path; inbound and outbound paths come from configuration.
+The full contract, including ownership leases and recovery, is [batch-execution-contract.md](batch-execution-contract.md). `batch-service` owns the window: only it writes `ops.batch_window`. Services never call `/internal/*`; they check the window through `ledger-core`'s `BatchWindowGuard`, which takes the shared side of the same application lock. No request carries a file path; inbound and outbound paths come from configuration.
 
 `/internal/*` is bound to 127.0.0.1 and requires `Authorization: Bearer <CARDDEMO_BATCH_INTERNAL_TOKEN>`, a static random token that `make setup` writes to the git-ignored `.env`. It is compared in constant time and never logged. A static token is enough for one host where only Airflow calls the API. A deployment replaces it with an OAuth2 client-credentials token from the identity provider (D-SEC-02), with no change to the operator, which sends a bearer header either way.
 

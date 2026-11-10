@@ -10,16 +10,16 @@
 | Legacy | Spring Batch exit status | Airflow |
 | :-- | :-- | :-- |
 | RC 0 | `COMPLETED` | task success |
-| RC 4 (POSTTRAN rejects, COBTUPDT record errors) | `COMPLETED_WITH_REJECTS` | task success; the reject count goes to XCom and the DAG run note |
+| RC 4 (POSTTRAN rejects, COBTUPDT record errors) | `COMPLETED_WITH_REJECTS` | task success; the reject count goes to XCom and the task log (a DAG run note is optional) |
 | U0999, CEE3ABD, RC 12 or 16 | `FAILED` | task failure; the DAG stops; the window stays open |
 
 ## Batch window
 
 CLOSEFIL closes five CICS files (`ACCTDAT`, `CCXREF`, `CXACAIX`, `TRANSACT`, `USRSEC`) before batch, OPENFIL reopens them, and a job that changes them must not overlap online updates (INV-002).
 
-- DAG task `open_batch_window` calls `POST /internal/batch-window/open {cycleId}` on `batch-service`, which owns the window ([api-security.md](api-security.md#batch-service-internal)). There is one global window in mode `WRITES_BLOCKED` (D-BAT-05), with one application lock. Each online write transaction holds the shared side of the lock; opening takes the exclusive side, waits until running writes have drained, records the row in `ops.batch_window` and returns. If they do not drain in time it answers `503 WINDOW_DRAIN_TIMEOUT` and leaves the window closed, and the DAG task retries. Opening again for the same cycle is a no-op. This replaces both SDSF `CEMT` and WAITSTEP's fixed 36-second sleep.
+- DAG task `open_batch_window` calls `POST /internal/batch-window/open {cycleId}` on `batch-service`, which owns the window ([api-security.md](api-security.md#batch-service-internal)). There is one global window in mode `WRITES_BLOCKED` (D-BAT-05), with one application lock. Each online write transaction holds the shared side of the lock; opening takes the exclusive side, waits until running writes have drained, records the row in `ops.batch_window` and returns. If they do not drain in time it answers `503 WINDOW_DRAIN_TIMEOUT` and leaves the window closed, and the DAG task retries. Opening again for the same holder is a no-op; while another holder (another cycle, or a reload keyed by `<dag_id>/<run_id>`) has it open, the open answers `503 WINDOW_BUSY` with `Retry-After` and the task waits ([contract](batch-execution-contract.md#6-batch-window)). This replaces both SDSF `CEMT` and WAITSTEP's fixed 36-second sleep.
 - Services check the window before using a covered table ([api-security.md](api-security.md#api-conventions)).
-- `close_batch_window` clears it. It runs only when every task before it succeeded. After a failure the window stays open, as the files stay closed today (ERR-JCA7-001), until an operator closes it with `make -C modernization batch-window-close` after recovery.
+- `close_batch_window` clears it. It runs only when every task before it succeeded. After a failure the window stays open, as the files stay closed today (ERR-JCA7-001), until an operator closes it with `make -C modernization batch-window-close` after recovery; that close leaves the cycle `OPEN`, so the next DAG run resumes it. Only the DAG's own close marks the cycle `COMPLETED`.
 
 | Window mode | Covered tables | Online effect | Default |
 | :-- | :-- | :-- | :-- |
@@ -136,7 +136,7 @@ Every other job in [mapping.md](mapping.md) is dropped.
 | `carddemo_data_load` | manual | `open_batch_window`, `load`, `verify`, `close_batch_window` |
 | `carddemo_export_masters`, `carddemo_import_migration` | manual | one job each |
 
-All DAGs that change data share the Airflow pool `carddemo_batch` with one slot, so a reload never overlaps the cycle. Tasks use one shared operator, `SpringBatchJobOperator` (launch, then a deferrable trigger that polls the execution, so a waiting task holds no worker slot). Airflow runs from the host venv with its metadata in the compose Postgres on 25432.
+The one global window keeps the cycle, the reference refresh, the data load and the import apart; the Airflow pool `carddemo_batch` (one slot) only limits concurrent job tasks. `carddemo_import_migration` opens and closes the window around its job. Tasks use one shared operator, `SpringBatchJobOperator` (launch, then a deferrable trigger that polls the execution, so a waiting task holds no worker slot). Airflow runs from the host venv with its metadata in the compose Postgres on 25432.
 
 ## Restart and idempotency
 
@@ -146,40 +146,31 @@ All DAGs that change data share the Airflow pool `carddemo_batch` with one slot,
 | `postDailyTransactionsJob` | Resumes after the last committed chunk. Each chunk commits the account, category balance, transaction and reject rows together with the reader position, so no record is half applied (fixes DEF-POST-008 by construction). | Refused: same `cycleId` and `attempt` is a completed job instance. A deliberate rerun goes through `make -C modernization cycle-rerun CYCLE=<id>` (below), which replaces the runbook restore. |
 | `calculateInterestJob` | Resumes at the next account; interest rows and the account update of one account commit together (DEF-INTC-009). | Refused; legacy reruns charge interest twice (DEF-INTC-005), an architecture-dependent item. |
 | `archiveMasterJob` | One statement; rerun is a no-op. | No-op. |
-| `statementJob`, `transactionReportJob`, `categoryBalanceListingJob` | Rerun from the start; outputs go to a temporary folder renamed on success, as z/OS deletes outputs on abend (ERR-STMT-008). | Same `runId`: refused (`409 JOB_INSTANCE_COMPLETE`). New `runId`: allowed, with a new run folder per `runId`. |
+| `statementJob`, `transactionReportJob`, `categoryBalanceListingJob` | Rerun from the start; outputs go to a temporary folder renamed after the commit, as z/OS deletes outputs on abend (ERR-STMT-008). | Same identity: refused (`409 JOB_INSTANCE_COMPLETE`). A new report run or DAG run: allowed, with a new run folder. |
 | `purgePendingAuthorizationsJob` | Resumes after the last chunk; deleted rows stay deleted. | Allowed; nothing left to purge. |
 | `dataLoadJob` steps | Each step truncates and loads in one transaction. | Allowed only inside a batch window. |
 
-**Operator retry contract** (between `SpringBatchJobOperator` and `batch-service`, [api-security.md](api-security.md#batch-service-internal)):
+**Operator retry contract.** The approved contract is [batch-execution-contract.md](batch-execution-contract.md); this summary does not override it.
 
-- **Job identity.** Cycle jobs are identified by `cycleId`, `businessDate` and `attempt` (`batch.cycle.attempt`, 1 unless a deliberate rerun raised it). Jobs that may run again add `runId`:
-  - cycle-scoped `statementJob` uses `runId` = `cycleId`;
-  - `transactionReportJob` uses the `batch.report_run` ID;
-  - `categoryBalanceListingJob`, `dataLoadJob` and the reference jobs use the Airflow `run_id`.
-
-  A task retry therefore finds the same instance, and a new DAG run or report request makes a new one, with its own run folder.
-- **Responses.** A launch answers `202 {executionId}`. Every job `409` is a problem with `code`, `jobName`, `executionId`, `executionStatus`, `exitStatus` and `rejectCount`:
+- **Job identity.** Cycle jobs are identified by `cycleId`, `businessDate` and `attempt` (`batch.cycle.attempt`, 1 unless a deliberate rerun raised it); `statementJob` writes to the folder `cycleId`-`attempt`. `transactionReportJob` is identified by its `batch.report_run` ID. `categoryBalanceListingJob`, `dataLoadJob`, the reference jobs, the export and the import are identified by `runKey` = `<dag_id>/<run_id>/<task_id>`. A task retry therefore finds the same instance, and a new DAG run or report request makes a new one. No caller-supplied key is used in a file name; output folders are named by IDs batch-service generates.
+- **Responses.** A launch answers `202 {executionId}`. Every job `409` carries `executionId`, `executionStatus`, `exitStatus` and `rejectCount`:
   - `JOB_EXECUTION_RUNNING`: the operator attaches to that execution and polls it.
-  - `JOB_INSTANCE_COMPLETE`: the task succeeds only if `exitStatus` is `COMPLETED` or `COMPLETED_WITH_REJECTS`, which keeps the reject count for XCom; any other exit status fails it. Nothing is posted twice (DEF-JPOST-003).
-  - `JOB_INSTANCE_NOT_RESTARTABLE`: an `ABANDONED` instance, or a job declared not restartable. Terminal: the task fails and an operator decides.
-- **Restart and retry.** A `FAILED` or `STOPPED` instance is restarted by the same launch (`202`) and resumes as the table above says.
-  - `503` (window drain timeout, database unavailable) and connection errors are retried with Airflow's backoff, within the task's `execution_timeout`.
-  - `400` and `404` are not retried.
-- **Singleton and crash recovery.** `batch-service` runs as one instance per environment. At startup it takes the session-owned application lock `carddemo.batch-service` on a dedicated connection and keeps it for its whole life; a second instance that cannot get it fails to start. Because only the lock holder runs jobs, every execution still `STARTED` or `STOPPING` when it starts was orphaned by a crash. The new holder marks them `FAILED` (exit description `ORPHANED`) before it accepts requests. A live owner cannot be failed this way: while it lives, it holds the lock. A poller whose execution was orphaned sees `FAILED`, and its retry restarts the instance. If the process dies, the lock goes with its connection.
-- **Cycles.** `POST /internal/cycles` is idempotent per `businessDate` and answers `{cycleId, businessDate, interest: boolean, attempt, status}` with the stored values. `interest` is the resolved decision (interest runs in this cycle or not).
-  - A repeat with a different resolved `interest` gets `409 CYCLE_PARAMETERS_DIFFER`, not retried.
-  - A cycle whose status is `OPEN` (a run stopped part-way) is returned as is. The DAG resumes it: the window open is idempotent, completed jobs answer `JOB_INSTANCE_COMPLETE`, and failed ones restart.
-  - A `COMPLETED` cycle gets `409 CYCLE_COMPLETE`, terminal. The DAG's first task registers the cycle before `open_batch_window`, so a re-triggered run for a finished date never blocks online writes.
-- **Deliberate rerun.** `make -C modernization cycle-rerun CYCLE=<id>` runs inside a window. It restores `batch.snapshot_account` and `batch.snapshot_tcat_bal`, deletes the cycle's `POSTED` and `INTEREST` transactions, its rejects and its staged file rows, and returns its `ONLINE_ADD` rows to waiting (`cycle_id`, `seq` NULL). It then raises `attempt` and sets the cycle back to `OPEN`, so the next DAG run creates fresh job instances.
+  - `JOB_INSTANCE_COMPLETE`: the task succeeds only if `exitStatus` is `COMPLETED` or `COMPLETED_WITH_REJECTS`; nothing is posted twice (DEF-JPOST-003). Clearing a completed task never reruns the job.
+  - `JOB_INSTANCE_NOT_RESTARTABLE` and `BATCH_WINDOW_REQUIRED`: terminal; the task fails and an operator decides.
+- **Restart and retry.** A `FAILED` or `STOPPED` instance is restarted by the same launch (`202`) and resumes as the table above says. `503` and connection errors are retried within the task's `execution_timeout`; `503 WINDOW_BUSY` waits do not use task retries. `400` and `404` are not retried.
+- **Ownership and crash recovery.** Each execution has a lease in `batch.execution_lease`, renewed every 10 s on the database clock. Every job transaction ends with a fence that fails when the lease has been revoked or not renewed for TTL + grace (120 s by default), so an owner that lost its lease commits nothing. Only a launch recovers an execution: it revokes the lease and marks the execution `FAILED` (`OWNER_LOST`) in one transaction, then restarts it. A poll only reports the lease (`recoverable: true`), and the operator then fails the attempt as retryable so the retry re-launches. Nothing is recovered at startup, and several batch-service processes may share one database.
+- **Cycles.** `POST /internal/cycles` is idempotent per `businessDate` and answers the stored `{cycleId, businessDate, attempt, interest, interestParm, status, ...}`. A different resolved `interest` gets `409 CYCLE_PARAMETERS_DIFFER`. An `OPEN` cycle is returned as is and the DAG resumes it. A `COMPLETED` cycle gets `409 CYCLE_COMPLETED`, terminal, before `open_batch_window`, so a re-triggered run for a finished date never blocks online writes.
+- **Deliberate rerun.** `make -C modernization cycle-rerun CYCLE=<id>` refuses while an execution of the cycle is live. Otherwise it runs inside the cycle's window, restores `batch.snapshot_account` and `batch.snapshot_tcat_bal`, deletes the cycle's `POSTED` and `INTEREST` transactions, its rejects and its staged file rows, and returns its `ONLINE_ADD` rows to waiting (`cycle_id`, `seq` NULL). It then raises `attempt` and sets the cycle back to `OPEN`, so the next DAG run creates fresh job instances.
 
 **Crash-recovery checks** (`make verify-cycle`, against a real Airflow and `batch-service`):
 
-1. Kill `batch-service` during `post` at a chunk boundary and inside a chunk, then start it again. The orphan is marked `FAILED`, the DAG retry restarts it, and the exported results equal an uninterrupted run.
-2. A second `batch-service` start fails while the first holds the lock, and the first one's running execution continues unchanged.
+1. Kill `batch-service` during `post` at a chunk boundary and inside a chunk, then start it again. Polls report the lease expiring and then recoverable; the task retry's launch recovers and restarts it, and the exported results equal an uninterrupted run.
+2. Start a second `batch-service` while the first runs a job: the running execution continues unchanged. Pause the owner (`SIGSTOP`) past TTL + grace and launch: one recovery, the resumed owner's next commit fails, and the results equal an uninterrupted run.
 3. A task retry after `COMPLETED_WITH_REJECTS` gets `JOB_INSTANCE_COMPLETE` with the same reject count and posts nothing again.
-4. Registering a `COMPLETED` cycle gets `409 CYCLE_COMPLETE`, and `ops.batch_window` is unchanged.
+4. Registering a `COMPLETED` cycle gets `409 CYCLE_COMPLETED`, and `ops.batch_window` is unchanged.
 5. `cycle-rerun` followed by the DAG gives the same results as the first clean run, including online adds that were waiting.
 6. An `ABANDONED` instance gets `JOB_INSTANCE_NOT_RESTARTABLE`, and the task fails without retrying.
+7. The reference refresh triggered while the cycle holds the window waits on `503 WINDOW_BUSY` and runs after the cycle closes it.
 Posting stays single-threaded in input order, because each record's over-limit check uses the cycle totals that earlier records changed (BR-POST-007). The processor keeps the accounts and category balances touched in the current chunk in a unit-of-work cache that the writer flushes, so later records in the chunk see earlier changes.
 
 ## Files and tables

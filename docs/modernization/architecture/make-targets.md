@@ -37,5 +37,5 @@ These targets are not in today's `Makefile`; the batch design needs them.
 
 | Target | What it does | Passes when |
 | :-- | :-- | :-- |
-| `batch-window-close` | Closes a batch window left open after a failed cycle, once the operator has recovered (replaces running OPENFIL by hand). | the `ops.batch_window` row is closed and the online services accept writes again. |
+| `batch-window-close` | Closes a batch window left open after a failed cycle, once the operator has recovered (replaces running OPENFIL by hand). The cycle stays `OPEN`, so the next DAG run resumes it. | the `ops.batch_window` row is closed and the online services accept writes again. |
 | `cycle-rerun CYCLE=<id>` | Restores the account and category-balance snapshots taken before the cycle's posting step and reruns the cycle as a new job instance (replaces the runbook restore). | the snapshot restore and the rerun both succeed and the cycle's end state equals the first successful run of that input. |
