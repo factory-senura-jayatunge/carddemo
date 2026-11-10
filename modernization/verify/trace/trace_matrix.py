@@ -10,7 +10,8 @@ and no test cites an ID the spec does not define. Every code switch needs passin
 modes, whatever its unit. Incidental items and questions need no test. With --unit, only the gaps
 of the named units count for the gate and the exit status; the matrix still shows every unit.
 Tests that write an ID in brackets ("[FLOW-BILL-002]") instead of as a tag ("@FLOW-BILL-002") are
-reported, not counted.
+reported, not counted. With --manifest, only the reports that one run wrote are read (see
+tracelib/manifest.py); a missing, stale or empty required report is a gap.
 Ends with "trace: OK" or "trace: FAILED (<reason>)"; exit status 0 or 1.
 """
 from __future__ import annotations
@@ -25,6 +26,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from tracelib import catalog, ledger, matrix, reports, spec  # noqa: E402
+from tracelib import manifest as run_manifest  # noqa: E402
 
 REPO = HERE.parents[2]
 STATUS_ORDER = ("gap", "covered", "deviation", "excluded", "not-required")
@@ -72,7 +74,43 @@ def _gate_label(m: matrix.Matrix) -> str:
     return f"for the units in scope: {', '.join(m.scope) or 'none'}"
 
 
-def render_md(m: matrix.Matrix, sources: list[str], generated: str) -> str:
+def _rel(p: Path, root: Path) -> str:
+    return p.relative_to(root).as_posix() if p.is_relative_to(root) else str(p)
+
+
+def _run_info(man: run_manifest.Manifest, outside: list[dict], root: Path) -> dict:
+    return {
+        "run": man.run, "manifest": man.source, "started": man.started_text, "started_ns": man.started_ns,
+        "reports": [{"path": e.rel, "required": e.required, "missing": e.missing,
+                     "current": [_rel(f, root) for f in e.current], "stale": [_rel(f, root) for f in e.stale]}
+                    for e in man.entries],
+        "outside": outside,
+    }
+
+
+def _run_md(info: dict) -> list[str]:
+    out = ["## Reports of this run", "",
+           f"Run `{info['run']}`, started {info['started']}, manifest `{info['manifest']}`. Only the current files "
+           "below were read: files at a listed path that the run did not write are stale and not read.", "",
+           "| Path | Required | Current | Stale (not read) |", "| :-- | :-- | --: | --: |"]
+    for e in info["reports"]:
+        cur = "missing" if e["missing"] else str(len(e["current"]))
+        out.append(f"| `{e['path']}` | {'yes' if e['required'] else 'no'} | {cur} | {len(e['stale'])} |")
+    stale = [s for e in info["reports"] for s in e["stale"]]
+    if stale:
+        out += ["", "Stale files: " + ", ".join(f"`{s}`" for s in stale) + "."]
+    out.append("")
+    if info["outside"]:
+        out += ["## Reports outside this run (not read)", "",
+                "These report files are on disk but not in the run's manifest, so this gate does not read them. "
+                "`make trace` without a manifest reads every one of them.", "",
+                "| Report | Results citing items | Failed |", "| :-- | --: | --: |"]
+        out += [f"| `{o['path']}` | {'unreadable' if o['unreadable'] else o['results']} | {o['failed']} |" for o in info["outside"]]
+        out.append("")
+    return out
+
+
+def render_md(m: matrix.Matrix, sources: list[str], generated: str, run_info: dict | None = None) -> str:
     out = ["# Traceability matrix", "",
            f"Generated {generated} by `make -C modernization trace` from the spec, `ledger/*.toml` and "
            f"{len(sources)} test report file{'s' if len(sources) != 1 else ''} ({_citing(m)} test results citing items).", ""]
@@ -86,6 +124,8 @@ def render_md(m: matrix.Matrix, sources: list[str], generated: str) -> str:
         out += ["## Gaps of units outside the gate", "", "| Item | Reason |", "| :-- | :-- |"]
         out += [f"| {g} | {_md_escape(r)} |" for g, r in m.ungated]
         out.append("")
+    if run_info:
+        out += _run_md(run_info)
     uncounted = _uncounted(m)
     if uncounted:
         out += ["## Bracketed IDs not counted", "", _uncounted_line(len(uncounted)) + ".", "",
@@ -119,7 +159,7 @@ def render_md(m: matrix.Matrix, sources: list[str], generated: str) -> str:
     return "\n".join(out) + "\n"
 
 
-def render_json(m: matrix.Matrix, sources: list[str], generated: str) -> str:
+def render_json(m: matrix.Matrix, sources: list[str], generated: str, run_info: dict | None = None) -> str:
     data = {
         "schema": 1,
         "generated": generated,
@@ -132,11 +172,13 @@ def render_json(m: matrix.Matrix, sources: list[str], generated: str) -> str:
         "unknown_citations": {i: [t.as_dict() for t in ts] for i, ts in sorted(m.unknown.items())},
         "uncounted_bracketed": [dict(r.as_dict(), ids=r.uncounted) for r in _uncounted(m)],
     }
+    if run_info:
+        data["run"] = run_info
     return json.dumps(data, indent=1, ensure_ascii=False) + "\n"
 
 
 def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, out=None,
-        units: list[str] | None = None) -> int:
+        units: list[str] | None = None, manifest_path: Path | None = None) -> int:
     out = out or sys.stdout
     led = ledger.load(ledger_dir)
     try:
@@ -156,31 +198,68 @@ def run(root: Path, ledger_dir: Path, report_paths: list[Path], out_dir: Path, o
             print(f"trace: FAILED (--unit {', '.join(unknown_units)} not in scope.toml; "
                   f"units in scope: {', '.join(sorted(led.units)) or 'none'})", file=out)
             return 1
-    files: list[Path] = []
-    for p in report_paths:
-        files += reports.discover(p) if p.is_dir() else [p]
+    man = None
+    run_gaps: list[str] = []
+    if manifest_path is not None:
+        man, problems = run_manifest.load(manifest_path, root)
+        if man is None:
+            for p in problems:
+                print(f"  {p}", file=out)
+            print("trace: FAILED (the run manifest is not valid)", file=out)
+            return 1
+        run_gaps = run_manifest.select(man)
+        files = list(dict.fromkeys(f for e in man.entries for f in e.current))
+    else:
+        files = []
+        for p in report_paths:
+            files += reports.discover(p) if p.is_dir() else [p]
     results: list[reports.Result] = []
     read_problems: list[str] = []
     sources: list[str] = []
+    citing: dict[Path, int] = {}
     for f in files:
         rs, probs = reports.read(f, root)
         read_problems += probs
+        citing[f] = sum(1 for x in rs if x.items)
         if rs:
             results += rs
-            sources.append(f.relative_to(root).as_posix() if f.is_relative_to(root) else str(f))
+            sources.append(_rel(f, root))
+    outside: list[dict] = []
+    if man is not None:
+        for e in man.entries:
+            if e.required and e.current and not any(citing.get(f) for f in e.current):
+                run_gaps.append(f"required report {e.rel} of {man.run} has no test result citing an item")
+        listed = set(files) | {f for e in man.entries for f in e.stale}
+        on_disk = [f for top in report_paths for f in (reports.discover(top) if top.is_dir() else [top])]
+        for f in dict.fromkeys(on_disk):
+            if f in listed:
+                continue
+            rs, probs = reports.read(f, root)
+            outside.append({"path": _rel(f, root), "results": sum(1 for x in rs if x.items),
+                            "failed": sum(1 for x in rs if x.items and x.status == "failed"), "unreadable": bool(probs)})
     arch = {i for row in catalog.architecture_dependent(root) for i in row}
     m = matrix.build(s, led, results, arch, units)
-    m.gaps += [("report", p) for p in read_problems]
+    m.gaps += [("report", p) for p in read_problems + run_gaps]
+    run_info = _run_info(man, outside, root) if man is not None else None
     generated = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "matrix.md").write_text(render_md(m, sources, generated), encoding="utf-8")
-    (out_dir / "matrix.json").write_text(render_json(m, sources, generated), encoding="utf-8")
+    (out_dir / "matrix.md").write_text(render_md(m, sources, generated, run_info), encoding="utf-8")
+    (out_dir / "matrix.json").write_text(render_json(m, sources, generated, run_info), encoding="utf-8")
     for ident, reason in m.gaps[:50]:
         print(f"  {ident}: {reason}", file=out)
     if len(m.gaps) > 50:
         print(f"  ... {len(m.gaps) - 50} more in {out_dir / 'matrix.md'}", file=out)
     if m.ungated:
         print(f"  ({len(m.ungated)} gap{'s' if len(m.ungated) != 1 else ''} of units outside the gate, listed in {out_dir / 'matrix.md'})", file=out)
+    failing_outside = [o for o in (run_info or {}).get("outside", []) if o["failed"] or o["unreadable"]]
+    if failing_outside:
+        n = len(failing_outside)
+        print(f"  warning: {n} report{'s' if n != 1 else ''} outside this run {'have' if n != 1 else 'has'} failing or "
+              f"unreadable results (not read here; make trace still reads {'them' if n != 1 else 'it'}):", file=out)
+        for o in failing_outside[:10]:
+            print(f"    {o['path']}: {'unreadable' if o['unreadable'] else str(o['failed']) + ' failed'}", file=out)
+        if n > 10:
+            print(f"    ... {n - 10} more in {out_dir / 'matrix.md'}", file=out)
     uncounted = _uncounted(m)
     if uncounted:
         print(f"  warning: {_uncounted_line(len(uncounted))}:", file=out)
@@ -207,11 +286,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, help="output directory (default: <root>/modernization/build/trace)")
     ap.add_argument("--unit", action="append", metavar="UNIT",
                     help="gate only this unit of scope.toml (repeatable; default: every unit in scope and every code switch)")
+    ap.add_argument("--manifest", type=Path, metavar="FILE",
+                    help="read only the reports this run manifest lists and the run wrote (see tracelib/manifest.py); "
+                         "a missing, stale or empty required report is a gap")
     args = ap.parse_args(argv)
+    if args.manifest is not None and args.reports:
+        ap.error("--manifest and --reports cannot be combined: the manifest names the reports")
     root = args.root.resolve()
     return run(root, args.ledger or root / "modernization/ledger",
                args.reports if args.reports else [root / "modernization"],
-               args.out or root / "modernization/build/trace", units=args.unit)
+               args.out or root / "modernization/build/trace", units=args.unit, manifest_path=args.manifest)
 
 
 if __name__ == "__main__":

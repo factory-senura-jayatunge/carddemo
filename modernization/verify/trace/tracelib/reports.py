@@ -187,11 +187,11 @@ REPORT_DIRS = (
 
 def discover(top: Path) -> list[Path]:
     """Every report file under a spec-items, test-results, playwright-report, surefire-reports or
-    failsafe-reports directory below top (node_modules, .git and var are skipped)."""
+    failsafe-reports directory at or below top (node_modules, .git and var are skipped)."""
     found: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(top):
         dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
-        parts = Path(dirpath).relative_to(top).parts
+        parts = (top.name,) + Path(dirpath).relative_to(top).parts
         suffixes = next((sfx for name, sfx in REPORT_DIRS if name in parts), None)
         if suffixes is None:
             continue
