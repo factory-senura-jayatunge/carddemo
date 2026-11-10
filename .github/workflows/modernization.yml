@@ -347,7 +347,10 @@ jobs:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
         run: |
           case "$BASE" in *[!0]*) ;; *) BASE= ;; esac
-          make -C modernization verify-migrations BASE="$BASE"
+          if [ -z "$BASE" ] && [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            echo 'verify-migrations: FAILED (no pull request base sha)' >&2; exit 1
+          fi
+          make -C modernization verify-migrations BASE="$BASE" REQUIRE_BASE=1
       - name: Upload results and logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

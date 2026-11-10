@@ -165,7 +165,7 @@ db-migrate: require-env ## Apply new migrations to CARDDEMO_DB_NAME without drop
 verify-migrations: require-env ## Migrations both ways on scratch databases: from BASE (default: merge base with origin/modernization) up to this checkout, and fresh; same schema at the end
 	@$(call need,mvnw,arrives with the backend)
 	@$(STACK) ensure-infra $@
-	@cd '$(HERE)' && $(WITH_ENV) $(PYTHON) '$(HERE)/scripts/verify_migrations.py' $(if $(BASE),--base '$(BASE)') $(if $(KEEP),--keep)
+	@cd '$(HERE)' && $(WITH_ENV) $(PYTHON) '$(HERE)/scripts/verify_migrations.py' $(if $(BASE),--base '$(BASE)') $(if $(KEEP),--keep) $(if $(REQUIRE_BASE),--require-base)
 load: require-env ## Load the sample data into CARDDEMO_DB_NAME with batch-service's dataLoadJob (db-reset first for a reload after payments)
 	@$(call need,batch/batch-service/pom.xml,arrives with the data migration)
 	@$(STACK) ensure-infra $@
