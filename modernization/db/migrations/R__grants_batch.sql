@@ -30,6 +30,13 @@ GRANT SELECT, INSERT, DELETE ON OBJECT::core.card TO batch_svc;
 GRANT SELECT, INSERT, DELETE ON OBJECT::core.card_xref TO batch_svc;
 GRANT SELECT, INSERT, DELETE ON OBJECT::core.tcat_bal TO batch_svc;
 GRANT SELECT, INSERT, DELETE ON OBJECT::core.[transaction] TO batch_svc;
+-- The reference tables, emptied and reloaded with the core tables.
+GRANT SELECT, INSERT, DELETE ON OBJECT::ref.tran_type TO batch_svc;
+GRANT SELECT, INSERT, DELETE ON OBJECT::ref.tran_category TO batch_svc;
+GRANT SELECT, INSERT, DELETE ON OBJECT::ref.disclosure_group TO batch_svc;
+GRANT SELECT, INSERT, DELETE ON OBJECT::ref.us_state TO batch_svc;
+GRANT SELECT, INSERT, DELETE ON OBJECT::ref.us_state_zip_prefix TO batch_svc;
+GRANT SELECT, INSERT, DELETE ON OBJECT::ref.nanp_area_code TO batch_svc;
 -- The load restarts the sequence above the highest loaded transaction ID (D-59).
 GRANT ALTER ON OBJECT::core.tran_id_seq TO batch_svc;
 GO

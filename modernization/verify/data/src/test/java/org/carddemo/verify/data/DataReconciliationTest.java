@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.batch.data.RefRows;
 import org.carddemo.identity.IdentityProperties;
 import org.carddemo.identity.fidelity.IdentityFidelity;
 import org.carddemo.identity.fidelity.IdentitySwitches;
@@ -25,11 +26,15 @@ import org.carddemo.platform.legacyformat.entity.AccountRecord;
 import org.carddemo.platform.legacyformat.entity.CardRecord;
 import org.carddemo.platform.legacyformat.entity.CardXrefRecord;
 import org.carddemo.platform.legacyformat.entity.CustomerRecord;
+import org.carddemo.platform.legacyformat.entity.DiscGroupRecord;
 import org.carddemo.platform.legacyformat.entity.TcatBalRecord;
+import org.carddemo.platform.legacyformat.entity.TranCategoryRecord;
+import org.carddemo.platform.legacyformat.entity.TranTypeRecord;
 import org.carddemo.platform.legacyformat.layout.Layouts;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader.SourceLine;
 import org.carddemo.platform.testsupport.TestDatabase;
+import org.carddemo.platform.validation.RuleTable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -51,6 +56,7 @@ class DataReconciliationTest {
     @BeforeEach
     void loadTheSample() {
         DB.fixtures().deleteAll();
+        loadReferenceTables();
         CoreRows rows = new CoreRows(admin, LEDGER_MODE);
         loadAccounts(rows);
         lines("custdata.txt", Layouts.CUSTOMER.length()).forEach(l -> rows.insert(CustomerRecord.parse(l.record())));
@@ -58,6 +64,23 @@ class DataReconciliationTest {
         lines("cardxref.txt", Layouts.CARD_XREF.length()).forEach(l -> rows.insert(CardXrefRecord.parse(l.record())));
         lines("tcatbal.txt", Layouts.TCAT_BAL.length()).forEach(l -> rows.insert(TcatBalRecord.parse(l.record())));
         seedUsersAsIdentityServiceDoes();
+    }
+
+    /** As dataLoadJob's reference steps: the three files, then the validators' lookup lists. */
+    private void loadReferenceTables() {
+        for (String table : List.of("ref.disclosure_group", "ref.tran_category", "ref.tran_type",
+                "ref.us_state_zip_prefix", "ref.us_state", "ref.nanp_area_code")) {
+            admin.sql("DELETE FROM " + table).update();
+        }
+        RefRows ref = new RefRows(admin);
+        lines("trantype.txt", Layouts.TRAN_TYPE.length()).forEach(l -> ref.insert(TranTypeRecord.parse(l.record())));
+        lines("trancatg.txt", Layouts.TRAN_CATEGORY.length())
+                .forEach(l -> ref.insert(TranCategoryRecord.parse(l.record())));
+        lines("discgrp.txt", Layouts.DISC_GROUP.length()).forEach(l -> ref.insert(DiscGroupRecord.parse(l.record())));
+        RuleTable rules = RuleTable.standard();
+        rules.list("usStateCodes").forEach(ref::insertState);
+        rules.list("usStateZipPrefixes").forEach(ref::insertStateZipPrefix);
+        rules.list("nanpGeneralPurposeAreaCodes").forEach(ref::insertAreaCode);
     }
 
     /** What identity-service does at its first start in profile demo (D-06), with the ledger's switch modes. */
@@ -110,7 +133,13 @@ class DataReconciliationTest {
         assertThat(report.lines()).filteredOn(l -> l.outcome() == Report.Outcome.OK)
                 .extracting(Report.Line::subject)
                 .contains("core.account", "core.customer", "core.card", "core.card_xref", "core.tcat_bal",
-                        "card has xref", "card account = xref", "tcat_bal account exists", "iam.app_user");
+                        "ref.tran_type", "ref.tran_category", "ref.disclosure_group", "ref.us_state",
+                        "ref.us_state_zip_prefix", "ref.nanp_area_code", "card has xref", "card account = xref",
+                        "tcat_bal account exists", "DEFAULT disc group", "iam.app_user");
+        assertThat(report.lines()).filteredOn(l -> l.subject().equals("ref.disclosure_group"))
+                .extracting(Report.Line::detail).first().asString().contains("51 rows").contains("1 control total");
+        assertThat(report.lines()).filteredOn(l -> l.subject().equals("ref.us_state_zip_prefix"))
+                .extracting(Report.Line::detail).first().asString().contains("240 codes");
         assertThat(report.lines()).filteredOn(l -> l.subject().equals("core.account"))
                 .extracting(Report.Line::detail).first().asString().contains("50 rows").contains("5 control totals");
     }
@@ -180,6 +209,36 @@ class DataReconciliationTest {
 
         assertThat(failure(report, "card account = xref")).contains("1 violations");
         assertThat(failure(report, "core.card")).contains("[CARD-ACCT-ID]").doesNotContain(card);
+    }
+
+    @Test
+    void aChangedRateFailsTheTotalAndNamesTheGroupKey() {
+        admin.sql("UPDATE ref.disclosure_group SET int_rate = 9.99 WHERE group_id = 'ZEROAPR' AND type_cd = '01'"
+                + " AND cat_cd = '0001'").update();
+
+        assertThat(failure(reconcile(), "ref.disclosure_group")).contains("total DIS-INT-RATE differs")
+                .contains("1 records re-export differently: ZEROAPR   010001 [DIS-INT-RATE]");
+    }
+
+    @Test
+    void withoutTheDefaultGroupTheCheckFails() {
+        admin.sql("DELETE FROM ref.disclosure_group WHERE group_id = 'DEFAULT'").update();
+
+        Report report = reconcile();
+
+        assertThat(failure(report, "DEFAULT disc group")).contains("no DEFAULT group");
+        assertThat(failure(report, "ref.disclosure_group")).contains("count 34, file 51");
+    }
+
+    @Test
+    void aMissingOrExtraLookupCodeIsNamed() {
+        admin.sql("DELETE FROM ref.us_state WHERE state_cd = 'PR'").update();
+        admin.sql("INSERT INTO ref.nanp_area_code (area_code) VALUES ('999')").update();
+
+        Report report = reconcile();
+
+        assertThat(failure(report, "ref.us_state")).isEqualTo("missing codes PR");
+        assertThat(failure(report, "ref.nanp_area_code")).isEqualTo("codes not in lookups.json 999");
     }
 
     @Test

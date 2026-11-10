@@ -19,6 +19,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.batch.data.RefRows;
 import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.legacyformat.Masking;
 import org.carddemo.platform.legacyformat.entity.UserSecurityRecord;
@@ -28,15 +29,17 @@ import org.carddemo.platform.legacyformat.record.FieldType;
 import org.carddemo.platform.legacyformat.record.FixedRecord;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader.SourceLine;
+import org.carddemo.platform.validation.RuleTable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * Reconciles the database with the legacy sample data after {@code make load}: per core
- * table the row count, the key set, the control totals and a byte-exact re-export of
- * every record (CRLF read as LF, the 36-byte xref records padded to 50); then the
- * relations between the tables, and the users of {@code DUSRSECJ} against
- * {@code iam.app_user} (no passwords). Only mismatching keys and field names are
- * reported, never values; card numbers show their last four digits.
+ * and reference table the row count, the key set, the control totals and a byte-exact
+ * re-export of every record (CRLF read as LF, the 36-byte xref records padded to 50);
+ * the lookup tables against the validators' lists; then the relations between the
+ * tables, and the users of {@code DUSRSECJ} against {@code iam.app_user} (no
+ * passwords). Only mismatching keys and field names are reported, never values; card
+ * numbers show their last four digits.
  */
 public final class DataReconciliation {
 
@@ -63,10 +66,11 @@ public final class DataReconciliation {
         Report report = new Report();
         // An account loaded in the other mode re-exports differently, so a wrong mode fails core.account.
         report.info("DEF-ACUP-002", groupIdMode.describe());
-        CoreRows rows = new CoreRows(db, groupIdMode.mode());
-        for (CoreTable t : CoreTable.ALL) {
+        LoadedTable.Rows rows = new LoadedTable.Rows(new CoreRows(db, groupIdMode.mode()), new RefRows(db));
+        for (LoadedTable t : LoadedTable.ALL) {
             table(report, t, rows);
         }
+        lookups(report, rows.ref());
         relations(report);
         users(report);
         long transactions = db.sql("SELECT COUNT_BIG(*) FROM core.[transaction]").query(Long.class).single();
@@ -74,9 +78,9 @@ public final class DataReconciliation {
         return report;
     }
 
-    // --- one core table --------------------------------------------------------------------
+    // --- one table loaded from a file ------------------------------------------------------
 
-    private void table(Report report, CoreTable t, CoreRows rows) {
+    private void table(Report report, LoadedTable t, LoadedTable.Rows rows) {
         List<SourceLine> source = LegacyFileReader.read(sourceDir.resolve(t.file()), t.layout().length());
         List<String> problems = new ArrayList<>();
 
@@ -139,7 +143,7 @@ public final class DataReconciliation {
         }
     }
 
-    private static Set<String> differingFields(CoreTable t, byte[] source, byte[] export) {
+    private static Set<String> differingFields(LoadedTable t, byte[] source, byte[] export) {
         FixedRecord a = FixedRecord.of(t.layout(), source);
         FixedRecord b = FixedRecord.of(t.layout(), export);
         Set<String> fields = new LinkedHashSet<>();
@@ -150,6 +154,34 @@ public final class DataReconciliation {
             }
         }
         return fields;
+    }
+
+    // --- lookup lists ----------------------------------------------------------------------
+
+    private static void lookups(Report report, RefRows rows) {
+        RuleTable rules = RuleTable.standard();
+        lookup(report, "ref.us_state", rules.list("usStateCodes"), rows.states());
+        lookup(report, "ref.us_state_zip_prefix", rules.list("usStateZipPrefixes"), rows.stateZipPrefixes());
+        lookup(report, "ref.nanp_area_code", rules.list("nanpGeneralPurposeAreaCodes"), rows.areaCodes());
+    }
+
+    private static void lookup(Report report, String table, List<String> expected, List<String> actual) {
+        Set<String> missing = new TreeSet<>(expected);
+        actual.forEach(missing::remove);
+        Set<String> extra = new TreeSet<>(actual);
+        expected.forEach(extra::remove);
+        List<String> problems = new ArrayList<>();
+        if (!missing.isEmpty()) {
+            problems.add("missing codes " + keys(missing, UnaryOperator.identity()));
+        }
+        if (!extra.isEmpty()) {
+            problems.add("codes not in " + RuleTable.LOOKUPS + " " + keys(extra, UnaryOperator.identity()));
+        }
+        if (problems.isEmpty()) {
+            report.ok(table, actual.size() + " codes match " + RuleTable.LOOKUPS);
+        } else {
+            report.fail(table, String.join("; ", problems));
+        }
     }
 
     // --- relations -------------------------------------------------------------------------
@@ -170,16 +202,12 @@ public final class DataReconciliation {
         relation(report, "tcat_bal account exists", UnaryOperator.identity(), """
                 SELECT t.acct_id + t.type_cd + t.cat_cd FROM core.tcat_bal AS t
                 LEFT JOIN core.account AS a ON a.acct_id = t.acct_id WHERE a.acct_id IS NULL""");
-        if (exists("ref.disclosure_group")) {
-            long defaults = db.sql("SELECT COUNT_BIG(*) FROM ref.disclosure_group WHERE group_id = 'DEFAULT'")
-                    .query(Long.class).single();
-            if (defaults > 0) {
-                report.ok("DEFAULT disc group", defaults + " rows in ref.disclosure_group");
-            } else {
-                report.fail("DEFAULT disc group", "ref.disclosure_group has no DEFAULT group");
-            }
+        long defaults = db.sql("SELECT COUNT_BIG(*) FROM ref.disclosure_group WHERE group_id = 'DEFAULT'")
+                .query(Long.class).single();
+        if (defaults > 0) {
+            report.ok("DEFAULT disc group", defaults + " rows in ref.disclosure_group");
         } else {
-            report.skip("DEFAULT disc group", "ref.disclosure_group does not exist yet (reference tables not migrated)");
+            report.fail("DEFAULT disc group", "ref.disclosure_group has no DEFAULT group");
         }
     }
 

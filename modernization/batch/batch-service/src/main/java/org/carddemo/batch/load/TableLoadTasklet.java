@@ -6,6 +6,7 @@ import java.util.function.UnaryOperator;
 
 import org.carddemo.batch.BatchSwitches;
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.batch.data.RefRows;
 import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.fidelity.FidelitySwitches;
 import org.carddemo.platform.legacyformat.LegacyTimestamps;
@@ -34,6 +35,7 @@ abstract class TableLoadTasklet implements Tasklet {
     private final DataLoadProperties properties;
     private final FidelitySwitches switches;
     protected CoreRows rows;
+    protected RefRows refRows;
 
     TableLoadTasklet(JdbcClient db, DataLoadProperties properties, FidelitySwitches switches) {
         this.db = db;
@@ -72,6 +74,7 @@ abstract class TableLoadTasklet implements Tasklet {
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
         rows = new CoreRows(db, groupIdMode());
+        refRows = new RefRows(db);
         SourceFile file = SourceFile.read(sourceDir(), fileName(), layout());
         file.requireAscendingKeys(keyLength(), keyDisplay());
         file.requireRepresentable();

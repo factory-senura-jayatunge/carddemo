@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 import org.carddemo.batch.BatchSwitches;
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.batch.data.RefRows;
 import org.carddemo.db.DatabaseProvisioner;
 import org.carddemo.db.LoginCheck;
 import org.carddemo.db.ServiceLogin;
@@ -21,6 +22,7 @@ import org.carddemo.platform.legacyformat.layout.Layouts;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader.SourceLine;
 import org.carddemo.platform.testsupport.CoreFixtures;
+import org.carddemo.platform.validation.RuleTable;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.JobExecution;
@@ -43,7 +45,7 @@ class DataLoadJobTest extends DataLoadTestBase {
     }
 
     @Test
-    void loadsTheFiveSampleFilesIntoEmptyTables() throws Exception {
+    void loadsTheSampleFilesAndLookupListsIntoEmptyTables() throws Exception {
         JobExecution execution = run();
 
         assertThat(execution.getStatus()).as(failures(execution)).isEqualTo(BatchStatus.COMPLETED);
@@ -51,11 +53,19 @@ class DataLoadJobTest extends DataLoadTestBase {
             assertThat(count(table)).as(table).isEqualTo(50);
         }
         assertThat(count("core.[transaction]")).isZero();
+        assertThat(count("ref.tran_type")).isEqualTo(7);
+        assertThat(count("ref.tran_category")).isEqualTo(18);
+        assertThat(count("ref.disclosure_group")).isEqualTo(51);
+        assertThat(count("ref.us_state")).isEqualTo(56);
+        assertThat(count("ref.us_state_zip_prefix")).isEqualTo(240);
+        assertThat(count("ref.nanp_area_code")).isEqualTo(410);
         Map<String, Long> written = execution.getStepExecutions().stream()
                 .collect(Collectors.toMap(StepExecution::getStepName, StepExecution::getWriteCount));
         assertThat(written).containsEntry("loadAccounts", 50L).containsEntry("loadCustomers", 50L)
                 .containsEntry("loadCards", 50L).containsEntry("loadCardXref", 50L)
-                .containsEntry("loadCategoryBalances", 50L);
+                .containsEntry("loadCategoryBalances", 50L).containsEntry("loadTransactionTypes", 7L)
+                .containsEntry("loadCategories", 18L).containsEntry("loadDisclosureGroups", 51L)
+                .containsEntry("loadLookups", 56L + 240L + 410L);
         assertThat(DB.admin().sql("SELECT NEXT VALUE FOR core.tran_id_seq").query(Long.class).single()).isEqualTo(1L);
     }
 
@@ -75,6 +85,23 @@ class DataLoadJobTest extends DataLoadTestBase {
         assertSameRecords("carddata.txt", Layouts.CARD.length(), rows.cards(), c -> c.toBytes());
         assertSameRecords("cardxref.txt", Layouts.CARD_XREF.length(), rows.cardXrefs(), x -> x.toBytes());
         assertSameRecords("tcatbal.txt", Layouts.TCAT_BAL.length(), rows.categoryBalances(), t -> t.toBytes());
+        RefRows ref = new RefRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)));
+        assertSameRecords("trantype.txt", Layouts.TRAN_TYPE.length(), ref.transactionTypes(), t -> t.toBytes());
+        assertSameRecords("trancatg.txt", Layouts.TRAN_CATEGORY.length(), ref.categories(), c -> c.toBytes());
+        assertSameRecords("discgrp.txt", Layouts.DISC_GROUP.length(), ref.disclosureGroups(), d -> d.toBytes());
+    }
+
+    @Test
+    void theLookupTablesHoldTheListsOfTheValidators() throws Exception {
+        assertThat(run().getStatus()).isEqualTo(BatchStatus.COMPLETED);
+        RefRows ref = new RefRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)));
+        RuleTable rules = RuleTable.standard();
+
+        assertThat(ref.states()).containsExactlyInAnyOrderElementsOf(rules.list("usStateCodes")).contains("PR");
+        assertThat(ref.stateZipPrefixes()).containsExactlyInAnyOrderElementsOf(rules.list("usStateZipPrefixes"))
+                .contains("AA34");
+        assertThat(ref.areaCodes()).containsExactlyInAnyOrderElementsOf(rules.list("nanpGeneralPurposeAreaCodes"))
+                .contains("201");
     }
 
     private static <T> void assertSameRecords(String file, int length, List<T> rows, Function<T, byte[]> export) {
@@ -109,6 +136,9 @@ class DataLoadJobTest extends DataLoadTestBase {
         assertThatThrownBy(() -> batch.sql("UPDATE core.account SET curr_bal = 0").update())
                 .hasMessageContaining("permission was denied");
         assertThatThrownBy(() -> batch.sql("SELECT TOP 1 tran_id FROM billpay.payment").query().listOfRows())
+                .hasMessageContaining("permission was denied");
+        assertThatThrownBy(() -> batch.sql("UPDATE ref.disclosure_group SET int_rate = 0").update())
+                .as("the load replaces reference rows; maintenance is reference-service's")
                 .hasMessageContaining("permission was denied");
         assertThat(batch.sql("SELECT COUNT(*) FROM batch.cycle").query(Integer.class).single()).isNotNegative();
     }
