@@ -1,6 +1,6 @@
 # Contract: batch-service job execution API
 
-Status: **approved 2026-11-10** by the architect. This is revision 3 of the build-data draft (`build-test/contracts/batch-execution.md`), with infra's review points and the architect's required changes folded in. Owner: build-data, which implements it in batch-service; infra implements `SpringBatchJobOperator` and the DAGs against it. Changes go through this document first. Where [batch.md](batch.md) or [api-security.md](api-security.md#batch-service-internal) differ, this document wins.
+Status: **approved 2026-11-10** by the architect. This is revision 3 of the build-data draft (`build-test/contracts/batch-execution.md`), with infra's review points and the architect's required changes folded in. Owner: build-data, which implements it in batch-service; infra implements `SpringBatchJobOperator` and the DAGs against it. Changes go through this document first. Amended 2026-11-10: D-33 matching steps and `expiryDays` on `postDailyTransactionsJob`. Where [batch.md](batch.md) or [api-security.md](api-security.md#batch-service-internal) differ, this document wins.
 
 ## Transport
 
@@ -44,7 +44,7 @@ Request: `{"params": {...}}`. batch-service builds the job parameters. Airflow n
 
 | Kind | Jobs | Identifying parameters | Non-identifying parameters |
 | :-- | :-- | :-- | :-- |
-| cycle | `archiveMasterJob`, `ingestDailyFileJob`, `postDailyTransactionsJob`, `calculateInterestJob`, `statementJob`, `applyRetentionJob`, `purgePendingAuthorizationsJob` | `cycleId` (request), `businessDate` and `attempt` (from `batch.cycle`) | `interestParm` (from the cycle, `calculateInterestJob`); `expiryDays` and `commitInterval` (from configuration, the purge). A request `businessDate`, if sent, must equal the cycle's. |
+| cycle | `archiveMasterJob`, `ingestDailyFileJob`, `postDailyTransactionsJob`, `calculateInterestJob`, `statementJob`, `applyRetentionJob`, `purgePendingAuthorizationsJob` | `cycleId` (request), `businessDate` and `attempt` (from `batch.cycle`) | `interestParm` (from the cycle, `calculateInterestJob`); `expiryDays` and `commitInterval` (from configuration, the purge); `expiryDays` (the same setting, `postDailyTransactionsJob`, for D-33 matching). A request `businessDate`, if sent, must equal the cycle's. |
 | report | `transactionReportJob` | `runId` (an existing `batch.report_run` row) | none: the job uses the row's stored parameters, not the request's |
 | run-keyed | `categoryBalanceListingJob`, `dataLoadJob`, `disclosureGroupReloadJob`, `transactionTypeMaintenanceJob`, `exportMastersJob`, `importMigrationJob` | `runKey` = `"<dag_id>/<run_id>/<task_id>"` from the Airflow context, 1 to 250 characters | `businessDate` (required: the DAG's logical date or `conf` override; the timestamps the job writes take their date from it); `windowRunKey` (required for the jobs that need a window, section 6); `exportId` (required, `importMigrationJob`) |
 
@@ -114,7 +114,7 @@ The owner's scheduler thread runs `UPDATE batch.execution_lease SET renewed_at =
 - Every transaction that changes data on behalf of an execution runs the renewal UPDATE as its last statement before COMMIT. 0 rows: the transaction rolls back and the step fails with `LEASE_LOST`.
 - The fence's exclusive lock on the lease row is held until the commit, so a revocation cannot fall between fence and commit.
 - **Two transaction managers.** Job steps get only the fencing transaction manager: a decorator that registers the fence as a `beforeCommit` synchronization for the execution bound to the thread, and fails a commit with no bound execution. Request handlers (cycle registration, window open and close, report-run reads) use the plain one and hold no lease; window operations are serialized by the window's application lock. A test asserts that every step of every registered job runs through the fencing decorator, and that no job bean can obtain the plain one.
-- **Coverage** includes every chunk and every tasklet: `archive`, `claimOnlineAdds`, `apply_retention`, the `dataLoadJob` steps, `checkDefaultGroup`, the purge, the import, the exports, the report and the listing, plus the status writes on `batch.report_run` and `batch.export_run`.
+- **Coverage** includes every chunk and every tasklet: `archive`, `claimOnlineAdds`, `stageAuthorizationMatches`, `applyAuthorizationMatches`, `apply_retention`, the `dataLoadJob` steps, `checkDefaultGroup`, the purge, the import, the exports, the report and the listing, plus the status writes on `batch.report_run` and `batch.export_run`.
 - **Files.** File operations never happen between the fence and the commit. An output folder is written under a temporary name and renamed to `<kind>/<id>` after the commit. The rename is idempotent: a restart replaces a leftover temporary folder and an existing target. The inbound daily file is identified at `stage` start by its name and SHA-256, stored with the cycle. It is moved to the archive after the job's last commit. The reader accepts the file in either place when the checksum matches, so a crash between commit and move loses nothing.
 
 ### 4.4 Recovery (revoke, then fail, in one transaction)
@@ -191,7 +191,7 @@ There is one global `WRITES_BLOCKED` window. It is the serialization point betwe
 
 ## 7. Deliberate cycle rerun
 
-`make -C modernization cycle-rerun CYCLE=<id>` refuses while any execution of that cycle is non-terminal and not recoverable. Otherwise it opens the cycle's window and recovers any recoverable executions. It then does the restore that [batch.md](batch.md#restart-and-idempotency) describes, raises `attempt` and sets the cycle `OPEN`. The next DAG run therefore creates fresh job instances (`attempt` is identifying).
+`make -C modernization cycle-rerun CYCLE=<id>` refuses while any execution of that cycle is non-terminal and not recoverable. Otherwise it opens the cycle's window and recovers any recoverable executions. It then reverts the cycle's authorization matches ([d33-matching-brief.md](d33-matching-brief.md#batch-steps)), does the restore that [batch.md](batch.md#restart-and-idempotency) describes, raises `attempt` and sets the cycle `OPEN`. The next DAG run therefore creates fresh job instances (`attempt` is identifying).
 
 ## 8. Superseded rules
 
