@@ -504,6 +504,22 @@ class BillPayApiTest extends BillPayTestBase {
     }
 
     @Test
+    @DisplayName("BILL-S9 after an online add: the legacy ID follows the add waiting for the next cycle")
+    @SpecItem({"BR-BILL-004", "BR-TRNA-003"})
+    void paymentAfterAWaitingOnlineAdd() throws Exception {
+        String added = "0000000000000050";
+        DB.fixtures().waitingOnlineAdd(added, CARD, "5.00");
+        String expected = fixed() ? NEXT_ID : "0000000000000051";
+        pay(ACCT, "Y", key()).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tranId").value(expected))
+                .andExpect(jsonPath("$.message").value("Payment successful.  Your Transaction ID is " + expected + "."));
+        assertThat(transaction(expected)).containsEntry("origin", "BILL_PAY").containsEntry("in_master", true);
+        assertThat(count("core.[transaction]")).isEqualTo(2);
+        assertThat(admin.sql("SELECT tran_id FROM core.daily_tran WHERE cycle_id IS NULL").query(String.class).list())
+                .containsExactly(added);
+    }
+
+    @Test
     @DisplayName("BILL-S22: a payment and another writer at once get distinct IDs")
     @SpecItem({"BR-BILL-004", "DEF-BILL-003", "BR-TRNA-003"})
     void s22_concurrentWriters() throws Exception {

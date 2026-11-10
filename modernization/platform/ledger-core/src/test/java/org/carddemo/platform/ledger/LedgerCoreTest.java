@@ -27,7 +27,10 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Runs as the Bill Pay login, so every statement also proves the grants suffice. */
+/**
+ * Runs as the Bill Pay login, and "copy last" as the transaction login, so every statement also
+ * proves the grants of the real callers suffice.
+ */
 class LedgerCoreTest {
 
     static final String ACCT = "00000000001";
@@ -36,11 +39,11 @@ class LedgerCoreTest {
     private final TestDatabase db = TestDatabase.shared();
     private final JdbcClient admin = db.admin();
 
-    private ApplicationContextRunner runner(String tranIdMode) {
+    private ApplicationContextRunner runner(ServiceLogin login, String tranIdMode) {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(DataSourceTransactionManagerAutoConfiguration.class,
                         TransactionAutoConfiguration.class, FidelityAutoConfiguration.class, LedgerAutoConfiguration.class))
-                .withBean(javax.sql.DataSource.class, () -> db.dataSource(ServiceLogin.BILLPAY))
+                .withBean(javax.sql.DataSource.class, () -> db.dataSource(login))
                 .withPropertyValues("carddemo.ledger.dir=" + System.getProperty("java.io.tmpdir") + "/no-ledger",
                         "carddemo.fidelity.BR-TRNA-003=" + tranIdMode);
     }
@@ -57,7 +60,11 @@ class LedgerCoreTest {
     }
 
     private void run(String mode, Consumer<AssertableApplicationContext> test) {
-        runner(mode).run(ctx -> {
+        run(ServiceLogin.BILLPAY, mode, test);
+    }
+
+    private void run(ServiceLogin login, String mode, Consumer<AssertableApplicationContext> test) {
+        runner(login, mode).run(ctx -> {
             assertThat(ctx).hasNotFailed();
             test.accept(ctx);
         });
@@ -98,6 +105,115 @@ class LedgerCoreTest {
             assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000008");
             assertThat(JdbcTransactionIds.format(9_999_999_999_999_999L)).isEqualTo("9999999999999999");
             assertThatThrownBy(() -> JdbcTransactionIds.format(10_000_000_000_000_000L)).isInstanceOf(IllegalStateException.class);
+        });
+    }
+
+    @Test
+    @SpecItem({"BR-TRNA-003", "BR-BILL-004"})
+    void legacyIdCountsOnlineAddsWaitingForTheNextCycle() {
+        run("legacy", ctx -> {
+            TransactionIds ids = ctx.getBean(TransactionIds.class);
+            db.fixtures().transaction("0000000000000041", CARD, "1.00").waitingOnlineAdd("0000000000000030", CARD, "1.00");
+            assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000042");
+            db.fixtures().waitingOnlineAdd("0000000000000050", CARD, "1.00");
+            assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000051");
+            admin.sql("DELETE FROM core.[transaction]").update();
+            assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000051");
+        });
+    }
+
+    @Test
+    @SpecItem("BR-TRNA-003")
+    void repeatedOnlineAddsThenABillPaymentTakeConsecutiveLegacyIds() {
+        run("legacy", ctx -> {
+            TransactionIds ids = ctx.getBean(TransactionIds.class);
+            db.fixtures().transaction("0000000000000041", CARD, "1.00");
+            for (String expected : new String[] {"0000000000000042", "0000000000000043", "0000000000000044"}) {
+                String id = inTransaction(ctx, ids::next);
+                assertThat(id).isEqualTo(expected);
+                db.fixtures().waitingOnlineAdd(id, CARD, "1.00");
+            }
+            String paymentId = inTransaction(ctx, () -> {
+                String id = ids.next();
+                ctx.getBean(TransactionWriter.class).insert(payment(id, "1.00"));
+                return id;
+            });
+            assertThat(paymentId).isEqualTo("0000000000000045");
+            assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000046");
+        });
+    }
+
+    @Test
+    @SpecItem("BR-TRNA-003")
+    void legacyIdIgnoresClaimedRowsAndCountsAPostedAddOnce() {
+        run("legacy", ctx -> {
+            TransactionIds ids = ctx.getBean(TransactionIds.class);
+            db.fixtures().transaction("0000000000000041", CARD, "1.00")
+                    .claimedDailyRow("2022-07-06", "DAILY_FILE", "0000000000000090", CARD)
+                    .claimedDailyRow("2022-07-06", "ONLINE_ADD", "0000000000000095", CARD);
+            assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000042");
+            db.fixtures().transaction("0000000000000095", CARD, "1.00");
+            assertThat(inTransaction(ctx, ids::next)).isEqualTo("0000000000000096");
+        });
+    }
+
+    @Test
+    @SpecItem({"BR-TRNA-003", "NUM-BILL-005"})
+    void fixedIdIgnoresWaitingOnlineAdds() {
+        run("fixed", ctx -> {
+            db.fixtures().waitingOnlineAdd("0000000000000050", CARD, "1.00").restartTranIdSequence(7);
+            assertThat(inTransaction(ctx, ctx.getBean(TransactionIds.class)::next)).isEqualTo("0000000000000007");
+        });
+    }
+
+    @Test
+    @SpecItem({"BR-TRNA-006", "BR-TRNA-003"})
+    void copyLatestReadsTheMasterAndTheWaitingAddsInBothModes() {
+        for (String mode : new String[] {"legacy", "fixed"}) {
+            db.fixtures().deleteAll()
+                    .account(CoreFixtures.Account.of(ACCT, "194.00"))
+                    .customer("000000001")
+                    .card(CARD, ACCT, "000000001");
+            run(ServiceLogin.TRANSACTION, mode, ctx -> {
+                LatestTransactions latest = ctx.getBean(LatestTransactions.class);
+                assertThat(latest.latest()).isEmpty();
+
+                db.fixtures().transaction("0000000000000041", CARD, "12.34");
+                assertThat(latest.latest()).contains(new LatestTransaction("0000000000000041", "01", "0001",
+                        "POS TERM", "FIXTURE PURCHASE", new BigDecimal("12.34"), "000000001", "FIXTURE", "TOWN",
+                        "10001", "2022-07-05", "2022-07-05", false));
+
+                db.fixtures().waitingOnlineAdd("0000000000000050", CARD, "56.78")
+                        .waitingOnlineAdd("0000000000000045", CARD, "1.00");
+                LatestTransaction add = new LatestTransaction("0000000000000050", "03", "0005", "OPERATOR",
+                        "ONLINE ADD 0000000000000050", new BigDecimal("56.78"), "000000002", "ADDED MERCHANT",
+                        "CITY", "20002", "2026-11-05", "2026-11-06", true);
+                assertThat(latest.latest()).contains(add);
+
+                // Rows of a cycle are not candidates until posting puts them in the master.
+                db.fixtures().claimedDailyRow("2022-07-06", "DAILY_FILE", "0000000000000090", CARD)
+                        .claimedDailyRow("2022-07-06", "ONLINE_ADD", "0000000000000095", CARD);
+                assertThat(latest.latest()).contains(add);
+                db.fixtures().transaction("0000000000000095", CARD, "9.50");
+                assertThat(latest.latest()).get().extracting(LatestTransaction::tranId, LatestTransaction::waiting)
+                        .containsExactly("0000000000000095", false);
+
+                // The ID allocation runs under the same login over the same set.
+                String next = inTransaction(ctx, ctx.getBean(TransactionIds.class)::next);
+                assertThat(next).isEqualTo(mode.equals("legacy") ? "0000000000000096" : "0000000000000001");
+            });
+        }
+    }
+
+    @Test
+    @SpecItem("BR-TRNA-006")
+    void copyLatestPrefersTheMasterRowOnATie() {
+        run(ServiceLogin.TRANSACTION, "legacy", ctx -> {
+            db.fixtures().transaction("0000000000000050", CARD, "1.00").waitingOnlineAdd("0000000000000050", CARD, "2.00");
+            for (int i = 0; i < 5; i++) {
+                assertThat(ctx.getBean(LatestTransactions.class).latest()).get()
+                        .extracting(LatestTransaction::waiting).isEqualTo(false);
+            }
         });
     }
 
