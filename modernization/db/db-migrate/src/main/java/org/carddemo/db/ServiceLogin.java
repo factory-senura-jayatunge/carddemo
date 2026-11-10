@@ -16,9 +16,12 @@ public enum ServiceLogin {
             "SELECT TOP 0 cust_id FROM core.customer",
             // INV-004: Bill Pay may change the balance, never another account column.
             "UPDATE core.account SET credit_limit = credit_limit WHERE 1 = 0",
-            "DELETE FROM core.[transaction] WHERE 1 = 0")),
+            "DELETE FROM core.[transaction] WHERE 1 = 0",
+            // Legacy ID allocation reads the IDs of waiting adds, never their content.
+            "SELECT TOP 0 card_num FROM core.daily_tran")),
     ACCOUNT("account", List.of("SELECT TOP 0 tran_id FROM core.[transaction]")),
-    TRANSACTION("transaction", List.of("SELECT TOP 0 cust_id FROM core.customer")),
+    TRANSACTION("transaction", List.of("SELECT TOP 0 cust_id FROM core.customer",
+            "SELECT TOP 0 raw_record FROM core.daily_tran")),
     REFERENCE("reference", List.of("SELECT TOP 0 tran_id FROM core.[transaction]")),
     AUTHORIZATION("authorization", List.of("SELECT TOP 0 tran_id FROM core.[transaction]")),
     INQUIRY("inquiry", List.of("SELECT TOP 0 cust_id FROM core.customer")),

@@ -6,11 +6,24 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** {@link TransactionIds} on core.transaction and core.tran_id_seq. */
+/** {@link TransactionIds} on core.transaction, core.daily_tran and core.tran_id_seq. */
 public class JdbcTransactionIds implements TransactionIds {
 
     static final String LOCK = "carddemo.tran_id";
     static final int LOCK_TIMEOUT_MILLIS = 10_000;
+
+    /**
+     * The legacy file the ID follows is the master plus the online adds that wait for the next
+     * cycle (D-27): an add goes to core.daily_tran, not to the master, until posting. Claimed rows
+     * are left out; they reach the master when the cycle posts them, and writers are blocked by
+     * the batch window in between.
+     */
+    static final String HIGHEST_ID = """
+            SELECT MAX(tran_id) FROM (
+                SELECT MAX(tran_id) AS tran_id FROM core.[transaction] WHERE in_master = 1
+                UNION ALL
+                SELECT MAX(tran_id) FROM core.daily_tran WHERE cycle_id IS NULL AND origin = 'ONLINE_ADD'
+            ) AS ids""";
 
     private final JdbcClient jdbc;
     private final FidelitySwitches switches;
@@ -31,8 +44,7 @@ public class JdbcTransactionIds implements TransactionIds {
         if (!AppLocks.acquire(jdbc, LOCK, "Exclusive", LOCK_TIMEOUT_MILLIS)) {
             throw new CannotAcquireLockException("application lock " + LOCK + " not granted");
         }
-        String highest = jdbc.sql("SELECT MAX(tran_id) FROM core.[transaction] WHERE in_master = 1")
-                .query(String.class).optional().orElse(null);
+        String highest = jdbc.sql(HIGHEST_ID).query(String.class).optional().orElse(null);
         return format(highest == null ? 1 : parse(highest) + 1);
     }
 
@@ -46,7 +58,7 @@ public class JdbcTransactionIds implements TransactionIds {
     private static long parse(String tranId) {
         String digits = tranId.trim();
         if (!digits.matches("\\d{1,16}")) {
-            throw new IllegalStateException("highest master transaction ID is not numeric: " + tranId);
+            throw new IllegalStateException("highest transaction ID is not numeric: " + tranId);
         }
         return Long.parseLong(digits);
     }

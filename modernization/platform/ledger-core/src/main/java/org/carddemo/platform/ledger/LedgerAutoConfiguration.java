@@ -27,6 +27,12 @@ public class LedgerAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public LatestTransactions latestTransactions(DataSource dataSource) {
+        return new JdbcLatestTransactions(JdbcClient.create(dataSource));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public TransactionWriter transactionWriter(DataSource dataSource) {
         return new JdbcTransactionWriter(JdbcClient.create(dataSource));
     }

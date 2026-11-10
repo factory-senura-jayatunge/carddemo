@@ -23,11 +23,13 @@ WHERE u.name = N'billpay_svc'
 EXEC sp_executesql @revoke;
 GO
 
--- Reads: the account, its cards, the master (legacy ID allocation), the
--- category balances and the batch window.
+-- Reads: the account, its cards, the master and the IDs of the online adds
+-- waiting for the next cycle (legacy ID allocation, D-27), the category
+-- balances and the batch window.
 GRANT SELECT ON OBJECT::core.account TO billpay_svc;
 GRANT SELECT ON OBJECT::core.card_xref TO billpay_svc;
 GRANT SELECT ON OBJECT::core.[transaction] TO billpay_svc;
+GRANT SELECT ON OBJECT::core.daily_tran (tran_id, cycle_id, origin) TO billpay_svc;
 GRANT SELECT ON OBJECT::core.tcat_bal TO billpay_svc;
 GRANT SELECT ON OBJECT::ops.batch_window TO billpay_svc;
 GO
