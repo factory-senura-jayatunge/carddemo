@@ -7,6 +7,9 @@ Steps, in order; the first failure ends the run:
   1. maven     ./mvnw verify for platform/ledger-core and billpay-service
   2. vitest    the Bill Pay page and number format tests
                (src/pages/BillPayPage.test.tsx, src/lib/format.test.ts)
+ 2b. tc-wait   until the Testcontainers containers and networks that appeared on
+               the Docker engine since step 1 began (Ryuk's own included) have
+               stopped or gone; it only watches, never stops or removes anything
   3. e2e-mock  Playwright e2e/bill.spec.ts on the mocked API (Vite on 25174,
                so it never reuses the stack's dev server on 25173)
   4. stack     the slice on its own database (scripts/e2e_stack.py): db-reset
@@ -64,6 +67,100 @@ class StepFailed(Exception):
     pass
 
 
+# Testcontainers labels every container and network it creates, Ryuk's own included.
+TC_LABEL = "org.testcontainers=true"
+# Ryuk (testcontainers/ryuk 0.14.0 with Testcontainers 2.0.5) removes a JVM's containers and
+# networks RYUK_RECONNECTION_TIMEOUT (10 s) after that JVM's connection closes, then removes
+# itself. A removal is retried every RYUK_CHANGES_RETRY_INTERVAL (1 s), up to RYUK_REMOVE_RETRIES
+# (10) times, each Docker request bounded by RYUK_REQUEST_TIMEOUT (10 s): about 30 s at worst.
+TC_GONE_LIMIT = 60.0
+TC_POLL = 0.5
+DOCKER_TIMEOUT = 20
+# Container states that hold no network interface any more.
+TC_DOWN_STATES = {"exited", "dead", "created"}
+
+
+class DockerError(Exception):
+    pass
+
+
+def docker_lines(argv, env, runner=subprocess.run) -> list:
+    try:
+        p = runner(["docker", *argv], env=env, capture_output=True, text=True, timeout=DOCKER_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise DockerError(f"docker {' '.join(argv[:2])}: {type(e).__name__}")
+    if p.returncode != 0:
+        first = (p.stderr or "").strip().splitlines()
+        raise DockerError(f"docker {' '.join(argv[:2])} exited {p.returncode}: {first[0][:200] if first else 'no message'}")
+    return [line for line in p.stdout.splitlines() if line.strip()]
+
+
+def tc_resources(env, runner=subprocess.run) -> dict:
+    """Testcontainers' containers and networks on the engine: 'container <id>' or 'network <id>' -> (state, name)."""
+    found = {}
+    for line in docker_lines(["ps", "-a", "--no-trunc", "--filter", "label=" + TC_LABEL,
+                              "--format", "{{.ID}}\t{{.State}}\t{{.Names}}"], env, runner):
+        ident, state, name = (line.split("\t") + ["", ""])[:3]
+        found["container " + ident] = (state, name)
+    for line in docker_lines(["network", "ls", "--no-trunc", "--filter", "label=" + TC_LABEL,
+                              "--format", "{{.ID}}\t{{.Name}}"], env, runner):
+        ident, name = (line.split("\t") + [""])[:2]
+        found["network " + ident] = ("present", name)
+    return found
+
+
+class TestcontainersBarrier:
+    """Waits until what Testcontainers started during Maven has stopped or gone.
+
+    Ryuk removes a JVM's SQL Server container, and then itself, about 10 s after Maven ends,
+    which can be while Playwright loads its first pages. When Docker deletes their interfaces,
+    a Chromium on the same host aborts the requests in flight with net::ERR_NETWORK_CHANGED;
+    Vite's module graph breaks and the page stays blank.
+
+    Docker gives no way to tell which Testcontainers session a Maven run used, so what counts
+    is what appeared on the engine (the docker CLI with Maven's environment) since before()
+    ran. Another run on the same engine at the same time is waited for too, and reported by
+    ID when it outlives TC_GONE_LIMIT.
+    """
+
+    def __init__(self, env, runner=subprocess.run, clock=time.monotonic, sleep=time.sleep, limit=TC_GONE_LIMIT):
+        self.env, self.runner, self.clock, self.sleep, self.limit = env, runner, clock, sleep, limit
+        self.known = None
+        self.before_error = None
+
+    def before(self) -> None:
+        try:
+            self.known = set(tc_resources(self.env, self.runner))
+        except DockerError as e:
+            self.known, self.before_error = None, str(e)
+
+    def wait(self) -> str:
+        start = self.clock()
+        seen = set()
+        while True:
+            try:
+                now = tc_resources(self.env, self.runner)
+            except DockerError as e:
+                if self.before_error is not None:
+                    return f"Docker not reachable before or after maven ({e}), so no Testcontainers to wait for"
+                raise StepFailed(f"tc-wait: cannot list Testcontainers containers and networks: {e}")
+            new = {key: value for key, value in now.items() if self.known is None or key not in self.known}
+            up = {key: (state, name) for key, (state, name) in new.items()
+                  if key.startswith("network ") or state not in TC_DOWN_STATES}
+            seen |= set(up)
+            elapsed = self.clock() - start
+            if not up:
+                scope = "on the engine" if self.known is None else "new since maven began"
+                return (f"{len(seen)} Testcontainers container(s) and network(s) {scope} were up; "
+                        f"all stopped or gone after {elapsed:.1f} s")
+            if elapsed >= self.limit:
+                listed = ", ".join(f"{key.split()[0]} {key.split()[1][:12]} {name or '?'} ({state})"
+                                   for key, (state, name) in sorted(up.items()))
+                raise StepFailed(f"tc-wait: still up after {self.limit:.0f} s: {listed}; "
+                                 "nothing was stopped (another run on this Docker engine can also own them)")
+            self.sleep(TC_POLL)
+
+
 def env_with_node(extra=None) -> dict:
     env = dict(os.environ)
     node = stack.node_bin()
@@ -103,10 +200,14 @@ def main() -> int:
     try:
         # Before any step writes a report, so that only this run's reports count.
         manifest.begin(Path(MANIFEST), Path(HERE).parent, "test-billpay", REPORTS)
+        barrier = TestcontainersBarrier(env_with_node())
+        barrier.before()
         run("maven", ["./mvnw", "-B", "verify", "-pl", "platform/ledger-core,services/billpay-service", "-am"])
         run("vitest", ["npm", "ci"], cwd=WEB)
         run("vitest", ["npx", "vitest", "run", *VITEST_FILES, "--reporter=default", "--reporter=junit",
                        "--outputFile.junit=" + os.path.join(RESULTS, "vitest-billpay-junit.xml")], cwd=WEB)
+        print(f"==    {'tc-wait':10} Testcontainers from maven, on the engine maven's environment names", flush=True)
+        print(f"      {'tc-wait':10} {barrier.wait()}", flush=True)
         playwright("e2e-mock", "mock", env_with_node({"CARDDEMO_WEB_PORT": MOCK_PORT}))
         try:
             with e2e_stack.Session("test-billpay") as s:
