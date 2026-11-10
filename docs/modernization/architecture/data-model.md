@@ -24,13 +24,14 @@ Each service connects with its own SQL login. The grants are the enforced versio
 | :-- | :-- | :-- | :-- | :-- |
 | `core.account` | all services, batch | batch (load) | account-service (profile columns); billpay-service (`curr_bal`, `curr_cyc_credit`, `curr_cyc_debit`); batch (balances, cycle totals) | batch (reload) |
 | `core.customer` | account, authorization, batch | batch (load) | account-service | batch (reload) |
-| `core.card` | account, batch | batch (load) | account-service (name, status, expiry; account in legacy mode) | batch (reload) |
+| `core.card` | account, authorization (status and expiry columns, D-32), batch | batch (load) | account-service (name, status, expiry; account in legacy mode) | batch (reload) |
 | `core.card_xref` | all services, batch | batch (load) | none | batch (reload) |
 | `core.transaction` | transaction, billpay, inquiry, batch | billpay-service, batch (online adds arrive through `core.daily_tran`, D-27) | batch (`in_master` only) | batch (retention purge) |
 | `core.tcat_bal` | batch, billpay-service | batch, billpay-service | batch, billpay-service (`balance`; DEF-BILL-010 fixed, D-28) | batch (reload) |
 | `core.daily_tran` | batch, transaction-service (waiting `ONLINE_ADD` rows, for legacy IDs and "copy latest") | batch, transaction-service (`ONLINE_ADD`, D-27) | batch (the claim) | batch (retention) |
 | `core.daily_reject` | batch, operations view | batch | none | batch (retention) |
 | `ref.*` | all | reference-service, batch (load, maintenance job) | same | same |
+| `pauth.*` | authorization-service, batch | authorization-service, batch (load) | authorization-service; batch (summary totals on purge) | batch (purge, reload); `auth_fraud` never |
 
 Column-level `GRANT UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` to the Bill Pay login is what keeps Bill Pay standalone yet unable to change anything else in the account (INV-004). The cycle columns are needed because a payment is posted like any other transaction (D-28).
 
@@ -103,14 +104,33 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, 
 | `iam.app_user` (ENT-USER-SECURITY) | `user_id CHAR(8)` BIN2 | `first_name`, `last_name VARCHAR(20)`, `password_hash VARCHAR(100)`, `user_type CHAR(1)`, `ebcdic_sort_key BINARY(8)` (list order, Q-USRL-002), `must_change_password`, `failed_attempts`, `locked_until`, `last_sign_on_at` (lockout and forced change, decided by D-04 and D-05), audit columns, `row_version`. |
 | `iam.session`, `iam.audit_event` | id | Sessions hold the hash of the current and previous refresh token. Audit rows never hold PII values, only IDs and field names. |
 | `billpay.payment` | `tran_pk` | `tran_id`, `acct_id`, `paid_by CHAR(8)`, `idempotency_key UNIQUEIDENTIFIER` unique, `amount`, `created_at`. |
-| `pauth.auth_summary` (ENT-AUTH-SUMMARY, IMS root `PAUTSUM0`) | `acct_id CHAR(11)` | Limits, balances, approved and declined counts and amounts as `DECIMAL(11,2)` and `SMALLINT` (the IMS domain); `row_version`. |
-| `pauth.auth_detail` (ENT-AUTH-DETAIL, IMS child `PAUTDTL1`) | `auth_id BIGINT IDENTITY` | FK `acct_id` to the summary `ON DELETE CASCADE` (the purge deletes a summary with its details). `processed_at DATETIME2(3)` indexed descending replaces the 9-complement key; `auth_date_9c` and `auth_time_9c` are kept as columns, unique per account, because the fraud key derives from them (Q-AUFR-001). |
-| `pauth.auth_fraud` (ENT-AUTH-FRAUD, Db2 `AUTHFRDS`) | `(card_num, auth_ts)` | The 26 Db2 columns; nullable `auth_id` without FK, so the row survives the purge. |
+| `pauth.auth_summary` (ENT-AUTH-SUMMARY, IMS root `PAUTSUM0`) | `acct_id CHAR(11)` | FK to `core.account`. Limits and balances `DECIMAL(11,2)`; approved and declined counts `INT` and amounts `DECIMAL(15,2)` ([below](#pending-authorizations-pauth)); no status fields; `row_version`. |
+| `pauth.auth_detail` (ENT-AUTH-DETAIL, IMS child `PAUTDTL1`) | `auth_id BIGINT IDENTITY` | FK `acct_id` to the summary `ON DELETE CASCADE` (the purge deletes a summary with its details). `processed_at DATETIME2(3)` indexed descending replaces the 9-complement key; `auth_date_9c` and `auth_time_9c` are kept as columns, unique per account, which reproduces the IMS duplicate-key rule; the loader carries them. IDs are never reused. |
+| `pauth.auth_fraud` (ENT-AUTH-FRAUD, Db2 `AUTHFRDS`) | `auth_id` (D-36) | The 26 Db2 columns plus `reported_by` (DEF-AUDT-006 deviation); non-unique index `(card_num, auth_ts)`; no FK, so the row survives the purge. |
 | `pauth.processed_message`, `pauth.outbox` | message key | Idempotency and reply outbox for the fixed mode of the authorization listener ([messaging.md](messaging.md)). |
 | `batch.cycle` | `cycle_id` | `business_date DATE` unique, `interest_parm CHAR(10)`, status, timestamps. |
 | `batch.report_run`, `batch.statement_run` | run ID | Parameters, requester, status, output paths. |
 | `batch.BATCH_*` | Spring Batch | Job repository; Spring Batch's SQL Server schema. |
 | `ops.batch_window` | `window_id` | `cycle_id`, `mode`, `opened_at`, `closed_at`. |
+
+### Pending authorizations (`pauth`)
+
+Rulings on the V500 to V502 DDL review (2026-11-06):
+
+- **Fraud key (D-36).** `pauth.auth_fraud` is keyed by `auth_id`, the detail's surrogate ID, one of the options D-36 accepted. Two authorizations can no longer share a fraud row (DEF-AUFR-001). `(card_num, auth_ts)` stays as a non-unique index in the Db2 order. There is no FK, so the fraud row outlives the detail.
+- **IDs are never reused.** Fraud rows keep `auth_id` after the detail is gone, so `pauth.auth_detail` is never truncated or reseeded. The loader deletes rows, which does not reset `IDENTITY`. `batch_svc` gets no `ALTER` on `pauth`.
+- **Summary to account.** The FK `auth_summary.acct_id` → `core.account` stays. As in the other referential checks, a summary for a missing account fails `loadPendingAuthorizations`. A reload deletes `pauth` before `core.account` and loads it afterwards.
+- **Unused summary fields.** `PA-AUTH-STATUS` and `PA-ACCOUNT-STATUS` get no columns. No program reads them, and online-created summaries hold leftover bytes in them (DEF-AUTH-013). The loader skips their bytes.
+- **Authorization code (D-32, BR-AUTH-008).** The service sets the code to the six rightmost digits of `auth_id`, zero-padded. There is no sequence and no unique constraint. The code is unique among any 1,000,000 consecutive authorizations, so it is unique among retained details while fewer than that arrive within one purge expiry. Loaded rows keep their legacy code. Nothing looks a row up by its code.
+- **Running totals.** The summary's approved and declined counts are `INT`, and its approved and declined amounts are `DECIMAL(15,2)`. The IMS domain (`S9(4) COMP`, `S9(9)V99`) is not kept for these totals. The declined totals grow with every decline. One declined request at the largest valid amount (`DECIMAL(12,2)`) already overflows `S9(9)V99`, and capping the count would decline every request of a busy account. Limits and balances keep `DECIMAL(11,2)`. How the screen shows the counts and amounts (NUM-AUSM-001, NUM-AUSM-002) belongs to the web contract.
+- **Purge (D-33, D-34).** Purging a detail subtracts it from the summary's totals: approved count and amount plus `credit_balance` for an approval, declined count and amount for anything else. A summary is deleted only when it has no details left. Details flagged `F` are not purged, because fraud rows are kept with no expiry. `processed_message` rows and sent `outbox` rows older than the same expiry are deleted.
+- **Matching (D-33).** D-33 releases a pending approval "when purged or matched". Only the purge release is built. No input links an authorization to a posted transaction, and nothing sets match status `M` today. Approvals are therefore held until the purge. The `match_status` column leaves room for a match rule, which needs a business decision on the match key.
+- **Loader mapping.** `processed_at` is derived from the 9-complement parts, with years `20YY`. `PA-FRAUD-RPT-DATE` is mapped to `DATE`: blank becomes NULL, and text that does not parse fails the step.
+
+| Login | Grants on `pauth` and for authorization |
+| :-- | :-- |
+| `authorization_svc` | `SELECT` on `core.card_xref`, `core.account`, `core.customer`. On `core.card`, column-level `SELECT` on the card number, account, active status and expiry only, never `cvv_cd` (D-DATA-04). `SELECT, INSERT, UPDATE` on `auth_summary` and `auth_fraud`. `SELECT, INSERT` on `auth_detail`, plus `UPDATE` on its fraud columns. `SELECT, INSERT` on `processed_message`. `SELECT, INSERT` on `outbox`, plus `UPDATE (attempts, sent_at)`. `INSERT` on `ops.audit`. `UNMASK` on `auth_detail.card_num` (the fraud copy), `processed_message.reply_body` and `outbox.body` (the resent replies). |
+| `batch_svc` | `SELECT, INSERT, DELETE` on `auth_summary` and `auth_detail` (load and purge). `UPDATE` on `auth_summary (credit_balance, approved_auth_cnt, approved_auth_amt, declined_auth_cnt, declined_auth_amt)`. `SELECT, DELETE` on `processed_message` and `outbox`. Nothing on `auth_fraud`, and no `UNMASK`. |
 
 ## How the legacy stores map
 
@@ -129,7 +149,7 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, 
 | `DALYREJS` GDG | sequential | `core.daily_reject` |
 | `TRANSACT.BKUP`, `SYSTRAN`, `TRANSACT.COMBINED`, `TRANSACT.DALY` GDGs | relative generations | rows tagged by `cycle_id` and `in_master` |
 | IMS `PAUTSUM0` / `PAUTDTL1` / `PAUTINDX` | packed account key; 9-complement date and time key | `pauth.auth_summary` / `pauth.auth_detail` / PK |
-| Db2 `AUTHFRDS` | `(CARD_NUM, AUTH_TS)` | `pauth.auth_fraud` |
+| Db2 `AUTHFRDS` | `(CARD_NUM, AUTH_TS)` | `pauth.auth_fraud` PK `auth_id`, index `(card_num, auth_ts)` |
 
 ## Numeric and text types
 
@@ -137,7 +157,7 @@ Indexes: `(card_num, tran_id) WHERE in_master = 1` for statements; `(proc_date, 
 | :-- | :-- | :-- |
 | `9(n)` used as an identifier | `CHAR(n)` BIN2 with a digits check | Keeps leading zeros, exact match and byte order. |
 | `S9(10)V99`, `S9(09)V99`, `S9(04)V99` zoned | `DECIMAL(12,2)`, `DECIMAL(11,2)`, `DECIMAL(6,2)` | Java `BigDecimal`, never floating point. |
-| `9(03)` score, `S9(4) COMP` counts | `SMALLINT` | |
+| `9(03)` score, `S9(4) COMP` counts | `SMALLINT` | Except the authorization summary's running totals ([above](#pending-authorizations-pauth)). |
 | `COMP-3` (IMS segments, export file) | `DECIMAL(p,s)` | Decoded by `platform/legacy-format`. |
 | Binary fields in the export file | `INT` / `BIGINT` | |
 | `X(10)` dates | `DATE` where every writer guarantees a valid date, else `CHAR(10)` | Account dates and DOB are `DATE`; card expiry stays text. |
