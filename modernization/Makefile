@@ -202,7 +202,7 @@ test-backend: require-env ## ./mvnw verify: unit, integration (Testcontainers or
 	@$(call need,mvnw,arrives with the backend)
 	@cd '$(HERE)' && $(WITH_ENV) $(HEAVY) $@ ./mvnw -B verify \
 	&& echo '$@: OK' || { echo '$@: FAILED (Maven, see above)' >&2; exit 1; }
-test-billpay: require-env ## Bill Pay: Maven verify, Vitest, Playwright on the mock and on the slice (db-reset load), BILL trace gate (heavy)
+test-billpay: require-env ## Bill Pay: Maven verify, Vitest, Playwright on the mock and on a slice on CARDDEMO_E2E_DB_NAME, BILL trace gate on this run's reports (heavy)
 	@$(PY311)
 	@$(call need,services/billpay-service/pom.xml,arrives with billpay-service)
 	@$(call need,web/e2e/bill.spec.ts,arrives with the web app)
