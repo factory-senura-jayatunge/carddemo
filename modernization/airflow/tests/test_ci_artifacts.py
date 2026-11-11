@@ -10,8 +10,9 @@ it matches without moving that root, hidden files are left out, and without
 merge-multiple every artifact lands in a directory of its own name.
 
 The jobs that upload Playwright's output leave out its trace archives and
-HARs, which record request headers and so the sign-on token, and keep the
-JSON and JUnit reports that make trace reads."""
+HARs, which record request headers and so the sign-on token, and its HTML
+report, which records each filled value (the seed password included) in a
+step title, and keep the JSON and JUnit reports that make trace reads."""
 
 from __future__ import annotations
 
@@ -209,7 +210,11 @@ def test_spec_items_add_only_the_citation_files_and_nothing_private(job, workspa
 
 
 PLAYWRIGHT_JOBS = ("billpay", "web", "e2e")
-NO_TRACES = {"!modernization/web/**/*.zip", "!modernization/web/**/*.har"}
+PRIVATE = {"!modernization/web/**/*.zip", "!modernization/web/**/*.har", "!modernization/web/playwright-report/html/"}
+
+
+def private(rel: str) -> bool:
+    return rel.endswith((".zip", ".har")) or "/playwright-report/html/" in "/" + rel
 
 
 @pytest.fixture
@@ -235,17 +240,19 @@ def playwright_output(workspace):
 
 
 @pytest.mark.parametrize("job", PLAYWRIGHT_JOBS)
-def test_playwright_uploads_leave_out_trace_archives_and_hars(job, playwright_output):
+def test_playwright_uploads_leave_out_traces_hars_and_the_html_report(job, playwright_output):
     _name, paths = upload(job)
     # The last matching pattern decides, so the exclusions come after every path.
-    assert set(paths[-len(NO_TRACES):]) == NO_TRACES
+    assert set(paths[-len(PRIVATE):]) == PRIVATE
     files = emulate_artifact(playwright_output, paths)
     assert not [rel for rel in files if rel.endswith((".zip", ".har"))]
-    # Only those: the reports, the HTML report and its other attachments stay,
-    # at the same place in the artifact as without the exclusions.
-    unfiltered = emulate_artifact(playwright_output, [p for p in paths if p not in NO_TRACES])
-    assert files == {rel: src for rel, src in unfiltered.items() if not rel.endswith((".zip", ".har"))}
-    assert any(rel.endswith("playwright-report/html/index.html") for rel in files)
+    assert not [rel for rel in files if "html" in rel.split("/")]
+    # Only those: the reports and the other test output stay, at the same
+    # place in the artifact as without the exclusions.
+    unfiltered = emulate_artifact(playwright_output, [p for p in paths if p not in PRIVATE])
+    assert any(rel.endswith("playwright-report/html/index.html") for rel in unfiltered)
+    assert files == {rel: src for rel, src in unfiltered.items() if not private(rel)}
+    assert any(rel.endswith("playwright-report/e2e-stack-fixed.json") for rel in files)
 
 
 @pytest.mark.parametrize("job", PLAYWRIGHT_JOBS)

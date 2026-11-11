@@ -188,8 +188,9 @@ jobs:
         with:
           name: test-results-billpay
           # Playwright's trace archives (and HARs) record every request with
-          # its headers, the sign-on token included; the JSON report keeps
-          # the results that make trace reads, and the HTML report still opens.
+          # its headers, the sign-on token included, and its HTML report
+          # records each filled value, the seed password included, in a step
+          # title; the JSON report keeps the results that make trace reads.
           path: |
             modernization/build/test-results/
             modernization/**/target/surefire-reports/
@@ -199,6 +200,7 @@ jobs:
             modernization/var/log/
             !modernization/web/**/*.zip
             !modernization/web/**/*.har
+            !modernization/web/playwright-report/html/
           if-no-files-found: error
           retention-days: 14
 
@@ -238,12 +240,14 @@ jobs:
           name: test-results-web
           # Both paths keep their directory names, which make trace looks for.
           # Without Playwright's trace archives and HARs (request headers,
-          # tokens included), as in the billpay job.
+          # tokens included) and its HTML report (filled values), as in the
+          # billpay job.
           path: |
             modernization/web/test-results/
             modernization/web/playwright-report/
             !modernization/web/**/*.zip
             !modernization/web/**/*.har
+            !modernization/web/playwright-report/html/
           if-no-files-found: warn
           retention-days: 14
 
@@ -418,13 +422,15 @@ jobs:
         with:
           name: test-results-e2e
           # Without Playwright's trace archives and HARs (request headers,
-          # tokens included), as in the billpay job.
+          # tokens included) and its HTML report (filled values), as in the
+          # billpay job.
           path: |
             modernization/build/test-results/
             modernization/web/playwright-report/
             modernization/var/log/
             !modernization/web/**/*.zip
             !modernization/web/**/*.har
+            !modernization/web/playwright-report/html/
           if-no-files-found: error
           retention-days: 14
 
