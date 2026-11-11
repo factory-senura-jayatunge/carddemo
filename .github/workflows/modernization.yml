@@ -187,6 +187,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-billpay
+          # Playwright's trace archives (and HARs) record every request with
+          # its headers, the sign-on token included; the JSON report keeps
+          # the results that make trace reads, and the HTML report still opens.
           path: |
             modernization/build/test-results/
             modernization/**/target/surefire-reports/
@@ -194,6 +197,8 @@ jobs:
             modernization/**/target/spec-items/
             modernization/web/playwright-report/
             modernization/var/log/
+            !modernization/web/**/*.zip
+            !modernization/web/**/*.har
           if-no-files-found: error
           retention-days: 14
 
@@ -232,9 +237,13 @@ jobs:
         with:
           name: test-results-web
           # Both paths keep their directory names, which make trace looks for.
+          # Without Playwright's trace archives and HARs (request headers,
+          # tokens included), as in the billpay job.
           path: |
             modernization/web/test-results/
             modernization/web/playwright-report/
+            !modernization/web/**/*.zip
+            !modernization/web/**/*.har
           if-no-files-found: warn
           retention-days: 14
 
@@ -408,10 +417,14 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-e2e
+          # Without Playwright's trace archives and HARs (request headers,
+          # tokens included), as in the billpay job.
           path: |
             modernization/build/test-results/
             modernization/web/playwright-report/
             modernization/var/log/
+            !modernization/web/**/*.zip
+            !modernization/web/**/*.har
           if-no-files-found: error
           retention-days: 14
 
@@ -486,6 +499,8 @@ jobs:
           path: modernization/build/ci-results/
       - name: Unit tests of the ledger and trace tools
         run: python3 -m unittest discover -s modernization/verify/trace/tests
+      - name: Unit tests of the make scripts (scripts/tests)
+        run: python3 -m unittest discover -s modernization/scripts/tests
       - name: make verify-ledger trace (ledger evidence, traceability gate)
         run: make -C modernization verify-ledger trace
       - name: Upload the traceability matrix

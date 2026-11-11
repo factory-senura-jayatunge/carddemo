@@ -243,9 +243,9 @@ Heavy targets (`test-backend`, `test-billpay`, `web-build`, `verify-batch`, `ver
 | `data` | `db-reset load up verify-data ONLY=identity-service` (identity-service seeds the users that `verify-data` checks), then `verify-migrations` from the previous head: the pull request's base, or the commit before the push (full history checkout) | |
 | `e2e` | `test-e2e` (its own database, reloaded per browser; Chromium, nightly also Firefox and WebKit through `E2E_BROWSERS`) | `web` |
 | `cycle` | `db-reset load up verify-cycle` (nightly, on demand, or on pull requests labelled `batch`) | `batch` |
-| `ledger` | the unit tests of `verify/trace/`, then `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |
+| `ledger` | the unit tests of `verify/trace/` and of `scripts/` (`scripts/tests/`), then `verify-ledger trace`, with the other jobs' test results in `build/ci-results/` | every job above that ran |
 
-The `plan` job reads `make -s stubs`: a job whose targets are still stubs is skipped, and the run summary says why. A stub never shows as a pass. Jobs set `CARDDEMO_SETUP_SKIP` (any of `java node docker airflow`) so `make setup` doesn't fail on a tool the job doesn't use. Every job uploads its JUnit results (and process logs) as `test-results-<job>`; `backend` and `billpay` also upload `target/spec-items/`, the Java tests' item citations, which `make trace` needs.
+The `plan` job reads `make -s stubs`: a job whose targets are still stubs is skipped, and the run summary says why. A stub never shows as a pass. Jobs set `CARDDEMO_SETUP_SKIP` (any of `java node docker airflow`) so `make setup` doesn't fail on a tool the job doesn't use. Every job uploads its JUnit results (and process logs) as `test-results-<job>`; `backend` and `billpay` also upload `target/spec-items/`, the Java tests' item citations, which `make trace` needs. The jobs that upload Playwright's output (`billpay`, `web`, `e2e`) leave out its trace archives and HARs (`*.zip`, `*.har` under `web/`): they record request headers, the sign-on token included. The JSON and JUnit reports that `make trace` reads stay; the HTML report opens without its trace links.
 
 ## Toolchain pinning
 
