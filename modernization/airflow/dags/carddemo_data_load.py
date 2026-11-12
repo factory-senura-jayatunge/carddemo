@@ -1,10 +1,12 @@
 """carddemo_data_load: the sample-data load (the ACCTFILE ... DUSRSECJ
-reload jobs), manual. dataLoadJob takes no parameters; batch-service reads
-its source directory from its own configuration and allows a reload of
-non-empty tables only where configured (D-41). The reconciliation is not a
-batch job: make -C modernization verify-data runs it after the load."""
+reload jobs), manual, inside a batch window that the run holds by its
+windowRunKey. dataLoadJob takes only its run key and business date;
+batch-service reads its source directory from its own configuration and
+allows a reload of non-empty tables only where configured (D-41). The
+reconciliation is not a batch job: make -C modernization verify-data runs
+it after the load."""
 
-from airflow.sdk import DAG, chain
+from airflow.sdk import DAG, Param, chain
 
 from carddemo_airflow import cycle
 from carddemo_airflow.operators import BATCH_POOL, BatchWindowOperator, SpringBatchJobOperator
@@ -16,7 +18,11 @@ with DAG(
     start_date=cycle.START_DATE,
     catchup=False,
     max_active_runs=1,
-    default_args={"pool": BATCH_POOL, "retries": 0},
+    default_args={"pool": BATCH_POOL},
+    params={
+        "businessDate": Param(None, type=["null", "string"], format="date",
+                              description="Date the load's timestamps take; empty means the logical date"),
+    },
     tags=["carddemo", "batch", "manual"],
 ) as dag:
     chain(

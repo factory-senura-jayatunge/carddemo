@@ -20,12 +20,11 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from with_env import main_modernization  # noqa: E402
+from with_env import VarDirError, resolve_var_dir  # noqa: E402
 
 
 def lock_path() -> str:
-    var_dir = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(main_modernization(), "var")
-    return os.path.join(var_dir, "run", "heavy.lock")
+    return os.path.join(resolve_var_dir(), "run", "heavy.lock")
 
 
 def main(argv: list) -> int:
@@ -36,7 +35,11 @@ def main(argv: list) -> int:
     name, command = args[0], args[1:]
     if command[:1] == ["--"]:
         command = command[1:]
-    path = lock_path()
+    try:
+        path = lock_path()
+    except VarDirError as e:
+        print(f"{name}: FAILED ({e})", file=sys.stderr)
+        return 2
     os.makedirs(os.path.dirname(path), exist_ok=True)
     fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
     try:

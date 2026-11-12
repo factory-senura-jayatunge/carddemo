@@ -22,7 +22,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from with_env import main_modernization  # noqa: E402
+from with_env import SA_SQLCMDPASSWORD, main_modernization  # noqa: E402
 
 IDENTITY = "http://127.0.0.1:28081"
 BILLPAY = "http://127.0.0.1:28082"
@@ -91,7 +91,7 @@ def row_counts(db):
            "-f", os.path.join(infra, "docker-compose.yml"),
            "--env-file", os.environ["CARDDEMO_ENV_FILE"],
            "exec", "-T", "mssql", "sh", "-c",
-           'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
+           SA_SQLCMDPASSWORD + ' /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
            f'-h -1 -W -d "{db}" -Q "$1"', "sh", COUNT_SQL]
     out = subprocess.run(cmd, capture_output=True, text=True)
     if out.returncode != 0:

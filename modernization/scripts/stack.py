@@ -26,11 +26,14 @@ Every command ends with one line, `<target>: OK` or `<target>: FAILED (...)`.
 Usage: stack.py infra-up | infra-down | up [--only NAME,...] | stop | down | status
        (--only airflow means the four Airflow processes)
        stack.py ensure-infra TARGET   (infra-up for another target; prints only on failure)
+       stack.py sa-secret             (the SA secret file, when asked for or needed; see sync_sa_secret)
+       stack.py rabbitmq-users        (the virtual host and service users; infra-up and up do it too)
 """
 
 import fcntl
 import glob
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -42,21 +45,42 @@ import urllib.parse
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from with_env import default_env_file, main_modernization, read_env  # noqa: E402
+import init_env  # noqa: E402
+import rabbitmq_users  # noqa: E402
+from with_env import (LEGACY_OUTPUT_SETTINGS, VAR_DIR_KEY, VAR_DIR_PRIVATE, VarDirError,  # noqa: E402
+                      default_env_file, is_private_var_dir, legacy_output_settings, main_modernization, read_env,
+                      resolve_var_dir)
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The same defaults as the Makefile, so stack.py run on its own drives the
 # shared compose project instead of planning to recreate it from this checkout.
 INFRA_DIR = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
 ENV_FILE = os.environ.get("CARDDEMO_ENV_FILE") or default_env_file()
-VAR_DIR = os.environ.get("CARDDEMO_VAR_DIR") or os.path.join(main_modernization(), "var")
+# Absolute, from the environment, .env or the main checkout (with_env.py);
+# a relative value leaves it empty and main() refuses every command. So does
+# a harness's private folder: the stack's run/, log/ and secrets/ are shared.
+try:
+    VAR_DIR, VAR_DIR_ERROR = resolve_var_dir(os.environ, None), None
+    if is_private_var_dir(VAR_DIR):
+        VAR_DIR_ERROR = VAR_DIR_PRIVATE
+except VarDirError as e:
+    VAR_DIR, VAR_DIR_ERROR = "", str(e)
+# The SA password's secret file is written only when it is asked for (the
+# variable set by the caller; the Makefile exports it only then) or needed
+# (see sync_sa_secret). docker-compose.yml reads the path from the environment,
+# which compose_env() gives the compose commands only. The default is never put
+# into os.environ: a harness that imports this module would pass it on to its
+# make children, whose stack.py would then take it as asked for.
+SA_SECRET_EXPLICIT = bool(os.environ.get("CARDDEMO_MSSQL_SA_PASSWORD_FILE"))
+SA_SECRET_FILE = (os.environ.get("CARDDEMO_MSSQL_SA_PASSWORD_FILE")
+                  or (os.path.join(VAR_DIR, "secrets", "mssql-sa-password") if VAR_DIR else ""))
+SA_SECRET_MOUNT = "/run/secrets/mssql_sa_password"
 RUN_DIR = os.path.join(VAR_DIR, "run")
 LOG_DIR = os.path.join(VAR_DIR, "log")
 UP_TIMEOUT = int(os.environ.get("UP_TIMEOUT", "300"))
 STOP_TIMEOUT = 30
 
 # Ports and heap caps: docs/modernization/architecture/overview.md#deployables.
-# batch-service runs one-shot jobs (make load) and is not started by up.
 JVM_SERVICES = [
     ("identity-service", "services/identity-service", 28081, "256m"),
     ("billpay-service", "services/billpay-service", 28082, "256m"),
@@ -67,6 +91,11 @@ JVM_SERVICES = [
     ("inquiry-service", "services/inquiry-service", 28087, "256m"),
 ]
 SPRING_PROFILE = os.environ.get("CARDDEMO_SPRING_PROFILE", "demo")
+# batch-service in server mode (batch-execution-contract.md): the internal API
+# that the DAGs drive, on loopback. No job starts by itself, and a launch
+# answers 202 at once. make load still runs its one-shot JVM.
+BATCH_SERVICE = ("batch-service", "batch/batch-service", "1g")
+BATCH_DEFAULT_PORT = 28090
 
 # Airflow (architecture: batch.md, repo-build-ci.md): four processes from the
 # host venv, LocalExecutor, metadata in the compose Postgres. All four report
@@ -215,6 +244,33 @@ def recorded_db(name: str):
         return None
 
 
+def batch_port(env=None) -> int:
+    env = os.environ if env is None else env
+    value = env.get("CARDDEMO_BATCH_PORT") or read_env(ENV_FILE).get("CARDDEMO_BATCH_PORT")
+    return int(value) if value else BATCH_DEFAULT_PORT
+
+
+def batch_component():
+    """batch-service's server, when this checkout has its module."""
+    name, rel, heap = BATCH_SERVICE
+    module = os.path.join(HERE, rel)
+    if not os.path.exists(os.path.join(module, "pom.xml")):
+        return None
+    port = batch_port()
+    jar = find_jar(module, name)
+    argv, problem = None, None
+    if jar:
+        # java itself, not a shell: the recorded pid is the JVM's, so stop
+        # signals the process that holds the execution leases.
+        argv = [java_bin(), f"-Xmx{heap}", "-XX:MaxMetaspaceSize=128m", "-Xss512k",
+                "-jar", jar, "--spring.profiles.active=server", f"--server.port={port}",
+                "--server.address=127.0.0.1"]
+    else:
+        problem = f"not built: no {rel}/target/{name}-*-exec.jar (run make build)"
+    return Component(name, port, module, argv, f"http://127.0.0.1:{port}{HEALTH_PATH}", jar or name, problem,
+                     prepare=jar_problem(module, jar), module=rel)
+
+
 def airflow_venv() -> str:
     return (os.environ.get("AIRFLOW_VENV") or read_env(ENV_FILE).get("AIRFLOW_VENV")
             or os.path.join(os.path.expanduser("~"), ".venvs", "carddemo-airflow"))
@@ -232,11 +288,30 @@ def airflow_components() -> list:
     else:
         env = read_env(ENV_FILE)
         missing = [k for k in AIRFLOW_SECRETS if not (os.environ.get(k) or env.get(k))]
+        merged = {**env, **os.environ}
         if missing:
             problem = f"{', '.join(missing)} not set in {ENV_FILE}; run make setup"
+        elif (merged.get("CARDDEMO_AIRFLOW_REPORT_USER", "").strip()
+              == merged.get("AIRFLOW_ADMIN_USER", "admin")):
+            # carddemo_airflow.auth restricts this name, so the admin would lose its rights.
+            problem = "CARDDEMO_AIRFLOW_REPORT_USER must differ from AIRFLOW_ADMIN_USER"
     return [Component(name, port, airflow_dir, [airflow, *args], AIRFLOW_HEALTH, f"airflow {args[0]}",
                       problem, health_key=key)
             for name, args, port, key in AIRFLOW_PROCESSES]
+
+
+def airflow_users(env: dict) -> dict:
+    """Name -> (role, password) of the simple auth manager's users: the
+    admin, and transaction-service's report account once setup has given it
+    a password. The account gets the lowest role; carddemo_airflow.auth
+    narrows it to triggering carddemo_transaction_report."""
+    admin = env.get("AIRFLOW_ADMIN_USER", "admin")
+    users = {admin: ("admin", env.get("AIRFLOW_ADMIN_PASSWORD", ""))}
+    report = env.get("CARDDEMO_AIRFLOW_REPORT_USER", "").strip()
+    password = env.get("CARDDEMO_AIRFLOW_REPORT_PASSWORD", "")
+    if report and password and report != admin:
+        users[report] = ("viewer", password)
+    return users
 
 
 def airflow_env(base: dict) -> dict:
@@ -259,7 +334,10 @@ def airflow_env(base: dict) -> dict:
         # The cycle changes data: a DAG runs only after someone unpauses it.
         "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION": "True",
         "AIRFLOW__CORE__FERNET_KEY": env.get("AIRFLOW_FERNET_KEY", ""),
-        "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS": f"{env.get('AIRFLOW_ADMIN_USER', 'admin')}:admin",
+        "AIRFLOW__CORE__AUTH_MANAGER": "carddemo_airflow.auth.CarddemoAuthManager",
+        "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS": ",".join(
+            f"{name}:{role}" for name, (role, _) in airflow_users(env).items()),
+        "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS": "False",
         "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE": os.path.join(home, "passwords.json"),
         "AIRFLOW__CORE__EXECUTION_API_SERVER_URL": f"{AIRFLOW_URL}/execution/",
         "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN": db,
@@ -289,6 +367,27 @@ def airflow_env(base: dict) -> dict:
     return env
 
 
+def note_report_user(home: str, report: str) -> None:
+    """Warns when CARDDEMO_AIRFLOW_REPORT_USER changed since the last start:
+    Airflow accepts a token until it expires without looking the name up,
+    and carddemo_airflow.auth restricts only the configured name, so a token
+    issued to the old name keeps its role, unrestricted."""
+    path = os.path.join(home, "report-user")
+    try:
+        with open(path, encoding="utf-8") as f:
+            previous = f.read().strip()
+    except OSError:
+        previous = ""
+    if previous and previous != report:
+        say("warn", "airflow", f"CARDDEMO_AIRFLOW_REPORT_USER changed from {previous} to {report or '(none)'}: "
+                               f"tokens issued to {previous} stay valid until they expire (24 h by default), "
+                               f"without the report restriction; rotate AIRFLOW_API_JWT_SECRET and restart "
+                               f"Airflow (README, Airflow)")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(report + "\n")
+
+
 def prepare_airflow(env: dict):
     """Migrates the metadata database, writes the admin password file and
     imports the pools before the processes start; returns an error or None."""
@@ -296,10 +395,16 @@ def prepare_airflow(env: dict):
     os.makedirs(home, exist_ok=True)
     os.makedirs(LOG_DIR, exist_ok=True)
     passwords = env["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE"]
+    users = airflow_users(env)
     fd = os.open(passwords, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump({env.get("AIRFLOW_ADMIN_USER", "admin"): env.get("AIRFLOW_ADMIN_PASSWORD", "")}, f)
+        json.dump({name: password for name, (_, password) in users.items()}, f)
+    report = env.get("CARDDEMO_AIRFLOW_REPORT_USER", "").strip()
+    if report and report not in users:
+        say("warn", "airflow", f"no Airflow account {report} for transaction-service's report trigger "
+                               f"(CARDDEMO_AIRFLOW_REPORT_PASSWORD not set; run make setup)")
     os.chmod(passwords, 0o600)
+    note_report_user(home, report)
     airflow = os.path.join(airflow_venv(), "bin", "airflow")
     log_path = os.path.join(LOG_DIR, "airflow-prepare.log")
     steps = [("db migrate", [airflow, "db", "migrate"]),
@@ -336,6 +441,10 @@ def components() -> list:
         found.append(Component(name, port, module, argv,
                                f"http://127.0.0.1:{port}{HEALTH_PATH}", jar or name, problem,
                                prepare=jar_problem(module, jar), module=rel))
+    # Before Airflow, whose tasks call it.
+    batch = batch_component()
+    if batch:
+        found.append(batch)
     found.extend(airflow_components())
     web = os.path.join(HERE, "web")
     if os.path.exists(os.path.join(web, "package.json")):
@@ -414,6 +523,25 @@ def child_env() -> dict:
     # default would not find the checkout's ledger.
     env.setdefault("CARDDEMO_LEDGER_DIR", os.path.join(HERE, "ledger"))
     env.setdefault("CARDDEMO_JWT_KEY_FILE", os.path.join(VAR_DIR, "secrets", "identity-jwt.pem"))
+    # transaction-service triggers the report DAG here.
+    env.setdefault("CARDDEMO_AIRFLOW_URL", AIRFLOW_URL)
+    # Every output and inbound file is under CARDDEMO_VAR_DIR (out/<database>/
+    # <instance>/ and inbound/); the services and db-migrate refuse the old
+    # per-folder settings by name, so none is set here, and up refuses one that
+    # the environment or .env still sets.
+    for key in LEGACY_OUTPUT_SETTINGS:
+        env.pop(key, None)
+    env[VAR_DIR_KEY] = VAR_DIR
+    # batch-service runs in its module directory, where its relative defaults
+    # point nowhere; the data load and the purge read these sample files.
+    sample = {"CARDDEMO_LOAD_SOURCE_DIR": os.path.join("..", "app", "data", "ASCII"),
+              "CARDDEMO_PAUTH_SOURCE_FILE": os.path.join("..", "app", "app-authorization-ims-db2-mq", "data",
+                                                         "EBCDIC", "AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat")}
+    for key, default in sample.items():
+        env[key] = os.path.normpath(os.path.join(HERE, env.get(key) or default))
+
+    # The Airflow tasks reach batch-service where up starts it.
+    env.setdefault("CARDDEMO_BATCH_URL", f"http://127.0.0.1:{batch_port(env)}")
     # npm and vite start "node" from PATH; web's engines field rejects
     # anything but Node 24, and Homebrew's default node can be newer.
     node = node_bin()
@@ -437,16 +565,26 @@ def compose(*args) -> list:
             "-f", os.path.join(INFRA_DIR, "docker-compose.yml"), "--env-file", ENV_FILE, *args]
 
 
+def compose_env() -> dict:
+    """The environment of a compose command: the SA secret's path for the mssql
+    service's compose secret."""
+    env = dict(os.environ)
+    if SA_SECRET_FILE:
+        env["CARDDEMO_MSSQL_SA_PASSWORD_FILE"] = SA_SECRET_FILE
+    return env
+
+
 def running_containers() -> set:
     out = subprocess.run(compose("ps", "--status", "running", "--format", "{{.Name}}"),
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, env=compose_env())
     return set(out.stdout.split())
 
 
 def would_recreate() -> list:
     """Running containers that `compose up` would recreate (restart), found
     with a dry run, which changes nothing."""
-    out = subprocess.run(compose("--dry-run", "up", "--detach"), capture_output=True, text=True)
+    out = subprocess.run(compose("--dry-run", "up", "--detach"), capture_output=True, text=True,
+                         env=compose_env())
     if out.returncode != 0:
         last = out.stderr.strip().splitlines()[-1:] or ["no output"]
         raise RuntimeError("compose dry run failed: " + last[0])
@@ -455,7 +593,117 @@ def would_recreate() -> list:
     return sorted(planned & running_containers())
 
 
+def mssql_secret_state() -> tuple:
+    """('mounted', host file) or ('not mounted', None) for the compose
+    project's mssql container, ('absent', None) when there is none, ('unknown',
+    None) when docker cannot say. Reads one field of docker inspect, the
+    mounts' destinations and sources, never Config.Env."""
+    try:
+        ps = subprocess.run(compose("ps", "--all", "-q", "mssql"), capture_output=True, text=True, timeout=60,
+                            env=compose_env())
+        if ps.returncode != 0:
+            return "unknown", None
+        ids = ps.stdout.split()
+        if not ids:
+            return "absent", None
+        out = subprocess.run(["docker", "inspect", "--format",
+                              "{{range .Mounts}}{{println .Destination .Source}}{{end}}", ids[0]],
+                             capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return "unknown", None
+    if out.returncode != 0:
+        return "unknown", None
+    for line in out.stdout.splitlines():
+        destination, _, source = line.strip().partition(" ")
+        if destination == SA_SECRET_MOUNT:
+            return "mounted", source
+    return "not mounted", None
+
+
+def compose_declares_sa_secret() -> bool:
+    try:
+        with open(os.path.join(INFRA_DIR, "docker-compose.yml"), encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return False
+    return re.search(r"(?m)^secrets:\n(?:(?:  .*|#.*|)\n)*?  mssql_sa_password:", text) is not None
+
+
+def canonical_sa_secret() -> str:
+    """The stack's own secret file: under .env's CARDDEMO_VAR_DIR or the main
+    checkout's var/, never under a CARDDEMO_VAR_DIR that only this process's
+    environment names (a test harness's private folder)."""
+    environ = {k: v for k, v in os.environ.items() if k != VAR_DIR_KEY}
+    return os.path.join(resolve_var_dir(environ), "secrets", "mssql-sa-password")
+
+
+def same_file(a: str, b: str) -> bool:
+    return os.path.realpath(a) == os.path.realpath(b)
+
+
+def mounted_from(source: str, path: str) -> bool:
+    """Whether docker's mount source is path. Docker Desktop reports host
+    files under a prefix of its VM (/host_mnt followed by the host path); Colima and Linux
+    report the host path itself."""
+    real = os.path.realpath(path)
+    return bool(source) and (same_file(source, path) or source.endswith(real) or source.endswith(path))
+
+
+def sync_sa_secret(verbose: bool = False) -> int:
+    """Copy MSSQL_SA_PASSWORD from .env to the secret file only when the
+    caller set CARDDEMO_MSSQL_SA_PASSWORD_FILE, when the mssql container
+    mounts the file, or when there is no mssql container and the compose file
+    gives the one up creates the secret. A container created before the
+    secret existed has its password in master and does not need the file, so
+    no copy of it is left on disk; a one-line note says so.
+
+    Unless the caller named the file, it is written only at the stack's own
+    path (canonical_sa_secret), and never when the container mounts the
+    secret from another file: a copy elsewhere would leave the password in a
+    folder nobody looks after, and compose would plan to recreate mssql."""
+    if not SA_SECRET_EXPLICIT:
+        try:
+            canonical = canonical_sa_secret()
+        except VarDirError as e:
+            say("FAIL", "sa-secret", f"{e}; nothing written")
+            return 1
+        if not same_file(SA_SECRET_FILE, canonical):
+            say("FAIL", "sa-secret", f"{SA_SECRET_FILE} is not the stack's secret file {canonical}: this "
+                                     f"process's CARDDEMO_VAR_DIR is not the stack's (a harness gives db-reset its "
+                                     f"own folder with RUN_VAR_DIR); nothing written")
+            return 1
+        state, source = mssql_secret_state()
+        if not (state == "mounted" or (state == "absent" and compose_declares_sa_secret())):
+            why = {"not mounted": "the mssql container does not mount the secret",
+                   "absent": "no mssql container, and the compose file has no SA secret",
+                   "unknown": "docker cannot say whether the mssql container mounts the secret"}[state]
+            say("note", "sa-secret", f"not written ({why}); set CARDDEMO_MSSQL_SA_PASSWORD_FILE to write it")
+            return 0
+        if state == "mounted" and not mounted_from(source, SA_SECRET_FILE):
+            say("FAIL", "sa-secret", f"the mssql container mounts the secret from {source or 'an unknown file'}, "
+                                     f"not {SA_SECRET_FILE}; nothing written")
+            return 1
+    return init_env.sa_secret(ENV_FILE, SA_SECRET_FILE, verbose=verbose)
+
+def rabbit_env() -> dict:
+    # The environment wins over .env, as for compose and the services.
+    return {**read_env(ENV_FILE), **os.environ}
+
+
+def rabbit_users() -> int:
+    if rabbitmq_users.provision(rabbit_env(), say, required=True) != 0:
+        print("rabbitmq-users: FAILED (see above)")
+        return 1
+    print("rabbitmq-users: OK")
+    return 0
+
+
 def infra_up(target: str) -> int:
+    # A changed .env value reaches the running container's health check
+    # through the same file.
+    if sync_sa_secret() != 0:
+        print(f"{target}: FAILED (the SA password secret file; see above)")
+        return 1
     try:
         recreate = would_recreate()
     except RuntimeError as e:
@@ -471,14 +719,19 @@ def infra_up(target: str) -> int:
         say("WARN", "compose", f"RECREATING (restarting) shared container(s) {names}; connections drop for every checkout")
     quiet = target not in ("infra-up", "up")
     res = subprocess.run(compose("up", "--detach", "--wait", "--wait-timeout", str(UP_TIMEOUT)),
-                         capture_output=quiet, text=True)
+                         capture_output=quiet, text=True, env=compose_env())
     rc = res.returncode
     if not quiet:
-        subprocess.run(compose("ps", "--format", "table {{.Service}}\t{{.Status}}\t{{.Ports}}"))
+        subprocess.run(compose("ps", "--format", "table {{.Service}}\t{{.Status}}\t{{.Ports}}"), env=compose_env())
     elif rc != 0:
         print(res.stderr.strip())
     if rc != 0:
         print(f"{target}: FAILED (containers not healthy within {UP_TIMEOUT} s; see make logs)")
+        return 1
+    # Only for the targets that start the services: the others (db-reset,
+    # load, ...) need SQL Server alone.
+    if target in ("infra-up", "up") and rabbitmq_users.provision(rabbit_env(), say) != 0:
+        print(f"{target}: FAILED (RabbitMQ virtual host or users; see above)")
         return 1
     if target == "infra-up":
         print(f"{target}: OK")
@@ -547,7 +800,7 @@ def infra_down(target: str, force: bool = False) -> int:
     running = sorted(running_containers())
     if running:
         say("WARN", "compose", "stopping the shared containers for every checkout: " + ", ".join(running))
-    rc = subprocess.run(compose("down", "--remove-orphans")).returncode
+    rc = subprocess.run(compose("down", "--remove-orphans"), env=compose_env()).returncode
     if rc != 0:
         print(f"{target}: FAILED (docker compose down exited {rc})")
         return 1
@@ -799,7 +1052,7 @@ def down() -> int:
 def status() -> int:
     problems = []
     out = subprocess.run(compose("ps", "--all", "--format", "{{.Service}}\t{{.State}}\t{{.Health}}\t{{.Ports}}"),
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, env=compose_env())
     if out.returncode != 0:
         print(f"status: FAILED (docker compose ps: {out.stderr.strip()})")
         return 1
@@ -837,6 +1090,9 @@ def status() -> int:
 
 
 def main(argv) -> int:
+    if VAR_DIR_ERROR:
+        print(f"{argv[1] if len(argv) > 1 else 'stack'}: FAILED ({VAR_DIR_ERROR})")
+        return 2
     if not os.path.exists(ENV_FILE):
         print(f"{argv[1] if len(argv) > 1 else 'stack'}: FAILED ({ENV_FILE} is missing; run make setup in the main checkout)")
         return 1
@@ -845,8 +1101,19 @@ def main(argv) -> int:
         return infra_up("infra-up")
     if cmd == "ensure-infra" and len(argv) == 3:
         return infra_up(argv[2])
+    if cmd == "sa-secret":
+        return sync_sa_secret(verbose=True)
+    if cmd == "rabbitmq-users":
+        return rabbit_users()
     if cmd == "infra-down":
         return infra_down("infra-down")
+    if cmd == "up":
+        legacy = legacy_output_settings(os.environ, read_env(ENV_FILE))
+        if legacy:
+            one = len(legacy) == 1
+            print(f"up: FAILED ({', '.join(legacy)} {'is' if one else 'are'} no longer read; remove "
+                  f"{'it' if one else 'them'}: every output is under {VAR_DIR_KEY}/out/)")
+            return 1
     if cmd in ("up", "stop", "down") and not guard_slice(cmd):
         return 1
     if cmd == "up":

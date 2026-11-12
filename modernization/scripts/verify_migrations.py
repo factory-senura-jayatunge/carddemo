@@ -9,15 +9,19 @@ so a new V004 can arrive after V202 is applied). This check proves that:
    service logins keep exactly their grants;
 2. fresh: a second scratch database migrated with this checkout's
    db-migrate from empty (version order) passes the same checks;
-3. both end in the same schema: tables, columns, defaults, keys, indexes,
-   checks, foreign keys, views and routines, sequences, permissions, role
-   members, migration-seeded row counts and the applied migrations
+3. both end in the same schema: tables, columns (with their masks),
+   defaults, keys, indexes, checks, foreign keys, views and routines,
+   sequences, permissions, role members, the database's collation and row
+   versioning, migration-seeded row counts and the applied migrations
    (version, checksum), ignoring the order and time they ran in.
 
 The scratch databases are <CARDDEMO_DB_NAME>_upgrade and <..>_fresh. They
 use the same service logins as CARDDEMO_DB_NAME (login prefix
 <CARDDEMO_DB_NAME>_ unless CARDDEMO_DB_LOGIN_PREFIX is set), so no new
 logins are left behind, and they are dropped at the end unless --keep.
+Each db-migrate run gets a CARDDEMO_VAR_DIR of its own (mkdtemp, removed
+when it ends; KEEP_VAR=1 keeps it), so their output roots never land in
+the shared folder.
 
 The base is --base REF; by default the merge base of HEAD and
 origin/modernization, or HEAD^ when HEAD is that commit. It is built in a
@@ -42,7 +46,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from with_env import main_modernization  # noqa: E402
+from with_env import SA_SQLCMDPASSWORD, VAR_DIR_KEY, PrivateVarDir, main_modernization  # noqa: E402
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(HERE)
@@ -50,19 +54,42 @@ NAME = "verify-migrations"
 DB_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,90}$")
 JAR_GLOB = os.path.join("db", "db-migrate", "target", "db-migrate-*-exec.jar")
 
+# The fields of a "col|<schema>.<table or view>.<column>|..." line after its
+# name, in order; CONCAT shows NULL as an empty field. The mask counts: a
+# migration that adds, changes or drops one must leave the upgraded and the
+# fresh database alike.
+COLUMN_FIELDS = (
+    ("type", "ty.name"),
+    ("max_length", "c.max_length"),
+    ("precision", "c.precision"),
+    ("scale", "c.scale"),
+    ("is_nullable", "c.is_nullable"),
+    ("collation", "c.collation_name"),
+    ("is_identity", "c.is_identity"),
+    ("default", "dc.definition"),
+    ("computed", "cc.definition"),
+    ("column_id", "c.column_id"),
+    ("is_masked", "c.is_masked"),
+    ("masking_function", "mc.masking_function"),
+)
+
 # One row per line, fields joined by "|". System-generated constraint names
 # carry a random suffix, so they are compared as "<system>".
 FINGERPRINT_SQL = r"""
 SET NOCOUNT ON;
 DECLARE @r TABLE (line NVARCHAR(MAX));
-INSERT @r SELECT CONCAT('col|', s.name, '.', o.name, '.', c.name, '|', ty.name, '|', c.max_length, '|',
-    c.precision, '|', c.scale, '|', c.is_nullable, '|', c.collation_name, '|', c.is_identity, '|',
-    dc.definition, '|', cc.definition, '|', c.column_id)
+INSERT @r SELECT CONCAT('col|', s.name, '.', o.name, '.', c.name, '|', """ + ", '|', ".join(
+    expr for _label, expr in COLUMN_FIELDS) + r""")
   FROM sys.columns c JOIN sys.objects o ON o.object_id = c.object_id AND o.type IN ('U', 'V')
   JOIN sys.schemas s ON s.schema_id = o.schema_id JOIN sys.types ty ON ty.user_type_id = c.user_type_id
   LEFT JOIN sys.default_constraints dc ON dc.object_id = c.default_object_id
   LEFT JOIN sys.computed_columns cc ON cc.object_id = c.object_id AND cc.column_id = c.column_id
+  LEFT JOIN sys.masked_columns mc ON mc.object_id = c.object_id AND mc.column_id = c.column_id
   WHERE o.is_ms_shipped = 0;
+-- db-migrate sets these only when it creates the database.
+INSERT @r SELECT CONCAT('db|', d.collation_name, '|', d.is_read_committed_snapshot_on, '|',
+    d.snapshot_isolation_state_desc)
+  FROM sys.databases d WHERE d.database_id = DB_ID();
 INSERT @r SELECT CONCAT('dfname|', s.name, '.', OBJECT_NAME(d.parent_object_id), '|',
     IIF(d.is_system_named = 1, '<system>', d.name))
   FROM sys.default_constraints d JOIN sys.schemas s ON s.schema_id = d.schema_id;
@@ -84,7 +111,7 @@ INSERT @r SELECT CONCAT('chk|', s.name, '.', OBJECT_NAME(k.parent_object_id), '|
 INSERT @r SELECT CONCAT('fk|', s.name, '.', OBJECT_NAME(f.parent_object_id), '|',
     IIF(f.is_system_named = 1, '<system>', f.name), '|', OBJECT_SCHEMA_NAME(f.referenced_object_id), '.',
     OBJECT_NAME(f.referenced_object_id), '|', f.delete_referential_action_desc, '|',
-    f.update_referential_action_desc, '|', f.is_disabled, '|',
+    f.update_referential_action_desc, '|', f.is_disabled, '|', f.is_not_trusted, '|',
     (SELECT STRING_AGG(CONCAT(COL_NAME(fc.parent_object_id, fc.parent_column_id), '>',
             COL_NAME(fc.referenced_object_id, fc.referenced_column_id)), ',')
             WITHIN GROUP (ORDER BY fc.constraint_column_id)
@@ -175,9 +202,12 @@ def build(modernization_dir: str, log_path: str) -> str | None:
 
 
 def migrate(jar: str, db: str, prefix: str, *options) -> tuple[bool, str]:
-    env = dict(os.environ, CARDDEMO_DB_NAME=db, CARDDEMO_DB_LOGIN_PREFIX=prefix)
-    out = subprocess.run([java(), "-jar", jar, *options], env=env, stdin=subprocess.DEVNULL,
-                         capture_output=True, text=True)
+    # db-migrate creates the scratch database's output root under
+    # CARDDEMO_VAR_DIR; the shared folder would keep one per run.
+    with PrivateVarDir(NAME, out=lambda line: print(line, flush=True)) as var:
+        env = dict(os.environ, CARDDEMO_DB_NAME=db, CARDDEMO_DB_LOGIN_PREFIX=prefix, **{VAR_DIR_KEY: var})
+        out = subprocess.run([java(), "-jar", jar, *options], env=env, stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True)
     text = out.stdout + out.stderr
     version = re.findall(r"schema version (\S+)", text)
     ok = out.returncode == 0 and "db-migrate: OK" in text
@@ -191,7 +221,7 @@ def sqlcmd(db: str, sql: str) -> list[str]:
     infra = os.environ.get("CARDDEMO_INFRA_DIR") or main_modernization()
     cmd = ["docker", "compose", "--project-directory", infra, "-f", os.path.join(infra, "docker-compose.yml"),
            "--env-file", os.environ["CARDDEMO_ENV_FILE"], "exec", "-T", "mssql", "sh", "-c",
-           'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
+           SA_SQLCMDPASSWORD + ' /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
            '-h -1 -y 8000 -d "$1" -i /dev/stdin', "sh", db]
     out = subprocess.run(cmd, input=sql, capture_output=True, text=True)
     if out.returncode != 0:

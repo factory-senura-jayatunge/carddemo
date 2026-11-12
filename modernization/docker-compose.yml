@@ -3,7 +3,8 @@
 # metadata (Airflow can't keep its metadata in SQL Server).
 #
 # Run it through the Makefile (`make up`, `make down`). Secrets come from
-# .env (git-ignored), which `make setup` creates from .env.example.
+# .env (git-ignored), which `make setup` creates from .env.example; the SQL
+# Server SA password reaches its container as a compose secret file.
 #
 # Host ports default to values that don't collide with the standard ports
 # (1433, 5672, 15672, 5432), so the stack can run next to other local
@@ -20,18 +21,26 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: ${MSSQL_PID:-Developer}
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is not set in modernization/.env; run make setup}
       # SQL Server's own memory cap (buffer pool and the rest), below the
       # container limit; the 8 GiB VM also holds the test containers.
       MSSQL_MEMORY_LIMIT_MB: ${MSSQL_MEMORY_LIMIT_MB:-2048}
+    # No MSSQL_SA_PASSWORD in environment: it would show in docker inspect
+    # and in every process's environment. The entrypoint hands the secret to
+    # the first start only, when SQL Server creates master.
+    secrets:
+      - mssql_sa_password
+    entrypoint: ["/bin/sh", "/opt/carddemo/mssql-entrypoint.sh"]
+    # Setting the entrypoint drops the image's command.
+    command: ["/opt/mssql/bin/sqlservr"]
     ports:
       - "127.0.0.1:${MSSQL_HOST_PORT:-21433}:1433"
     volumes:
       - mssql-data:/var/opt/mssql
+      - ./infra/mssql/entrypoint.sh:/opt/carddemo/mssql-entrypoint.sh:ro
     mem_limit: 4g
     healthcheck:
       # SQLCMDPASSWORD keeps the password out of the sqlcmd command line.
-      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -l 5 -Q 'SELECT 1' >/dev/null"]
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$(cat /run/secrets/mssql_sa_password)\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -l 5 -Q 'SELECT 1' >/dev/null"]
       interval: 10s
       timeout: 10s
       retries: 12
@@ -90,3 +99,11 @@ volumes:
   mssql-data:
   rabbitmq-data:
   airflow-db-data:
+
+secrets:
+  # MSSQL_SA_PASSWORD of .env, which make setup and every make up copy here
+  # (scripts/init_env.py --sa-secret). Compose bind-mounts the file, so it
+  # is mode 644 for SQL Server's user (uid 10001) on a Linux host; its
+  # directory, mode 700, keeps other host users out.
+  mssql_sa_password:
+    file: ${CARDDEMO_MSSQL_SA_PASSWORD_FILE:-./var/secrets/mssql-sa-password}

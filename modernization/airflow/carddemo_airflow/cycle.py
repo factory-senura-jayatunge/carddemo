@@ -1,24 +1,18 @@
-"""Run settings shared by the DAG files: dates, templates and the decisions
-that choose which cycle tasks run. DAG files import only Airflow and this
-package, so these helpers live here."""
+"""Run settings shared by the DAG files: dates, parameter choices and the
+decisions that choose which cycle tasks run. DAG files import only Airflow
+and this package, so these helpers live here."""
 
 from __future__ import annotations
 
-import calendar
 import datetime
 import json
 import os
 
 import pendulum
+from airflow.sdk.exceptions import AirflowFailException
 
 # DAGs never catch up; the start date only has to be in the past.
 START_DATE = pendulum.datetime(2022, 7, 1, tz="UTC")
-
-# The business date is the conf/param override when given, else the run's
-# logical date. batch-service keeps one cycle per business date.
-BUSINESS_DATE = "{{ params.businessDate or ds }}"
-# A run ID that is safe as a directory name (var/reports/<job>/<runId>/).
-RUN_ID = "{{ run_id | replace(':', '') | replace('+', '') }}"
 
 INTEREST_CHOICES = ["always", "month_end", "never"]
 STATEMENT_CHOICES = ["every_cycle", "with_interest"]
@@ -33,26 +27,23 @@ def batch_pool_slots() -> int:
 
 
 def business_date(context) -> datetime.date:
-    value = (context.get("params") or {}).get("businessDate") or context["ds"]
-    return datetime.date.fromisoformat(str(value))
-
-
-def interest_due(context) -> bool:
-    """params.interest: always, never, or month_end (the last day of the
-    business date's month)."""
-    choice = context["params"]["interest"]
-    if choice == "always":
-        return True
-    if choice == "never":
-        return False
-    day = business_date(context)
-    return day.day == calendar.monthrange(day.year, day.month)[1]
+    """params.businessDate when given, else the run's logical date; a manual
+    run without a logical date takes the date it was triggered for."""
+    value = (context.get("params") or {}).get("businessDate") or context.get("ds")
+    if not value:
+        run = context.get("dag_run")
+        run_after = getattr(run, "run_after", None)
+        if run_after is None:
+            raise ValueError("the run has no logical date; trigger it with the param businessDate")
+        value = run_after.date().isoformat()
+    return datetime.date.fromisoformat(str(value)[:10])
 
 
 def cycle_interest(context) -> bool:
-    """Whether the run's cycle charges interest, as register_cycle decided."""
+    """Whether the run's cycle charges interest: the boolean that
+    batch-service stored when it resolved the run's interest policy."""
     registered = context["ti"].xcom_pull(task_ids="register_cycle") or {}
-    return bool(registered.get("interest"))
+    return registered.get("interest") is True
 
 
 def statements_due(context) -> bool:
@@ -70,7 +61,12 @@ def purge_after_cycle(context) -> bool:
 
 
 def inbound_file(kind: str, context) -> str:
-    var_dir = os.environ.get("CARDDEMO_VAR_DIR", "var")
+    """<CARDDEMO_VAR_DIR>/inbound/<kind>/<businessDate>.txt. stack.py gives
+    every Airflow process the absolute setting; without it the task fails, so
+    a missing file is never assumed because of the working directory."""
+    var_dir = os.environ.get("CARDDEMO_VAR_DIR", "")
+    if not os.path.isabs(var_dir):
+        raise AirflowFailException("CARDDEMO_VAR_DIR is unset or relative")
     return os.path.join(var_dir, "inbound", kind, f"{business_date(context).isoformat()}.txt")
 
 

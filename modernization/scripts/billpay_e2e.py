@@ -27,7 +27,7 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smoke  # noqa: E402
 from smoke import BILLPAY, IDENTITY, SEED_USER, WEB  # noqa: E402
-from with_env import main_modernization  # noqa: E402
+from with_env import SA_SQLCMDPASSWORD, main_modernization  # noqa: E402
 
 ACCOUNT = "00000000001"
 SUCCESS = "Payment successful.  Your Transaction ID is {}."
@@ -61,7 +61,7 @@ def sql(db, query):
            "-f", os.path.join(infra, "docker-compose.yml"),
            "--env-file", os.environ["CARDDEMO_ENV_FILE"],
            "exec", "-T", "mssql", "sh", "-c",
-           'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
+           SA_SQLCMDPASSWORD + ' /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b '
            f'-h -1 -W -s "|" -d "{db}" -Q "$1"', "sh", "SET NOCOUNT ON; " + query]
     out = subprocess.run(cmd, capture_output=True, text=True)
     if out.returncode != 0:

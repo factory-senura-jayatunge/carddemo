@@ -24,7 +24,11 @@ restores what ran before.
   4. For each browser: stops the two services, runs db-reset and load on the
      e2e database (unless --no-reload), starts the slice on it (stack.py up
      --only, which also builds stale jars), and runs Playwright with
-     CARDDEMO_E2E_TARGET=stack.
+     CARDDEMO_E2E_TARGET=stack. db-reset's and load's JVMs get a
+     CARDDEMO_VAR_DIR of the session's own (RUN_VAR_DIR, mkdtemp, 0700), so
+     the e2e database's output roots never land in the shared folder; the
+     slice itself keeps the shared one (its pid files and the identity key).
+     The folder is removed at the end; KEEP_VAR=1 keeps it.
   5. Always, also after a failure or SIGINT, SIGTERM or SIGHUP: stops the
      processes it started and starts again, each from its own checkout and on
      its own database, the components that ran before. A component that was
@@ -48,6 +52,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stack  # noqa: E402
+from with_env import PrivateVarDir  # noqa: E402
 
 HERE = stack.HERE
 SERVICES = ("identity-service", "billpay-service")
@@ -98,6 +103,8 @@ class Session:
         self.fd = None
         self.prior = []        # (name, pid, checkout, database or None) of what ran before
         self.started = {}      # name -> pid of the slice processes this session started
+        self.private_var = PrivateVarDir(name, out=lambda line: print(line, flush=True))
+        self.var = None        # db-reset's and load's CARDDEMO_VAR_DIR, from begin() until close()
 
     def env(self, **extra) -> dict:
         env = dict(os.environ)
@@ -151,6 +158,7 @@ class Session:
     def begin(self):
         self.lock()
         try:
+            self.var = self.private_var.open()
             self.note_prior()
             for name in SLICE:
                 self.stop(name)
@@ -242,6 +250,8 @@ class Session:
             if rc != 0:
                 problems.append(f"restoring {','.join(names)} from {checkout} failed; run make up ONLY="
                                 f"{','.join(names)} there")
+        self.private_var.close()
+        self.var = None
         self.unlock()
         return problems
 
@@ -271,7 +281,8 @@ class Session:
             self.stop(name)
         if reload:
             make = os.environ.get("MAKE", "make")
-            self.run("reload", [make, "--no-print-directory", "-C", HERE, "db-reset", "load"])
+            self.run("reload", [make, "--no-print-directory", "-C", HERE, "db-reset", "load",
+                                f"RUN_VAR_DIR={self.var}"])
         else:
             self.say("warn", "reload", f"skipped: {self.db} keeps what earlier runs left")
         self.run("slice", [sys.executable, os.path.join(HERE, "scripts", "stack.py"), "up", "--only", ",".join(SLICE)])

@@ -6,8 +6,10 @@ register_cycle → open_batch_window → [purge before posting] → archive_mast
 cycle charges interest) → generate_statements → apply_retention →
 close_batch_window → purge_pending_authorizations (after the cycle).
 
-A failed task stops the run and leaves the window open; an operator closes
-it with make -C modernization batch-window-close after recovery.
+The cycle holds the window by its cycleId. A failed task stops the run and
+leaves the window open; an operator recovers, closes it with
+make -C modernization batch-window-close, and the next run resumes the
+cycle. Task retries exist only for lost executions and transient errors.
 """
 
 from airflow.sdk import DAG, Param, TriggerRule, chain
@@ -22,7 +24,7 @@ with DAG(
     start_date=cycle.START_DATE,
     catchup=False,
     max_active_runs=1,
-    default_args={"pool": BATCH_POOL, "retries": 0},
+    default_args={"pool": BATCH_POOL},
     params={
         "businessDate": Param(None, type=["null", "string"], format="date",
                               description="Business date of the cycle; empty means the logical date"),
@@ -39,22 +41,21 @@ with DAG(
     open_window = BatchWindowOperator(task_id="open_batch_window", action="open", with_cycle=True)
     purge_early = SpringBatchJobOperator(
         task_id="purge_pending_authorizations_before_posting", job_name="purgePendingAuthorizationsJob",
-        with_cycle=True, run_if=cycle.purge_before_posting)
-    archive = SpringBatchJobOperator(task_id="archive_master", job_name="archiveMasterJob", with_cycle=True,
+        run_if=cycle.purge_before_posting)
+    archive = SpringBatchJobOperator(task_id="archive_master", job_name="archiveMasterJob",
                                      trigger_rule=TriggerRule.NONE_FAILED)
-    ingest = SpringBatchJobOperator(task_id="ingest_daily_file", job_name="ingestDailyFileJob", with_cycle=True)
-    post = SpringBatchJobOperator(task_id="post_daily_transactions", job_name="postDailyTransactionsJob",
-                                  with_cycle=True)
+    ingest = SpringBatchJobOperator(task_id="ingest_daily_file", job_name="ingestDailyFileJob")
+    post = SpringBatchJobOperator(task_id="post_daily_transactions", job_name="postDailyTransactionsJob")
     interest = SpringBatchJobOperator(task_id="calculate_interest", job_name="calculateInterestJob",
-                                      with_cycle=True, run_if=cycle.cycle_interest)
-    statements = SpringBatchJobOperator(task_id="generate_statements", job_name="statementJob", with_cycle=True,
+                                      run_if=cycle.cycle_interest)
+    statements = SpringBatchJobOperator(task_id="generate_statements", job_name="statementJob",
                                         run_if=cycle.statements_due, trigger_rule=TriggerRule.NONE_FAILED)
-    retention = SpringBatchJobOperator(task_id="apply_retention", job_name="applyRetentionJob", with_cycle=True,
+    retention = SpringBatchJobOperator(task_id="apply_retention", job_name="applyRetentionJob",
                                        trigger_rule=TriggerRule.NONE_FAILED)
     close_window = BatchWindowOperator(task_id="close_batch_window", action="close", with_cycle=True,
                                        trigger_rule=TriggerRule.NONE_FAILED)
     purge = SpringBatchJobOperator(task_id="purge_pending_authorizations", job_name="purgePendingAuthorizationsJob",
-                                   with_cycle=True, run_if=cycle.purge_after_cycle)
+                                   run_if=cycle.purge_after_cycle)
 
     chain(register, open_window, purge_early, archive, ingest, post, interest, statements, retention,
           close_window, purge)

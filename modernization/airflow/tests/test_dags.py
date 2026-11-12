@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from conftest import AIRFLOW_DIR
+from conftest import AIRFLOW_DIR, WINDOW_JOBS
 
 DAG_IDS = {
     "carddemo_daily_cycle",
@@ -147,6 +147,38 @@ def test_conditional_tasks(dagbag):
     assert ref.get_task("maintain_transaction_types").run_if is cycle.transaction_type_input_present
 
 
+def test_inbound_file_is_under_the_absolute_var_dir_from_any_cwd(var_dir, make_context, monkeypatch, tmp_path):
+    from carddemo_airflow import cycle
+
+    context = make_context(ds="2022-07-06")
+    expected = os.path.join(str(var_dir), "inbound", "trantype", "2022-07-06.txt")
+    assert cycle.inbound_file("trantype", context) == expected
+    assert not cycle.transaction_type_input_present(context)
+    os.makedirs(os.path.dirname(expected))
+    with open(expected, "w", encoding="utf-8"):
+        pass
+    for cwd in (tmp_path, os.path.dirname(AIRFLOW_DIR)):
+        monkeypatch.chdir(cwd)
+        assert cycle.transaction_type_input_present(context)
+
+
+@pytest.mark.parametrize("value", [None, "", "var", "./var"])
+def test_inbound_file_fails_without_an_absolute_var_dir(value, make_context, monkeypatch, tmp_path):
+    from airflow.sdk.exceptions import AirflowFailException
+
+    from carddemo_airflow import cycle
+
+    if value is None:
+        monkeypatch.delenv("CARDDEMO_VAR_DIR")
+    else:
+        monkeypatch.setenv("CARDDEMO_VAR_DIR", value)
+    # A relative "var" next to the working directory must not be taken for it.
+    os.makedirs(tmp_path / "var" / "inbound" / "trantype" / "2022-07-06.txt")
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(AirflowFailException, match="CARDDEMO_VAR_DIR"):
+        cycle.transaction_type_input_present(make_context(ds="2022-07-06"))
+
+
 @pytest.mark.parametrize("dag_id,order", [
     ("carddemo_reference_refresh",
      ["open_batch_window", "maintain_transaction_types", "reload_disclosure_groups", "close_batch_window"]),
@@ -154,7 +186,7 @@ def test_conditional_tasks(dagbag):
     ("carddemo_transaction_report", ["run_report"]),
     ("carddemo_category_balance_listing", ["run_listing"]),
     ("carddemo_export_masters", ["export_masters"]),
-    ("carddemo_import_migration", ["import_migration"]),
+    ("carddemo_import_migration", ["open_batch_window", "import_migration", "close_batch_window"]),
 ])
 def test_other_dag_order(dagbag, dag_id, order):
     assert linear_order(dagbag.dags[dag_id]) == order
@@ -178,8 +210,41 @@ def test_on_demand_dags_have_no_schedule(dagbag, dag_id):
 def test_transaction_report_params(dagbag):
     dag = dagbag.dags["carddemo_transaction_report"]
     assert set(dag.params.keys()) == {"runId", "startDate", "endDate", "requestedBy"}
-    task = dag.get_task("run_report")
-    assert set(task.job_params) == {"runId", "startDate", "endDate", "requestedBy"}
+    assert dag.render_template_as_native_obj is True
+    # The job reads the stored report run; only its ID is sent.
+    assert dag.get_task("run_report").job_params == {"runId": "{{ params.runId }}"}
+
+
+@pytest.mark.parametrize("dag_id", sorted(DAG_IDS))
+def test_only_the_report_runs_without_unpausing(dagbag, dag_id):
+    # transaction-service's trigger must start a run; every DAG that changes
+    # data waits until someone unpauses it (DAGS_ARE_PAUSED_AT_CREATION).
+    assert (dagbag.dags[dag_id].is_paused_upon_creation is False) == (dag_id == "carddemo_transaction_report")
+
+
+def test_import_takes_an_integer_export_id(dagbag):
+    dag = dagbag.dags["carddemo_import_migration"]
+    assert dag.params.get_param("exportId").schema["type"] == "integer"
+    assert dag.render_template_as_native_obj is True
+    assert dag.get_task("import_migration").job_params == {"exportId": "{{ params.exportId }}"}
+
+
+@pytest.mark.parametrize("dag_id", sorted(DAG_IDS))
+def test_window_jobs_run_inside_the_runs_window(dagbag, dag_id):
+    """Contract section 6: a window job runs between its run's open and
+    close; a DAG without one opens no window. Only the cycle holds it by
+    cycleId."""
+    dag = dagbag.dags[dag_id]
+    order = linear_order(dag)
+    window_tasks = [t for t in order if hasattr(dag.get_task(t), "job_name")
+                    and dag.get_task(t).job_name in WINDOW_JOBS]
+    if not window_tasks:
+        assert "open_batch_window" not in order and "close_batch_window" not in order
+        return
+    first, last = order.index("open_batch_window"), order.index("close_batch_window")
+    assert all(first < order.index(t) < last for t in window_tasks)
+    for t in ("open_batch_window", "close_batch_window"):
+        assert dag.get_task(t).with_cycle is (dag_id == "carddemo_daily_cycle"), t
 
 
 @pytest.mark.parametrize("dag_id", sorted(DAG_IDS))
@@ -210,8 +275,11 @@ def test_pool_definition():
 
 
 @pytest.mark.parametrize("dag_id", sorted(DAG_IDS))
-def test_no_retries_on_data_changes(dagbag, dag_id):
-    """Failure policy: stop the chain and alert; never re-launch a job by itself."""
+def test_every_task_can_recover_a_lost_execution(dagbag, dag_id):
+    """Contract section 5: a lost owner's execution is recovered by the
+    launch of a task retry, so every task retries at least twice, and
+    execution_timeout bounds what recovery cannot resolve. A failed job
+    still stops the chain: that failure is not retried."""
     for task in dagbag.dags[dag_id].tasks:
-        if dag_id in CHANGES_DATA:
-            assert task.retries == 0, task.task_id
+        assert task.retries >= 2, task.task_id
+        assert task.execution_timeout is not None, task.task_id

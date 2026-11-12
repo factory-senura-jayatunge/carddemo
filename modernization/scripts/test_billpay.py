@@ -22,7 +22,7 @@ Steps, in order; the first failure ends the run:
 
 The demo database (CARDDEMO_DB_NAME) is never reset. Vitest writes its JUnit
 report to build/test-results/billpay/; Playwright keeps its own output in
-web/test-results/e2e. A Chromium-only run writes
+web/e2e-output/results. A Chromium-only run writes
 web/playwright-report/e2e-<target>-<mode>.json; each Playwright step checks
 that it wrote it. Run under heavy.py and with_env.py, as make test-billpay does.
 

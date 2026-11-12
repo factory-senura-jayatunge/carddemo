@@ -18,18 +18,31 @@ MAIN_CHECKOUT := $(if $(GIT_COMMON_DIR),$(patsubst %/,%,$(dir $(GIT_COMMON_DIR))
 MAIN_MODERNIZATION := $(if $(wildcard $(MAIN_CHECKOUT)/modernization/docker-compose.yml),$(MAIN_CHECKOUT)/modernization,$(HERE))
 CARDDEMO_ENV_FILE ?= $(MAIN_MODERNIZATION)/.env
 CARDDEMO_INFRA_DIR ?= $(MAIN_MODERNIZATION)
-# Runtime files (logs, PIDs, locks, keys, batch files) are machine-wide too.
-CARDDEMO_VAR_DIR ?= $(MAIN_MODERNIZATION)/var
-CARDDEMO_JWT_KEY_FILE ?= $(CARDDEMO_VAR_DIR)/secrets/identity-jwt.pem
-export CARDDEMO_ENV_FILE CARDDEMO_INFRA_DIR CARDDEMO_VAR_DIR CARDDEMO_JWT_KEY_FILE
 ENV_FILE := $(CARDDEMO_ENV_FILE)
+# Only the keys read through env_value come from .env (CARDDEMO_VAR_DIR,
+# CARDDEMO_DB_NAME and the toolchain overrides), so secrets never become make
+# variables.
+env_value = $(shell sed -n 's/^$(1)=//p' '$(ENV_FILE)' 2>/dev/null | tail -n 1)
+# Runtime files (logs, PIDs, locks, keys, batch outputs) are machine-wide too:
+# the environment's CARDDEMO_VAR_DIR, else .env's, else the main checkout's
+# var/. It must be absolute; setup and every script refuse a relative one.
+# RUN_VAR_DIR=<absolute path> gives db-reset, db-migrate and load's JVM a
+# test harness's private output folder instead; nothing else uses it.
+override CARDDEMO_VAR_DIR := $(or $(strip $(CARDDEMO_VAR_DIR)),$(call env_value,CARDDEMO_VAR_DIR),$(MAIN_MODERNIZATION)/var)
+CARDDEMO_JWT_KEY_FILE ?= $(CARDDEMO_VAR_DIR)/secrets/identity-jwt.pem
+# The SA password as the mssql service's compose secret, copied from .env.
+CARDDEMO_MSSQL_SA_PASSWORD_FILE ?= $(CARDDEMO_VAR_DIR)/secrets/mssql-sa-password
+export CARDDEMO_ENV_FILE CARDDEMO_INFRA_DIR CARDDEMO_VAR_DIR CARDDEMO_JWT_KEY_FILE
+# Exported only when given (environment or command line): stack.py writes the
+# secret file unasked only when the mssql container mounts it or is created.
+ifneq ($(filter environment command,$(origin CARDDEMO_MSSQL_SA_PASSWORD_FILE)),)
+export CARDDEMO_MSSQL_SA_PASSWORD_FILE
+endif
 TOOLCHAIN := $(HERE)/scripts/toolchain.sh
 PYTHON ?= python3
 UP_TIMEOUT ?= 300
 
-# Toolchain overrides: the environment wins, then .env, then detection. Only
-# these keys are read from .env, so secrets never become make variables.
-env_value = $(shell sed -n 's/^$(1)=//p' '$(ENV_FILE)' 2>/dev/null | tail -n 1)
+# Toolchain overrides: the environment wins, then .env, then detection.
 CARDDEMO_JAVA_HOME ?= $(call env_value,CARDDEMO_JAVA_HOME)
 CARDDEMO_NODE_BIN ?= $(call env_value,CARDDEMO_NODE_BIN)
 AIRFLOW_VENV ?= $(or $(call env_value,AIRFLOW_VENV),$(HOME)/.venvs/carddemo-airflow)
@@ -67,6 +80,9 @@ WITH_ENV = $(PYTHON) '$(HERE)/scripts/with_env.py'
 # Heavy targets run their command through $(HEAVY) <target> <command>.
 HEAVY = $(PYTHON) '$(HERE)/scripts/heavy.py'
 JAVA = $(if $(JAVA_HOME),$(JAVA_HOME)/bin/java,java)
+# The one JVM of db-reset, db-migrate and load writes into RUN_VAR_DIR when a
+# harness gives one; with_env.py refuses it when it is not absolute.
+RUN_VAR = $(if $(RUN_VAR_DIR),CARDDEMO_VAR_DIR='$(RUN_VAR_DIR)' )
 DB_NAME = $(or $(CARDDEMO_DB_NAME),$(call env_value,CARDDEMO_DB_NAME),carddemo)
 # verify/trace needs tomllib.
 PY311 = $(PYTHON) -c 'import sys; sys.exit(sys.version_info < (3, 11))' || { echo '$@: FAILED ($(PYTHON) is older than 3.11; set PYTHON=python3.11 or newer)' >&2; exit 1; }
@@ -79,10 +95,11 @@ need = [ -e '$(HERE)/$(1)' ] || { echo '$@: FAILED (no modernization/$(1) in thi
 # that delivers it; replace the stub with the real recipe (and drop it from
 # STUBS) when that work lands. Every target ends with "<target>: OK" or
 # "<target>: FAILED (<reason>)".
-STUBS := verify-batch verify-harness verify-cycle
+STUBS := verify-cycle
 .PHONY: help stubs setup toolchain build up stop down status logs infra-up infra-down \
 	infra-wipe require-env verify-spec db-reset db-migrate smoke verify-ledger \
-	test-backend web-build test-e2e trace load verify-data verify-migrations billpay test-billpay test-airflow $(STUBS)
+	test-backend web-build test-e2e trace load verify-data verify-migrations billpay test-billpay test-airflow test-batch-live \
+	batch-window-close rabbitmq-users cycle-rerun identity-bcrypt-check $(STUBS)
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":[^#]*## "} /^[a-zA-Z0-9_-]+:[^=]*## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -94,6 +111,7 @@ setup: ## Check JDK 21, Node 24, Docker/Colima and the Airflow venv; create .env
 	@rc=0; \
 	'$(TOOLCHAIN)' check || rc=1; \
 	$(PYTHON) '$(HERE)/scripts/init_env.py' '$(HERE)/.env.example' '$(ENV_FILE)' || rc=1; \
+	$(STACK) sa-secret || rc=1; \
 	'$(HERE)/scripts/init_jwt_key.sh' '$(CARDDEMO_JWT_KEY_FILE)' || rc=1; \
 	'$(HERE)/scripts/airflow_venv.sh' || rc=1; \
 	if [ '$(ENV_FILE)' != '$(HERE)/.env' ] && [ -f '$(HERE)/.env' ] && [ ! '$(HERE)/.env' -ef '$(ENV_FILE)' ]; then \
@@ -114,6 +132,7 @@ toolchain: ## Show the JDK, Node and Docker endpoint that the recipes use
 	@echo "CARDDEMO_INFRA_DIR=$(CARDDEMO_INFRA_DIR)"
 	@echo "CARDDEMO_VAR_DIR=$(CARDDEMO_VAR_DIR)"
 	@echo "CARDDEMO_JWT_KEY_FILE=$(CARDDEMO_JWT_KEY_FILE)"
+	@echo "CARDDEMO_MSSQL_SA_PASSWORD_FILE=$(CARDDEMO_MSSQL_SA_PASSWORD_FILE)"
 
 require-env:
 	@[ -f '$(ENV_FILE)' ] || { echo '$(ENV_FILE) is missing; run make setup (in the main checkout) first' >&2; exit 1; }
@@ -138,6 +157,9 @@ status: require-env ## Containers and host processes of the stack, with their he
 infra-up: require-env ## Start SQL Server, RabbitMQ and the Airflow Postgres and wait until healthy (RECREATE=1 to allow restarts)
 	@$(STACK) infra-up
 
+rabbitmq-users: require-env ## Create the RabbitMQ virtual host and service users when missing and set their permissions (infra-up and up do it too)
+	@$(STACK) rabbitmq-users
+
 infra-down: require-env ## Stop and remove the infrastructure containers for every checkout; volumes are kept
 	@$(STACK) infra-down
 
@@ -154,13 +176,14 @@ db-reset: require-env ## Recreate the application database (CARDDEMO_DB_NAME) an
 	@$(STACK) ensure-infra $@
 	@echo 'WARN  db-reset drops and recreates database $(DB_NAME) on the shared SQL Server'
 	@cd '$(HERE)' && ./mvnw -q -B -pl db/db-migrate -am package -DskipTests || { echo '$@: FAILED (building db-migrate)' >&2; exit 1; }
-	@cd '$(HERE)' && $(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --reset --check-logins \
+	@cd '$(HERE)' && $(RUN_VAR)$(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --reset --check-logins \
 	&& echo '$@: OK' || { echo '$@: FAILED (db-migrate, see above)' >&2; exit 1; }
-db-migrate: require-env ## Apply new migrations to CARDDEMO_DB_NAME without dropping it, then check the logins' grants
+db-migrate: require-env ## Apply new migrations to CARDDEMO_DB_NAME without dropping it, then check the logins' grants; NEW_INSTANCE=1 after a restore gives it a new output root
+	@case '$(NEW_INSTANCE)' in ''|1) ;; *) echo '$@: FAILED (NEW_INSTANCE must be 1 or unset)' >&2; exit 2;; esac
 	@$(call need,mvnw,arrives with the backend)
 	@$(STACK) ensure-infra $@
 	@cd '$(HERE)' && ./mvnw -q -B -pl db/db-migrate -am package -DskipTests || { echo '$@: FAILED (building db-migrate)' >&2; exit 1; }
-	@cd '$(HERE)' && $(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --check-logins \
+	@cd '$(HERE)' && $(RUN_VAR)$(WITH_ENV) '$(JAVA)' -jar "$$(ls db/db-migrate/target/db-migrate-*-exec.jar | tail -n 1)" --check-logins$(if $(NEW_INSTANCE), --new-instance) \
 	&& echo '$@: OK' || { echo '$@: FAILED (db-migrate, see above)' >&2; exit 1; }
 verify-migrations: require-env ## Migrations both ways on scratch databases: from BASE (default: merge base with origin/modernization) up to this checkout, and fresh; same schema at the end
 	@$(call need,mvnw,arrives with the backend)
@@ -172,8 +195,26 @@ load: require-env ## Load the sample data into CARDDEMO_DB_NAME with batch-servi
 	@cd '$(HERE)' && ./mvnw -q -B -pl batch/batch-service -am package -DskipTests || { echo '$@: FAILED (building batch-service)' >&2; exit 1; }
 	@cd '$(HERE)' && jar=$$(ls batch/batch-service/target/batch-service-*-exec.jar 2>/dev/null | tail -n 1) \
 	&& { [ -n "$$jar" ] || { echo '$@: FAILED (no batch/batch-service/target/batch-service-*-exec.jar after the build)' >&2; exit 1; }; } \
-	&& CARDDEMO_LOAD_SOURCE_DIR='$(HERE)/../app/data/ASCII' $(WITH_ENV) '$(JAVA)' -jar "$$jar" --spring.profiles.active=demo \
+	&& CARDDEMO_LOAD_SOURCE_DIR='$(HERE)/../app/data/ASCII' \
+	CARDDEMO_PAUTH_SOURCE_FILE='$(HERE)/../app/app-authorization-ims-db2-mq/data/EBCDIC/AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat' $(RUN_VAR)$(WITH_ENV) '$(JAVA)' -jar "$$jar" --spring.profiles.active=demo \
 	&& echo '$@: OK' || { echo '$@: FAILED (dataLoadJob, see above; on a foreign-key error run make db-reset first)' >&2; exit 1; }
+# CYCLE and RUN_KEY reach the script only in its environment (make exports
+# command-line variables), never through the shell.
+batch-window-close: require-env ## After a failure, reopen online writes: close the batch window of CYCLE=<id> (the cycle stays OPEN) or RUN_KEY=<dag_id>/<run_id>
+	@$(WITH_ENV) $(PYTHON) '$(HERE)/scripts/batch_window_close.py'
+# CYCLE is checked before the .env check, the build, the containers and the
+# JVM, so a bad value changes nothing; the jar gets it from the environment.
+cycle-rerun: ## Deliberate rerun of the cycle CYCLE=<id>: batch-service's cycle-rerun command in a one-shot JVM (no demo profile)
+	@$(PYTHON) -c 'import os, re, sys; c = os.environ.get("CYCLE", ""); sys.exit(0 if re.fullmatch("[1-9][0-9]{0,9}", c) and int(c) <= 2147483647 else 2)' \
+	|| { echo '$@: FAILED (CYCLE must be a cycle ID, a whole number from 1 to 2147483647: make cycle-rerun CYCLE=<id>)' >&2; exit 2; }
+	@[ -f '$(ENV_FILE)' ] || { echo '$(ENV_FILE) is missing; run make setup (in the main checkout) first' >&2; exit 1; }
+	@$(call need,batch/batch-service/pom.xml,arrives with the data migration)
+	@$(STACK) ensure-infra $@
+	@cd '$(HERE)' && ./mvnw -q -B -pl batch/batch-service -am package -DskipTests || { echo '$@: FAILED (building batch-service)' >&2; exit 1; }
+	@cd '$(HERE)' && jar=$$(ls batch/batch-service/target/batch-service-*-exec.jar 2>/dev/null | tail -n 1) \
+	&& { [ -n "$$jar" ] || { echo '$@: FAILED (no batch/batch-service/target/batch-service-*-exec.jar after the build)' >&2; exit 1; }; } \
+	&& $(WITH_ENV) '$(JAVA)' -jar "$$jar" --carddemo.batch.command=cycle-rerun --carddemo.batch.rerun.cycle-id="$$CYCLE" \
+	&& echo '$@: OK' || { echo '$@: FAILED (cycle-rerun of cycle '"$$CYCLE"', see above)' >&2; exit 1; }
 smoke: require-env ## Read-only check of the running slice: health, sign-on, me, features, a Bill Pay preview, JWKS, no row changes
 	@$(WITH_ENV) $(PYTHON) '$(HERE)/scripts/smoke.py'
 billpay: require-env ## One scripted payment on the running slice (db-reset and load first when there is no data); leaves it up
@@ -207,8 +248,21 @@ test-billpay: require-env ## Bill Pay: Maven verify, Vitest, Playwright on the m
 	@$(call need,services/billpay-service/pom.xml,arrives with billpay-service)
 	@$(call need,web/e2e/bill.spec.ts,arrives with the web app)
 	@cd '$(HERE)' && $(WITH_ENV) $(HEAVY) $@ $(PYTHON) scripts/test_billpay.py
-verify-batch: ## GnuCOBOL vs Spring Batch differential tests (heavy) [not implemented yet]
-verify-batch: PHASE = Phase 3, the batch jobs (differential tests against GnuCOBOL)
+test-batch-live: require-env ## batch-service's internal API live, on its own database (CARDDEMO_BATCH_E2E_DB_NAME) and port: cycles, windows, dataLoadJob, restart, job probe; SIGSTOP=1 on Linux (heavy)
+	@$(call need,batch/batch-service/pom.xml,arrives with the data migration)
+	@cd '$(HERE)' && $(WITH_ENV) $(HEAVY) $@ $(PYTHON) scripts/batch_e2e.py --name $@ $(if $(SIGSTOP),--sigstop)
+verify-batch: require-env ## GnuCOBOL vs Spring Batch for every required job, sample and stress, legacy, each switch fixed, all fixed; ONLY=POSTTRAN,INTCALC ends PARTIAL, exit 3 (heavy)
+	@$(PY311)
+	@$(call need,verify/differential/verify_batch.py,arrives with the differential harness)
+	@cd '$(HERE)' && $(if $(ONLY),ONLY='$(ONLY)') $(WITH_ENV) $(HEAVY) $@ $(PYTHON) verify/differential/verify_batch.py --name $@
+verify-batch-spec: require-env ## The spec validators' live cases (PRTCATBL, TRANBKP, PURGE, DISCGRP, DATALOAD) on the private verify-batch database, legacy and fixed; ONLY=PURGE ends PARTIAL, exit 3 (heavy)
+	@$(PY311)
+	@$(call need,verify/adapter/spec_cli.py,arrives with the spec transport)
+	@cd '$(HERE)/..' && $(if $(ONLY),ONLY='$(ONLY)') $(WITH_ENV) $(HEAVY) $@ $(PYTHON) -m modernization.verify.adapter.spec_cli --name $@
+identity-bcrypt-check: require-env ## Read-only: fails when an active user outside the demo seed still has a {bcrypt} hash; prints user IDs only
+	@$(call need,scripts/identity_bcrypt_check.py,arrives with the identity-service bcrypt check)
+	@$(call need,services/identity-service/src/main/resources/checks/bcrypt-outside-seed.sql,arrives with the identity-service bcrypt check)
+	@$(WITH_ENV) $(PYTHON) '$(HERE)/scripts/identity_bcrypt_check.py'
 verify-data: require-env ## Reconcile the loaded tables with the sample files: counts, keys, control totals, re-export, relations, users (after up: identity-service seeds the users)
 	@$(call need,verify/data/pom.xml,arrives with the data migration)
 	@$(STACK) ensure-infra $@
@@ -221,8 +275,10 @@ verify-data: require-env ## Reconcile the loaded tables with the sample files: c
 	else cat "$$out"; \
 		if grep -Eq '^fail +iam\.app_user' "$$out"; then echo 'hint  users are seeded when identity-service starts: run make up (or make up ONLY=identity-service) first'; fi; \
 		echo '$@: FAILED (see the fail lines above)' >&2; exit 1; fi
-verify-harness: ## Self-test of the differential test harness [not implemented yet]
-verify-harness: PHASE = Phase 3, the batch jobs (differential harness)
+verify-harness: ## Self-test of the differential harness: seeded differences of real GnuCOBOL outputs must be reported
+	@$(PY311)
+	@$(call need,verify/differential/verify_batch.py,arrives with the differential harness)
+	@$(PYTHON) '$(HERE)/verify/differential/verify_batch.py' --self-test --name $@
 verify-cycle: ## Full batch cycle through Airflow and Spring Batch (heavy) [not implemented yet]
 verify-cycle: PHASE = Phase 3, Airflow (end-to-end batch cycle run)
 test-airflow: ## pytest without a running Airflow: DagBag import, task order, parameters, pool, the import rule, the operators against a stub batch-service
