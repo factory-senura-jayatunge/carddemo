@@ -1,0 +1,738 @@
+name: PH-12 Linux (verify/differential tests)
+on:
+  # One run per reviewed revision: only a push to modernization that adds or changes this file starts it.
+  # Every other push leaves it alone. A workflow_dispatch trigger would need the file on the default branch.
+  push:
+    branches: [modernization]
+    paths: ['.github/workflows/ph12-linux.yml']
+permissions:
+  contents: read
+concurrency:
+  group: ph12-linux-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  # The tree identifier is a constant of these reviewed bytes, never an input.
+  PH12_TREE: B
+  # Reviewed constants. A new tree (C, K) is added only by a reviewed edit of this file, never by an input.
+  PH12_REVIEWED: >-
+    {"B": {"modernization_tree": "dd4c2d37acc21ec916f7a2c8845b883b5c36665f",
+    "java_inventory_sha256": "2eed0257c7694083e9582e844ac17837b05e114b2837ed1df1887e3d5c0c1e17",
+    "python_inventory_sha256": "648948b17b52d5e0094177a0b4c8d3487fa51f3d89dea6692b0f6dd6e20f9bd8",
+    "java_methods": 127, "java_invocations": 133, "java_classes": 17, "java_owned": 88, "python_tests": 39}}
+  PH12_TOOLCHAIN: >-
+    {"maven": "3.9.11", "maven_core_sha256": "93d3c0523dda6c86c6620d9e692e7df39d0e2e4e4cd860061a8c0d274c2ad185",
+    "surefire": "3.5.6", "dependency_plugin": "3.10.0", "junit_platform": "6.0.3", "java_major": "21"}
+
+jobs:
+  ph12:
+    runs-on: ubuntu-24.04
+    # The sum of the step limits below (113 min) plus 12 min for the runner's own set-up and post steps,
+    # so that a hang always ends at a step limit and the gate, upload and verdict still run.
+    timeout-minutes: 125
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with: { persist-credentials: false }
+      - name: Write the PH-12 helper
+        timeout-minutes: 1
+        run: |
+          echo "PH12=$RUNNER_TEMP/ph12" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/ph12/home" "$RUNNER_TEMP/ph12/tmp" "$RUNNER_TEMP/ph12/private"
+          : > "$RUNNER_TEMP/ph12/private/helper.stderr"
+          cat > "$RUNNER_TEMP/ph12/ph12.py" <<'PH12PY'
+          """PH-12 Linux helper (standard library only). Every printed or written value is a typed field:
+          a fixed label, a count, a boolean, a reviewed constant, a hash, or a source-derived Class#method
+          identifier. No log line, message, property, host name, path or time is ever copied."""
+          import glob
+          import hashlib
+          import json
+          import os
+          import platform
+          import re
+          import secrets
+          import signal
+          import socket
+          import subprocess
+          import sys
+          import traceback
+          import xml.etree.ElementTree as ET
+
+          MODES = ("tree", "jdk", "prep-summary", "observe", "gate")
+          OWNED = {"ExitTokensTest", "ExportBatchStdoutTest", "ExportFilesTest", "RefusalCodesTest", "RefusalJsonTest",
+                   "RefusalModeTest", "RefusalOptionsTest", "RefusalRunTest", "WorkFolderHelperTest"}
+          PARAM = {"LoadReportTest#everyKeyMustBeThereWithItsType": 7}
+          KINDS = ("p-maven", "p-fork", "p-child", "p-yes", "p-sleep", "p-py")
+          ID = re.compile(r"[A-Z][A-Za-z0-9_]*#[A-Za-z_][A-Za-z0-9_]*")
+          HEX = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+          TOKEN = re.compile(r"[A-Za-z0-9._+-][A-Za-z0-9._+ -]{0,63}")
+          PH12 = WS = MOD = None
+          REVIEWED = TOOLS = None
+
+
+          def setup():
+              global PH12, WS, MOD, REVIEWED, TOOLS
+              PH12 = os.environ["PH12"]
+              WS = os.environ["GITHUB_WORKSPACE"]
+              MOD = os.path.join(WS, "modernization", "verify", "differential")
+              REVIEWED = json.loads(os.environ["PH12_REVIEWED"])
+              TOOLS = json.loads(os.environ["PH12_TOOLCHAIN"])
+
+
+          def sha(b):
+              return hashlib.sha256(b).hexdigest()
+
+
+          def git(*args):
+              r = subprocess.run(["/usr/bin/git", "-C", WS, *args], capture_output=True, text=True, timeout=60)
+              return r.stdout.strip() if r.returncode == 0 else ""
+
+
+          def emit(path_var, text):
+              path = os.environ.get(path_var)
+              if path:
+                  with open(path, "a", encoding="utf-8") as f:
+                      f.write(text)
+
+
+          def read(name, default=""):
+              try:
+                  with open(os.path.join(PH12, name), encoding="utf-8") as f:
+                      return f.read().strip()
+              except OSError:
+                  return default
+
+
+          def load(name):
+              try:
+                  with open(os.path.join(PH12, name), encoding="utf-8") as f:
+                      return json.load(f)
+              except (OSError, ValueError):
+                  return {}
+
+
+          def save(name, obj):
+              with open(os.path.join(PH12, name), "w", encoding="utf-8") as f:
+                  json.dump(obj, f, indent=1, sort_keys=True)
+
+
+          def tree_ok():
+              tree = os.environ.get("PH12_TREE", "")
+              if tree not in REVIEWED:
+                  return tree, None, False
+              return tree, REVIEWED[tree], git("rev-parse", "HEAD:modernization") == REVIEWED[tree]["modernization_tree"]
+
+
+          def cmd_tree():
+              tree, r, ok = tree_ok()
+              if r is None:
+                  print("tree not-reviewed")
+                  sys.exit(1)
+              print(f"tree {tree} modernization-subtree {'match' if ok else 'mismatch'}")
+              sys.exit(0 if ok else 1)
+
+
+          def cmd_jdk():
+              fields = {}
+              with open(os.path.join(os.environ["JAVA_HOME"], "release"), encoding="utf-8") as f:
+                  for line in f.read().splitlines():
+                      m = re.fullmatch(r'(JAVA_VERSION|JAVA_RUNTIME_VERSION|IMPLEMENTOR)="(.*)"', line)
+                      if m:
+                          fields[m.group(1)] = m.group(2) if TOKEN.fullmatch(m.group(2)) else "unknown"
+              rec = {"java_version": fields.get("JAVA_VERSION", "unknown"),
+                     "java_runtime_version": fields.get("JAVA_RUNTIME_VERSION", "unknown"),
+                     "implementor": fields.get("IMPLEMENTOR", "unknown")}
+              save("jdk.json", rec)
+              print(f"jdk {rec['implementor']} {rec['java_version']} {rec['java_runtime_version']}")
+              sys.exit(0 if rec["java_version"].split(".")[0] == TOOLS["java_major"] else 1)
+
+
+          def listing():
+              """sha256 of sorted 'root/relative-path  sha256' lines over every .jar and .pom. Any link (file or
+              folder) or any entry that is neither a regular file nor a folder is counted, and must be 0."""
+              lines, odd = [], 0
+              for name in ("m2", "mvnw"):
+                  root = os.path.join(PH12, name)
+                  for d, dirs, files in os.walk(root):
+                      odd += sum(1 for x in dirs if os.path.islink(os.path.join(d, x)))
+                      dirs.sort()
+                      for f in files:
+                          p = os.path.join(d, f)
+                          if os.path.islink(p) or not os.path.isfile(p):
+                              odd += 1
+                              continue
+                          if f.endswith((".jar", ".pom")):
+                              with open(p, "rb") as fh:
+                                  lines.append(name + "/" + os.path.relpath(p, root) + "  " + sha(fh.read()))
+              lines.sort()
+              return sha("".join(x + "\n" for x in lines).encode()), len(lines), odd
+
+
+          def maven_core():
+              jars = glob.glob(os.path.join(PH12, "mvnw", "wrapper", "dists", "apache-maven-" + TOOLS["maven"], "*", "lib",
+                                            "maven-core-" + TOOLS["maven"] + ".jar"))
+              if len(jars) != 1 or os.path.islink(jars[0]):
+                  return "none", len(jars)
+              with open(jars[0], "rb") as fh:
+                  return sha(fh.read()), 1
+
+
+          def cmd_prep_summary():
+              m2 = os.path.join(PH12, "m2")
+              core, ncore = maven_core()
+              sfdir = os.path.join(m2, "org", "apache", "maven", "plugins", "maven-surefire-plugin")
+              sf = sorted(os.listdir(sfdir)) if os.path.isdir(sfdir) else []
+              prov = os.path.isfile(os.path.join(m2, "org", "apache", "maven", "surefire", "surefire-junit-platform",
+                                                 TOOLS["surefire"], "surefire-junit-platform-" + TOOLS["surefire"] + ".jar"))
+              launcher = os.path.isfile(os.path.join(m2, "org", "junit", "platform", "junit-platform-launcher",
+                                                     TOOLS["junit_platform"], "junit-platform-launcher-" + TOOLS["junit_platform"] + ".jar"))
+              ours = os.path.exists(os.path.join(m2, "org", "carddemo"))
+              digest, n, odd = listing()
+              checks = {
+                  "prepare-rc-0": read("prepare.rc") == "0",
+                  "seed-rc-0": read("seed.rc") == "0",
+                  "maven-core-pinned": core == TOOLS["maven_core_sha256"] and ncore == 1,
+                  "surefire-version-pinned": sf == [TOOLS["surefire"]],
+                  "provider-present": prov,
+                  "launcher-present": launcher,
+                  "no-carddemo-artifact": not ours,
+                  "no-links-or-special-files": odd == 0,
+              }
+              ok = all(checks.values())
+              save("prep.json", {"ok": ok, "checks": checks, "files": n, "m2_listing": digest, "maven_core_sha256": core})
+              rows = "".join(f"| {k} | {'yes' if v else 'no'} |\n" for k, v in checks.items())
+              emit("GITHUB_STEP_SUMMARY", f"### PH-12 prepare\n\n| check | result |\n|:--|:--|\n{rows}"
+                   f"| files (.jar, .pom) | {n} |\n| m2 listing | `{digest}` |\n| maven-core sha256 | `{core}` |\n")
+              for k, v in checks.items():
+                  print(f"prepare {k} {'yes' if v else 'no'}")
+              print(f"prepare files {n} ok {'yes' if ok else 'no'}")
+              sys.exit(0 if ok else 1)
+
+
+          PS_ROW = re.compile(r"[ \t]*([0-9]+)[ \t]+([0-9]+)[ \t]+(\S.*)")
+          SS_LOCAL = re.compile(r"\S+:([0-9]+|\*)")
+          SS_PEER = re.compile(r"\S+:\*")
+          SENTINEL_CODE = "import time; time.sleep(60)"
+
+
+          class ObserveError(Exception):
+              """A process or listener listing that cannot be trusted. main() turns it into a HOLD."""
+
+
+          def parse_ps(rc, out, me, own_pid, sentinel_pid, sentinel_tail):
+              """Rows (uid, pid, args) of `ps -ww -eo uid=,pid=,args=`. Raises unless the listing is complete enough to
+              trust: rc 0, not empty, every row in the expected layout, the sentinel shown once with its whole argument
+              list (so arguments are not cut), and this helper's own process present."""
+              if rc != 0 or not out.strip():
+                  raise ObserveError("ps-rc-or-empty")
+              rows = []
+              for line in out.splitlines():
+                  if not line.strip():
+                      continue
+                  m = PS_ROW.fullmatch(line.rstrip())
+                  if not m:
+                      raise ObserveError("ps-layout")
+                  rows.append((m.group(1), int(m.group(2)), m.group(3)))
+              sent = [r for r in rows if r[1] == sentinel_pid]
+              if len(sent) != 1 or sent[0][0] != me or not sent[0][2].endswith(" " + sentinel_tail):
+                  raise ObserveError("ps-sentinel")
+              if not any(r[1] == own_pid and r[0] == me for r in rows):
+                  raise ObserveError("ps-own-process")
+              return rows
+
+
+          def parse_ss(rc, out, sentinel_port):
+              """Listener flags from `ss -Hltn`. Raises unless rc is 0, the output is not empty, every row has the five
+              columns State Recv-Q Send-Q Local Peer, and the sentinel listener on 127.0.0.1 is shown exactly once."""
+              if rc != 0 or not out.strip():
+                  raise ObserveError("ss-rc-or-empty")
+              ports, seen = set(), 0
+              for line in out.splitlines():
+                  if not line.strip():
+                      continue
+                  f = line.split()
+                  if (len(f) != 5 or f[0] != "LISTEN" or not f[1].isdigit() or not f[2].isdigit()
+                          or not SS_LOCAL.fullmatch(f[3]) or not SS_PEER.fullmatch(f[4])):
+                      raise ObserveError("ss-layout")
+                  ports.add(f[3].rsplit(":", 1)[-1])
+                  seen += f[3] == f"127.0.0.1:{sentinel_port}"
+              if seen != 1:
+                  raise ObserveError("ss-sentinel")
+              return {"listen-1": "1" in ports, "listen-9": "9" in ports}
+
+
+          def count_kinds(rows, me, skip_pid):
+              wt = WS + "/"
+              counts = dict.fromkeys(KINDS, 0)
+              for uid, pid, c in rows:
+                  if uid != me or pid == skip_pid:
+                      continue
+                  if "org.codehaus.plexus.classworlds.launcher.Launcher" in c and wt in c:
+                      counts["p-maven"] += 1
+                  elif "surefirebooter" in c and wt in c:
+                      counts["p-fork"] += 1
+                  elif " -cp " in c and ("org.carddemo.verify.differential.ExportBatch" in c
+                                         or "org.carddemo.verify.differential.StdoutProbe" in c):
+                      counts["p-child"] += 1
+                  elif re.match(r"/usr/bin/yes( |$)", c):
+                      counts["p-yes"] += 1
+                  elif c == "/bin/sleep 20":
+                      counts["p-sleep"] += 1
+                  elif " -I -B -S -c " in c:
+                      counts["p-py"] += 1
+              return counts
+
+
+          def observe_now():
+              """Positive controls: a sentinel process in its own session, with a long unique argument, must appear in
+              the process listing, and a listener this helper opens on a loopback port must appear in the listener
+              listing. Both are removed before the listings are parsed; any failure raises, which gives a HOLD."""
+              token = "ph12-sentinel-" + secrets.token_hex(96)
+              sentinel = subprocess.Popen([sys.executable, "-I", "-B", "-c", SENTINEL_CODE, token], stdin=subprocess.DEVNULL,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+              sock = None
+              try:
+                  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  sock.bind(("127.0.0.1", 0))
+                  sock.listen(1)
+                  port = sock.getsockname()[1]
+                  ps = subprocess.run(["/bin/ps", "-ww", "-eo", "uid=,pid=,args="], capture_output=True, text=True, timeout=30)
+                  ss = subprocess.run(["/usr/bin/ss", "-Hltn"], capture_output=True, text=True, timeout=30)
+              finally:
+                  if sock is not None:
+                      sock.close()
+                  try:
+                      os.killpg(sentinel.pid, signal.SIGKILL)
+                  except ProcessLookupError:
+                      pass
+                  sentinel.wait(timeout=5)
+              me = str(os.getuid())
+              rows = parse_ps(ps.returncode, ps.stdout, me, os.getpid(), sentinel.pid, "-c " + SENTINEL_CODE + " " + token)
+              return count_kinds(rows, me, sentinel.pid), parse_ss(ss.returncode, ss.stdout, port)
+
+
+          def cmd_observe(label, require_clean):
+              if not re.fullmatch(r"[a-z-]{1,24}", label):
+                  sys.exit(2)
+              p, s = observe_now()
+              save(f"obs-{label}.json", {"procs": p, "listen": s, "controls": {"ps": "ok", "ss": "ok"}})
+              total = str(sum(p.values()))
+              ls = " ".join(f"{k}={'yes' if v else 'no'}" for k, v in s.items())
+              print(f"observe {label} procs-total={total} {ls} controls=ok")
+              clean = total == "0" and not any(s.values())
+              sys.exit(0 if clean or not require_clean else 1)
+
+
+          def obs_clean(label, need_listen):
+              o = load(f"obs-{label}.json")
+              if not o or o.get("procs") is None or sum(o["procs"].values()) != 0:
+                  return False
+              return not need_listen or (o.get("listen") is not None and not any(o["listen"].values()))
+
+
+          ANN = re.compile(r"[ \t]*@(Test|ParameterizedTest)([ \t(]|$)")
+          VOID = re.compile(r"void ([A-Za-z0-9_]+)\(")
+          CLS = re.compile(r"class ([A-Za-z0-9_]+)")
+          DEF = re.compile(r"    def (test_[A-Za-z0-9_]+)\(")
+
+
+          def expected_java():
+              d = os.path.join(MOD, "src", "test", "java", "org", "carddemo", "verify", "differential")
+              out, par = {}, []
+              for f in sorted(n for n in os.listdir(d) if n.endswith("Test.java")):
+                  cls, pend, isp = f[:-5], False, False
+                  with open(os.path.join(d, f), encoding="utf-8") as fh:
+                      for line in fh.read().splitlines():
+                          m = ANN.match(line)
+                          if m:
+                              pend, isp = True, m.group(1) == "ParameterizedTest"
+                              continue
+                          v = VOID.search(line) if pend else None
+                          if v:
+                              key = cls + "#" + v.group(1)
+                              if isp:
+                                  par.append(key)
+                              out[key] = PARAM.get(key, 0) if isp else 1
+                              pend = False
+              return out, par == list(PARAM)
+
+
+          def expected_python():
+              out = {}
+              for f in ("test_work_folder_helper.py", "test_work_folder_helper_audit.py"):
+                  c = None
+                  with open(os.path.join(MOD, "tests", f), encoding="utf-8") as fh:
+                      for line in fh.read().splitlines():
+                          m = CLS.match(line)
+                          if m:
+                              c = m.group(1)
+                          d = DEF.match(line)
+                          if d:
+                              out[f"{c}#{d.group(1)}"] = 1
+              return out
+
+
+          def inv_text(inv):
+              return "".join(f"{k} {n}\n" for k, n in sorted(inv.items()))
+
+
+          RANK = {"pass": 0, "skipped": 1, "failure": 2, "error": 3}
+          JKIND = {"failure": "failure", "error": "error", "skipped": "skipped", "flakyFailure": "error",
+                   "flakyError": "error", "rerunFailure": "error", "rerunError": "error"}
+
+
+          def actual_java():
+              files = sorted(glob.glob(os.path.join(MOD, "target", "surefire-reports", "TEST-org.carddemo.verify.differential.*.xml")))
+              counts, status, bad, suite_total, props = {}, {}, 0, 0, {}
+              for f in files:
+                  try:
+                      root = ET.parse(f).getroot()
+                  except (ET.ParseError, OSError):
+                      bad += 1
+                      continue
+                  for s in ([root] if root.tag == "testsuite" else root.findall("testsuite")):
+                      try:
+                          suite_total += int(s.get("tests", "x"))
+                      except ValueError:
+                          bad += 1
+                      for p in s.iter("property"):
+                          if p.get("name") in ("java.vendor", "java.version") and TOKEN.fullmatch(p.get("value", "")):
+                              props.setdefault(p.get("name"), p.get("value"))
+                      for tc in s.iter("testcase"):
+                          n = re.sub(r"\[.*$", "", re.sub(r"\(.*$", "", tc.get("name", "")))
+                          key = tc.get("classname", "").rsplit(".", 1)[-1] + "#" + n
+                          counts[key] = counts.get(key, 0) + 1
+                          st = "pass"
+                          for child in tc:
+                              k = JKIND.get(child.tag)
+                              if k and RANK[k] > RANK[st]:
+                                  st = k
+                          if RANK[st] > RANK[status.get(key, "pass")]:
+                              status[key] = st
+                          status.setdefault(key, st)
+              return {"files": len(files), "parse_errors": bad, "suite_total": suite_total, "counts": counts,
+                      "status": status, "props": props}
+
+
+          PYLINE = re.compile(r"(test_[A-Za-z0-9_]+) \(([A-Za-z0-9_.]+)\)(.*)$")
+          PYST = ((" ... ok", "pass"), (" ... FAIL", "failure"), (" ... ERROR", "error"), (" ... skipped", "skipped"),
+                  (" ... expected failure", "expected-failure"), (" ... unexpected success", "unexpected-success"))
+
+
+          def actual_python():
+              try:
+                  with open(os.path.join(PH12, "py.log"), encoding="utf-8", errors="replace") as f:
+                      lines = f.read().splitlines()
+              except OSError:
+                  lines = []
+              counts, status, unparsed, ran, result = {}, {}, 0, None, None
+              for i, line in enumerate(lines):
+                  m = PYLINE.match(line)
+                  if m:
+                      name, parts = m.group(1), m.group(2).split(".")
+                      cls = parts[-2] if len(parts) >= 2 and parts[-1] == name else parts[-1]
+                      key = f"{cls}#{name}"
+                      counts[key] = counts.get(key, 0) + 1
+                      st = next((s for pre, s in PYST if m.group(3) == pre or m.group(3).startswith(pre + " ")
+                                 or (pre == " ... skipped" and m.group(3).startswith(pre))), None)
+                      if st is None:
+                          unparsed += 1
+                          st = "unparsed"
+                      status[key] = st if status.get(key, "pass") == "pass" else status[key]
+                  r = re.fullmatch(r"Ran (\d+) tests? in \d+\.\d+s", line)
+                  if r:
+                      ran = int(r.group(1))
+                      result = next((x for x in lines[i + 1:] if re.fullmatch(r"(OK|FAILED)( \(.*\))?", x)), None)
+              return {"counts": counts, "status": status, "unparsed": unparsed, "ran": ran, "result": result}
+
+
+          def holds():
+              """Typed record of helper trouble: modes that raised, and whether the private stderr file has any byte."""
+              modes = sorted({x.split()[0] for x in read("holds.txt").splitlines() if x.split() and x.split()[0] in MODES})
+              try:
+                  stderr_bytes = os.path.getsize(os.path.join(PH12, "private", "helper.stderr"))
+              except OSError:
+                  stderr_bytes = -1
+              return modes, stderr_bytes
+
+
+          def write_evidence(summary, inv, prov):
+              ev = os.path.join(PH12, "evidence")
+              os.makedirs(ev, exist_ok=True)
+              with open(os.path.join(ev, "summary.json"), "w", encoding="utf-8") as f:
+                  json.dump(summary, f, indent=1, sort_keys=True)
+              if inv is not None:
+                  with open(os.path.join(ev, "inventory.txt"), "w", encoding="utf-8") as f:
+                      f.write("".join(x + "\n" for x in inv))
+              if prov is not None:
+                  with open(os.path.join(ev, "provenance.json"), "w", encoding="utf-8") as f:
+                      json.dump(prov, f, indent=1, sort_keys=True)
+
+
+          def cmd_gate():
+              tree, r, tok = tree_ok()
+              if r is None:
+                  write_evidence({"tree": "not-reviewed", "ok": False, "verdict": "FAIL"}, None, None)
+                  print("gate tree not-reviewed")
+                  print("gate verdict FAIL")
+                  emit("GITHUB_OUTPUT", "ok=false\n")
+                  sys.exit(1)
+              ej, par_ok = expected_java()
+              ep = expected_python()
+              aj, ap = actual_java(), actual_python()
+              prep, jdk = load("prep.json"), load("jdk.json")
+              digest, _, odd = listing()
+              core, _ = maven_core()
+              jc, pc = aj["counts"], ap["counts"]
+              jbad = sum(1 for s in aj["status"].values() if s != "pass")
+              pbad = sum(1 for s in ap["status"].values() if s != "pass")
+              try:
+                  pyc = int(read("py.pyc1", "x")) - int(read("py.pyc0", "x"))
+              except ValueError:
+                  pyc = None
+              checks = {
+                  "tree-reviewed-subtree": tok,
+                  "prepare-ok": prep.get("ok") is True,
+                  "m2-listing-unchanged": bool(HEX.fullmatch(str(prep.get("m2_listing", "")))) and digest == prep["m2_listing"] and odd == 0,
+                  "maven-core-pinned": core == TOOLS["maven_core_sha256"],
+                  "jdk-major": str(jdk.get("java_version", "")).split(".")[0] == TOOLS["java_major"],
+                  "jdk-same-in-tests": aj["props"].get("java.version", "absent") == jdk.get("java_version", "unknown"),
+                  "expected-java-source-pinned": par_ok and sha(inv_text(ej).encode()) == r["java_inventory_sha256"],
+                  "expected-python-source-pinned": sha(inv_text(ep).encode()) == r["python_inventory_sha256"],
+                  "java-step-env": read("java.stepenv") == "ok",
+                  "java-rc-0": read("java.rc") == "0",
+                  "java-report-files": aj["files"] == r["java_classes"],
+                  "java-xml-parsed": aj["parse_errors"] == 0,
+                  "java-suite-totals-consistent": aj["suite_total"] == sum(jc.values()),
+                  "java-invocations": sum(jc.values()) == r["java_invocations"],
+                  "java-methods": len(jc) == r["java_methods"],
+                  "java-classes": len({k.split("#")[0] for k in jc}) == r["java_classes"],
+                  "java-owned": sum(n for k, n in jc.items() if k.split("#")[0] in OWNED) == r["java_owned"],
+                  "java-no-failure-error-skip": jbad == 0,
+                  "java-inventory-match": jc == ej,
+                  "python-step-env": read("py.stepenv") == "ok",
+                  "python-rc-0": read("py.rc") == "0",
+                  "python-ran": ap["ran"] == r["python_tests"],
+                  "python-result-ok": ap["result"] == "OK",
+                  "python-lines-equal-ran": ap["ran"] is not None and sum(pc.values()) == ap["ran"] and ap["unparsed"] == 0,
+                  "python-no-failure-error-skip": pbad == 0,
+                  "python-inventory-match": pc == ep,
+                  "python-pycache-new-0": pyc == 0,
+                  "listen-before-java-none": obs_clean("before-java", True),
+                  "listen-after-java-none": obs_clean("after-java", True),
+                  "procs-after-java-0": obs_clean("after-java", False),
+                  "procs-before-python-0": obs_clean("before-python", False),
+                  "procs-after-python-0": obs_clean("after-python", False),
+              }
+              inv = []
+              for lang, exp, act, st in (("java", ej, jc, aj["status"]), ("python", ep, pc, ap["status"])):
+                  for k in sorted(exp):
+                      if not ID.fullmatch(k):
+                          continue
+                      s = st.get(k, "missing") if act.get(k, 0) else "missing"
+                      inv.append(f"{lang} {k} expected={exp[k]} actual={act.get(k, 0)} status={s}")
+              extra = {"java": sum(1 for k in jc if k not in ej), "python": sum(1 for k in pc if k not in ep)}
+              tok_or = lambda v: v if TOKEN.fullmatch(v) else "unknown"
+              prov = {
+                  "commit": os.environ.get("GITHUB_SHA", "") if HEX.fullmatch(os.environ.get("GITHUB_SHA", "")) else "invalid",
+                  "whole_tree": git("rev-parse", "HEAD^{tree}"),
+                  "modernization_tree": git("rev-parse", "HEAD:modernization"),
+                  "workflow_blob": git("rev-parse", "HEAD:.github/workflows/ph12-linux.yml") or "absent",
+                  "image_os": tok_or(os.environ.get("ImageOS", "")),
+                  "image_version": tok_or(os.environ.get("ImageVersion", "")),
+                  "arch": tok_or(platform.machine()),
+                  "jdk_release_version": jdk.get("java_version", "unknown"),
+                  "jdk_runtime_version": jdk.get("java_runtime_version", "unknown"),
+                  "jdk_implementor": jdk.get("implementor", "unknown"),
+                  "tests_java_vendor": aj["props"].get("java.vendor", "unknown"),
+                  "tests_java_version": aj["props"].get("java.version", "unknown"),
+                  "python_test_interpreter": read("py.version") if re.fullmatch(r"3\.\d+\.\d+", read("py.version")) else "unknown",
+                  "maven": TOOLS["maven"], "maven_core_sha256": TOOLS["maven_core_sha256"],
+                  "m2_listing": prep.get("m2_listing", "invalid") if HEX.fullmatch(str(prep.get("m2_listing", ""))) else "invalid",
+                  "helper_sha256": sha(open(os.path.abspath(__file__), "rb").read()),
+              }
+              summary = {
+                  "tree": tree, "checks": checks,
+                  "java": {"invocations": sum(jc.values()), "methods": len(jc), "report_files": aj["files"],
+                           "not_pass": jbad, "extra_ids_unnamed": extra["java"],
+                           "per_class": {c: sum(n for k, n in jc.items() if k.split("#")[0] == c and k in ej)
+                                         for c in sorted({k.split("#")[0] for k in ej})}},
+                  "python": {"ran": ap["ran"], "result_ok": ap["result"] == "OK", "not_pass": pbad,
+                             "extra_ids_unnamed": extra["python"]},
+              }
+              for k, v in checks.items():
+                  print(f"gate {k} {'yes' if v else 'no'}")
+              print(f"gate java-extra-unnamed {extra['java']} python-extra-unnamed {extra['python']}")
+              # Read last, so that anything the gate itself sent to stderr is counted.
+              modes, stderr_bytes = holds()
+              held = bool(modes) or stderr_bytes != 0
+              verdict = "HOLD" if held else ("PASS" if all(checks.values()) else "FAIL")
+              summary.update(ok=verdict == "PASS", verdict=verdict,
+                             hold={"helper_error_modes": modes, "private_stderr_nonempty": stderr_bytes != 0})
+              write_evidence(summary, inv, prov)
+              print(f"gate helper-error-modes {len(modes)} private-stderr {'empty' if stderr_bytes == 0 else 'not-empty'}")
+              print(f"gate verdict {verdict}")
+              emit("GITHUB_OUTPUT", f"ok={'true' if verdict == 'PASS' else 'false'}\n")
+
+
+          def main():
+              cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+              if cmd not in MODES:
+                  sys.exit(2)
+              try:
+                  setup()
+                  if cmd == "tree":
+                      cmd_tree()
+                  elif cmd == "jdk":
+                      cmd_jdk()
+                  elif cmd == "prep-summary":
+                      cmd_prep_summary()
+                  elif cmd == "observe":
+                      cmd_observe(args[0], "--require-clean" in args[1:])
+                  else:
+                      cmd_gate()
+              except SystemExit:
+                  raise
+              except BaseException as e:
+                  # The traceback goes to stderr, which the workflow sends to a private file that is never uploaded
+                  # or printed. The job log gets only the fixed line below.
+                  traceback.print_exc()
+                  try:
+                      with open(os.path.join(os.environ.get("PH12", "."), "holds.txt"), "a", encoding="utf-8") as f:
+                          f.write(f"{cmd} unexpected-error\n")
+                      if cmd == "gate":
+                          write_evidence({"ok": False, "verdict": "HOLD", "hold": {"helper_error_modes": ["gate"]}}, None, None)
+                  except BaseException:
+                      traceback.print_exc()
+                  if cmd == "gate":
+                      emit("GITHUB_OUTPUT", "ok=false\n")
+                  print(f"helper {cmd} HOLD unexpected-error")
+                  sys.exit(3)
+
+
+          if __name__ == "__main__":
+              main()
+          PH12PY
+      - name: Reviewed tree (before any network use)
+        timeout-minutes: 2
+        run: /usr/bin/python3 -I -B "$PH12/ph12.py" tree 2>> "$PH12/private/helper.stderr"
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        timeout-minutes: 10
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          overwrite-settings: false
+          # Otherwise the action exports MAVEN_ARGS=-ntp, which the preflight forbids; -ntp is on every command.
+          show-download-progress: true
+          cache-jdk: false
+          problem-matcher: false
+      - name: Record the JDK (patch level recorded, not pinned)
+        timeout-minutes: 2
+        run: /usr/bin/python3 -I -B "$PH12/ph12.py" jdk 2>> "$PH12/private/helper.stderr"
+      - name: Preflight and settings (fails, never installs)
+        timeout-minutes: 2
+        run: |
+          test "$(id -u)" -ne 0
+          for p in /bin/sh /bin/cat /bin/pwd /bin/ps /bin/sleep /bin/ls /usr/bin/env /usr/bin/yes /usr/bin/head \
+                   /usr/bin/timeout /usr/bin/ss /usr/bin/python3 /usr/bin/git /usr/bin/find; do test -x "$p"; done
+          /usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'
+          bad=$(env | cut -d= -f1 | grep -cE '^(CARDDEMO_[A-Z0-9_]*|MSSQL_SA_PASSWORD|MSSQL_HOST_PORT|MAVEN_OPTS|MAVEN_ARGS|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS)$' || true)
+          test "$bad" -eq 0
+          cat > "$PH12/settings.xml" <<'XML'
+          <settings>
+            <mirrors><mirror><id>central-only</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>
+          </settings>
+          XML
+          printf '%s\n' '<settings><offline>true</offline></settings>' > "$PH12/settings-offline.xml"
+      # ---- bounded online prepare: fresh private repository and wrapper home, no cache ----
+      - name: Populate (online, strict checksums; compiles, runs no test)
+        timeout-minutes: 16
+        working-directory: modernization
+        run: |
+          E=(env -i HOME="$PH12/home" PATH="$JAVA_HOME/bin:/usr/bin:/bin" LANG=C.UTF-8 TMPDIR="$PH12/tmp"
+             JAVA_HOME="$JAVA_HOME" MAVEN_USER_HOME="$PH12/mvnw" MAVEN_SKIP_RC=true)
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 900 ./mvnw -C -B -ntp -Dstyle.color=never \
+            -s "$PH12/settings.xml" -gs "$PH12/settings.xml" -Dmaven.repo.local="$PH12/m2" \
+            -pl verify/differential -am test -Dtest=Ph12NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false \
+            > "$PH12/prepare.log" 2>&1 < /dev/null || rc=$?
+          echo "$rc" > "$PH12/prepare.rc"
+      - name: Seed the Surefire JUnit Platform provider (online, strict checksums, pinned versions)
+        timeout-minutes: 6
+        working-directory: modernization
+        run: |
+          T() { /usr/bin/python3 -I -c 'import json, os, sys; print(json.loads(os.environ["PH12_TOOLCHAIN"])[sys.argv[1]])' "$1"; }
+          E=(env -i HOME="$PH12/home" PATH="$JAVA_HOME/bin:/usr/bin:/bin" LANG=C.UTF-8 TMPDIR="$PH12/tmp"
+             JAVA_HOME="$JAVA_HOME" MAVEN_USER_HOME="$PH12/mvnw" MAVEN_SKIP_RC=true)
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 300 ./mvnw -C -B -ntp -N -Dstyle.color=never \
+            -s "$PH12/settings.xml" -gs "$PH12/settings.xml" -Dmaven.repo.local="$PH12/m2" \
+            "org.apache.maven.plugins:maven-dependency-plugin:$(T dependency_plugin):get" \
+            "-Dartifact=org.apache.maven.surefire:surefire-junit-platform:$(T surefire)" -Dtransitive=true \
+            > "$PH12/seed.log" 2>&1 < /dev/null || rc=$?
+          echo "$rc" > "$PH12/seed.rc"
+      - name: Typed prepare summary (no raw log in the job log)
+        timeout-minutes: 5
+        run: /usr/bin/python3 -I -B "$PH12/ph12.py" prep-summary 2>> "$PH12/private/helper.stderr"
+      # ---- offline tests: the same repository and wrapper home, Maven offline ----
+      - name: Java tests (Maven offline, card selector, parallel off; output private)
+        timeout-minutes: 34
+        working-directory: modernization
+        run: |
+          /usr/bin/python3 -I -B "$PH12/ph12.py" observe before-java --require-clean 2>> "$PH12/private/helper.stderr" \
+            || { echo not-started > "$PH12/java.rc"; exit 0; }
+          E=(env -i HOME="$PH12/home" PATH="$JAVA_HOME/bin:/usr/bin:/bin" LANG=C.UTF-8 TMPDIR="$PH12/tmp"
+             JAVA_HOME="$JAVA_HOME" MAVEN_USER_HOME="$PH12/mvnw" MAVEN_SKIP_RC=true)
+          names=$("${E[@]}" /usr/bin/env | cut -d= -f1 | LC_ALL=C sort | tr '\n' ' ')
+          if [ "$names" != "HOME JAVA_HOME LANG MAVEN_SKIP_RC MAVEN_USER_HOME PATH TMPDIR " ]; then
+            echo bad > "$PH12/java.stepenv"; echo not-started > "$PH12/java.rc"; exit 0
+          fi
+          echo ok > "$PH12/java.stepenv"
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 1800 ./mvnw -o -B -ntp -Dstyle.color=never \
+            -s "$PH12/settings-offline.xml" -gs "$PH12/settings-offline.xml" -Dmaven.repo.local="$PH12/m2" \
+            -pl verify/differential -am test '-Dtest=org.carddemo.verify.differential.*Test' \
+            -Dsurefire.failIfNoSpecifiedTests=false -Djunit.jupiter.execution.parallel.enabled=false \
+            > "$PH12/java.log" 2>&1 < /dev/null || rc=$?
+          echo "$rc" > "$PH12/java.rc"
+          /usr/bin/python3 -I -B "$PH12/ph12.py" observe after-java 2>> "$PH12/private/helper.stderr" || true
+      - name: Python tests (no -I; output private)
+        timeout-minutes: 16
+        working-directory: modernization/verify/differential
+        run: |
+          /usr/bin/python3 -I -B "$PH12/ph12.py" observe before-python 2>> "$PH12/private/helper.stderr" || true
+          pyc() { /usr/bin/timeout -k 5 60 /usr/bin/find . -path ./target -prune -o -type d -name __pycache__ -print | wc -l | tr -d ' '; }
+          pyc > "$PH12/py.pyc0"
+          E=(env -i HOME="$PH12/home" PATH=/usr/bin:/bin LANG=C.UTF-8 TMPDIR="$PH12/tmp")
+          names=$("${E[@]}" /usr/bin/env | cut -d= -f1 | LC_ALL=C sort | tr '\n' ' ')
+          if [ "$names" != "HOME LANG PATH TMPDIR " ]; then
+            echo bad > "$PH12/py.stepenv"; echo not-started > "$PH12/py.rc"; exit 0
+          fi
+          echo ok > "$PH12/py.stepenv"
+          "${E[@]}" /usr/bin/timeout -k 5 30 /usr/bin/python3 -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' > "$PH12/py.version"
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 600 /usr/bin/python3 -B -m unittest discover -v -s tests \
+            -p 'test_work_folder_helper*.py' > "$PH12/py.log" 2>&1 < /dev/null || rc=$?
+          echo "$rc" > "$PH12/py.rc"
+          pyc > "$PH12/py.pyc1"
+          /usr/bin/python3 -I -B "$PH12/ph12.py" observe after-python 2>> "$PH12/private/helper.stderr" || true
+      # ---- evidence ----
+      - name: Sanitize and gate (typed lines only)
+        id: gate
+        if: ${{ !cancelled() }}
+        timeout-minutes: 8
+        run: /usr/bin/python3 -I -B "$PH12/ph12.py" gate 2>> "$PH12/private/helper.stderr"
+      - name: Upload sanitized evidence only
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ph12-linux-evidence
+          path: ${{ runner.temp }}/ph12/evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Gate verdict
+        if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        env:
+          GATE_OK: ${{ steps.gate.outputs.ok }}
+        run: test "$GATE_OK" = true
