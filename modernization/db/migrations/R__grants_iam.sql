@@ -3,6 +3,11 @@
 -- runs; this file only grants. It first revokes every permission of
 -- identity_svc except CONNECT, so this file is the whole truth for that user:
 -- a grant removed here is gone after the next migrate.
+--
+-- V203 (user ID family NCHAR(8), names NVARCHAR), V204 (deleted_at,
+-- deleted_by, ebcdic_sort_key dropped) and V205 (password_hash VARCHAR(255))
+-- keep these object grants; V206 adds iam.user_signon_state. This file runs
+-- again after them (data-model.md, Migrations).
 
 DECLARE @revoke NVARCHAR(MAX) = N'';
 SELECT @revoke += N'REVOKE ' + p.permission_name
@@ -23,9 +28,16 @@ WHERE u.name = N'identity_svc'
 EXEC sp_executesql @revoke;
 GO
 
--- No DELETE: sessions end through ended_at, and sign-on never removes a user.
+-- No DELETE: sessions end through ended_at, and a deleted user keeps its row
+-- (deleted_at, D-56).
 GRANT SELECT, INSERT, UPDATE ON OBJECT::iam.app_user TO identity_svc;
 GRANT SELECT, INSERT, UPDATE ON OBJECT::iam.session TO identity_svc;
+-- Failed attempts, lockout and last sign-on (V206); a re-added user's row is
+-- reset, never deleted.
+GRANT SELECT, INSERT, UPDATE ON OBJECT::iam.user_signon_state TO identity_svc;
 -- Audit rows are append-only for the service.
 GRANT INSERT ON OBJECT::iam.audit_event TO identity_svc;
+GRANT INSERT ON OBJECT::ops.audit TO identity_svc;
+-- User add, update and delete wait while a batch window is open (D-BAT-05).
+GRANT SELECT ON OBJECT::ops.batch_window TO identity_svc;
 GO

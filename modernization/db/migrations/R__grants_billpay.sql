@@ -3,6 +3,9 @@
 -- every permission of billpay_svc except CONNECT, so this file is the whole
 -- truth for that user. Each owner keeps its own R__grants_<owner>.sql and
 -- revokes only its own users.
+-- Applied again after V415__user_id_family.sql, which altered
+-- core.transaction.created_by, core.daily_tran.created_by and
+-- billpay.payment.paid_by.
 
 DECLARE @revoke NVARCHAR(MAX) = N'';
 SELECT @revoke += N'REVOKE ' + p.permission_name
@@ -25,8 +28,12 @@ GO
 
 -- Reads: the account, its cards, the master and the IDs of the online adds
 -- waiting for the next cycle (legacy ID allocation, D-27), the category
--- balances and the batch window.
-GRANT SELECT ON OBJECT::core.account TO billpay_svc;
+-- balances and the batch window. core.account is granted by column, so a
+-- column added later, such as the load's ZIP and group provenance
+-- (DEF-ACUP-002), stays out of this login until a grant names it.
+GRANT SELECT ON OBJECT::core.account (acct_id, active_status, curr_bal, credit_limit, cash_credit_limit,
+    open_date, expiration_date, reissue_date, curr_cyc_credit, curr_cyc_debit, addr_zip, group_id,
+    legacy_filler, row_version) TO billpay_svc;
 GRANT SELECT ON OBJECT::core.card_xref TO billpay_svc;
 GRANT SELECT ON OBJECT::core.[transaction] TO billpay_svc;
 GRANT SELECT ON OBJECT::core.daily_tran (tran_id, cycle_id, origin) TO billpay_svc;
