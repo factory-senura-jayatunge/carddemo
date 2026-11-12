@@ -3,9 +3,12 @@ package org.carddemo.batch.data;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.legacyformat.LegacyTimestamps;
 import org.carddemo.platform.legacyformat.entity.AccountRecord;
 import org.carddemo.platform.legacyformat.entity.CardRecord;
@@ -20,104 +23,126 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * CBEXPORT) reads with it, so a value the tables cannot hold shows up as a
  * re-export difference.
  *
- * <p>Two rules are applied here. DEF-ACUP-002 (D-11): in fixed mode the group
- * ID that every sample account holds at the ZIP position (INV-039) goes to
- * {@code group_id} and {@code addr_zip} stays empty, and the export puts them
- * back; in legacy mode both positions are stored as read. Dates: a blank date
+ * <p>Two rules are applied here. DEF-ACUP-002 (D-11): an account row keeps
+ * positions 103-122 as read in {@code legacy_zip_group} next to the values the
+ * load chose for {@code addr_zip} and {@code group_id} ({@link ZipGroup}); the
+ * export writes that text back while both values are unchanged, per row and
+ * with no mode, and the {@code CVACT01Y} layout otherwise. Dates: a blank date
  * is {@code NULL}; anything else must be a valid {@code YYYY-MM-DD} date (the
- * load checks that before it inserts).
+ * load checks that before it inserts). A text value is stored unchanged or the
+ * insert fails ({@link ColumnCapacity}).
  */
 public final class CoreRows {
 
     private final JdbcClient db;
-    private final boolean moveGroupId;
+    private final Map<String, ColumnCapacity> capacities = new HashMap<>();
 
-    /** @param groupIdMode the mode of DEF-ACUP-002 the account rows were or are to be loaded in */
-    public CoreRows(JdbcClient db, FidelityMode groupIdMode) {
+    public CoreRows(JdbcClient db) {
         this.db = db;
-        this.moveGroupId = groupIdMode == FidelityMode.FIXED;
     }
 
     // --- account --------------------------------------------------------------------------
 
-    public void insert(AccountRecord a) {
-        db.sql("""
-                INSERT INTO core.account (acct_id, active_status, curr_bal, credit_limit, cash_credit_limit,
-                    open_date, expiration_date, reissue_date, curr_cyc_credit, curr_cyc_debit,
-                    addr_zip, group_id, legacy_filler)
-                VALUES (:acctId, :activeStatus, :currBal, :creditLimit, :cashCreditLimit,
-                    :openDate, :expirationDate, :reissueDate, :currCycCredit, :currCycDebit,
-                    :addrZip, :groupId, :legacyFiller)
-                """)
-                .param("acctId", a.acctId())
-                .param("activeStatus", a.activeStatus())
-                .param("currBal", a.currBal())
-                .param("creditLimit", a.creditLimit())
-                .param("cashCreditLimit", a.cashCreditLimit())
-                .param("openDate", date(a.openDate()))
-                .param("expirationDate", date(a.expirationDate()))
-                .param("reissueDate", date(a.reissueDate()))
-                .param("currCycCredit", a.currCycCredit())
-                .param("currCycDebit", a.currCycDebit())
-                .param("addrZip", moveGroupId ? "" : a.addrZip())
-                .param("groupId", moveGroupId ? a.addrZip() : a.groupId())
-                .param("legacyFiller", a.legacyFiller())
-                .update();
+    /**
+     * One exported account: the record, the row's {@code zip_group_origin} ({@code null} when the
+     * row was not loaded from a file) and whether 103-122 is the load-time text unchanged.
+     */
+    public record AccountExport(AccountRecord record, String origin, boolean restored) {
     }
 
+    /** Inserts a record stored as read ({@code CVACT01Y}, origin {@code R}). */
+    public void insert(AccountRecord a) {
+        insert(a, ZipGroup.classify(ZipGroup.asRead(a), AccountLayout.CVACT01Y));
+    }
+
+    /** Inserts a record with the 103-122 values the load classified from it. */
+    public void insert(AccountRecord a, ZipGroup.Stored zipGroup) {
+        insert("core.account", accountRow(a, zipGroup));
+    }
+
+    static Map<String, Object> accountRow(AccountRecord a, ZipGroup.Stored zipGroup) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("acct_id", a.acctId());
+        row.put("active_status", a.activeStatus());
+        row.put("curr_bal", a.currBal());
+        row.put("credit_limit", a.creditLimit());
+        row.put("cash_credit_limit", a.cashCreditLimit());
+        row.put("open_date", date(a.openDate()));
+        row.put("expiration_date", date(a.expirationDate()));
+        row.put("reissue_date", date(a.reissueDate()));
+        row.put("curr_cyc_credit", a.currCycCredit());
+        row.put("curr_cyc_debit", a.currCycDebit());
+        row.put("addr_zip", zipGroup.addrZip());
+        row.put("group_id", zipGroup.groupId());
+        row.put("legacy_zip_group", zipGroup.legacyZipGroup());
+        row.put("zip_group_origin", zipGroup.origin());
+        row.put("legacy_filler", a.legacyFiller());
+        return row;
+    }
+
+    /** The accounts as an export writes them (contract v2 section 3). */
     public List<AccountRecord> accounts() {
+        return accountExports().stream().map(AccountExport::record).toList();
+    }
+
+    /** The accounts as an export writes them, with each row's provenance and export rule. */
+    public List<AccountExport> accountExports() {
         return db.sql("""
                 SELECT acct_id, active_status, curr_bal, credit_limit, cash_credit_limit, open_date,
                        expiration_date, reissue_date, curr_cyc_credit, curr_cyc_debit, addr_zip, group_id,
-                       legacy_filler
+                       legacy_zip_group, zip_group_origin, legacy_filler
                 FROM core.account ORDER BY acct_id
                 """)
-                .query((rs, n) -> new AccountRecord(
-                        rs.getString("acct_id"),
-                        rs.getString("active_status"),
-                        rs.getBigDecimal("curr_bal"),
-                        rs.getBigDecimal("credit_limit"),
-                        rs.getBigDecimal("cash_credit_limit"),
-                        text(rs, "open_date"),
-                        text(rs, "expiration_date"),
-                        text(rs, "reissue_date"),
-                        rs.getBigDecimal("curr_cyc_credit"),
-                        rs.getBigDecimal("curr_cyc_debit"),
-                        rs.getString(moveGroupId ? "group_id" : "addr_zip"),
-                        rs.getString(moveGroupId ? "addr_zip" : "group_id"),
-                        rs.getString("legacy_filler")))
+                .query((rs, n) -> {
+                    String origin = rs.getString("zip_group_origin");
+                    ZipGroup.Exported zipGroup = ZipGroup.export(rs.getString("addr_zip"), rs.getString("group_id"),
+                            rs.getString("legacy_zip_group"), origin);
+                    AccountRecord record = new AccountRecord(
+                            rs.getString("acct_id"),
+                            rs.getString("active_status"),
+                            rs.getBigDecimal("curr_bal"),
+                            rs.getBigDecimal("credit_limit"),
+                            rs.getBigDecimal("cash_credit_limit"),
+                            text(rs, "open_date"),
+                            text(rs, "expiration_date"),
+                            text(rs, "reissue_date"),
+                            rs.getBigDecimal("curr_cyc_credit"),
+                            rs.getBigDecimal("curr_cyc_debit"),
+                            ZipGroup.stripTrailingSpaces(ZipGroup.zip(zipGroup.zipGroup())),
+                            ZipGroup.stripTrailingSpaces(ZipGroup.group(zipGroup.zipGroup())),
+                            rs.getString("legacy_filler"));
+                    return new AccountExport(record, origin, zipGroup.restored());
+                })
                 .list();
     }
 
     // --- customer -------------------------------------------------------------------------
 
     public void insert(CustomerRecord c) {
-        db.sql("""
-                INSERT INTO core.customer (cust_id, first_name, middle_name, last_name, addr_line_1, addr_line_2,
-                    addr_line_3, state_cd, country_cd, zip, phone_1, phone_2, ssn, govt_issued_id, dob,
-                    eft_account_id, pri_card_holder_ind, fico_score)
-                VALUES (:custId, :firstName, :middleName, :lastName, :addr1, :addr2, :addr3, :state, :country,
-                    :zip, :phone1, :phone2, :ssn, :govtId, :dob, :eft, :pri, :fico)
-                """)
-                .param("custId", c.custId())
-                .param("firstName", c.firstName())
-                .param("middleName", c.middleName())
-                .param("lastName", c.lastName())
-                .param("addr1", c.addrLine1())
-                .param("addr2", c.addrLine2())
-                .param("addr3", c.addrLine3())
-                .param("state", c.stateCd())
-                .param("country", c.countryCd())
-                .param("zip", c.zip())
-                .param("phone1", c.phone1())
-                .param("phone2", c.phone2())
-                .param("ssn", c.ssn())
-                .param("govtId", c.govtIssuedId())
-                .param("dob", date(c.dob()))
-                .param("eft", c.eftAccountId())
-                .param("pri", c.priCardHolderInd())
-                .param("fico", c.ficoScore())
-                .update();
+        insert("core.customer", customerRow(c));
+    }
+
+    static Map<String, Object> customerRow(CustomerRecord c) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("cust_id", c.custId());
+        row.put("first_name", c.firstName());
+        row.put("middle_name", c.middleName());
+        row.put("last_name", c.lastName());
+        row.put("addr_line_1", c.addrLine1());
+        row.put("addr_line_2", c.addrLine2());
+        row.put("addr_line_3", c.addrLine3());
+        row.put("state_cd", c.stateCd());
+        row.put("country_cd", c.countryCd());
+        row.put("zip", c.zip());
+        row.put("phone_1", c.phone1());
+        row.put("phone_2", c.phone2());
+        row.put("ssn", c.ssn());
+        row.put("govt_issued_id", c.govtIssuedId());
+        row.put("dob", date(c.dob()));
+        row.put("eft_account_id", c.eftAccountId());
+        row.put("pri_card_holder_ind", c.priCardHolderInd());
+        row.put("fico_score", c.ficoScore());
+        return row;
     }
 
     public List<CustomerRecord> customers() {
@@ -152,19 +177,19 @@ public final class CoreRows {
     // --- card -----------------------------------------------------------------------------
 
     public void insert(CardRecord c) {
-        db.sql("""
-                INSERT INTO core.card (card_num, acct_id, cvv_cd, embossed_name, expiration_date, active_status,
-                    legacy_filler)
-                VALUES (:cardNum, :acctId, :cvv, :name, :expiration, :status, :legacyFiller)
-                """)
-                .param("cardNum", c.cardNum())
-                .param("acctId", c.acctId())
-                .param("cvv", c.cvvCd())
-                .param("name", c.embossedName())
-                .param("expiration", c.expirationDate())
-                .param("status", c.activeStatus())
-                .param("legacyFiller", c.legacyFiller())
-                .update();
+        insert("core.card", cardRow(c));
+    }
+
+    static Map<String, Object> cardRow(CardRecord c) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("card_num", c.cardNum());
+        row.put("acct_id", c.acctId());
+        row.put("cvv_cd", c.cvvCd());
+        row.put("embossed_name", c.embossedName());
+        row.put("expiration_date", c.expirationDate());
+        row.put("active_status", c.activeStatus());
+        row.put("legacy_filler", c.legacyFiller());
+        return row;
     }
 
     public List<CardRecord> cards() {
@@ -186,11 +211,15 @@ public final class CoreRows {
     // --- card cross-reference -------------------------------------------------------------
 
     public void insert(CardXrefRecord x) {
-        db.sql("INSERT INTO core.card_xref (card_num, cust_id, acct_id) VALUES (:cardNum, :custId, :acctId)")
-                .param("cardNum", x.cardNum())
-                .param("custId", x.custId())
-                .param("acctId", x.acctId())
-                .update();
+        insert("core.card_xref", cardXrefRow(x));
+    }
+
+    static Map<String, Object> cardXrefRow(CardXrefRecord x) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("card_num", x.cardNum());
+        row.put("cust_id", x.custId());
+        row.put("acct_id", x.acctId());
+        return row;
     }
 
     public List<CardXrefRecord> cardXrefs() {
@@ -203,16 +232,17 @@ public final class CoreRows {
     // --- category balance -----------------------------------------------------------------
 
     public void insert(TcatBalRecord t) {
-        db.sql("""
-                INSERT INTO core.tcat_bal (acct_id, type_cd, cat_cd, balance, legacy_filler)
-                VALUES (:acctId, :typeCd, :catCd, :balance, :legacyFiller)
-                """)
-                .param("acctId", t.acctId())
-                .param("typeCd", t.typeCd())
-                .param("catCd", t.catCd())
-                .param("balance", t.balance())
-                .param("legacyFiller", t.legacyFiller())
-                .update();
+        insert("core.tcat_bal", categoryBalanceRow(t));
+    }
+
+    static Map<String, Object> categoryBalanceRow(TcatBalRecord t) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("acct_id", t.acctId());
+        row.put("type_cd", t.typeCd());
+        row.put("cat_cd", t.catCd());
+        row.put("balance", t.balance());
+        row.put("legacy_filler", t.legacyFiller());
+        return row;
     }
 
     public List<TcatBalRecord> categoryBalances() {
@@ -226,6 +256,27 @@ public final class CoreRows {
     }
 
     // --- helpers --------------------------------------------------------------------------
+
+    /**
+     * Inserts one row given column by column, after checking that the table has every column
+     * ({@link MissingColumnException}) and that every text column holds its value unchanged; a
+     * value it cannot hold fails with {@link ColumnCapacityException}.
+     */
+    private void insert(String table, Map<String, Object> row) {
+        insertRow(db, capacities.computeIfAbsent(table, t -> ColumnCapacity.of(db, t)), table, row);
+    }
+
+    static void insertRow(JdbcClient db, ColumnCapacity capacity, String table, Map<String, Object> row) {
+        capacity.requireColumns(row.keySet());
+        row.forEach(capacity::require);
+        String columns = String.join(", ", row.keySet());
+        String values = row.keySet().stream().map(c -> ":" + c).collect(Collectors.joining(", "));
+        var spec = db.sql("INSERT INTO " + table + " (" + columns + ") VALUES (" + values + ")");
+        for (Map.Entry<String, Object> e : row.entrySet()) {
+            spec = spec.param(e.getKey(), e.getValue());
+        }
+        spec.update();
+    }
 
     /** A blank text date is NULL; the caller has checked that any other value is a valid date. */
     static LocalDate date(String text) {

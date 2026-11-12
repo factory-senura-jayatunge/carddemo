@@ -18,6 +18,7 @@ import org.carddemo.db.LoginCheck;
 import org.carddemo.db.ServiceLogin;
 import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.fidelity.FidelitySwitches;
+import org.carddemo.platform.legacyformat.entity.CardRecord;
 import org.carddemo.platform.legacyformat.layout.Layouts;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader;
 import org.carddemo.platform.legacyformat.record.LegacyFileReader.SourceLine;
@@ -65,8 +66,41 @@ class DataLoadJobTest extends DataLoadTestBase {
                 .containsEntry("loadCards", 50L).containsEntry("loadCardXref", 50L)
                 .containsEntry("loadCategoryBalances", 50L).containsEntry("loadTransactionTypes", 7L)
                 .containsEntry("loadCategories", 18L).containsEntry("loadDisclosureGroups", 51L)
-                .containsEntry("loadLookups", 56L + 240L + 410L);
-        assertThat(DB.admin().sql("SELECT NEXT VALUE FOR core.tran_id_seq").query(Long.class).single()).isEqualTo(1L);
+                .containsEntry("loadLookups", 56L + 240L + 410L)
+                .containsEntry("loadPendingAuthorizations", 21L + 202L);
+        assertThat(execution.getStepExecutions()).extracting(StepExecution::getStepName).containsExactly(
+                "clearCoreTables", "loadAccounts", "loadCustomers", "loadCards", "loadCardXref",
+                "loadCategoryBalances", "loadTransactionTypes", "loadCategories", "loadDisclosureGroups", "loadLookups",
+                "restartTranIdSequence", "loadPendingAuthorizations");
+        assertThat(count("pauth.auth_summary")).isEqualTo(21);
+        assertThat(count("pauth.auth_detail")).isEqualTo(202);
+        assertThat(DB.admin().sql("SELECT NEXT VALUE FOR core.tran_id_seq").query(Long.class).single())
+                .as("the first fixed-mode ID is the start of the reserved range").isEqualTo(9_000_000_000_000_000L);
+    }
+
+    /**
+     * restartTranIdSequence takes the highest ID over every core.daily_tran row, whatever its
+     * cycle. The row is a claimed one of a COMPLETED cycle, posted history that a reload keeps, so
+     * the load reaches that step even where it refuses waiting online adds.
+     */
+    @Test
+    void aClaimedRowAtTheEndOfTheReservedRangeFailsTheLoadWithTranIdExhausted() throws Exception {
+        String completedDate = "2101-07-01";
+        DB.fixtures().claimedDailyRow(completedDate, "DAILY_FILE", "9999999999999999", "4111111111111111");
+        DB.admin().sql("UPDATE batch.cycle SET status = 'COMPLETED', closed_at = SYSUTCDATETIME()"
+                + " WHERE business_date = :d").param("d", completedDate).update();
+        try {
+            JobExecution execution = run();
+
+            assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
+            assertThat(failures(execution)).contains("TRAN_ID_EXHAUSTED");
+            assertThat(execution.getStepExecutions().stream().filter(s -> s.getStepName().equals("restartTranIdSequence"))
+                    .map(StepExecution::getStatus)).containsExactly(BatchStatus.FAILED);
+        } finally {
+            DB.admin().sql("DELETE d FROM core.daily_tran AS d JOIN batch.cycle AS c ON c.cycle_id = d.cycle_id"
+                    + " WHERE c.business_date = :d").param("d", completedDate).update();
+            DB.admin().sql("DELETE FROM batch.cycle WHERE business_date = :d").param("d", completedDate).update();
+        }
     }
 
     @Test
@@ -77,12 +111,19 @@ class DataLoadJobTest extends DataLoadTestBase {
     @Test
     void reExportEqualsTheSourceFilesByteForByte() throws Exception {
         assertThat(run().getStatus()).isEqualTo(BatchStatus.COMPLETED);
-        CoreRows rows = new CoreRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)),
-                switches.mode(BatchSwitches.DEF_ACUP_002));
+        CoreRows rows = new CoreRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)));
 
         assertSameRecords("acctdata.txt", Layouts.ACCOUNT.length(), rows.accounts(), a -> a.toBytes());
         assertSameRecords("custdata.txt", Layouts.CUSTOMER.length(), rows.customers(), c -> c.toBytes());
-        assertSameRecords("carddata.txt", Layouts.CARD.length(), rows.cards(), c -> c.toBytes());
+        // batch_svc reads the CVV masked, so only the admin login sees the bytes that were loaded.
+        List<CardRecord> adminCards = new CoreRows(DB.admin()).cards();
+        assertSameRecords("carddata.txt", Layouts.CARD.length(), adminCards, c -> c.toBytes());
+        List<CardRecord> batchCards = rows.cards();
+        assertThat(batchCards).extracting(CardRecord::cvvCd).as("batch_svc reads CARD-CVV-CD masked")
+                .containsOnly("xxx");
+        assertThat(batchCards.stream().map(DataLoadJobTest::withoutCvv).toList())
+                .as("batch_svc reads every card field but CARD-CVV-CD as loaded")
+                .isEqualTo(adminCards.stream().map(DataLoadJobTest::withoutCvv).toList());
         assertSameRecords("cardxref.txt", Layouts.CARD_XREF.length(), rows.cardXrefs(), x -> x.toBytes());
         assertSameRecords("tcatbal.txt", Layouts.TCAT_BAL.length(), rows.categoryBalances(), t -> t.toBytes());
         RefRows ref = new RefRows(JdbcClient.create(DB.dataSource(ServiceLogin.BATCH)));
@@ -102,6 +143,11 @@ class DataLoadJobTest extends DataLoadTestBase {
                 .contains("AA34");
         assertThat(ref.areaCodes()).containsExactlyInAnyOrderElementsOf(rules.list("nanpGeneralPurposeAreaCodes"))
                 .contains("201");
+    }
+
+    private static CardRecord withoutCvv(CardRecord c) {
+        return new CardRecord(c.cardNum(), c.acctId(), null, c.embossedName(), c.expirationDate(), c.activeStatus(),
+                c.legacyFiller());
     }
 
     private static <T> void assertSameRecords(String file, int length, List<T> rows, Function<T, byte[]> export) {
@@ -133,8 +179,6 @@ class DataLoadJobTest extends DataLoadTestBase {
     void batchLoginHasOnlyItsGrants() {
         assertThat(new LoginCheck(new DatabaseProvisioner(DB.settings())).run()).isEmpty();
         JdbcClient batch = JdbcClient.create(DB.dataSource(ServiceLogin.BATCH));
-        assertThatThrownBy(() -> batch.sql("UPDATE core.account SET curr_bal = 0").update())
-                .hasMessageContaining("permission was denied");
         assertThatThrownBy(() -> batch.sql("SELECT TOP 1 tran_id FROM billpay.payment").query().listOfRows())
                 .hasMessageContaining("permission was denied");
         assertThatThrownBy(() -> batch.sql("UPDATE ref.disclosure_group SET int_rate = 0").update())

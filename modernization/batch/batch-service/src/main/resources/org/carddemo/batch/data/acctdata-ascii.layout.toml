@@ -1,0 +1,7 @@
+# DEF-ACUP-002 built-in layout manifest (ruling v4 section 2): the ASCII sample
+# app/data/ASCII/acctdata.txt, unchanged since Release 1.0. D-11 decided that all
+# 50 of its accounts hold the group ID at 103-112 (the COACTUPC update layout).
+# AccountLayoutsTest recomputes the hash from the file.
+schema = 1
+sha256 = "c2a97b6a32dc4a87a7aafdf7f72e6712e560412d30b00c5526cca80fc9dfd260"
+default_layout = "ACUP_UPDATE"

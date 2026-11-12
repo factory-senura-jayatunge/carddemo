@@ -1,11 +1,15 @@
 package org.carddemo.batch.load;
 
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.util.function.UnaryOperator;
+import java.util.List;
+import java.util.Set;
 
 import org.carddemo.batch.BatchSwitches;
+import org.carddemo.batch.data.ColumnCapacityException;
 import org.carddemo.batch.data.CoreRows;
+import org.carddemo.batch.data.MissingColumnException;
 import org.carddemo.batch.data.RefRows;
 import org.carddemo.platform.fidelity.FidelityMode;
 import org.carddemo.platform.fidelity.FidelitySwitches;
@@ -32,7 +36,7 @@ abstract class TableLoadTasklet implements Tasklet {
     private static final Logger log = LoggerFactory.getLogger(TableLoadTasklet.class);
 
     protected final JdbcClient db;
-    private final DataLoadProperties properties;
+    protected final DataLoadProperties properties;
     private final FidelitySwitches switches;
     protected CoreRows rows;
     protected RefRows refRows;
@@ -59,52 +63,98 @@ abstract class TableLoadTasklet implements Tasklet {
 
     abstract String table();
 
-    /** How a key appears in messages; card numbers override this to show the last four only. */
-    UnaryOperator<String> keyDisplay() {
-        return UnaryOperator.identity();
-    }
-
     /** Checks what the layout cannot (dates, references) and inserts one record. */
     abstract void insert(SourceFile file, SourceLine line);
+
+    /** Reads the step's file; a step that must hash exactly the bytes it loads overrides it. */
+    SourceFile readSource(StepContribution contribution, Path dir) {
+        return SourceFile.read(dir, fileName(), layout());
+    }
+
+    /**
+     * Called once after the file-wide checks and before anything is deleted, for checks and
+     * classifications that need the whole file and may report to the step.
+     */
+    void prepare(StepContribution contribution, SourceFile file) {
+    }
 
     /** Called once before the first insert, for checks that need the whole file or other tables. */
     void beforeInsert(SourceFile file) {
     }
 
+    /** Called once after the last insert, to report what the step stored. */
+    void afterInsert(StepContribution contribution, SourceFile file) {
+    }
+
+    /** Appended to the step's summary log line. */
+    String loadDetail() {
+        return "";
+    }
+
+    /**
+     * The 1-based positions of the unnamed FILLERs whose content this step drops: the file may
+     * hold anything there and the export writes the constant. Every other unnamed FILLER must
+     * hold its constant, or the step fails.
+     */
+    Set<Integer> droppedFillers() {
+        return Set.of();
+    }
+
+    /** Reports the lines whose dropped FILLER did not hold its constant; called before the first insert. */
+    void reportDroppedFillers(StepContribution contribution, SourceFile file, List<Integer> lines) {
+    }
+
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
-        rows = new CoreRows(db, groupIdMode());
+        rows = new CoreRows(db);
         refRows = new RefRows(db);
-        SourceFile file = SourceFile.read(sourceDir(), fileName(), layout());
-        file.requireAscendingKeys(keyLength(), keyDisplay());
-        file.requireRepresentable();
+        SourceFile file = readSource(contribution, sourceDir());
+        file.requireAscendingKeys(keyLength());
+        List<Integer> dropped = file.requireRepresentable(droppedFillers());
+        if (!droppedFillers().isEmpty()) {
+            reportDroppedFillers(contribution, file, dropped);
+        }
+        prepare(contribution, file);
         beforeInsert(file);
         db.sql("DELETE FROM " + table()).update();
         for (SourceLine line : file.lines()) {
             contribution.incrementReadCount();
             try {
                 insert(file, line);
+            } catch (DataLoadException e) {
+                throw e;
+            } catch (ColumnCapacityException | MissingColumnException e) {
+                // The file, line and column identify the value; the key would be personal data (D-NFR-04).
+                throw new DataLoadException(file.where(line) + ": " + e.getMessage());
             } catch (DataAccessException e) {
-                // The driver's message can quote key values (card numbers); keep only the error number.
+                // The driver's message can quote the row's values; keep only the error number.
                 Throwable cause = NestedExceptionUtils.getMostSpecificCause(e);
                 String code = cause instanceof SQLException sql ? "SQL Server error " + sql.getErrorCode()
                         : cause.getClass().getSimpleName();
                 throw new DataLoadException(file.where(line) + ": " + table() + " refused the row (" + code + ")");
+            } catch (RuntimeException e) {
+                throw new DataLoadException(file.where(line) + ": " + table() + " refused the row ("
+                        + e.getClass().getSimpleName() + ")");
             }
         }
         contribution.incrementWriteCount(file.lines().size());
-        log.info("{}: {} rows from {} into {}", stepName(), file.lines().size(), fileName(), table());
+        afterInsert(contribution, file);
+        log.info("{}: {} rows from {} into {}{}", stepName(), file.lines().size(), fileName(), table(), loadDetail());
         return RepeatStatus.FINISHED;
     }
 
-    // A property, not a job parameter: the job has an incrementer, and Spring Batch
-    // ignores the parameters given to a job that has one.
+    // A property, not a job parameter: a launch names the run, not where its files are.
     private Path sourceDir() {
-        Path dir = properties.sourceDir();
-        if (dir == null) {
+        String dir = properties.sourceDir();
+        if (dir == null || dir.isBlank()) {
             throw new DataLoadException("no source directory: set carddemo.data-load.source-dir");
         }
-        return dir;
+        try {
+            return Path.of(dir);
+        } catch (InvalidPathException e) {
+            // Its message quotes the setting's value, which may name a folder below CARDDEMO_VAR_DIR.
+            throw new DataLoadException("carddemo.data-load.source-dir is not a valid path");
+        }
     }
 
     static void requireDate(SourceFile file, SourceLine line, String field, String value) {

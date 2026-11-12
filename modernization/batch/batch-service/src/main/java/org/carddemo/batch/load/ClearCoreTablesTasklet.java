@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.carddemo.batch.statement.StatementRuns;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -17,16 +18,18 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 /**
  * First step of dataLoadJob: the core and reference tables must be empty, or
  * emptied when a reload is allowed (D-41: seed load only, except in local and
- * demo environments). Children go first because of the foreign keys. The
+ * demo environments), and with them the pending authorizations, whose
+ * summaries refer to the accounts. Children go first because of the foreign keys. The
  * transaction table is emptied too: the load starts it empty (TRANFILE's dummy
- * row is not carried over).
+ * row is not carried over). The statement runs end in the same transaction: their watermarks
+ * name transaction keys that the emptied table no longer holds (batch.md, "Data load").
  */
 final class ClearCoreTablesTasklet implements Tasklet {
 
     private static final Logger log = LoggerFactory.getLogger(ClearCoreTablesTasklet.class);
 
     static final List<String> CHILDREN_FIRST = List.of(
-            "core.[transaction]", "core.tcat_bal", "core.card_xref", "core.card", "core.customer", "core.account",
+            "pauth.auth_detail", "pauth.auth_summary", "core.[transaction]", "core.tcat_bal", "core.card_xref", "core.card", "core.customer", "core.account",
             "ref.disclosure_group", "ref.tran_category", "ref.tran_type",
             "ref.us_state_zip_prefix", "ref.us_state", "ref.nanp_area_code");
 
@@ -46,6 +49,7 @@ final class ClearCoreTablesTasklet implements Tasklet {
         }
         Map<String, Long> nonEmpty = counts.entrySet().stream().filter(e -> e.getValue() > 0)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+        StatementRuns.endForDataLoad(db);
         if (nonEmpty.isEmpty()) {
             log.info("clearCoreTables: the core and reference tables are empty");
             return RepeatStatus.FINISHED;

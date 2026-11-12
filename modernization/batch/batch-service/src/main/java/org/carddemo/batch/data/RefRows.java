@@ -1,6 +1,9 @@
 package org.carddemo.batch.data;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.carddemo.platform.legacyformat.entity.DiscGroupRecord;
 import org.carddemo.platform.legacyformat.entity.TranCategoryRecord;
@@ -16,6 +19,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 public final class RefRows {
 
     private final JdbcClient db;
+    private final Map<String, ColumnCapacity> capacities = new HashMap<>();
 
     public RefRows(JdbcClient db) {
         this.db = db;
@@ -24,10 +28,14 @@ public final class RefRows {
     // --- transaction type -----------------------------------------------------------------
 
     public void insert(TranTypeRecord t) {
-        db.sql("INSERT INTO ref.tran_type (type_cd, description) VALUES (:typeCd, :description)")
-                .param("typeCd", t.typeCd())
-                .param("description", t.description())
-                .update();
+        insert("ref.tran_type", transactionTypeRow(t));
+    }
+
+    static Map<String, Object> transactionTypeRow(TranTypeRecord t) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("type_cd", t.typeCd());
+        row.put("description", t.description());
+        return row;
     }
 
     public List<TranTypeRecord> transactionTypes() {
@@ -39,11 +47,15 @@ public final class RefRows {
     // --- transaction category -------------------------------------------------------------
 
     public void insert(TranCategoryRecord c) {
-        db.sql("INSERT INTO ref.tran_category (type_cd, cat_cd, description) VALUES (:typeCd, :catCd, :description)")
-                .param("typeCd", c.typeCd())
-                .param("catCd", c.catCd())
-                .param("description", c.description())
-                .update();
+        insert("ref.tran_category", categoryRow(c));
+    }
+
+    static Map<String, Object> categoryRow(TranCategoryRecord c) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("type_cd", c.typeCd());
+        row.put("cat_cd", c.catCd());
+        row.put("description", c.description());
+        return row;
     }
 
     public List<TranCategoryRecord> categories() {
@@ -56,15 +68,16 @@ public final class RefRows {
     // --- disclosure group -----------------------------------------------------------------
 
     public void insert(DiscGroupRecord d) {
-        db.sql("""
-                INSERT INTO ref.disclosure_group (group_id, type_cd, cat_cd, int_rate)
-                VALUES (:groupId, :typeCd, :catCd, :intRate)
-                """)
-                .param("groupId", d.groupId())
-                .param("typeCd", d.typeCd())
-                .param("catCd", d.catCd())
-                .param("intRate", d.intRate())
-                .update();
+        insert("ref.disclosure_group", disclosureGroupRow(d));
+    }
+
+    static Map<String, Object> disclosureGroupRow(DiscGroupRecord d) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("group_id", d.groupId());
+        row.put("type_cd", d.typeCd());
+        row.put("cat_cd", d.catCd());
+        row.put("int_rate", d.intRate());
+        return row;
     }
 
     public List<DiscGroupRecord> disclosureGroups() {
@@ -75,6 +88,11 @@ public final class RefRows {
                 .query((rs, n) -> new DiscGroupRecord(rs.getString("group_id"), rs.getString("type_cd"),
                         rs.getString("cat_cd"), rs.getBigDecimal("int_rate")))
                 .list();
+    }
+
+    /** As {@link CoreRows}: a text value is stored unchanged or the insert fails. */
+    private void insert(String table, Map<String, Object> row) {
+        CoreRows.insertRow(db, capacities.computeIfAbsent(table, t -> ColumnCapacity.of(db, t)), table, row);
     }
 
     // --- lookup lists ---------------------------------------------------------------------

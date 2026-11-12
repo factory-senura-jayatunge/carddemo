@@ -62,7 +62,7 @@ final class RefTableLoaders {
         void insert(SourceFile file, SourceLine line) {
             TranCategoryRecord c = file.convert(line, TranCategoryRecord::parse);
             if (!types.contains(c.typeCd())) {
-                throw new DataLoadException(file.where(line) + ": transaction type " + c.typeCd() + " is not loaded");
+                throw new DataLoadException(file.where(line) + ": TRAN-TYPE-CD names a transaction type that is not loaded");
             }
             refRows.insert(c);
         }

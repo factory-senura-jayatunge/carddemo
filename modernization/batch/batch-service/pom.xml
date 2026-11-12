@@ -12,7 +12,7 @@
 
   <artifactId>batch-service</artifactId>
   <name>CardDemo batch service</name>
-  <description>Spring Batch jobs of the modernized CardDemo; in this slice dataLoadJob, the sample-data load of the core and reference tables.</description>
+  <description>Spring Batch jobs of the modernized CardDemo and the internal API that Airflow drives them through; in this slice dataLoadJob, the sample-data load of the core and reference tables.</description>
 
   <dependencies>
     <dependency>
@@ -25,11 +25,35 @@
     </dependency>
     <dependency>
       <groupId>org.carddemo</groupId>
+      <artifactId>output-root</artifactId>
+    </dependency>
+    <!-- Posting and interest change balances and read the ID switch only through ledger-core. -->
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>ledger-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
       <artifactId>validation</artifactId>
+    </dependency>
+    <!-- statementJob writes its PDFs with the creation API only; no PDF is ever parsed in main code. -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-batch-jdbc</artifactId>
+    </dependency>
+    <!-- The internal API (profile server); webmvc without web-support, whose resource-server
+         security is for the user-facing services. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
     <dependency>
       <groupId>com.microsoft.sqlserver</groupId>
@@ -47,9 +71,21 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.carddemo</groupId>
       <artifactId>test-support</artifactId>
       <scope>test</scope>
+      <exclusions>
+        <!-- Its Spring Security would guard the internal API in tests; the service runs without it. -->
+        <exclusion>
+          <groupId>org.carddemo</groupId>
+          <artifactId>web-support</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 
@@ -58,6 +94,18 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- TestDatabase.shared is private to this JVM; never run batch classes in concurrent forks. -->
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+          <!-- As BatchServiceApplication.main sets it: Spring Batch writes LAST_UPDATED in the JVM's
+               zone, and lease-less recovery compares it with SYSUTCDATETIME(). -->
+          <argLine>-Duser.timezone=UTC</argLine>
+        </configuration>
       </plugin>
     </plugins>
   </build>
