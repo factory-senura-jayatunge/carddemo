@@ -1,0 +1,97 @@
+{
+ "note": "The cases whose input holds an unpaired UTF-16 surrogate (a lone surrogate counts as one code point and is not latin1). They are valid JSON, but Vite's JSON loader refuses an unpaired surrogate escape, and the web build imports rule-vectors.json, so they live here. \"cases\" run on the rule table of rule-vectors.json, \"shippedCases\" on the shipped rules.json, as there. Run by FormRulesVectorsTest, rules.test.ts and the identity-service parity tests.",
+ "cases": [
+  {
+   "name": "text rules: a lone surrogate is not blank and is not latin1",
+   "form": "textRules",
+   "today": "2026-11-11",
+   "input": {
+    "code": "\ud800",
+    "secret": "xyz",
+    "again": "qq",
+    "kind": "A",
+    "plain": "p"
+   },
+   "problems": [
+    [
+     "code",
+     "UNSUPPORTED_CHARACTER",
+     "Code contains a character that is not supported."
+    ]
+   ],
+   "wrongFields": [
+    "code"
+   ]
+  },
+  {
+   "name": "text rules: a lone high surrogate counts as one code point",
+   "form": "textRules",
+   "today": "2026-11-11",
+   "input": {
+    "code": "ab",
+    "secret": "ab\ud800c",
+    "again": "qq",
+    "kind": "A",
+    "plain": "p"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "text rules: a lone low surrogate counts as one code point",
+   "form": "textRules",
+   "today": "2026-11-11",
+   "input": {
+    "code": "ab",
+    "secret": "abc\udc00d",
+    "again": "qq",
+    "kind": "A",
+    "plain": "p"
+   },
+   "problems": [
+    [
+     "secret",
+     "SECRET_LENGTH",
+     "Secret must be 2 to 4 printable characters."
+    ]
+   ],
+   "wrongFields": [
+    "secret"
+   ]
+  }
+ ],
+ "shippedCases": [
+  {
+   "name": "passwordChange: a lone surrogate counts as one code point (8)",
+   "form": "passwordChange",
+   "today": "2026-11-11",
+   "input": {
+    "userId": "USER0001",
+    "currentPassword": "Password1",
+    "newPassword": "Abcdefg\ud800"
+   },
+   "problems": [],
+   "wrongFields": []
+  },
+  {
+   "name": "passwordChange: a lone surrogate counts as one code point (7)",
+   "form": "passwordChange",
+   "today": "2026-11-11",
+   "input": {
+    "userId": "USER0001",
+    "currentPassword": "Password1",
+    "newPassword": "Abcdef\ud800"
+   },
+   "problems": [
+    [
+     "newPassword",
+     "NEW_PASSWORD_LENGTH",
+     "New Password must be 8 to 64 characters ..."
+    ]
+   ],
+   "wrongFields": [
+    "newPassword"
+   ]
+  }
+ ]
+}

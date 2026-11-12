@@ -1,4 +1,1326 @@
 {
  "schema": 1,
- "forms": {}
+ "forms": {
+  "accountView": {
+   "fields": [
+    {
+     "name": "acctId",
+     "label": "Account Number",
+     "checks": [
+      {
+       "kind": "required",
+       "code": "ACCT_ID_REQUIRED",
+       "message": "No input received"
+      },
+      {
+       "kind": "numeric",
+       "length": 11,
+       "exact": true,
+       "code": "INVALID_ACCT_ID",
+       "message": "Account Filter must  be a non-zero 11 digit number"
+      },
+      {
+       "kind": "nonZero",
+       "code": "INVALID_ACCT_ID",
+       "message": "Account Filter must  be a non-zero 11 digit number"
+      }
+     ]
+    }
+   ]
+  },
+  "accountUpdateLookup": {
+   "fields": [
+    {
+     "name": "acctId",
+     "label": "Account Number",
+     "checks": [
+      {
+       "kind": "required",
+       "code": "ACCT_ID_REQUIRED",
+       "message": "Account number not provided"
+      },
+      {
+       "kind": "numeric",
+       "length": 11,
+       "code": "INVALID_ACCT_ID",
+       "message": "Account Number if supplied must be a 11 digit Non-Zero Number"
+      },
+      {
+       "kind": "nonZero",
+       "code": "INVALID_ACCT_ID",
+       "message": "Account Number if supplied must be a 11 digit Non-Zero Number"
+      }
+     ]
+    }
+   ]
+  },
+  "accountUpdate": {
+   "groups": [
+    [
+     "ssn1",
+     "ssn2",
+     "ssn3"
+    ],
+    [
+     "zip5",
+     "zipPlus4"
+    ]
+   ],
+   "fields": [
+    {
+     "name": "activeStatus",
+     "label": "Account Status",
+     "checks": [
+      {
+       "kind": "required",
+       "emptyValues": [
+        "0"
+       ]
+      },
+      {
+       "kind": "yesNo",
+       "ignoreCase": true
+      }
+     ]
+    },
+    {
+     "kind": "date",
+     "id": "open",
+     "label": "Open Date",
+     "parts": {
+      "year": "openYear",
+      "month": "openMonth",
+      "day": "openDay"
+     },
+     "maxYear": 9999,
+     "notFuture": true,
+     "allowToday": true,
+     "messages": {
+      "DATE_FUTURE": "{label}:cannot be in the future"
+     }
+    },
+    {
+     "name": "creditLimit",
+     "label": "Credit Limit",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "amount",
+       "maxIntegerDigits": 10,
+       "maxScale": 2
+      },
+      {
+       "kind": "amountRange",
+       "min": "0",
+       "code": "NEGATIVE_AMOUNT",
+       "message": "{label} must not be negative."
+      }
+     ]
+    },
+    {
+     "kind": "date",
+     "id": "expiry",
+     "label": "Expiry Date",
+     "parts": {
+      "year": "expiryYear",
+      "month": "expiryMonth",
+      "day": "expiryDay"
+     },
+     "maxYear": 9999
+    },
+    {
+     "kind": "dateOrder",
+     "date": "expiry",
+     "min": "open",
+     "exclusive": true,
+     "code": "EXPIRY_NOT_AFTER_OPEN",
+     "message": "Expiry Date:must be after Open Date"
+    },
+    {
+     "name": "cashCreditLimit",
+     "label": "Cash Credit Limit",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "amount",
+       "maxIntegerDigits": 10,
+       "maxScale": 2
+      },
+      {
+       "kind": "amountRange",
+       "min": "0",
+       "code": "NEGATIVE_AMOUNT",
+       "message": "{label} must not be negative."
+      }
+     ]
+    },
+    {
+     "kind": "notAbove",
+     "field": "cashCreditLimit",
+     "limit": "creditLimit",
+     "code": "CASH_ABOVE_CREDIT",
+     "message": "Cash Credit Limit must not be more than the Credit Limit."
+    },
+    {
+     "kind": "date",
+     "id": "reissue",
+     "label": "Reissue Date",
+     "parts": {
+      "year": "reissueYear",
+      "month": "reissueMonth",
+      "day": "reissueDay"
+     },
+     "maxYear": 9999
+    },
+    {
+     "kind": "dateOrder",
+     "date": "reissue",
+     "min": "open",
+     "max": "expiry",
+     "code": "REISSUE_NOT_BETWEEN",
+     "message": "Reissue Date:must be between Open Date and Expiry Date"
+    },
+    {
+     "name": "groupId",
+     "label": "Account Group",
+     "checks": [
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 10
+      }
+     ]
+    },
+    {
+     "name": "ssn1",
+     "label": "SSN: First 3 chars",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "numeric",
+       "length": 3
+      },
+      {
+       "kind": "nonZero"
+      },
+      {
+       "kind": "notIn",
+       "values": [
+        666
+       ],
+       "ranges": [
+        [
+         900,
+         999
+        ]
+       ],
+       "message": "SSN: First 3 chars: should not be 000, 666, or between 900 and 999"
+      }
+     ]
+    },
+    {
+     "name": "ssn2",
+     "label": "SSN 4th & 5th chars",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "numeric",
+       "length": 2
+      },
+      {
+       "kind": "nonZero"
+      }
+     ]
+    },
+    {
+     "name": "ssn3",
+     "label": "SSN Last 4 chars",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "numeric",
+       "length": 4
+      },
+      {
+       "kind": "nonZero"
+      }
+     ]
+    },
+    {
+     "kind": "date",
+     "id": "dob",
+     "label": "Date of Birth",
+     "parts": {
+      "year": "dobYear",
+      "month": "dobMonth",
+      "day": "dobDay"
+     },
+     "maxYear": 9999,
+     "notFuture": true,
+     "allowToday": true
+    },
+    {
+     "name": "ficoScore",
+     "label": "FICO Score",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "numeric",
+       "length": 3
+      },
+      {
+       "kind": "nonZero"
+      },
+      {
+       "kind": "range",
+       "min": 300,
+       "max": 850,
+       "message": "FICO Score: should be between 300 and 850"
+      }
+     ]
+    },
+    {
+     "name": "firstName",
+     "label": "First Name",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "maxLength",
+       "length": 25
+      },
+      {
+       "kind": "alphabetic",
+       "extra": "-'."
+      }
+     ]
+    },
+    {
+     "name": "middleName",
+     "label": "Middle Name",
+     "checks": [
+      {
+       "kind": "maxLength",
+       "length": 25
+      },
+      {
+       "kind": "alphabetic",
+       "extra": "-'."
+      }
+     ]
+    },
+    {
+     "name": "lastName",
+     "label": "Last Name",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "maxLength",
+       "length": 25
+      },
+      {
+       "kind": "alphabetic",
+       "extra": "-'."
+      }
+     ]
+    },
+    {
+     "name": "addrLine1",
+     "label": "Address Line 1",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 50
+      }
+     ]
+    },
+    {
+     "name": "stateCd",
+     "label": "State",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "alphabetic"
+      },
+      {
+       "kind": "inList",
+       "list": "usStateCodes",
+       "ignoreCase": true,
+       "message": "State: is not a valid state code"
+      }
+     ]
+    },
+    {
+     "name": "addrLine2",
+     "label": "Address Line 2",
+     "checks": [
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 50
+      }
+     ]
+    },
+    {
+     "name": "zip5",
+     "label": "Zip",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "numeric",
+       "length": 5
+      },
+      {
+       "kind": "nonZero"
+      }
+     ]
+    },
+    {
+     "name": "zipPlus4",
+     "label": "Zip+4",
+     "checks": [
+      {
+       "kind": "numeric",
+       "length": 4
+      }
+     ]
+    },
+    {
+     "name": "city",
+     "label": "City",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "maxLength",
+       "length": 50
+      },
+      {
+       "kind": "alphabetic",
+       "extra": "-'."
+      }
+     ]
+    },
+    {
+     "kind": "phone",
+     "label": "Phone Number 1",
+     "parts": {
+      "area": "phone1Area",
+      "prefix": "phone1Prefix",
+      "line": "phone1Line"
+     },
+     "areaList": "nanpGeneralPurposeAreaCodes",
+     "nanpPrefix": true
+    },
+    {
+     "name": "govtIssuedId",
+     "label": "Government Issued Id",
+     "checks": [
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "kind": "phone",
+     "label": "Phone Number 2",
+     "parts": {
+      "area": "phone2Area",
+      "prefix": "phone2Prefix",
+      "line": "phone2Line"
+     },
+     "areaList": "nanpGeneralPurposeAreaCodes",
+     "nanpPrefix": true
+    },
+    {
+     "name": "eftAccountId",
+     "label": "EFT Account Id",
+     "checks": [
+      {
+       "kind": "required"
+      },
+      {
+       "kind": "numeric",
+       "length": 10
+      },
+      {
+       "kind": "nonZero"
+      }
+     ]
+    },
+    {
+     "name": "priCardHolderInd",
+     "label": "Primary Card Holder",
+     "checks": [
+      {
+       "kind": "required",
+       "emptyValues": [
+        "0"
+       ]
+      },
+      {
+       "kind": "yesNo",
+       "ignoreCase": true
+      }
+     ]
+    },
+    {
+     "kind": "stateZip",
+     "state": "stateCd",
+     "zip": "zip5",
+     "ignoreCase": true
+    }
+   ]
+  },
+  "cardSearch": {
+   "fields": [
+    {
+     "name": "acctId",
+     "label": "Account filter",
+     "blankChars": " 0",
+     "checks": [
+      {
+       "kind": "numeric",
+       "length": 11,
+       "exact": true,
+       "code": "INVALID_ACCT_FILTER",
+       "message": "ACCOUNT FILTER,IF SUPPLIED MUST BE A 11 DIGIT NUMBER"
+      }
+     ]
+    },
+    {
+     "name": "cardNum",
+     "label": "Card filter",
+     "blankChars": " 0",
+     "checks": [
+      {
+       "kind": "numeric",
+       "length": 16,
+       "exact": true,
+       "code": "INVALID_CARD_FILTER",
+       "message": "CARD ID FILTER,IF SUPPLIED MUST BE A 16 DIGIT NUMBER"
+      }
+     ]
+    }
+   ]
+  },
+  "cardLookup": {
+   "fields": [
+    {
+     "kind": "anyEntered",
+     "fields": [
+      "acctId",
+      "cardNum"
+     ],
+     "code": "NO_INPUT",
+     "message": "No input received"
+    },
+    {
+     "name": "acctId",
+     "label": "Account number",
+     "checks": [
+      {
+       "kind": "required",
+       "code": "ACCT_ID_REQUIRED",
+       "message": "Account number not provided"
+      },
+      {
+       "kind": "numeric",
+       "length": 11,
+       "exact": true,
+       "code": "INVALID_ACCT_ID",
+       "message": "Account number must be a non zero 11 digit number"
+      },
+      {
+       "kind": "nonZero",
+       "code": "ACCT_ID_REQUIRED",
+       "message": "Account number not provided"
+      }
+     ]
+    },
+    {
+     "name": "cardNum",
+     "label": "Card number",
+     "checks": [
+      {
+       "kind": "required",
+       "code": "CARD_NUM_REQUIRED",
+       "message": "Card number not provided"
+      },
+      {
+       "kind": "numeric",
+       "length": 16,
+       "exact": true,
+       "code": "INVALID_CARD_NUM",
+       "message": "Card number must be a non zero 16 digit number"
+      },
+      {
+       "kind": "nonZero",
+       "code": "CARD_NUM_REQUIRED",
+       "message": "Card number not provided"
+      }
+     ]
+    }
+   ]
+  },
+  "cardUpdate": {
+   "fields": [
+    {
+     "name": "embossedName",
+     "label": "Card name",
+     "checks": [
+      {
+       "kind": "required",
+       "emptyValues": [
+        "00000000000000000000000000000000000000000000000000"
+       ],
+       "code": "CARD_NAME_REQUIRED",
+       "message": "Card name not provided"
+      },
+      {
+       "kind": "maxLength",
+       "length": 50,
+       "code": "CARD_NAME_TOO_LONG",
+       "message": "Card name must not be longer than 50 characters."
+      },
+      {
+       "kind": "alphabetic",
+       "code": "INVALID_CARD_NAME",
+       "message": "Card name can only contain alphabets and spaces"
+      }
+     ]
+    },
+    {
+     "name": "activeStatus",
+     "label": "Card Active Status",
+     "checks": [
+      {
+       "kind": "required",
+       "emptyValues": [
+        "0"
+       ],
+       "code": "INVALID_CARD_STATUS",
+       "message": "Card Active Status must be Y or N"
+      },
+      {
+       "kind": "yesNo",
+       "ignoreCase": true,
+       "code": "INVALID_CARD_STATUS",
+       "message": "Card Active Status must be Y or N"
+      }
+     ]
+    },
+    {
+     "name": "expiryMonth",
+     "label": "Card expiry month",
+     "checks": [
+      {
+       "kind": "required",
+       "emptyValues": [
+        "0",
+        "00"
+       ],
+       "code": "INVALID_EXPIRY_MONTH",
+       "message": "Card expiry month must be between 1 and 12"
+      },
+      {
+       "kind": "numeric",
+       "length": 2,
+       "code": "INVALID_EXPIRY_MONTH",
+       "message": "Card expiry month must be between 1 and 12"
+      },
+      {
+       "kind": "range",
+       "min": 1,
+       "max": 12,
+       "code": "INVALID_EXPIRY_MONTH",
+       "message": "Card expiry month must be between 1 and 12"
+      }
+     ]
+    },
+    {
+     "name": "expiryYear",
+     "label": "Card expiry year",
+     "checks": [
+      {
+       "kind": "required",
+       "emptyValues": [
+        "0000"
+       ],
+       "code": "INVALID_EXPIRY_YEAR",
+       "message": "Invalid card expiry year"
+      },
+      {
+       "kind": "numeric",
+       "length": 4,
+       "code": "INVALID_EXPIRY_YEAR",
+       "message": "Invalid card expiry year"
+      },
+      {
+       "kind": "range",
+       "min": 1950,
+       "max": 2099,
+       "code": "INVALID_EXPIRY_YEAR",
+       "message": "Invalid card expiry year"
+      }
+     ]
+    },
+    {
+     "kind": "monthYearNotPast",
+     "label": "Card expiry date",
+     "parts": {
+      "month": "expiryMonth",
+      "year": "expiryYear"
+     },
+     "code": "EXPIRY_IN_PAST",
+     "message": "Card expiry date cannot be in the past"
+    }
+   ]
+  },
+  "userAdd": {
+   "fields": [
+    {
+     "name": "firstName",
+     "label": "First Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "FIRST_NAME_EMPTY",
+       "message": "First Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "lastName",
+     "label": "Last Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "LAST_NAME_EMPTY",
+       "message": "Last Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "leading": " ",
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_ID_EMPTY",
+       "message": "User ID can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 8
+      },
+      {
+       "kind": "noSpace",
+       "code": "USER_ID_INVALID",
+       "message": "User ID must not contain spaces..."
+      }
+     ]
+    },
+    {
+     "name": "password",
+     "label": "Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "PASSWORD_EMPTY",
+       "message": "Password can NOT be empty..."
+      },
+      {
+       "kind": "codePoints",
+       "min": 8,
+       "max": 64,
+       "printable": true,
+       "code": "NEW_PASSWORD_LENGTH",
+       "message": "New Password must be 8 to 64 characters ..."
+      }
+     ]
+    },
+    {
+     "kind": "differs",
+     "field": "password",
+     "other": "userId",
+     "fold": "legacyUpper",
+     "code": "NEW_PASSWORD_IS_USER_ID",
+     "message": "New Password must not be the User ID ..."
+    },
+    {
+     "name": "userType",
+     "label": "User Type",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_TYPE_EMPTY",
+       "message": "User Type can NOT be empty..."
+      },
+      {
+       "kind": "inList",
+       "list": "userTypes",
+       "code": "USER_TYPE_INVALID",
+       "message": "User Type must be A or U..."
+      }
+     ]
+    }
+   ]
+  },
+  "userUpdate": {
+   "fields": [
+    {
+     "name": "firstName",
+     "label": "First Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "FIRST_NAME_EMPTY",
+       "message": "First Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "lastName",
+     "label": "Last Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "LAST_NAME_EMPTY",
+       "message": "Last Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "leading": " ",
+      "trailing": " \u0000"
+     }
+    },
+    {
+     "name": "password",
+     "label": "Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "codePoints",
+       "min": 8,
+       "max": 64,
+       "printable": true,
+       "code": "NEW_PASSWORD_LENGTH",
+       "message": "New Password must be 8 to 64 characters ..."
+      }
+     ]
+    },
+    {
+     "kind": "differs",
+     "field": "password",
+     "other": "userId",
+     "fold": "legacyUpper",
+     "code": "NEW_PASSWORD_IS_USER_ID",
+     "message": "New Password must not be the User ID ..."
+    },
+    {
+     "name": "userType",
+     "label": "User Type",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_TYPE_EMPTY",
+       "message": "User Type can NOT be empty..."
+      },
+      {
+       "kind": "inList",
+       "list": "userTypes",
+       "code": "USER_TYPE_INVALID",
+       "message": "User Type must be A or U..."
+      }
+     ]
+    }
+   ]
+  },
+  "userAddLegacy": {
+   "fields": [
+    {
+     "name": "firstName",
+     "label": "First Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "FIRST_NAME_EMPTY",
+       "message": "First Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "lastName",
+     "label": "Last Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "LAST_NAME_EMPTY",
+       "message": "Last Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "leading": " ",
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_ID_EMPTY",
+       "message": "User ID can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 8
+      },
+      {
+       "kind": "noSpace",
+       "code": "USER_ID_INVALID",
+       "message": "User ID must not contain spaces..."
+      }
+     ]
+    },
+    {
+     "name": "password",
+     "label": "Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "PASSWORD_EMPTY",
+       "message": "Password can NOT be empty..."
+      },
+      {
+       "kind": "codePoints",
+       "max": 8,
+       "code": "NEW_PASSWORD_LENGTH",
+       "message": "New Password must be 1 to 8 characters ..."
+      }
+     ]
+    },
+    {
+     "name": "userType",
+     "label": "User Type",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_TYPE_EMPTY",
+       "message": "User Type can NOT be empty..."
+      },
+      {
+       "kind": "inList",
+       "list": "userTypes",
+       "code": "USER_TYPE_INVALID",
+       "message": "User Type must be A or U..."
+      }
+     ]
+    }
+   ]
+  },
+  "userUpdateLegacy": {
+   "fields": [
+    {
+     "name": "firstName",
+     "label": "First Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "FIRST_NAME_EMPTY",
+       "message": "First Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "lastName",
+     "label": "Last Name",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " "
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "LAST_NAME_EMPTY",
+       "message": "Last Name can NOT be empty..."
+      },
+      {
+       "kind": "latin1"
+      },
+      {
+       "kind": "maxLength",
+       "length": 20
+      }
+     ]
+    },
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "leading": " ",
+      "trailing": " \u0000"
+     }
+    },
+    {
+     "name": "password",
+     "label": "Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "codePoints",
+       "max": 8,
+       "code": "NEW_PASSWORD_LENGTH",
+       "message": "New Password must be 1 to 8 characters ..."
+      }
+     ]
+    },
+    {
+     "name": "userType",
+     "label": "User Type",
+     "blankChars": "\u0000\t\n\u000b\f\r\u001c\u001d\u001e\u001f \u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2008\u2009\u200a\u2028\u2029\u205f\u3000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_TYPE_EMPTY",
+       "message": "User Type can NOT be empty..."
+      },
+      {
+       "kind": "inList",
+       "list": "userTypes",
+       "code": "USER_TYPE_INVALID",
+       "message": "User Type must be A or U..."
+      }
+     ]
+    }
+   ]
+  },
+  "signOn": {
+   "fields": [
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_ID_REQUIRED",
+       "message": "Please enter User ID ..."
+      }
+     ]
+    },
+    {
+     "name": "password",
+     "label": "Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "PASSWORD_REQUIRED",
+       "message": "Please enter Password ..."
+      },
+      {
+       "kind": "codePoints",
+       "max": 64,
+       "code": "INVALID_INPUT",
+       "message": "Please enter Password ..."
+      }
+     ]
+    }
+   ]
+  },
+  "passwordChange": {
+   "fields": [
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_ID_REQUIRED",
+       "message": "Please enter User ID ..."
+      }
+     ]
+    },
+    {
+     "name": "currentPassword",
+     "label": "Current Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "PASSWORD_REQUIRED",
+       "message": "Please enter Password ..."
+      },
+      {
+       "kind": "codePoints",
+       "max": 64,
+       "code": "INVALID_INPUT",
+       "message": "Please enter Password ..."
+      }
+     ]
+    },
+    {
+     "name": "newPassword",
+     "label": "New Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "NEW_PASSWORD_REQUIRED",
+       "message": "Please enter new Password ..."
+      },
+      {
+       "kind": "codePoints",
+       "min": 8,
+       "max": 64,
+       "printable": true,
+       "code": "NEW_PASSWORD_LENGTH",
+       "message": "New Password must be 8 to 64 characters ..."
+      }
+     ]
+    },
+    {
+     "kind": "differs",
+     "field": "newPassword",
+     "other": "currentPassword",
+     "code": "NEW_PASSWORD_SAME",
+     "message": "New Password must differ from the current one ..."
+    },
+    {
+     "kind": "differs",
+     "field": "newPassword",
+     "other": "userId",
+     "fold": "legacyUpper",
+     "code": "NEW_PASSWORD_IS_USER_ID",
+     "message": "New Password must not be the User ID ..."
+    }
+   ]
+  },
+  "passwordChangeAnyMode": {
+   "fields": [
+    {
+     "name": "userId",
+     "label": "User ID",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "USER_ID_REQUIRED",
+       "message": "Please enter User ID ..."
+      }
+     ]
+    },
+    {
+     "name": "currentPassword",
+     "label": "Current Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "PASSWORD_REQUIRED",
+       "message": "Please enter Password ..."
+      }
+     ]
+    },
+    {
+     "name": "newPassword",
+     "label": "New Password",
+     "blankChars": " \u0000",
+     "trim": {
+      "trailing": " \u0000"
+     },
+     "checks": [
+      {
+       "kind": "required",
+       "code": "NEW_PASSWORD_REQUIRED",
+       "message": "Please enter new Password ..."
+      }
+     ]
+    }
+   ]
+  }
+ }
 }

@@ -56,9 +56,14 @@ class PiiTest {
             assertThatThrownBy(() -> Unmask.requireFields(bad, allowed))
                     .isInstanceOfSatisfying(ApiException.class, e -> {
                         assertThat(e.code()).isEqualTo("INVALID_UNMASK_FIELD");
-                        assertThat(e.text()).isEqualTo("Name one or more of these fields to unmask: cardNum, dob, ssn");
+                        assertThat(e.text()).isEqualTo("Unmask one or more of: cardNum, dob, ssn");
                     });
         }
+        assertThatThrownBy(() -> Unmask.requireFields(new Unmask.Request(List.of("cvv")), List.of("ssn", "dob", "cardNum")))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.text())
+                        .isEqualTo("Unmask one or more of: ssn, dob, cardNum"));
+        assertThat(Unmask.requireFields(new Unmask.Request(List.of("ssn", "dob")), List.of("ssn", "dob", "cardNum")))
+                .containsExactly("dob", "ssn");
         ResponseEntity<String> response = Unmask.noStore("x");
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
         assertThat(response.getHeaders().getFirst("Pragma")).isEqualTo("no-cache");

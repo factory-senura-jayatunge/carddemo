@@ -1,5 +1,6 @@
 package org.carddemo.platform.ledger;
 
+import java.sql.Types;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,13 +26,14 @@ public class JdbcTransactionWriter implements TransactionWriter {
                             OUTPUT INSERTED.tran_pk
                             VALUES (:tranId, :typeCd, :catCd, :source, :description, :amount, :merchantId,
                                 :merchantName, :merchantCity, :merchantZip, :cardNum, :origTs, :procTs,
-                                NULL, :origin, NULL, 1, :createdBy)""")
+                                NULL, :origin, :cycleId, 1, :createdBy)""")
                     .param("tranId", t.tranId()).param("typeCd", t.typeCd()).param("catCd", t.catCd())
                     .param("source", t.source()).param("description", t.description()).param("amount", t.amount())
                     .param("merchantId", t.merchantId()).param("merchantName", t.merchantName())
                     .param("merchantCity", t.merchantCity()).param("merchantZip", t.merchantZip())
                     .param("cardNum", t.cardNum()).param("origTs", t.origTs()).param("procTs", t.procTs())
                     .param("origin", t.origin().name()).param("createdBy", t.createdBy())
+                    .param("cycleId", t.cycleId(), Types.INTEGER)
                     .query(Long.class).single();
             return pk;
         } catch (DuplicateKeyException e) {

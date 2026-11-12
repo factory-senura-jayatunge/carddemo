@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,14 +36,19 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -105,6 +112,16 @@ class WebSupportSecurityTest {
         @PreAuthorize("hasRole('USER')")
         String boom() {
             throw new IllegalStateException("secret technical detail");
+        }
+
+        @GetMapping("/api/test/db-failure")
+        @PreAuthorize("hasRole('USER')")
+        String dbFailure() {
+            SQLException driver = new SQLException("String or binary data would be truncated in table"
+                    + " 'core.customer', column 'govt_issued_id'. Truncated value: 'Zq7-secret'.", "22001", 2628);
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, MessageCatalog.ACCOUNT_SAVE_FAILED, "acctId",
+                    new UncategorizedSQLException("update", "UPDATE core.customer SET govt_issued_id = 'Zq7-secret'",
+                            driver));
         }
     }
 
@@ -225,6 +242,27 @@ class WebSupportSecurityTest {
                 .andExpect(status().isOk());
     }
 
+    /** The browser sends cd_at on its own, so a bearer header next to it must not lift the check. */
+    @Test
+    void cookieAndBearerTogetherStillNeedTheCsrfToken() throws Exception {
+        Cookie session = new Cookie("cd_at", token(b -> { }));
+        String jwt = token(b -> { });
+        for (HttpMethod method : new HttpMethod[] {HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE}) {
+            for (String scheme : new String[] {"Bearer ", "bearer "}) {
+                mvc.perform(request(method, "/api/test/echo").cookie(session).header("Authorization", scheme + jwt))
+                        .andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.code").value("CSRF_REJECTED"));
+            }
+        }
+        mvc.perform(post("/api/test/echo").cookie(session, new Cookie("XSRF-TOKEN", "abc"))
+                        .header("Authorization", "Bearer " + jwt).header("X-XSRF-TOKEN", "xyz"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_REJECTED"));
+        mvc.perform(post("/api/test/echo").cookie(session, new Cookie("XSRF-TOKEN", "abc"))
+                        .header("Authorization", "Bearer " + jwt).header("X-XSRF-TOKEN", "abc"))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void anUnsafeRequestWithoutAnyTokenIsUnauthenticated() throws Exception {
         mvc.perform(post("/api/test/echo"))
@@ -243,6 +281,24 @@ class WebSupportSecurityTest {
                         "Bill payment is not available while the batch cycle runs. Try again later..."))
                 .andExpect(jsonPath("$.field").value("acctId"))
                 .andExpect(jsonPath("$.currentBalance").value("194.00"));
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void loggedCausesCarryNoMessage(CapturedOutput output) throws Exception {
+        mvc.perform(get("/api/test/db-failure").header("Authorization", "Bearer " + token(b -> { })))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_UPDATE_FAILED"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Zq7"))));
+        mvc.perform(get("/api/test/boom").header("Authorization", "Bearer " + token(b -> { })))
+                .andExpect(status().isInternalServerError());
+        mvc.perform(post("/api/test/body").header("Authorization", "Bearer " + token(b -> { }))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"value\": Zq7-secret}"))
+                .andExpect(status().isBadRequest());
+        assertThat(output.getAll())
+                .contains("500 ACCOUNT_UPDATE_FAILED: UncategorizedSQLException < SQLException SQL error 2628 (state 22001)",
+                        "unexpected error: IllegalStateException", "at org.carddemo.platform.web.WebSupportSecurityTest")
+                .doesNotContain("Zq7", "Truncated value", "secret technical detail", "UPDATE core.customer");
     }
 
     @Test

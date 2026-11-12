@@ -149,6 +149,65 @@ public final class Layouts {
             .filler(4, '0')
             .build();
 
+    /**
+     * ENT-AUTH-SUMMARY, {@code CIPAUSMY}, IMS root segment PAUTSUM0 of DBPAUTP0. The five
+     * {@code PA-ACCOUNT-STATUS} occurrences are {@code PA-ACCOUNT-STATUS-1} to {@code -5}.
+     */
+    public static final RecordLayout PENDING_AUTH_SUMMARY = RecordLayout.builder("PENDING-AUTH-SUMMARY", 100)
+            .packed("PA-ACCT-ID", "S9(11)")
+            .digits("PA-CUST-ID", 9)
+            .text("PA-AUTH-STATUS", 1)
+            .text("PA-ACCOUNT-STATUS-1", 2)
+            .text("PA-ACCOUNT-STATUS-2", 2)
+            .text("PA-ACCOUNT-STATUS-3", 2)
+            .text("PA-ACCOUNT-STATUS-4", 2)
+            .text("PA-ACCOUNT-STATUS-5", 2)
+            .packed("PA-CREDIT-LIMIT", "S9(09)V99")
+            .packed("PA-CASH-LIMIT", "S9(09)V99")
+            .packed("PA-CREDIT-BALANCE", "S9(09)V99")
+            .packed("PA-CASH-BALANCE", "S9(09)V99")
+            .binary("PA-APPROVED-AUTH-CNT", "S9(04)")
+            .binary("PA-DECLINED-AUTH-CNT", "S9(04)")
+            .packed("PA-APPROVED-AUTH-AMT", "S9(09)V99")
+            .packed("PA-DECLINED-AUTH-AMT", "S9(09)V99")
+            .filler(34)
+            .build();
+
+    /**
+     * ENT-AUTH-DETAIL, {@code CIPAUDTY}, IMS child segment PAUTDTL1 of DBPAUTP0. The key
+     * holds the 9-complements of the date ({@code YYDDD}) and time ({@code HHMMSSmmm}).
+     */
+    public static final RecordLayout PENDING_AUTH_DETAIL = RecordLayout.builder("PENDING-AUTH-DETAILS", 200)
+            .packed("PA-AUTH-DATE-9C", "S9(05)")
+            .packed("PA-AUTH-TIME-9C", "S9(09)")
+            .text("PA-AUTH-ORIG-DATE", 6)
+            .text("PA-AUTH-ORIG-TIME", 6)
+            .text("PA-CARD-NUM", 16)
+            .text("PA-AUTH-TYPE", 4)
+            .text("PA-CARD-EXPIRY-DATE", 4)
+            .text("PA-MESSAGE-TYPE", 6)
+            .text("PA-MESSAGE-SOURCE", 6)
+            .text("PA-AUTH-ID-CODE", 6)
+            .text("PA-AUTH-RESP-CODE", 2)
+            .text("PA-AUTH-RESP-REASON", 4)
+            .digits("PA-PROCESSING-CODE", 6)
+            .packed("PA-TRANSACTION-AMT", "S9(10)V99")
+            .packed("PA-APPROVED-AMT", "S9(10)V99")
+            .text("PA-MERCHANT-CATAGORY-CODE", 4)
+            .text("PA-ACQR-COUNTRY-CODE", 3)
+            .digits("PA-POS-ENTRY-MODE", 2)
+            .text("PA-MERCHANT-ID", 15)
+            .text("PA-MERCHANT-NAME", 22)
+            .text("PA-MERCHANT-CITY", 13)
+            .text("PA-MERCHANT-STATE", 2)
+            .text("PA-MERCHANT-ZIP", 9)
+            .text("PA-TRANSACTION-ID", 15)
+            .text("PA-MATCH-STATUS", 1)
+            .text("PA-AUTH-FRAUD", 1)
+            .text("PA-FRAUD-RPT-DATE", 8)
+            .filler(17)
+            .build();
+
     /** ENT-USER-SECURITY, {@code CSUSR01Y}, USRSEC. */
     public static final RecordLayout USER_SECURITY = RecordLayout.builder("SEC-USER-DATA", 80)
             .text("SEC-USR-ID", 8)

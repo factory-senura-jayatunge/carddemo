@@ -1,5 +1,5 @@
 {
- "source": "app/cpy/CSLKPCDY.cpy",
+ "source": "app/cpy/CSLKPCDY.cpy, app/cpy/COCOM01Y.cpy",
  "lists": {
   "usStateCodes": [
    "AL",
@@ -712,6 +712,10 @@
    "985",
    "986",
    "989"
+  ],
+  "userTypes": [
+   "A",
+   "U"
   ]
  }
 }

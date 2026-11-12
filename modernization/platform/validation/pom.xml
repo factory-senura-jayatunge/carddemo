@@ -21,6 +21,10 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>legacy-format</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>

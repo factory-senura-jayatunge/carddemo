@@ -1,0 +1,90 @@
+{
+ "about": "COBOL FUNCTION UPPER-CASE on legacy text: a to z become A to Z and nothing else changes. Run by LegacyCaseVectorsTest (platform/legacy-format's LegacyCase.upper) and by legacyCase.test.ts (the TypeScript mirror).",
+ "vectors": [
+  {
+   "in": "user0001",
+   "out": "USER0001",
+   "note": "a user ID typed in lower case"
+  },
+  {
+   "in": "Abc xyz1",
+   "out": "ABC XYZ1",
+   "note": "mixed case, a space and a digit"
+  },
+  {
+   "in": "0123456789 -_.",
+   "out": "0123456789 -_.",
+   "note": "no letters"
+  },
+  {
+   "in": "ABCDEFGH",
+   "out": "ABCDEFGH",
+   "note": "already upper case"
+  },
+  {
+   "in": "`az{@AZ[",
+   "out": "`AZ{@AZ[",
+   "note": "the ASCII neighbours of a, z, A and Z stay"
+  },
+  {
+   "in": "",
+   "out": "",
+   "note": "empty"
+  },
+  {
+   "in": "\u00e9",
+   "out": "\u00e9",
+   "note": "e acute: toUpperCase gives E acute"
+  },
+  {
+   "in": "\u00df",
+   "out": "\u00df",
+   "note": "sharp s: toUpperCase gives SS, two characters"
+  },
+  {
+   "in": "\u00ff",
+   "out": "\u00ff",
+   "note": "y diaeresis: toUpperCase gives U+0178, outside Latin-1"
+  },
+  {
+   "in": "\u00b5",
+   "out": "\u00b5",
+   "note": "micro sign: toUpperCase gives Greek capital mu"
+  },
+  {
+   "in": "\u00e9a\u0000\u00ffz",
+   "out": "\u00e9A\u0000\u00ffZ",
+   "note": "Latin-1 letters and NUL around a and z"
+  },
+  {
+   "in": "ab/c\u0000d",
+   "out": "AB/C\u0000D",
+   "note": "a user ID holding a slash and NUL"
+  },
+  {
+   "in": "\u0131 i \ud83d\ude00 \ufb00",
+   "out": "\u0131 I \ud83d\ude00 \ufb00",
+   "note": "dotless i, a surrogate pair and the ff ligature pass through"
+  },
+  {
+   "in": "\u01c6",
+   "out": "\u01c6",
+   "note": "dz digraph: toUpperCase gives U+01C4"
+  },
+  {
+   "in": "\uff41\uff5a",
+   "out": "\uff41\uff5a",
+   "note": "full-width a and z"
+  },
+  {
+   "in": "\ud800a",
+   "out": "\ud800A",
+   "note": "a lone high surrogate before a"
+  },
+  {
+   "in": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f\u0080\u0081\u0082\u0083\u0084\u0085\u0086\u0087\u0088\u0089\u008a\u008b\u008c\u008d\u008e\u008f\u0090\u0091\u0092\u0093\u0094\u0095\u0096\u0097\u0098\u0099\u009a\u009b\u009c\u009d\u009e\u009f\u00a0\u00a1\u00a2\u00a3\u00a4\u00a5\u00a6\u00a7\u00a8\u00a9\u00aa\u00ab\u00ac\u00ad\u00ae\u00af\u00b0\u00b1\u00b2\u00b3\u00b4\u00b5\u00b6\u00b7\u00b8\u00b9\u00ba\u00bb\u00bc\u00bd\u00be\u00bf\u00c0\u00c1\u00c2\u00c3\u00c4\u00c5\u00c6\u00c7\u00c8\u00c9\u00ca\u00cb\u00cc\u00cd\u00ce\u00cf\u00d0\u00d1\u00d2\u00d3\u00d4\u00d5\u00d6\u00d7\u00d8\u00d9\u00da\u00db\u00dc\u00dd\u00de\u00df\u00e0\u00e1\u00e2\u00e3\u00e4\u00e5\u00e6\u00e7\u00e8\u00e9\u00ea\u00eb\u00ec\u00ed\u00ee\u00ef\u00f0\u00f1\u00f2\u00f3\u00f4\u00f5\u00f6\u00f7\u00f8\u00f9\u00fa\u00fb\u00fc\u00fd\u00fe\u00ff",
+   "out": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~\u007f\u0080\u0081\u0082\u0083\u0084\u0085\u0086\u0087\u0088\u0089\u008a\u008b\u008c\u008d\u008e\u008f\u0090\u0091\u0092\u0093\u0094\u0095\u0096\u0097\u0098\u0099\u009a\u009b\u009c\u009d\u009e\u009f\u00a0\u00a1\u00a2\u00a3\u00a4\u00a5\u00a6\u00a7\u00a8\u00a9\u00aa\u00ab\u00ac\u00ad\u00ae\u00af\u00b0\u00b1\u00b2\u00b3\u00b4\u00b5\u00b6\u00b7\u00b8\u00b9\u00ba\u00bb\u00bc\u00bd\u00be\u00bf\u00c0\u00c1\u00c2\u00c3\u00c4\u00c5\u00c6\u00c7\u00c8\u00c9\u00ca\u00cb\u00cc\u00cd\u00ce\u00cf\u00d0\u00d1\u00d2\u00d3\u00d4\u00d5\u00d6\u00d7\u00d8\u00d9\u00da\u00db\u00dc\u00dd\u00de\u00df\u00e0\u00e1\u00e2\u00e3\u00e4\u00e5\u00e6\u00e7\u00e8\u00e9\u00ea\u00eb\u00ec\u00ed\u00ee\u00ef\u00f0\u00f1\u00f2\u00f3\u00f4\u00f5\u00f6\u00f7\u00f8\u00f9\u00fa\u00fb\u00fc\u00fd\u00fe\u00ff",
+   "note": "every character of the legacy range, U+0000 to U+00FF"
+  }
+ ]
+}

@@ -13,7 +13,7 @@ import org.springframework.http.HttpStatus;
  * by {@link ProblemExceptionHandler}. Throw it from the step that fails, so the first failing check
  * in the spec's order is the one the client sees.
  */
-public class ApiException extends RuntimeException {
+public class ApiException extends RuntimeException implements SafeErrors.MessageFree {
 
     private final HttpStatus status;
     private final Message catalogMessage;
@@ -27,7 +27,10 @@ public class ApiException extends RuntimeException {
     }
 
     public ApiException(HttpStatus status, Message message, String field, Throwable cause, String... args) {
-        super(Objects.requireNonNull(message, "message").code() + ": " + message.render(args), cause);
+        // The cause is kept message-free, and nothing can be suppressed into it, so a log line that
+        // prints this exception holds no value and a transaction callback can rethrow it as it is.
+        super(Objects.requireNonNull(message, "message").code() + ": " + message.render(args),
+                cause == null ? null : SafeErrors.sanitized(cause), false, true);
         this.status = Objects.requireNonNull(status, "status");
         this.catalogMessage = message;
         this.text = message.render(args);

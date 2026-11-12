@@ -43,10 +43,57 @@ public class JdbcBalancePosting implements BalancePosting {
                     .param("id", acctId).param("type", typeCd).param("cat", catCd)
                     .param("bal", Amounts.truncate(amount, Amounts.CATEGORY_DIGITS)).update();
         } else {
-            jdbc.sql("UPDATE core.tcat_bal SET balance = :bal WHERE acct_id = :id AND type_cd = :type AND cat_cd = :cat")
-                    .param("bal", Amounts.truncate(category.add(amount), Amounts.CATEGORY_DIGITS))
-                    .param("id", acctId).param("type", typeCd).param("cat", catCd).update();
+            updateCategory(acctId, typeCd, catCd, category.add(amount));
         }
+        postAccount(account, acctId, amount);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PostedCategory post(String acctId, String typeCd, String catCd, BigDecimal amount, String fillerForNewRow) {
+        String filler = PostedCategory.requireFiller(fillerForNewRow);
+        Map<String, Object> account = lockAccount(acctId);
+        Map<String, Object> row = jdbc.sql("""
+                        SELECT balance, legacy_filler FROM core.tcat_bal WITH (UPDLOCK, ROWLOCK)
+                        WHERE acct_id = :id AND type_cd = :type AND cat_cd = :cat""")
+                .param("id", acctId).param("type", typeCd).param("cat", catCd)
+                .query().listOfRows().stream().findFirst().orElse(null);
+        PostedCategory posted;
+        if (row == null) {
+            jdbc.sql("""
+                            INSERT INTO core.tcat_bal (acct_id, type_cd, cat_cd, balance, legacy_filler)
+                            VALUES (:id, :type, :cat, :bal, :filler)""")
+                    .param("id", acctId).param("type", typeCd).param("cat", catCd)
+                    .param("bal", Amounts.truncate(amount, Amounts.CATEGORY_DIGITS)).param("filler", filler).update();
+            posted = new PostedCategory(true, filler);
+        } else {
+            updateCategory(acctId, typeCd, catCd, ((BigDecimal) row.get("balance")).add(amount));
+            posted = new PostedCategory(false, (String) row.get("legacy_filler"));
+        }
+        postAccount(account, acctId, amount);
+        return posted;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void interest(String acctId, BigDecimal totalInterest) {
+        if (totalInterest.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("total interest has more than 2 decimals");
+        }
+        Map<String, Object> account = lockAccount(acctId);
+        BigDecimal balance = Amounts.truncate(((BigDecimal) account.get("curr_bal")).add(totalInterest),
+                Amounts.ACCOUNT_DIGITS);
+        update(jdbc.sql("UPDATE core.account SET curr_bal = :bal, curr_cyc_credit = 0, curr_cyc_debit = 0 WHERE acct_id = :id")
+                .param("bal", balance).param("id", acctId).update(), acctId);
+    }
+
+    private void updateCategory(String acctId, String typeCd, String catCd, BigDecimal sum) {
+        jdbc.sql("UPDATE core.tcat_bal SET balance = :bal WHERE acct_id = :id AND type_cd = :type AND cat_cd = :cat")
+                .param("bal", Amounts.truncate(sum, Amounts.CATEGORY_DIGITS))
+                .param("id", acctId).param("type", typeCd).param("cat", catCd).update();
+    }
+
+    private void postAccount(Map<String, Object> account, String acctId, BigDecimal amount) {
         BigDecimal balance = Amounts.truncate(((BigDecimal) account.get("curr_bal")).add(amount), Amounts.ACCOUNT_DIGITS);
         boolean credit = amount.signum() >= 0;
         String column = credit ? "curr_cyc_credit" : "curr_cyc_debit";

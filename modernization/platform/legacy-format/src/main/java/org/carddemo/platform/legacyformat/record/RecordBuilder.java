@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.carddemo.platform.legacyformat.Binary;
+import org.carddemo.platform.legacyformat.Latin1;
 import org.carddemo.platform.legacyformat.LegacyFormatException;
 import org.carddemo.platform.legacyformat.Packed;
 import org.carddemo.platform.legacyformat.Zoned;
@@ -12,8 +13,9 @@ import org.carddemo.platform.legacyformat.Zoned;
 /**
  * Builds a fixed-length record field by field. Every field starts as its
  * layout fill (spaces, a FILLER's constant, binary zeros for packed and binary
- * fields). Setters are strict: text that is too long, an identifier that is
- * not all digits, or a number that does not fit is an error, never truncated.
+ * fields). Setters are strict: text that is too long or has a character above
+ * U+00FF, an identifier that is not all digits, or a number that does not fit
+ * is an error, never truncated or replaced.
  */
 public final class RecordBuilder {
 
@@ -110,7 +112,12 @@ public final class RecordBuilder {
     }
 
     private void put(FieldSpec f, String s) {
-        byte[] b = s.getBytes(StandardCharsets.ISO_8859_1);
+        byte[] b;
+        try {
+            b = Latin1.encode(s, "value");
+        } catch (LegacyFormatException e) {
+            throw error(f, e.getMessage());
+        }
         System.arraycopy(b, 0, data, f.offset(), f.length());
     }
 

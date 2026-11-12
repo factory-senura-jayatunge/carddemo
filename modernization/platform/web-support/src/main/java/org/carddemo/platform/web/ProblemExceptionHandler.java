@@ -16,7 +16,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * Turns every exception that leaves a controller into an {@link ApiProblem}. Only catalogue texts
- * reach the client; the technical cause is logged with the correlation ID (D-58).
+ * reach the client; the technical cause is logged with the correlation ID (D-58), through
+ * {@link SafeErrors}, so no exception message reaches the log either (D-NFR-04).
  */
 @RestControllerAdvice
 public class ProblemExceptionHandler {
@@ -26,7 +27,8 @@ public class ProblemExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiProblem> api(ApiException e) {
         if (e.status().is5xxServerError()) {
-            log.error("{} {}", e.status().value(), e.code(), e.getCause() != null ? e.getCause() : e);
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            log.error("{} {}: {}", e.status().value(), e.code(), SafeErrors.describe(cause), SafeErrors.sanitized(cause));
         } else {
             log.debug("{} {}", e.status().value(), e.code());
         }
@@ -45,7 +47,7 @@ public class ProblemExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiProblem> unreadable(HttpMessageNotReadableException e) {
-        log.debug("unreadable request body", e);
+        log.debug("unreadable request body: {}", SafeErrors.describe(e));
         return problem(HttpStatus.BAD_REQUEST, MessageCatalog.INVALID_REQUEST);
     }
 
@@ -55,12 +57,12 @@ public class ProblemExceptionHandler {
             HttpStatusCode code = response.getStatusCode();
             HttpStatus status = HttpStatus.resolve(code.value());
             if (status != null && status.is4xxClientError()) {
-                log.debug("{} {}", status.value(), e.toString());
+                log.debug("{} {}", status.value(), SafeErrors.describe(e));
                 return ResponseEntity.status(status).headers(response.getHeaders())
                         .contentType(ApiProblem.MEDIA_TYPE).body(ApiProblem.of(status, catalogFor(status), null));
             }
         }
-        log.error("unexpected error", e);
+        log.error("unexpected error: {}", SafeErrors.describe(e), SafeErrors.sanitized(e));
         // The ID lets support find the logged cause; the cause itself never reaches the client.
         ApiProblem body = ApiProblem.of(HttpStatus.INTERNAL_SERVER_ERROR, MessageCatalog.INTERNAL_ERROR, null);
         String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);

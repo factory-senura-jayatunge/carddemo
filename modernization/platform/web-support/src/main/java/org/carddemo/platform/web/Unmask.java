@@ -28,10 +28,15 @@ public final class Unmask {
      * {@code allowed}: {@code 400 INVALID_UNMASK_FIELD}, naming the allowed fields.
      */
     public static SortedSet<String> requireFields(Request request, Set<String> allowed) {
+        return requireFields(request, List.copyOf(new TreeSet<>(allowed)));
+    }
+
+    /** As {@link #requireFields(Request, Set)}; the message names the allowed fields in this order. */
+    public static SortedSet<String> requireFields(Request request, List<String> allowed) {
         List<String> fields = request == null || request.fields() == null ? List.of() : request.fields();
         if (fields.isEmpty() || !allowed.containsAll(fields)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, MessageCatalog.INVALID_UNMASK_FIELD, "fields",
-                    String.join(", ", new TreeSet<>(allowed)));
+                    String.join(", ", allowed));
         }
         return new TreeSet<>(fields);
     }

@@ -1,7 +1,9 @@
 package org.carddemo.platform.ledger;
 
+import java.sql.SQLException;
 import org.carddemo.platform.fidelity.FidelitySwitches;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +13,9 @@ public class JdbcTransactionIds implements TransactionIds {
 
     static final String LOCK = "carddemo.tran_id";
     static final int LOCK_TIMEOUT_MILLIS = 10_000;
+    static final long MAX_ID = 9_999_999_999_999_999L;
+    /** SQL Server: the sequence object has reached its minimum or maximum value. */
+    static final int SEQUENCE_EXHAUSTED = 11728;
 
     /**
      * The legacy file the ID follows is the master plus the online adds that wait for the next
@@ -37,7 +42,15 @@ public class JdbcTransactionIds implements TransactionIds {
     @Transactional(propagation = Propagation.MANDATORY)
     public String next() {
         if (switches.isFixed(LedgerSwitches.BR_TRNA_003)) {
-            Long value = jdbc.sql("SELECT NEXT VALUE FOR core.tran_id_seq").query(Long.class).single();
+            Long value;
+            try {
+                value = jdbc.sql("SELECT NEXT VALUE FOR core.tran_id_seq").query(Long.class).single();
+            } catch (DataAccessException e) {
+                if (sequenceExhausted(e)) {
+                    throw new TranIdExhaustedException(e);
+                }
+                throw e;
+            }
             return format(value);
         }
         // The lock is held until commit, so the next writer sees this one's insert (DEF-BILL-003).
@@ -45,11 +58,24 @@ public class JdbcTransactionIds implements TransactionIds {
             throw new CannotAcquireLockException("application lock " + LOCK + " not granted");
         }
         String highest = jdbc.sql(HIGHEST_ID).query(String.class).optional().orElse(null);
-        return format(highest == null ? 1 : parse(highest) + 1);
+        long last = highest == null ? 0 : parse(highest);
+        if (last >= MAX_ID) {
+            throw new TranIdExhaustedException(null);
+        }
+        return format(last + 1);
+    }
+
+    private static boolean sequenceExhausted(DataAccessException e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof SQLException sql && sql.getErrorCode() == SEQUENCE_EXHAUSTED) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static String format(long id) {
-        if (id < 1 || id > 9_999_999_999_999_999L) {
+        if (id < 1 || id > MAX_ID) {
             throw new IllegalStateException("transaction ID " + id + " does not fit 16 digits");
         }
         return String.format("%016d", id);

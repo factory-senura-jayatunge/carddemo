@@ -1,0 +1,537 @@
+{
+  "layouts": {
+    "CIPAUDTY": {
+      "fields": [
+        {
+          "length": 3,
+          "name": "PA-AUTH-DATE-9C",
+          "numeric": true,
+          "offset": 0,
+          "scale": 0,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 5,
+          "name": "PA-AUTH-TIME-9C",
+          "numeric": true,
+          "offset": 3,
+          "scale": 0,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 6,
+          "name": "PA-AUTH-ORIG-DATE",
+          "numeric": false,
+          "offset": 8,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 6,
+          "name": "PA-AUTH-ORIG-TIME",
+          "numeric": false,
+          "offset": 14,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 16,
+          "name": "PA-CARD-NUM",
+          "numeric": false,
+          "offset": 20,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 4,
+          "name": "PA-AUTH-TYPE",
+          "numeric": false,
+          "offset": 36,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 4,
+          "name": "PA-CARD-EXPIRY-DATE",
+          "numeric": false,
+          "offset": 40,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 6,
+          "name": "PA-MESSAGE-TYPE",
+          "numeric": false,
+          "offset": 44,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 6,
+          "name": "PA-MESSAGE-SOURCE",
+          "numeric": false,
+          "offset": 50,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 6,
+          "name": "PA-AUTH-ID-CODE",
+          "numeric": false,
+          "offset": 56,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-AUTH-RESP-CODE",
+          "numeric": false,
+          "offset": 62,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 4,
+          "name": "PA-AUTH-RESP-REASON",
+          "numeric": false,
+          "offset": 64,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 6,
+          "name": "PA-PROCESSING-CODE",
+          "numeric": true,
+          "offset": 68,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 7,
+          "name": "PA-TRANSACTION-AMT",
+          "numeric": true,
+          "offset": 74,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 7,
+          "name": "PA-APPROVED-AMT",
+          "numeric": true,
+          "offset": 81,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 4,
+          "name": "PA-MERCHANT-CATAGORY-CODE",
+          "numeric": false,
+          "offset": 88,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 3,
+          "name": "PA-ACQR-COUNTRY-CODE",
+          "numeric": false,
+          "offset": 92,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-POS-ENTRY-MODE",
+          "numeric": true,
+          "offset": 95,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 15,
+          "name": "PA-MERCHANT-ID",
+          "numeric": false,
+          "offset": 97,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 22,
+          "name": "PA-MERCHANT-NAME",
+          "numeric": false,
+          "offset": 112,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 13,
+          "name": "PA-MERCHANT-CITY",
+          "numeric": false,
+          "offset": 134,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-MERCHANT-STATE",
+          "numeric": false,
+          "offset": 147,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 9,
+          "name": "PA-MERCHANT-ZIP",
+          "numeric": false,
+          "offset": 149,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 15,
+          "name": "PA-TRANSACTION-ID",
+          "numeric": false,
+          "offset": 158,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 1,
+          "name": "PA-MATCH-STATUS",
+          "numeric": false,
+          "offset": 173,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 1,
+          "name": "PA-AUTH-FRAUD",
+          "numeric": false,
+          "offset": 174,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 8,
+          "name": "PA-FRAUD-RPT-DATE",
+          "numeric": false,
+          "offset": 175,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        }
+      ],
+      "length": 200
+    },
+    "CIPAUSMY": {
+      "fields": [
+        {
+          "length": 6,
+          "name": "PA-ACCT-ID",
+          "numeric": true,
+          "offset": 0,
+          "scale": 0,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 9,
+          "name": "PA-CUST-ID",
+          "numeric": true,
+          "offset": 6,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 1,
+          "name": "PA-AUTH-STATUS",
+          "numeric": false,
+          "offset": 15,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-ACCOUNT-STATUS-1",
+          "numeric": false,
+          "offset": 16,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-ACCOUNT-STATUS-2",
+          "numeric": false,
+          "offset": 18,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-ACCOUNT-STATUS-3",
+          "numeric": false,
+          "offset": 20,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-ACCOUNT-STATUS-4",
+          "numeric": false,
+          "offset": 22,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 2,
+          "name": "PA-ACCOUNT-STATUS-5",
+          "numeric": false,
+          "offset": 24,
+          "scale": 0,
+          "signed": false,
+          "usage": "DISPLAY"
+        },
+        {
+          "length": 6,
+          "name": "PA-CREDIT-LIMIT",
+          "numeric": true,
+          "offset": 26,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 6,
+          "name": "PA-CASH-LIMIT",
+          "numeric": true,
+          "offset": 32,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 6,
+          "name": "PA-CREDIT-BALANCE",
+          "numeric": true,
+          "offset": 38,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 6,
+          "name": "PA-CASH-BALANCE",
+          "numeric": true,
+          "offset": 44,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 2,
+          "name": "PA-APPROVED-AUTH-CNT",
+          "numeric": true,
+          "offset": 50,
+          "scale": 0,
+          "signed": true,
+          "usage": "COMP"
+        },
+        {
+          "length": 2,
+          "name": "PA-DECLINED-AUTH-CNT",
+          "numeric": true,
+          "offset": 52,
+          "scale": 0,
+          "signed": true,
+          "usage": "COMP"
+        },
+        {
+          "length": 6,
+          "name": "PA-APPROVED-AUTH-AMT",
+          "numeric": true,
+          "offset": 54,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        },
+        {
+          "length": 6,
+          "name": "PA-DECLINED-AUTH-AMT",
+          "numeric": true,
+          "offset": 60,
+          "scale": 2,
+          "signed": true,
+          "usage": "COMP-3"
+        }
+      ],
+      "length": 100
+    }
+  },
+  "sample": {
+    "blankRoots": [
+      {
+        "children": 0,
+        "position": 21
+      }
+    ],
+    "cardsCrc32": "ce1db1c3",
+    "detailSums": {
+      "PA-APPROVED-AMT": "1838.30",
+      "PA-AUTH-DATE-9C": "15488834",
+      "PA-AUTH-TIME-9C": "181537233054",
+      "PA-TRANSACTION-AMT": "1838.30"
+    },
+    "distinctCards": 21,
+    "file": "AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat",
+    "fraud": {
+      " ": 202
+    },
+    "keyDateYyddd": {
+      "max": 24096,
+      "min": 23292
+    },
+    "matchStatus": {
+      "P": 202
+    },
+    "records": 226,
+    "respCodes": {
+      "00": 202
+    },
+    "roots": [
+      {
+        "acctId": 1,
+        "children": 6
+      },
+      {
+        "acctId": 5,
+        "children": 1
+      },
+      {
+        "acctId": 7,
+        "children": 50
+      },
+      {
+        "acctId": 13,
+        "children": 58
+      },
+      {
+        "acctId": 15,
+        "children": 17
+      },
+      {
+        "acctId": 16,
+        "children": 11
+      },
+      {
+        "acctId": 17,
+        "children": 2
+      },
+      {
+        "acctId": 18,
+        "children": 5
+      },
+      {
+        "acctId": 23,
+        "children": 5
+      },
+      {
+        "acctId": 29,
+        "children": 1
+      },
+      {
+        "acctId": 30,
+        "children": 1
+      },
+      {
+        "acctId": 31,
+        "children": 1
+      },
+      {
+        "acctId": 32,
+        "children": 3
+      },
+      {
+        "acctId": 33,
+        "children": 2
+      },
+      {
+        "acctId": 34,
+        "children": 6
+      },
+      {
+        "acctId": 38,
+        "children": 2
+      },
+      {
+        "acctId": 42,
+        "children": 8
+      },
+      {
+        "acctId": 45,
+        "children": 2
+      },
+      {
+        "acctId": 46,
+        "children": 6
+      },
+      {
+        "acctId": 47,
+        "children": 2
+      },
+      {
+        "acctId": 48,
+        "children": 13
+      }
+    ],
+    "segments": {
+      "PAUTDTL1": 202,
+      "PAUTSUM0": 22
+    },
+    "summarySums": {
+      "PA-ACCT-ID": "570",
+      "PA-APPROVED-AUTH-AMT": "1838.30",
+      "PA-APPROVED-AUTH-CNT": "202",
+      "PA-CASH-BALANCE": "0.00",
+      "PA-CASH-LIMIT": "45585.00",
+      "PA-CREDIT-BALANCE": "1838.30",
+      "PA-CREDIT-LIMIT": "85089.00",
+      "PA-DECLINED-AUTH-AMT": "0.00",
+      "PA-DECLINED-AUTH-CNT": "0"
+    }
+  },
+  "segments": {
+    "PAUTDTL1": "CIPAUDTY",
+    "PAUTSUM0": "CIPAUSMY"
+  }
+}

@@ -24,12 +24,17 @@
     <module>platform/validation</module>
     <module>platform/ledger-core</module>
     <module>platform/web-support</module>
+    <module>platform/output-root</module>
     <module>db/db-migrate</module>
     <module>platform/test-support</module>
     <module>services/identity-service</module>
     <module>services/billpay-service</module>
+    <module>services/account-service</module>
+    <module>services/authorization-service</module>
+    <module>services/transaction-service</module>
     <module>batch/batch-service</module>
     <module>verify/data</module>
+    <module>verify/differential</module>
   </modules>
 
   <properties>
@@ -40,6 +45,9 @@
     <!-- Versions the Spring Boot BOM does not manage. -->
     <archunit.version>1.5.1</archunit.version>
     <springdoc.version>3.2.0</springdoc.version>
+    <bouncycastle.version>1.86</bouncycastle.version>
+    <!-- statementJob's PDFs; 3.0.7 or later (CVE-2026-23907), checked against the PDFBox security page and OSV. -->
+    <pdfbox.version>3.0.8</pdfbox.version>
     <!-- Same image as docker-compose.yml, so Testcontainers and the compose stack run one SQL Server build. -->
     <carddemo.mssql.image>mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04@sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3</carddemo.mssql.image>
   </properties>
@@ -73,6 +81,11 @@
       </dependency>
       <dependency>
         <groupId>org.carddemo</groupId>
+        <artifactId>output-root</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.carddemo</groupId>
         <artifactId>db-migrate</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -90,6 +103,17 @@
         <groupId>org.springdoc</groupId>
         <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
         <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <!-- Spring Security's Argon2PasswordEncoder (identity-service). -->
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pdfbox</groupId>
+        <artifactId>pdfbox</artifactId>
+        <version>${pdfbox.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

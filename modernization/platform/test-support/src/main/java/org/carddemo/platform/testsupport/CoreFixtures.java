@@ -1,7 +1,12 @@
 package org.carddemo.platform.testsupport;
 
 import java.math.BigDecimal;
+import java.sql.Types;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
@@ -11,8 +16,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 public final class CoreFixtures {
 
     private static final String[] DELETE_ORDER = {
+        "pauth.outbox", "pauth.processed_message", "pauth.auth_fraud", "pauth.auth_detail", "pauth.auth_summary",
         "core.daily_reject", "core.daily_tran", "billpay.payment", "core.[transaction]", "core.tcat_bal",
-        "core.card_xref", "core.card", "core.customer", "core.account", "ops.batch_window", "batch.cycle",
+        "core.card_xref", "core.card", "core.customer", "core.account", "ops.batch_window",
+        "batch.account_statement", "batch.statement_capture", "batch.statement_run", "batch.cycle",
         "ops.audit",
     };
 
@@ -22,23 +29,61 @@ public final class CoreFixtures {
         this.jdbc = jdbc;
     }
 
-    /** Empties every table of the foundation and Bill Pay schemas and the cycles, children first, and restarts the ID sequence at 1. */
+    /**
+     * Empties every table of the foundation, Bill Pay and pending-authorization schemas and the
+     * cycles, children first, and restarts the ID sequence at its lowest value, as a load of no
+     * transactions leaves it.
+     */
     public CoreFixtures deleteAll() {
         for (String table : DELETE_ORDER) {
             jdbc.sql("DELETE FROM " + table).update();
         }
-        return restartTranIdSequence(1);
+        return restartTranIdSequence(tranIdSequenceMinimum());
     }
 
-    /** The next {@code NEXT VALUE FOR core.tran_id_seq}, as the load sets it above the highest loaded ID. */
+    /**
+     * Every row version of the table, in version order, as the hex of its 8 bytes. They are read as
+     * bytes because a CONVERT to text that does not fit gives every row the same blank or cut
+     * value, and a before-and-after comparison of those passes whatever was written.
+     */
+    public List<String> rowVersions(String table) {
+        List<String> versions = jdbc.sql("SELECT row_version FROM " + table + " ORDER BY row_version")
+                .query((rs, n) -> HexFormat.of().formatHex(rs.getBytes(1))).list();
+        if (versions.stream().anyMatch(v -> v.length() != 16) || new HashSet<>(versions).size() != versions.size()) {
+            throw new IllegalStateException("row versions of " + table + " are not distinct 8-byte values");
+        }
+        return versions;
+    }
+
+    /** The {@code MINVALUE} of {@code core.tran_id_seq}: the first fixed-mode transaction ID. */
+    public long tranIdSequenceMinimum() {
+        return jdbc.sql("SELECT CAST(minimum_value AS BIGINT) FROM sys.sequences WHERE object_id = OBJECT_ID('core.tran_id_seq')")
+                .query(Long.class).single();
+    }
+
+    /**
+     * The next {@code NEXT VALUE FOR core.tran_id_seq}, as the load sets it above the highest loaded
+     * ID. A value outside the sequence's range fails, as {@code ALTER SEQUENCE} does.
+     */
     public CoreFixtures restartTranIdSequence(long next) {
-        jdbc.sql("ALTER SEQUENCE core.tran_id_seq RESTART WITH " + Math.max(1, next)).update();
+        jdbc.sql("ALTER SEQUENCE core.tran_id_seq RESTART WITH " + next).update();
         return this;
     }
 
-    /** Opens a batch window (mode WRITES_BLOCKED). */
+    /** Opens a batch window (mode WRITES_BLOCKED) held by a fresh run key {@code test/<uuid>}. */
     public CoreFixtures openBatchWindow() {
-        jdbc.sql("INSERT INTO ops.batch_window (mode, opened_by) VALUES ('WRITES_BLOCKED', 'test')").update();
+        // A window must name exactly one holder, a cycle or a run key, once V406 adds run_key. The
+        // insert naming run_key is dynamic SQL because a batch that names a missing column does not
+        // compile, so this works on databases with and without V406.
+        jdbc.sql("""
+                IF COL_LENGTH('ops.batch_window', 'run_key') IS NULL
+                    INSERT INTO ops.batch_window (mode, opened_by) VALUES ('WRITES_BLOCKED', 'test');
+                ELSE
+                    EXEC sp_executesql
+                        N'INSERT INTO ops.batch_window (mode, opened_by, run_key) VALUES (''WRITES_BLOCKED'', ''test'', @runKey)',
+                        N'@runKey VARCHAR(250)', @runKey = :runKey;""")
+                .param("runKey", "test/" + UUID.randomUUID())
+                .update();
         return this;
     }
 
@@ -79,14 +124,49 @@ public final class CoreFixtures {
         return this;
     }
 
+    public record Customer(String custId, String firstName, String middleName, String lastName, String addrLine1,
+                           String addrLine2, String addrLine3, String stateCd, String countryCd, String zip,
+                           String phone1, String phone2, String ssn, String govtIssuedId, LocalDate dob,
+                           String eftAccountId, String priCardHolderInd, int ficoScore) {
+
+        public static Customer of(String custId) {
+            return new Customer(custId, "TEST", "", "CUSTOMER", "1 MAIN ST", "", "TOWN", "NY", "USA", "10001",
+                    "(212)555-0100", "", "000000000", "", LocalDate.of(1980, 1, 1), "0000000000", "Y", 700);
+        }
+
+        public Customer withZip(String value) {
+            return new Customer(custId, firstName, middleName, lastName, addrLine1, addrLine2, addrLine3, stateCd,
+                    countryCd, value, phone1, phone2, ssn, govtIssuedId, dob, eftAccountId, priCardHolderInd, ficoScore);
+        }
+
+        public Customer withPhones(String first, String second) {
+            return new Customer(custId, firstName, middleName, lastName, addrLine1, addrLine2, addrLine3, stateCd,
+                    countryCd, zip, first, second, ssn, govtIssuedId, dob, eftAccountId, priCardHolderInd, ficoScore);
+        }
+
+        public Customer withDob(LocalDate value) {
+            return new Customer(custId, firstName, middleName, lastName, addrLine1, addrLine2, addrLine3, stateCd,
+                    countryCd, zip, phone1, phone2, ssn, govtIssuedId, value, eftAccountId, priCardHolderInd, ficoScore);
+        }
+    }
+
     public CoreFixtures customer(String custId) {
+        return customer(Customer.of(custId));
+    }
+
+    public CoreFixtures customer(Customer c) {
         jdbc.sql("""
                 INSERT INTO core.customer (cust_id, first_name, middle_name, last_name, addr_line_1, addr_line_2,
                     addr_line_3, state_cd, country_cd, zip, phone_1, phone_2, ssn, govt_issued_id, dob,
                     eft_account_id, pri_card_holder_ind, fico_score)
-                VALUES (:id, 'TEST', '', 'CUSTOMER', '1 MAIN ST', '', 'TOWN', 'NY', 'USA', '10001',
-                    '(212)555-0100', '', '000000000', '', '1980-01-01', '0000000000', 'Y', 700)""")
-                .param("id", custId)
+                VALUES (:id, :first, :middle, :last, :addr1, :addr2, :addr3, :state, :country, :zip,
+                    :phone1, :phone2, :ssn, :govt, :dob, :eft, :primary, :fico)""")
+                .param("id", c.custId()).param("first", c.firstName()).param("middle", c.middleName())
+                .param("last", c.lastName()).param("addr1", c.addrLine1()).param("addr2", c.addrLine2())
+                .param("addr3", c.addrLine3()).param("state", c.stateCd()).param("country", c.countryCd())
+                .param("zip", c.zip()).param("phone1", c.phone1()).param("phone2", c.phone2())
+                .param("ssn", c.ssn()).param("govt", c.govtIssuedId()).param("dob", c.dob(), Types.DATE)
+                .param("eft", c.eftAccountId()).param("primary", c.priCardHolderInd()).param("fico", c.ficoScore())
                 .update();
         return this;
     }
