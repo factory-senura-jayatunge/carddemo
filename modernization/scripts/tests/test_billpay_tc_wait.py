@@ -184,8 +184,9 @@ class TestcontainersBarrierTest(unittest.TestCase):
 
 
 class MainOrderTest(unittest.TestCase):
-    def test_snapshot_before_maven_and_wait_before_the_first_browser(self):
-        order = []
+    def run_main(self, fail_step=None):
+        """test_billpay.main() with each step recorded instead of run; fail_step's run raises StepFailed."""
+        order, calls = [], []
 
         class Barrier:
             def __init__(self, env):
@@ -216,19 +217,42 @@ class MainOrderTest(unittest.TestCase):
             def env(self, **extra):
                 return {}
 
+        def run(step, argv, **kw):
+            order.append(step)
+            calls.append((step, argv, kw.get("cwd")))
+            if step == fail_step:
+                raise test_billpay.StepFailed(f"{step}: exited 1, see above")
+
         with unittest.mock.patch.multiple(
             test_billpay,
             TestcontainersBarrier=Barrier,
-            run=lambda step, argv, **kw: order.append(step),
+            run=run,
             playwright=lambda step, target, env: order.append(step),
             trace_bill=lambda: order.append("trace"),
         ), unittest.mock.patch.object(test_billpay.manifest, "begin", lambda *a: order.append("manifest")), \
                 unittest.mock.patch.object(test_billpay.e2e_stack, "Session", Session), \
                 unittest.mock.patch.object(test_billpay.e2e_stack, "install_signal_exit", lambda: None), \
                 unittest.mock.patch("builtins.print"):
-            self.assertEqual(test_billpay.main(), 0)
-        self.assertEqual(order, ["manifest", "before", "maven", "vitest", "vitest", "wait", "e2e-mock", "stack",
-                                 "e2e-stack", "trace"])
+            rc = test_billpay.main()
+        return rc, order, calls
+
+    def test_snapshot_before_maven_and_wait_before_the_first_browser(self):
+        rc, order, _ = self.run_main()
+        self.assertEqual(rc, 0)
+        self.assertEqual(order, ["manifest", "before", "maven", "vitest", "gen", "vitest", "wait", "e2e-mock",
+                                 "stack", "e2e-stack", "trace"])
+
+    def test_gen_runs_the_generator_with_node_in_web_right_after_npm_ci(self):
+        _, _, calls = self.run_main()
+        steps = [(step, argv) for step, argv, _ in calls]
+        gen = steps.index(("gen", ["node", "scripts/gen-validation.mjs"]))
+        self.assertEqual(gen, steps.index(("vitest", ["npm", "ci"])) + 1)
+        self.assertEqual(calls[gen][2], test_billpay.WEB)
+
+    def test_a_gen_failure_starts_nothing_after_it(self):
+        rc, order, _ = self.run_main(fail_step="gen")
+        self.assertEqual(rc, 1)
+        self.assertEqual(order, ["manifest", "before", "maven", "vitest", "gen"])
 
 
 if __name__ == "__main__":

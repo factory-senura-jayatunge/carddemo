@@ -7,11 +7,14 @@ each converted service from its executable jar, Airflow's four processes
 from the Airflow venv, and the Vite dev server.
 A component that has not been converted yet (its directory does not exist)
 is skipped. up prepares the others first: it builds the service jars that
-are missing or older than their sources (Maven, tests skipped) and runs npm
-ci when web/node_modules is missing or older than package-lock.json, except
-for a component that is already running, whose files are left alone. A
-component whose preparation fails does not start, so a missing piece never
-looks like a pass.
+are missing or older than their sources (Maven, tests skipped), runs npm ci
+when web/node_modules is missing or older than package-lock.json and then
+web/scripts/gen-validation.mjs, which also runs alone when only its
+git-ignored output is missing (web_generate), except for a component that
+is already running, whose files are left alone. A component whose
+preparation fails does not start, so a missing piece never looks like a pass.
+An existing output is not regenerated when platform/validation's rules
+change; npm run gen:validation in web/ or make test-billpay does that.
 
 PIDs go to $CARDDEMO_VAR_DIR/run/<name>.pid, logs to $CARDDEMO_VAR_DIR/log/.
 Each service also records the database it was started against
@@ -129,7 +132,7 @@ def say(status: str, name: str, detail: str) -> None:
 
 class Component:
     """One host process; `problem` says why a converted one can't start,
-    `prepare` what up must do first (build or npm ci) and why."""
+    `prepare` what up must do first (build, npm ci or gen-validation) and why."""
 
     def __init__(self, name, port, cwd, argv, health_url, marker, problem=None, health_key=None,
                  prepare=None, module=None):
@@ -214,14 +217,24 @@ def jar_problem(module: str, jar):
     return None
 
 
+# Relative to web/. src/api/generated is git-ignored and only the script writes it; the
+# sign-on rules in WEB_RULES are imported on the path every web entry point loads.
+GEN_VALIDATION = os.path.join("scripts", "gen-validation.mjs")
+WEB_RULES = os.path.join("src", "api", "generated", "validation-forms", "auth.json")
+WEB_RULES_MISSING = "no " + WEB_RULES
+
+
 def web_problem(web: str):
-    """Why npm ci must run first, or None when node_modules matches the lock file."""
+    """Why npm ci and gen-validation, or gen-validation alone, must run first, or None when
+    node_modules matches the lock file and the generated rules exist."""
     installed = os.path.join(web, "node_modules", ".package-lock.json")
     if not os.path.exists(installed):
         return "no node_modules"
     lock = os.path.join(web, "package-lock.json")
     if os.path.exists(lock) and os.path.getmtime(lock) > os.path.getmtime(installed):
         return "node_modules older than package-lock.json"
+    if not os.path.exists(os.path.join(web, WEB_RULES)):
+        return WEB_RULES_MISSING
     return None
 
 
@@ -903,10 +916,25 @@ def run_logged(argv, cwd, env, log_name, what) -> bool:
     return rc == 0
 
 
+def web_generate(web, env) -> bool:
+    """Runs GEN_VALIDATION in web.cwd with node, not npm run. Never while this checkout's dev
+    server runs: the script deletes and rewrites folders that Vite serves."""
+    if own_process_runs(web):
+        say("FAIL", "web", "its dev server runs, so gen-validation was not run; make stop first")
+        return False
+    node = node_bin()
+    argv = [os.path.join(node, "node") if node else "node", GEN_VALIDATION]
+    say("..", "web", f"node {GEN_VALIDATION}")
+    if not run_logged(argv, web.cwd, env, "up-gen-validation.log", "gen-validation"):
+        return False
+    say("ok", "web", "gen-validation")
+    return True
+
+
 def prepare(comps, env) -> list:
-    """Builds the missing or stale service jars and installs the web
-    dependencies, for the components that are not running; returns the
-    components after preparation."""
+    """Builds the missing or stale service jars, installs the web
+    dependencies and generates the web app's rules, for the components that
+    are not running; returns the components after preparation."""
     names = [c.name for c in comps]
     todo = [c for c in comps if c.prepare]
     for c in todo:
@@ -929,10 +957,13 @@ def prepare(comps, env) -> list:
             failed |= {c.name for c in builds}
     web = next((c for c in todo if c.name == "web"), None)
     if web:
-        say("..", "web", f"npm ci ({web.prepare})")
-        if run_logged([web.argv[0], "ci"], web.cwd, env, "up-npm-ci.log", "npm ci"):
-            say("ok", "web", "npm ci")
-        else:
+        installed = True
+        if web.prepare != WEB_RULES_MISSING:
+            say("..", "web", f"npm ci ({web.prepare})")
+            installed = run_logged([web.argv[0], "ci"], web.cwd, env, "up-npm-ci.log", "npm ci")
+            if installed:
+                say("ok", "web", "npm ci")
+        if not (installed and web_generate(web, env)):
             failed.add("web")
     fresh = {c.name: c for c in components()}
     result = []

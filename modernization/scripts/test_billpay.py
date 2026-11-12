@@ -6,7 +6,10 @@ Steps, in order; the first failure ends the run:
                report files already on disk (verify/trace/tracelib/manifest.py)
   1. maven     ./mvnw verify for platform/ledger-core and billpay-service
   2. vitest    the Bill Pay page and number format tests
-               (src/pages/BillPayPage.test.tsx, src/lib/format.test.ts)
+               (src/pages/BillPayPage.test.tsx, src/lib/format.test.ts), after
+               npm ci and gen (node scripts/gen-validation.mjs: web/src/api/generated,
+               which git ignores and the pages' imports need; e2e-mock's dev server
+               serves the same files)
  2b. tc-wait   until the Testcontainers containers and networks that appeared on
                the Docker engine since step 1 began (Ryuk's own included) have
                stopped or gone; it only watches, never stops or removes anything
@@ -204,6 +207,7 @@ def main() -> int:
         barrier.before()
         run("maven", ["./mvnw", "-B", "verify", "-pl", "platform/ledger-core,services/billpay-service", "-am"])
         run("vitest", ["npm", "ci"], cwd=WEB)
+        run("gen", ["node", stack.GEN_VALIDATION], cwd=WEB)
         run("vitest", ["npx", "vitest", "run", *VITEST_FILES, "--reporter=default", "--reporter=junit",
                        "--outputFile.junit=" + os.path.join(RESULTS, "vitest-billpay-junit.xml")], cwd=WEB)
         print(f"==    {'tc-wait':10} Testcontainers from maven, on the engine maven's environment names", flush=True)
