@@ -4,7 +4,10 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The outcome of each check, printed one line per check. Details hold keys and field names, never values. */
+/**
+ * The outcome of each check, printed one line per check. Details hold field names, file lines,
+ * row ordinals and public codes, never values or account, customer or card keys.
+ */
 public final class Report {
 
     public enum Outcome { OK, FAIL, SKIP, INFO }

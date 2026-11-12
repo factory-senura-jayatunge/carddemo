@@ -4,11 +4,12 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-from .ledger import Ledger, covering_switch
+from .ledger import Ledger, covering_switch, gate_units, partial_problem, requires_test
 from .reports import Result, is_valid_id
-from .spec import Spec
+from .spec import Item, Spec
 
 BOTH = ("LEGACY", "FIXED")
+DECIDED = (None, "FIXED")
 
 
 @dataclass
@@ -27,15 +28,20 @@ class Row:
     requirement: str = "none"
     status: str = "not-required"
     reason: str = ""
+    # Only for an invariant with a partial deviation: one obligation per unit of gate_units.
+    units: dict[str, dict] = field(default_factory=dict)
 
     def as_dict(self) -> dict:
-        return {
+        out = {
             "id": self.id, "unit": self.unit, "kind": self.kind, "title": self.title,
             "fidelity": self.fidelity, "classes": list(self.classes), "in_scope": self.in_scope,
             "switch": self.switch, "deviation": self.deviation, "excluded": self.excluded,
             "requirement": self.requirement, "status": self.status, "reason": self.reason,
             "tests": [t.as_dict() for t in self.tests],
         }
+        if self.units:
+            out["units"] = self.units
+        return out
 
 
 @dataclass
@@ -56,8 +62,20 @@ class Matrix:
         return not self.gaps
 
 
+def _switch_tested(entry: dict | None) -> bool:
+    return entry is not None and (entry.get("code_switch") is True or covering_switch(entry) is not None)
+
+
 def _requirement(row: Row) -> str:
-    if row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch)):
+    if requires_test(row.deviation):
+        # A partial deviation: the retained part is tested in the decided mode, which is the fidelity
+        # entry's value when the item has one (a legacy-valued item keeps legacy behaviour), else fixed.
+        if _switch_tested(row.switch):
+            return "both-modes"
+        if row.switch is not None:
+            return f"ledger-mode:{str(row.switch.get('value', 'legacy')).upper()}"
+        return "decided-mode"
+    if _switch_tested(row.switch):
         return "both-modes"
     if row.switch is None and "defect-decide" in row.classes:
         return "both-modes"
@@ -68,11 +86,37 @@ def _requirement(row: Row) -> str:
     return "none"
 
 
+def _check(requirement: str, tests: list[Result], switch: dict | None = None) -> tuple[str, str]:
+    """The status and reason of a requirement other than none, from the tests that count for it."""
+    failed = [t for t in tests if t.status == "failed"]
+    passed = [t for t in tests if t.status == "passed"]
+    if failed:
+        return "gap", f"{len(failed)} failing test{'s' if len(failed) > 1 else ''}"
+    if requirement == "both-modes":
+        missing = [m for m in BOTH if not any(t.mode == m for t in passed)]
+        if missing:
+            reason = "no passing test in " + " or ".join(m.lower() for m in missing) + " mode"
+            cover = covering_switch(switch)
+            if cover:
+                reason += f" (covered by the switch {cover}: its tests must cite this item too)"
+            return "gap", reason
+    elif requirement == "decided-mode":
+        if not any(t.mode in DECIDED for t in passed):
+            return "gap", "no passing test in the decided mode (fixed, or a test without a mode)"
+    elif requirement.startswith("ledger-mode:"):
+        mode = requirement.split(":", 1)[1]
+        if not any(t.mode in (None, mode) for t in passed):
+            return "gap", f"no passing test in {mode.lower()} mode"
+    elif not passed:
+        return "gap", "no passing test"
+    return "covered", ""
+
+
 def _evaluate(row: Row) -> None:
     if row.excluded is not None:
         row.requirement, row.status, row.reason = "none", "excluded", row.excluded
         return
-    if row.deviation is not None:
+    if row.deviation is not None and not requires_test(row.deviation):
         row.requirement, row.status = "none", "deviation"
         row.reason = f"{row.deviation.get('kind')}: {row.deviation.get('target', '')}"
         return
@@ -80,29 +124,51 @@ def _evaluate(row: Row) -> None:
     if row.requirement == "none":
         row.status = "not-required"
         return
-    failed = [t for t in row.tests if t.status == "failed"]
-    passed = [t for t in row.tests if t.status == "passed"]
-    if failed:
-        row.status, row.reason = "gap", f"{len(failed)} failing test{'s' if len(failed) > 1 else ''}"
+    row.status, row.reason = _check(row.requirement, row.tests, row.switch)
+    if row.status == "gap" and requires_test(row.deviation):
+        row.reason += " (partial deviation: the retained part stays required)"
+
+
+def _evaluate_invariant(row: Row, items: dict[str, Item], ledger: Ledger) -> None:
+    """An invariant with a partial deviation: every unit of gate_units in scope owes its own passing
+    test, one that cites the invariant together with an item of that unit. The unit's test runs in
+    both modes when the unit has a code switch or the co-cited item is tested through one."""
+    row.requirement = "per-unit"
+    owners = gate_units(row.deviation)
+    if not owners:
+        row.status, row.reason = "gap", "partial deviation of an invariant without gate_units (run make verify-ledger)"
         return
-    if row.requirement == "both-modes":
-        missing = [m for m in BOTH if not any(t.mode == m for t in passed)]
-        if missing:
-            row.status = "gap"
-            row.reason = "no passing test in " + " or ".join(m.lower() for m in missing) + " mode"
-            cover = covering_switch(row.switch)
-            if cover:
-                row.reason += f" (covered by the switch {cover}: its tests must cite this item too)"
-            return
-    elif row.requirement.startswith("ledger-mode:"):
-        mode = row.requirement.split(":", 1)[1]
-        if not any(t.mode in (None, mode) for t in passed):
-            row.status, row.reason = "gap", f"no passing test in {mode.lower()} mode"
-            return
-    elif not passed:
-        row.status, row.reason = "gap", "no passing test"
-        return
-    row.status, row.reason = "covered", ""
+
+    def unit_items(t: Result, unit: str) -> list[str]:
+        return [i for i in t.items if i in items and items[i].unit == unit]
+
+    # A failing test that names no owning unit cannot be placed, so it counts against every one.
+    stray_failed = [t for t in row.tests if t.status == "failed" and not any(unit_items(t, u) for u in owners)]
+    for unit in owners:
+        if unit not in ledger.units:
+            row.units[unit] = {"requirement": "none", "status": "out-of-scope", "reason": "", "tests": []}
+            continue
+        tests = [t for t in row.tests if unit_items(t, unit)]
+        cited = {i for t in tests for i in unit_items(t, unit)}
+        both = (any(_switch_tested(e) for i, e in ledger.switches.items() if i in items and items[i].unit == unit)
+                or any(_switch_tested(ledger.switches.get(i)) for i in cited))
+        requirement = "both-modes" if both else "decided-mode"
+        status, reason = _check(requirement, tests + stray_failed)
+        failing = any(t.status == "failed" for t in tests + stray_failed)
+        if status == "gap" and not failing and not any(t.status == "passed" for t in tests):
+            reason = f"no passing test that cites {row.id} together with an item of {unit}"
+            elsewhere = [t for t in row.tests if t.status == "passed" and t not in tests]
+            if elsewhere:
+                reason += f" ({len(elsewhere)} passing test{'s' if len(elsewhere) > 1 else ''} cite it for other units or none)"
+        row.units[unit] = {"requirement": requirement, "status": status, "reason": reason, "tests": [t.name for t in tests]}
+    scoped = {u: r for u, r in row.units.items() if r["status"] != "out-of-scope"}
+    if not scoped:
+        row.status, row.reason = "out-of-scope", ""
+    elif all(r["status"] == "covered" for r in scoped.values()):
+        row.status, row.reason = "covered", ""
+    else:
+        row.status = "gap"
+        row.reason = "; ".join(f"{u}: {r['reason']}" for u, r in scoped.items() if r["status"] == "gap")
 
 
 def _id_unit(ident: str) -> str:
@@ -122,7 +188,8 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
     """units: gate only the gaps of these units (a subset of scope.toml); None gates every unit in
     scope plus the code switches outside it that are live (see declared). An undefined ID counts for
     a selected unit when it looks like one of its IDs or when a test that cites it also cites an
-    item of the unit.
+    item of the unit. The obligation of each unit of an invariant's partial deviation is gated with
+    that unit. A deviation whose partial fields trace cannot read is a gap in any unit.
 
     declared: the switch IDs the main code declares or reads (tracelib/code.py). A code switch of a
     unit outside scope.toml, or an item covered by one, is live when the code declares that switch,
@@ -167,8 +234,24 @@ def build(spec: Spec, ledger: Ledger, results: list[Result], arch_items: set[str
                    for i in switch_ids(row))
 
     for ident, row in sorted(rows.items(), key=lambda kv: (kv[1].unit, kv[0])):
+        problem = partial_problem(row.deviation)
+        if problem:
+            # Gated whatever the unit or selection: the entry's scope cannot be trusted either.
+            row.requirement, row.status = "valid-entry", "gap"
+            row.reason = f"malformed partial deviation: {problem} (run make verify-ledger)"
+            gaps.append((ident, row.reason))
+            continue
+        if row.kind in ("INV", "PINV") and requires_test(row.deviation):
+            _evaluate_invariant(row, spec.items, ledger)
+            row.in_scope = row.status != "out-of-scope"
+            if not row.units and row.status == "gap":
+                gaps.append((ident, row.reason))
+            for unit, res in row.units.items():
+                if res["status"] == "gap":
+                    (gaps if selected is None or unit in selected else ungated).append((ident, f"{unit}: {res['reason']}"))
+            continue
         # An item covered by a switch is tested by that switch's tests, so it is gated wherever the switch is.
-        code_switch = row.switch is not None and (row.switch.get("code_switch") is True or covering_switch(row.switch) is not None)
+        code_switch = _switch_tested(row.switch)
         if row.kind in ("Q", "INV", "PINV") and not code_switch:
             row.requirement, row.status = "none", ("deviation" if row.deviation else "not-required")
             continue

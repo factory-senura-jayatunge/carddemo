@@ -9,13 +9,18 @@ a deviation, every architecture-dependent item has a deviation, no cited item ha
 and no test cites an ID the spec does not define. A code switch of another unit, and an item it
 covers, needs passing tests in both modes too once the main code declares or reads that switch or
 a test cites it; until then it is listed as planned (not gated, not delivered) and gates as soon
-as that happens or its unit enters scope.toml. Incidental items and questions need no test. With
+as that happens or its unit enters scope.toml. Incidental items and questions need no test. A
+partial deviation (requires_test = true) keeps its item required in the decided mode; an invariant
+with one needs, for each unit of its gate_units in scope, a passing test that cites it with an item
+of that unit. With
 --unit, only the gaps of the named units count for the gate and the exit status; the matrix still
 shows every unit.
 Tests that write an ID in brackets ("[FLOW-BILL-002]") instead of as a tag ("@FLOW-BILL-002") are
 reported, not counted. With --manifest, only the reports that one run wrote are read (see
 tracelib/manifest.py); a missing, stale or empty required report is a gap.
 Ends with "trace: OK" or "trace: FAILED (<reason>)"; exit status 0 or 1.
+Trace does not validate the ledger beyond what it needs to fail closed; its result counts only after
+verify-ledger passes on the same ledger.
 """
 from __future__ import annotations
 
@@ -55,7 +60,8 @@ def _ledger_cell(row: matrix.Row) -> str:
         parts.append(f"{row.switch.get('value')}" + (" (switch)" if row.switch.get("code_switch") else "")
                      + f" {row.switch.get('decision', '')}".rstrip())
     if row.deviation is not None:
-        parts.append(f"deviation {row.deviation.get('kind')} {row.deviation.get('decision', '')}".rstrip())
+        parts.append(f"deviation {row.deviation.get('kind')} {row.deviation.get('decision', '')}".rstrip()
+                     + (" (partial: retained part requires a test)" if ledger.requires_test(row.deviation) else ""))
     return "; ".join(parts) or "-"
 
 
@@ -155,6 +161,16 @@ def render_md(m: matrix.Matrix, sources: list[str], generated: str, run_info: di
             status = r.status + (f": {r.reason}" if r.reason and r.status in ("gap", "excluded") else "")
             out.append(f"| {r.id} | {_md_escape(r.title)} | {_md_escape(r.fidelity or '-')} | {_md_escape(_ledger_cell(r))} | "
                        f"{_tests_cell(r)} | {_md_escape(status)} |")
+        out.append("")
+    invariants = sorted((r for r in m.rows.values() if r.units or r.requirement == "per-unit"), key=lambda r: r.id)
+    if invariants:
+        out += ["## Invariants tested per unit", "",
+                "Each unit owes a passing test that cites the invariant together with an item of that unit.", "",
+                "| Invariant | Unit | Requirement | Tests | Status |", "| :-- | :-- | :-- | --: | :-- |"]
+        for r in invariants:
+            for unit, res in (r.units or {"-": {"requirement": r.requirement, "tests": [], "status": r.status, "reason": r.reason}}).items():
+                status = res["status"] + (f": {res['reason']}" if res["reason"] and res["status"] == "gap" else "")
+                out.append(f"| {r.id} | {unit} | {res['requirement']} | {len(res['tests'])} | {_md_escape(status)} |")
         out.append("")
     switches = sorted((r for r in m.rows.values() if r.switch and r.switch.get("code_switch") is True), key=lambda r: r.id)
     if switches:

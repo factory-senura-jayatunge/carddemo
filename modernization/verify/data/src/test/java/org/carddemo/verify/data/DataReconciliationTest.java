@@ -2,15 +2,21 @@ package org.carddemo.verify.data;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import org.carddemo.batch.data.AccountLayouts;
 import org.carddemo.batch.data.CoreRows;
 import org.carddemo.batch.data.RefRows;
+import org.carddemo.batch.data.ZipGroup;
 import org.carddemo.identity.IdentityProperties;
 import org.carddemo.identity.fidelity.IdentityFidelity;
 import org.carddemo.identity.fidelity.IdentitySwitches;
@@ -37,7 +43,10 @@ import org.carddemo.platform.testsupport.TestDatabase;
 import org.carddemo.platform.validation.RuleTable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.support.JdbcTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class DataReconciliationTest {
 
@@ -57,8 +66,8 @@ class DataReconciliationTest {
     void loadTheSample() {
         DB.fixtures().deleteAll();
         loadReferenceTables();
-        CoreRows rows = new CoreRows(admin, LEDGER_MODE);
-        loadAccounts(rows);
+        CoreRows rows = new CoreRows(admin);
+        loadAccounts(rows, LEDGER_MODE);
         lines("custdata.txt", Layouts.CUSTOMER.length()).forEach(l -> rows.insert(CustomerRecord.parse(l.record())));
         lines("carddata.txt", Layouts.CARD.length()).forEach(l -> rows.insert(CardRecord.parse(l.record())));
         lines("cardxref.txt", Layouts.CARD_XREF.length()).forEach(l -> rows.insert(CardXrefRecord.parse(l.record())));
@@ -95,13 +104,28 @@ class DataReconciliationTest {
         FidelitySwitches switches = FidelitySwitches.of(IdentitySwitches.ALL, ledger);
         IdentityProperties props = new IdentityProperties(null, null, null, null, 4, null, null,
                 new IdentityProperties.Seed(true, true, DEMO_PASSWORD, null), null);
+        TransactionTemplate tx = new TransactionTemplate(new JdbcTransactionManager(DB.adminDataSource()));
         int added = new UserSeeder(new UserRepository(admin), new PasswordHasher(4), new IdentityFidelity(switches),
-                props, Clock.systemUTC()).seedIfEmpty();
+                props, Clock.systemUTC(), tx).seedIfEmpty();
         assertThat(added).isEqualTo(10);
     }
 
-    private static void loadAccounts(CoreRows rows) {
-        lines("acctdata.txt", Layouts.ACCOUNT.length()).forEach(l -> rows.insert(AccountRecord.parse(l.record())));
+    /** As dataLoadJob's account step: each record stored in the layout the mode and the built-in manifest give it. */
+    private static void loadAccounts(CoreRows rows, FidelityMode mode) {
+        List<SourceLine> source = lines("acctdata.txt", Layouts.ACCOUNT.length());
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(SAMPLE.resolve("acctdata.txt"));
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        Set<String> ids = source.stream().map(l -> new String(l.record(), 0, 11, StandardCharsets.ISO_8859_1))
+                .collect(Collectors.toSet());
+        AccountLayouts layouts = AccountLayouts.resolve(mode, bytes, ids, null);
+        for (SourceLine l : source) {
+            AccountRecord a = AccountRecord.parse(l.record());
+            rows.insert(a, ZipGroup.classify(ZipGroup.asRead(a), layouts.layoutOf(a.acctId())));
+        }
     }
 
     private static FidelityMode other(FidelityMode mode) {
@@ -142,6 +166,38 @@ class DataReconciliationTest {
                 .extracting(Report.Line::detail).first().asString().contains("240 codes");
         assertThat(report.lines()).filteredOn(l -> l.subject().equals("core.account"))
                 .extracting(Report.Line::detail).first().asString().contains("50 rows").contains("5 control totals");
+        assertThat(report.lines()).filteredOn(l -> l.subject().equals("core.customer FILLER"))
+                .extracting(Report.Line::detail).containsExactly("customer FILLER normalised: 0");
+    }
+
+    /**
+     * DEF-ACUP-020: a source whose customers hold residue at 333-500 reconciles with the loaded
+     * table, whose export writes spaces there; verify-data counts the lines itself.
+     */
+    @Test
+    void customerResidueAt333To500IsCountedAndComparedAsSpaces(@TempDir Path dir) throws Exception {
+        for (String name : List.of("acctdata.txt", "carddata.txt", "cardxref.txt", "tcatbal.txt", "trantype.txt",
+                "trancatg.txt", "discgrp.txt")) {
+            Files.copy(SAMPLE.resolve(name), dir.resolve(name));
+        }
+        List<String> customers = new ArrayList<>(Files.readAllLines(SAMPLE.resolve("custdata.txt"),
+                StandardCharsets.ISO_8859_1));
+        String residue = "Residue text left by a save";
+        customers.set(1, (customers.get(1) + " ".repeat(500)).substring(0, 332) + "\0".repeat(168));
+        customers.set(4, (customers.get(4) + " ".repeat(500)).substring(0, 332) + (residue + " ".repeat(168)).substring(0, 168));
+        Files.writeString(dir.resolve("custdata.txt"), String.join("\n", customers) + "\n", StandardCharsets.ISO_8859_1);
+
+        Report report = new DataReconciliation(admin, dir, USERS, LEDGER_MODE).run();
+
+        assertThat(report.failures()).isEmpty();
+        assertThat(report.lines()).filteredOn(l -> l.subject().equals("core.customer FILLER"))
+                .extracting(Report.Line::detail).containsExactly("customer FILLER normalised: 2 (positions 333-500 not"
+                        + " all spaces, compared as spaces): custdata.txt lines 2, 5");
+        for (int i : new int[] {1, 4}) {
+            String id = customers.get(i).substring(0, 9);
+            report.lines().forEach(l -> assertThat(l.detail()).doesNotContain(id));
+        }
+        report.lines().forEach(l -> assertThat(l.detail()).doesNotContain(residue).doesNotContain("\0"));
     }
 
     @Test
@@ -157,16 +213,54 @@ class DataReconciliationTest {
         admin.sql("DELETE FROM core.card_xref").update();
         admin.sql("DELETE FROM core.card").update();
         admin.sql("DELETE FROM core.account").update();
-        CoreRows rows = new CoreRows(admin, other(LEDGER_MODE));
-        loadAccounts(rows);
+        CoreRows rows = new CoreRows(admin);
+        loadAccounts(rows, other(LEDGER_MODE));
         lines("carddata.txt", Layouts.CARD.length()).forEach(l -> rows.insert(CardRecord.parse(l.record())));
         lines("cardxref.txt", Layouts.CARD_XREF.length()).forEach(l -> rows.insert(CardXrefRecord.parse(l.record())));
         lines("tcatbal.txt", Layouts.TCAT_BAL.length()).forEach(l -> rows.insert(TcatBalRecord.parse(l.record())));
 
         assertThat(reconcile(other(LEDGER_MODE)).failures()).isEmpty();
-        assertThat(failure(reconcile(LEDGER_MODE), "core.account"))
-                .as("verified in the wrong mode").contains("50 records re-export differently")
-                .contains("[ACCT-ADDR-ZIP, ACCT-GROUP-ID]");
+        Report wrongMode = reconcile(LEDGER_MODE);
+        assertThat(wrongMode.failures()).as("verified in the wrong mode: the re-export has no mode, check 6 fails")
+                .extracting(Report.Line::subject).containsExactly(DataReconciliation.ZIP_GROUP);
+        assertThat(failure(wrongMode, DataReconciliation.ZIP_GROUP)).startsWith("50 records differ: acctdata.txt line 1 [")
+                .contains("zip_group_origin");
+    }
+
+    @Test
+    void theLedgerModeStoresEveryAccountMigratedAndCheck6SaysSo() {
+        assertThat(reconcile().lines()).filteredOn(l -> l.subject().equals(DataReconciliation.ZIP_GROUP))
+                .extracting(Report.Line::outcome, Report.Line::detail)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(Report.Outcome.OK, "50 records of acctdata.txt match"
+                        + " addr_zip, group_id, zip_group_origin and legacy_zip_group (as read 0, migrated 50, layout"
+                        + " manifest " + AccountLayouts.Source.BUILTIN.key() + ")"));
+    }
+
+    @Test
+    void aChangedStoredGroupFailsCheck6ByLineAndColumnOnly() {
+        String account = "00000000007";
+        int line = lines("acctdata.txt", Layouts.ACCOUNT.length()).stream()
+                .filter(l -> new String(l.record(), 0, 11, StandardCharsets.ISO_8859_1).equals(account))
+                .findFirst().orElseThrow().lineNumber();
+        admin.sql("UPDATE core.account SET legacy_zip_group = REPLICATE(N'9', 20) WHERE acct_id = :a")
+                .param("a", account).update();
+
+        Report report = reconcile();
+
+        assertThat(failure(report, DataReconciliation.ZIP_GROUP))
+                .startsWith("1 records differ: acctdata.txt line " + line + " [legacy_zip_group]");
+        assertThat(failure(report, "core.account")).as("the row no longer restores its load-time text")
+                .contains("acctdata.txt line " + line);
+        report.lines().forEach(l -> assertThat(l.detail()).doesNotContain(account));
+    }
+
+    @Test
+    void aSuppliedManifestThatIsMissingFailsCheck6(@TempDir Path dir) {
+        Path missing = dir.resolve("absent.layout.toml");
+
+        Report report = new DataReconciliation(admin, SAMPLE, USERS, LEDGER_MODE, missing).run();
+
+        assertThat(failure(report, DataReconciliation.ZIP_GROUP)).isEqualTo("layout manifest not found: " + missing);
     }
 
     @Test
@@ -178,26 +272,33 @@ class DataReconciliationTest {
     }
 
     @Test
-    void aChangedBalanceFailsTheTotalAndNamesTheKeyAndField() {
-        admin.sql("UPDATE core.account SET curr_bal = curr_bal + 1 WHERE acct_id = '00000000007'").update();
+    void aChangedBalanceFailsTheTotalAndNamesTheLineAndField() {
+        String account = "00000000007";
+        int line = lines("acctdata.txt", Layouts.ACCOUNT.length()).stream()
+                .filter(l -> new String(l.record(), 0, 11, StandardCharsets.ISO_8859_1).equals(account))
+                .findFirst().orElseThrow().lineNumber();
+        admin.sql("UPDATE core.account SET curr_bal = curr_bal + 1 WHERE acct_id = :a").param("a", account).update();
 
-        String detail = failure(reconcile(), "core.account");
+        Report report = reconcile();
 
-        assertThat(detail).contains("total ACCT-CURR-BAL differs")
-                .contains("1 records re-export differently: 00000000007 [ACCT-CURR-BAL]");
+        assertThat(failure(report, "core.account")).contains("total ACCT-CURR-BAL differs")
+                .contains("1 records re-export differently: acctdata.txt line " + line + " [ACCT-CURR-BAL]");
+        report.lines().forEach(l -> assertThat(l.detail()).doesNotContain(account));
     }
 
     @Test
-    void aMissingCrossReferenceIsReportedWithTheLastFourDigitsOnly() throws Exception {
+    void aMissingCrossReferenceIsReportedByItsFileLineOnly() throws Exception {
         String card = Files.readAllLines(SAMPLE.resolve("cardxref.txt")).get(4).substring(0, 16);
+        int cardLine = Files.readAllLines(SAMPLE.resolve("carddata.txt")).stream().map(l -> l.substring(0, 16)).toList()
+                .indexOf(card) + 1;
         admin.sql("DELETE FROM core.card_xref WHERE card_num = :c").param("c", card).update();
 
         Report report = reconcile();
 
         assertThat(failure(report, "core.card_xref")).contains("count 49, file 50")
-                .contains("missing keys " + Masking.lastFour(card)).doesNotContain(card);
-        assertThat(failure(report, "card has xref")).contains("1 violations").doesNotContain(card);
-        report.lines().forEach(l -> assertThat(l.detail()).doesNotContain(card));
+                .contains("missing keys at cardxref.txt line 5");
+        assertThat(failure(report, "card has xref")).isEqualTo("1 violations: carddata.txt line " + cardLine);
+        report.lines().forEach(l -> assertThat(l.detail()).doesNotContain(card).doesNotContain(Masking.lastFour(card)));
     }
 
     @Test
@@ -208,7 +309,8 @@ class DataReconciliationTest {
         Report report = reconcile();
 
         assertThat(failure(report, "card account = xref")).contains("1 violations");
-        assertThat(failure(report, "core.card")).contains("[CARD-ACCT-ID]").doesNotContain(card);
+        assertThat(failure(report, "core.card")).contains("[CARD-ACCT-ID]").doesNotContain(card)
+                .doesNotContain(Masking.lastFour(card));
     }
 
     @Test

@@ -3,6 +3,7 @@
 # [unit.<CODE>]  the unit code of a spec (BILL for COBIL00C)
 # spec           the spec file
 # excluded       items of the unit the conversion leaves out, with the reason
+# note           context for the unit that trace does not gate
 #
 # For each unit the trace gate requires a passing test for every must-preserve item that is not
 # excluded, passing tests in both modes for every code switch, and an entry in fidelity.toml or
@@ -16,6 +17,202 @@ spec = "docs/modernization/spec/programs/COBIL00C.md"
 [unit.SGN]
 spec = "docs/modernization/spec/programs/COSGN00C.md"
 
+[unit.JCSDUP]
+spec = "docs/modernization/spec/jobs/CBADMCDJ.md"
+
+[unit.JDCUST]
+spec = "docs/modernization/spec/jobs/DEFCUST.md"
+
+[unit.JIRD1]
+spec = "docs/modernization/spec/jobs/INTRDRJ1.md"
+
+[unit.JIRD2]
+spec = "docs/modernization/spec/jobs/INTRDRJ2.md"
+
+[unit.JREPT]
+spec = "docs/modernization/spec/jobs/REPTFILE.md"
+
+[unit.WAIT]
+spec = "docs/modernization/spec/programs/COBSWAIT.md"
+
+[unit.WAIT.excluded]
+"BR-WAIT-001" = "COBSWAIT is dropped (mapping.md): fixed waits are replaced by Airflow task dependencies"
+"BR-WAIT-002" = "COBSWAIT is dropped (mapping.md): fixed waits are replaced by Airflow task dependencies; no wait step exists, so there is no step return code"
+"DEF-WAIT-002" = "COBSWAIT is dropped (mapping.md): fixed waits are replaced by Airflow task dependencies; a comment defect of a program that is not rebuilt"
+"FLOW-WAIT-001" = "COBSWAIT is dropped (mapping.md): fixed waits are replaced by Airflow task dependencies"
+"NUM-WAIT-002" = "COBSWAIT is dropped (mapping.md): fixed waits are replaced by Airflow task dependencies; no wait interval exists in the target"
+
+[unit.MWAT]
+spec = "docs/modernization/spec/programs/MVSWAIT.md"
+
+[unit.MWAT.excluded]
+"BR-MWAT-001" = "MVSWAIT is dropped (mapping.md): the STIMER wrapper of COBSWAIT is not rebuilt"
+"BR-MWAT-002" = "MVSWAIT is dropped (mapping.md): the STIMER wrapper of COBSWAIT is not rebuilt"
+"DEF-MWAT-002" = "MVSWAIT is dropped (mapping.md): the STIMER wrapper of COBSWAIT is not rebuilt; reentrancy of an assembler module"
+"DEF-MWAT-003" = "MVSWAIT is dropped (mapping.md): the STIMER wrapper of COBSWAIT is not rebuilt; a comment defect"
+"FLOW-MWAT-003" = "MVSWAIT is dropped (mapping.md): the STIMER wrapper of COBSWAIT is not rebuilt"
+"NUM-MWAT-001" = "MVSWAIT is dropped (mapping.md): the STIMER wrapper of COBSWAIT is not rebuilt"
+
+[unit.DTFT]
+spec = "docs/modernization/spec/programs/COBDATFT.md"
+
+[unit.DTFT.excluded]
+"BR-DTFT-001" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates"
+"BR-DTFT-002" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates"
+"BR-DTFT-003" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates"
+"DEF-DTFT-004" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates; no caller-visible parameter block exists"
+"DEF-DTFT-005" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates; reentrancy of an assembler module"
+"DEF-DTFT-006" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates; copybook naming"
+"ERR-DTFT-001" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates"
+"FLOW-DTFT-002" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates; the parameter-block layout has no target"
+"FLOW-DTFT-003" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates; register return linkage"
+"NUM-DTFT-001" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates"
+"NUM-DTFT-002" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates; assembler implicit lengths"
+"SE-DTFT-001" = "COBDATFT is dropped (mapping.md): its only caller, CBACT01C, is dropped, and java.time formats dates"
+
+[unit.JESRR]
+spec = "docs/modernization/spec/jobs/ESDSRRDS.md"
+
+[unit.JESRR.excluded]
+"SE-JESRR-002" = "ESDSRRDS is dropped (mapping.md): ESDS and RRDS copies of the seed users with no consumer in the repository (Q-JESRR-001); the target seeds users in iam.app_user (JUSEC)"
+
+[unit.JFTP]
+spec = "docs/modernization/spec/jobs/FTPJCL.md"
+
+[unit.JFTP.excluded]
+"FLOW-JFTP-001" = "FTPJCL is dropped (mapping.md): a demo FTP job with no business content. The kept intent, no credentials in source, is the target's configuration rule (seed password from .env, JUSEC; D-07)"
+
+[unit.JCSDD]
+spec = "docs/modernization/spec/jobs/CRDDEMOD-CSD.md"
+
+[unit.JCSDD.excluded]
+"DEF-JCSDD-002" = "THREADLIMIT(1) is a CICS-Db2 attachment setting; the target uses a connection pool (mapping.md)"
+"ERR-JCSDD-001" = "CICS attributes are dropped (mapping.md): the target has no CICS region; the backout outcome is the one SQL Server transaction per online action of TTUP and TTLS, gated with those units"
+"FLOW-JCSDD-001" = "CTLI becomes the route /admin/transaction-types (mapping.md); carried by the TTLS items"
+"FLOW-JCSDD-002" = "CTTU becomes the route /admin/transaction-types/maintain (mapping.md); carried by the TTUP items"
+"NUM-JCSDD-001" = "CICS attributes are dropped (mapping.md): the target has no CICS region; CICS transaction attributes"
+
+[unit.JCSDM]
+spec = "docs/modernization/spec/jobs/CRDDEMOM-CSD.md"
+
+[unit.JCSDM.excluded]
+"DEF-JCSDM-002" = "A duplicate CICS LIBRARY definition; libraries are dropped (mapping.md)"
+"DEF-JCSDM-004" = "The legacy MQ objects are not in the repository and are not rebuilt; the target defines its own RabbitMQ topology in the repository (mapping.md, messaging.md), so nothing legacy is left to reproduce (Q-JCSDM-001)"
+"ERR-JCSDM-001" = "CICS attributes are dropped (mapping.md): the target has no CICS region; the request-message backout is carried by the MQAC and MQDT items"
+"FLOW-JCSDM-001" = "CDRA becomes the carddemo.inquiry.account.request listener (mapping.md); carried by the MQAC items"
+"FLOW-JCSDM-002" = "CDRD becomes the carddemo.inquiry.date.request listener (mapping.md); carried by the MQDT items"
+"NUM-JCSDM-001" = "CICS attributes are dropped (mapping.md): the target has no CICS region; CICS transaction attributes"
+
+[unit.DBUL]
+spec = "docs/modernization/spec/programs/DBUNLDGS.md"
+
+[unit.DBUL.excluded]
+"BR-DBUL-001" = "DBUNLDGS is dropped (mapping.md)"
+"BR-DBUL-002" = "DBUNLDGS is dropped (mapping.md)"
+"DEF-DBUL-003" = "DBUNLDGS is dropped (mapping.md)"
+"DEF-DBUL-004" = "DBUNLDGS is dropped (mapping.md); message text of a program that is not rebuilt"
+"DEF-DBUL-005" = "DBUNLDGS is dropped (mapping.md); dead code"
+"ERR-DBUL-001" = "DBUNLDGS is dropped (mapping.md)"
+"ERR-DBUL-002" = "DBUNLDGS is dropped (mapping.md)"
+"ERR-DBUL-003" = "DBUNLDGS is dropped (mapping.md)"
+"ERR-DBUL-004" = "DBUNLDGS is dropped (mapping.md)"
+"FLOW-DBUL-001" = "DBUNLDGS is dropped (mapping.md)"
+"NUM-DBUL-001" = "DBUNLDGS is dropped (mapping.md)"
+"SE-DBUL-001" = "DBUNLDGS is dropped (mapping.md)"
+"SE-DBUL-002" = "DBUNLDGS is dropped (mapping.md)"
+
+[unit.PDUL]
+spec = "docs/modernization/spec/programs/PAUDBUNL.md"
+
+[unit.PDUL.excluded]
+"BR-PDUL-001" = "PAUDBUNL is dropped (mapping.md); the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+"BR-PDUL-002" = "PAUDBUNL is dropped (mapping.md); the loader skips the all-spaces root of the HD unload with its details as its own rule, and any other invalid key fails the load (both specified in data-load-mapping.md)"
+"BR-PDUL-003" = "PAUDBUNL is dropped (mapping.md); the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+"DEF-PDUL-004" = "PAUDBUNL is dropped (mapping.md); dead code"
+"ERR-PDUL-001" = "PAUDBUNL is dropped (mapping.md)"
+"ERR-PDUL-002" = "PAUDBUNL is dropped (mapping.md)"
+"ERR-PDUL-003" = "PAUDBUNL is dropped (mapping.md)"
+"ERR-PDUL-004" = "PAUDBUNL is dropped (mapping.md)"
+"FLOW-PDUL-001" = "PAUDBUNL is dropped (mapping.md); the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+"NUM-PDUL-001" = "PAUDBUNL is dropped (mapping.md); the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+"SE-PDUL-001" = "PAUDBUNL is dropped (mapping.md); the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+"SE-PDUL-002" = "PAUDBUNL is dropped (mapping.md); the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+
+[unit.PDLD]
+spec = "docs/modernization/spec/programs/PAUDBLOD.md"
+
+[unit.PDLD.excluded]
+"BR-PDLD-001" = "PAUDBLOD is dropped (mapping.md); keeping a segment already in the database is the IMS merge of DEF-JLDPA-002 (DEV-PLATFORM); the target's loader step is part of dataLoadJob, which the DAG carddemo_data_load runs (data-model.md), and that data load refuses to run on non-empty tables outside a local environment (decisions.md D-BAT-08; the text of D-41 itself names only the master data); a reload deletes and replaces the rows (authorization-service.md, Loader)"
+"BR-PDLD-002" = "PAUDBLOD is dropped (mapping.md); the loader puts each detail under the summary before it in the file (data-load-mapping.md, pauth.auth_detail)"
+"BR-PDLD-003" = "PAUDBLOD is dropped (mapping.md)"
+"DEF-PDLD-003" = "PAUDBLOD is dropped (mapping.md); the read loop of a program that is not rebuilt (see ERR-PDLD-002, DEV-PLATFORM)"
+"DEF-PDLD-005" = "PAUDBLOD is dropped (mapping.md); console output and dead code"
+"ERR-PDLD-001" = "PAUDBLOD is dropped (mapping.md)"
+"ERR-PDLD-003" = "PAUDBLOD is dropped (mapping.md)"
+"ERR-PDLD-004" = "PAUDBLOD is dropped (mapping.md)"
+"ERR-PDLD-005" = "PAUDBLOD is dropped (mapping.md); the partial commit on RC 16 is DEF-PDLD-004 (DEV-PLATFORM); the target load checks the whole file and writes in one transaction, all or nothing (data-load-mapping.md)"
+"FLOW-PDLD-001" = "PAUDBLOD is dropped (mapping.md)"
+"NUM-PDLD-001" = "PAUDBLOD is dropped (mapping.md)"
+"SE-PDLD-001" = "PAUDBLOD is dropped (mapping.md); the loader writes one pauth.auth_summary row per root, 21 on the sample (data-model.md)"
+"SE-PDLD-002" = "PAUDBLOD is dropped (mapping.md); the loader writes one pauth.auth_detail row per detail, 202 on the sample (data-model.md)"
+
+[unit.JDBPA]
+spec = "docs/modernization/spec/jobs/DBPAUTP0.md"
+
+[unit.JDBPA.excluded]
+"ERR-JDBPA-001" = "DBPAUTP0 is dropped (mapping.md)"
+"ERR-JDBPA-002" = "DBPAUTP0 is dropped (mapping.md); DBRC authorization does not exist in the target (Q-JDBPA-002)"
+"NUM-JDBPA-001" = "DBPAUTP0 is dropped (mapping.md); z/OS data set attributes"
+"SE-JDBPA-002" = "DBPAUTP0 is dropped (mapping.md); the sample HD unload it wrote, AWS.M2.CARDDEMO.IMSDATA.DBPAUTP0.dat, is the input of loadPendingAuthorizations (data-model.md)"
+
+[unit.JLDPA]
+spec = "docs/modernization/spec/jobs/LOADPADB.md"
+
+[unit.JLDPA.excluded]
+"ERR-JLDPA-001" = "LOADPADB is dropped (mapping.md)"
+"ERR-JLDPA-002" = "LOADPADB is dropped (mapping.md); z/OS allocation and IMS region start"
+"FLOW-JLDPA-001" = "LOADPADB is dropped (mapping.md); loading is loadPendingAuthorizations (data-load-mapping.md)"
+"NUM-JLDPA-001" = "LOADPADB is dropped (mapping.md); the 100- and 206-byte PAUDBUNL records are not a target input (data-model.md, Loader source)"
+"SE-JLDPA-002" = "LOADPADB is dropped (mapping.md); merge versus restore is DEF-JLDPA-002 (DEV-PLATFORM)"
+
+[unit.JULPA]
+spec = "docs/modernization/spec/jobs/UNLDPADB.md"
+
+[unit.JULPA.excluded]
+"ERR-JULPA-001" = "UNLDPADB is dropped (mapping.md); z/OS allocation"
+"ERR-JULPA-002" = "UNLDPADB is dropped (mapping.md)"
+"FLOW-JULPA-001" = "UNLDPADB is dropped (mapping.md)"
+"NUM-JULPA-001" = "UNLDPADB is dropped (mapping.md)"
+"SE-JULPA-002" = "UNLDPADB is dropped (mapping.md); its output has no consumer in the target; the target's one-time loader step loadPendingAuthorizations reads the DBPAUTP0 HD unload, not these files (data-model.md, Loader source)"
+
+[unit.JULGS]
+spec = "docs/modernization/spec/jobs/UNLDGSAM.md"
+
+[unit.JULGS.excluded]
+"ERR-JULGS-001" = "UNLDGSAM is dropped (mapping.md)"
+"ERR-JULGS-002" = "UNLDGSAM is dropped (mapping.md); z/OS allocation"
+"FLOW-JULGS-001" = "UNLDGSAM is dropped (mapping.md)"
+"NUM-JULGS-001" = "UNLDGSAM is dropped (mapping.md)"
+"SE-JULGS-001" = "UNLDGSAM is dropped (mapping.md)"
+"SE-JULGS-002" = "UNLDGSAM is dropped (mapping.md)"
+
+[unit.JGDGD]
+spec = "docs/modernization/spec/jobs/DEFGDGD.md"
+
+[unit.JGDGD.excluded]
+"NUM-JGDGD-001" = "DEFGDGD is dropped (mapping.md): the reference-data backup files do not exist; SQL Server backups replace them. The record lengths of the reference tables are gated by NUM-JTTYP-001, NUM-JTCATG-001 and NUM-JDISC-001."
+
+[unit.JRPROC]
+spec = "docs/modernization/spec/jobs/REPROC.md"
+
+[unit.JRPROC.excluded]
+"SE-JRPROC-001" = "REPROC is dropped (mapping.md): a generic copy procedure; each caller gets its own snapshot or export, gated with that caller."
+
 [unit.MENU]
 spec = "docs/modernization/spec/programs/COMEN01C.md"
-excluded = { "BR-MENU-002" = "options 1-9 and 11 not converted", "FLOW-MENU-001" = "replaced by the route guard" }
+note = "BR-MENU-005 (incidental, not gated) is dormant in target: every option implemented; code path covered at unit level. From web commit 52bf97b every main-menu option has a page, so no live option reaches the coming-soon path. The MenuPage.test.tsx test \"@BR-MENU-005 an option without a page is coming soon, in green, and the menu stays\" reaches it through an injected placeholder option; no e2e test reaches it. BR-MENU-005 has no fidelity or deviation entry: the target keeps the rule, and the message text is the DEF-MENU-004 deviation."
+
+# JDISC (jobs/DISCGRP.md) and JPCAT (jobs/PRTCATBL.md) enter only after a passing reported run of
+# verify-batch-spec for disclosureGroupReloadJob and categoryBalanceListingJob, in both modes, and of
+# their batch-service tests. Their ledger records are kept meanwhile; DEF-JPCAT-001 gates as a declared
+# switch.

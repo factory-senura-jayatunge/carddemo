@@ -21,6 +21,16 @@ from tracelib import code, ledger, matrix, reports, spec  # noqa: E402
 from tracelib import manifest as run_manifest  # noqa: E402
 
 REPO = TRACE.parents[2]
+# The item each unit's INV-001 test cites with it (transaction-service.md section 9).
+INVARIANT_ITEM = {"BILL": "BR-BILL-004", "TRNA": "BR-TRNA-003", "POST": "ERR-POST-004", "INTC": "DEF-INTC-010"}
+
+
+def closing_items(gap: dict) -> list[str]:
+    """What a passing test cites to close a gap: an invariant's gap of one unit also needs that unit's item."""
+    unit, sep, _ = gap["reason"].partition(": ")
+    if gap["id"].startswith("INV-") and sep:
+        return [gap["id"], INVARIANT_ITEM[unit]]
+    return [gap["id"]]
 
 
 def make_spec() -> spec.Spec:
@@ -96,6 +106,14 @@ class GateTest(unittest.TestCase):
         gaps = self.gaps(ALL_PASSING[1:])
         self.assertEqual(gaps["BR-BILL-001"], "no passing test")
         self.assertEqual(gaps["FLOW-BILL-001"], "no passing test")
+
+    def test_decided_fix_of_must_preserve_item_still_needs_a_passing_test(self):
+        led = make_ledger()
+        led.switches["BR-BILL-001"] = {"value": "fixed", "code_switch": False, "decision": "D-28"}
+        m = self.build(ALL_PASSING[1:], led=led)
+        self.assertEqual(dict(m.gaps)["BR-BILL-001"], "no passing test")
+        self.assertEqual(m.rows["BR-BILL-001"].requirement, "passing-test")
+        self.assertEqual(self.build(ALL_PASSING, led=led).rows["BR-BILL-001"].status, "covered")
 
     def test_skipped_test_does_not_count(self):
         gaps = self.gaps([r("a", ["BR-BILL-001", "FLOW-BILL-001"], status="skipped")] + ALL_PASSING[1:])
@@ -279,6 +297,218 @@ class GateTest(unittest.TestCase):
         self.assertEqual(m.gaps, [])
 
 
+PARTIAL = {"kind": "architecture-dependent", "decision": "none", "target": "no FILLER",
+           "retained": ["Each confirmed add queues one row."], "requires_test": True}
+BOTH_MODES = ("LEGACY", "FIXED")
+
+
+class PartialHelpers:
+    def ledger(self, units=("BILL", "MENU"), **deviations):
+        led = make_ledger(units)
+        led.deviations.update({k.replace("_", "-"): v for k, v in deviations.items()})
+        return led
+
+    def build(self, results, led, spec_=None, units=None):
+        return matrix.build(spec_ or make_spec(), led, results, {"DEF-BILL-001"}, units)
+
+
+class PartialDeviationTest(PartialHelpers, unittest.TestCase):
+    """A deviation with requires_test = true keeps its item under the gate in the decided mode."""
+
+    def test_partial_deviation_without_results_is_a_gap(self):
+        m = self.build(ALL_PASSING[1:], self.ledger(BR_BILL_001=dict(PARTIAL)))
+        row = m.rows["BR-BILL-001"]
+        self.assertEqual((row.requirement, row.status), ("decided-mode", "gap"))
+        self.assertEqual(dict(m.gaps)["BR-BILL-001"], "no passing test in the decided mode (fixed, or a test without a mode) "
+                                                        "(partial deviation: the retained part stays required)")
+
+    def test_partial_deviation_is_covered_by_a_passing_test_in_the_decided_mode(self):
+        led = self.ledger(BR_BILL_001=dict(PARTIAL))
+        for mode in (None, "FIXED"):
+            m = self.build(ALL_PASSING[1:] + [r("a", ["BR-BILL-001", "FLOW-BILL-001"], mode=mode)], led)
+            self.assertEqual((m.gaps, m.rows["BR-BILL-001"].status), ([], "covered"), mode)
+        m = self.build(ALL_PASSING[1:] + [r("a", ["BR-BILL-001", "FLOW-BILL-001"], mode="LEGACY")], led)
+        self.assertEqual(set(dict(m.gaps)), {"BR-BILL-001"})
+        m = self.build(ALL_PASSING + [r("e", ["BR-BILL-001"], status="failed")], led)
+        self.assertTrue(dict(m.gaps)["BR-BILL-001"].startswith("1 failing test"))
+        m = self.build(ALL_PASSING[1:] + [r("a", ["BR-BILL-001", "FLOW-BILL-001"], status="skipped")], led)
+        self.assertIn("BR-BILL-001", dict(m.gaps))
+
+    def test_whole_item_deviation_still_needs_nothing(self):
+        whole = {k: v for k, v in PARTIAL.items() if k not in ("retained", "requires_test")}
+        m = self.build([r("a", ["FLOW-BILL-001"])] + ALL_PASSING[1:], self.ledger(BR_BILL_001=whole))
+        self.assertEqual((m.gaps, m.rows["BR-BILL-001"].status, m.rows["BR-BILL-001"].requirement), ([], "deviation", "none"))
+
+    def test_malformed_partial_fields_fail_closed(self):
+        """verify-ledger rejects these entries; trace run on its own must not read them as whole-item deviations."""
+        whole = {k: v for k, v in PARTIAL.items() if k not in ("retained", "requires_test")}
+        passing = [r("a", ["BR-BILL-001", "FLOW-BILL-001"])] + ALL_PASSING[1:]
+        cases = {
+            "requires_test string": dict(PARTIAL, requires_test="true"),
+            "requires_test false": dict(PARTIAL, requires_test=False),
+            "retained without requires_test": dict(whole, retained=["x"]),
+            "requires_test without retained": dict(whole, requires_test=True),
+            "retained a string": dict(PARTIAL, retained="x"),
+            "retained empty": dict(PARTIAL, retained=[]),
+            "retained blank": dict(PARTIAL, retained=[" "]),
+            "gate_units empty": dict(PARTIAL, gate_units=[]),
+            "gate_excluded alone": dict(whole, gate_excluded={"POST": "ruled"}),
+        }
+        for name, entry in cases.items():
+            m = self.build(passing, self.ledger(BR_BILL_001=entry))
+            row = m.rows["BR-BILL-001"]
+            self.assertEqual((row.requirement, row.status), ("valid-entry", "gap"), name)
+            self.assertTrue(dict(m.gaps)["BR-BILL-001"].startswith("malformed partial deviation: "), name)
+            self.assertTrue(dict(m.gaps)["BR-BILL-001"].endswith("(run make verify-ledger)"), name)
+        # Out of scope and outside the selected units, it is still gated.
+        m = self.build(ALL_PASSING, self.ledger(BR_POST_001=dict(PARTIAL, requires_test="yes")), units=["BILL"])
+        self.assertIn("BR-POST-001", dict(m.gaps))
+        m = self.build(ALL_PASSING, self.ledger(INV_002=dict(PARTIAL, requires_test=1)))
+        self.assertIn("INV-002", dict(m.gaps))
+
+    def test_partial_deviation_on_a_legacy_entry_keeps_the_legacy_mode(self):
+        """The decided mode of an item with a fidelity entry is the entry's value, not fixed."""
+        led = self.ledger(DEF_BILL_009=dict(PARTIAL))
+        others = [t for t in ALL_PASSING if t.name != "b"]
+        m = self.build(others + [r("b", ["DEF-BILL-009"], mode="LEGACY")], led)
+        row = m.rows["DEF-BILL-009"]
+        self.assertEqual((row.requirement, row.status, m.gaps), ("ledger-mode:LEGACY", "covered", []))
+        m = self.build(others + [r("b", ["DEF-BILL-009"], mode="FIXED")], led)
+        self.assertEqual(dict(m.gaps)["DEF-BILL-009"],
+                         "no passing test in legacy mode (partial deviation: the retained part stays required)")
+        m = self.build(others + [r("b", ["DEF-BILL-009"])], led)
+        self.assertEqual(m.rows["DEF-BILL-009"].status, "covered")
+        led.switches["DEF-BILL-009"] = {"value": "fixed", "code_switch": False}
+        m = self.build(others + [r("b", ["DEF-BILL-009"], mode="LEGACY")], led)
+        self.assertEqual(m.rows["DEF-BILL-009"].requirement, "ledger-mode:FIXED")
+        self.assertIn("DEF-BILL-009", dict(m.gaps))
+
+    def test_excluded_and_out_of_scope_items_stay_so(self):
+        m = self.build(ALL_PASSING, self.ledger(BR_MENU_002=dict(PARTIAL), BR_POST_001=dict(PARTIAL)))
+        self.assertEqual(m.gaps, [])
+        self.assertEqual(m.rows["BR-MENU-002"].status, "excluded")
+        self.assertEqual(m.rows["BR-POST-001"].status, "out-of-scope")
+        led = self.ledger(("BILL", "MENU", "POST"), BR_POST_001=dict(PARTIAL))
+        self.assertIn("BR-POST-001", dict(self.build(ALL_PASSING, led).gaps))
+        m = self.build(ALL_PASSING, led, units=["BILL"])
+        self.assertEqual((m.gaps, set(dict(m.ungated))), ([], {"BR-POST-001"}))
+
+    def test_partial_deviation_covered_by_a_switch_needs_both_modes(self):
+        led = self.ledger(FLOW_BILL_001=dict(PARTIAL))
+        led.switches["FLOW-BILL-001"] = {"value": "fixed", "code_switch": False, "note": "Covered by the switch DEF-BILL-010."}
+        m = self.build(ALL_PASSING, led)
+        self.assertEqual(m.rows["FLOW-BILL-001"].requirement, "both-modes")
+        self.assertIn("no passing test in legacy or fixed mode", dict(m.gaps)["FLOW-BILL-001"])
+
+    def test_code_switches_and_decided_entries_are_unchanged(self):
+        def view(m):
+            return {i: (x.requirement, x.status, x.reason) for i, x in m.rows.items() if i != "BR-BILL-001"}
+        results = [t for t in ALL_PASSING if not (t.name == "c" and t.mode == "FIXED")]
+        plain = self.build(results, make_ledger())
+        partial = self.build(results, self.ledger(BR_BILL_001=dict(PARTIAL)))
+        self.assertEqual(view(plain), view(partial))
+        self.assertEqual(partial.rows["DEF-BILL-010"].requirement, "both-modes")
+        self.assertEqual(partial.rows["DEF-BILL-009"].requirement, "ledger-mode:LEGACY")
+
+
+def inv_spec() -> spec.Spec:
+    s = make_spec()
+    s.invariants |= {"INV-001"}
+    s.invariant_units = {"INV-001": ("BILL", "TRNA", "POST")}
+    return s
+
+
+INV = dict(PARTIAL, retained=["BILL: two payments never get the same ID.", "POST: a duplicate never posts."],
+           gate_units=["BILL", "TRNA", "POST"])
+
+
+class PartialInvariantTest(PartialHelpers, unittest.TestCase):
+    """An invariant with a partial deviation: each unit of gate_units in scope owes its own test."""
+
+    def inv(self, results, units=("BILL", "MENU"), select=None, entry=None):
+        return self.build(ALL_PASSING + results, self.ledger(units, INV_001=dict(entry or INV)), inv_spec(), select)
+
+    def test_each_unit_in_scope_needs_its_own_cocited_test(self):
+        m = self.inv([])
+        row = m.rows["INV-001"]
+        self.assertEqual((row.requirement, row.status, row.in_scope), ("per-unit", "gap", True))
+        self.assertEqual(dict(m.gaps)["INV-001"], "BILL: no passing test that cites INV-001 together with an item of BILL")
+        self.assertEqual({u: x["status"] for u, x in row.units.items()}, {"BILL": "gap", "TRNA": "out-of-scope", "POST": "out-of-scope"})
+
+    def test_a_citation_of_the_invariant_alone_or_with_another_unit_does_not_count(self):
+        m = self.inv([r("x", ["INV-001"], mode=mode) for mode in BOTH_MODES])
+        self.assertIn("(2 passing tests cite it for other units or none)", dict(m.gaps)["INV-001"])
+        m = self.inv([r("p", ["INV-001", "BR-POST-001"], mode=mode) for mode in BOTH_MODES])
+        self.assertTrue(dict(m.gaps)["INV-001"].startswith("BILL: no passing test that cites INV-001"))
+
+    def test_unit_with_a_code_switch_needs_both_modes(self):
+        m = self.inv([r("b", ["INV-001", "BR-BILL-001"], mode="FIXED")])
+        self.assertEqual(dict(m.gaps)["INV-001"], "BILL: no passing test in legacy mode")
+        self.assertEqual(m.rows["INV-001"].units["BILL"]["requirement"], "both-modes")
+        m = self.inv([r("b", ["INV-001", "BR-BILL-001"], mode=mode) for mode in BOTH_MODES])
+        self.assertEqual((m.gaps, m.rows["INV-001"].status), ([], "covered"))
+        self.assertEqual(m.rows["INV-001"].units["BILL"]["tests"], ["b", "b"])
+
+    def test_unit_without_a_switch_needs_the_decided_mode(self):
+        bill = [r("b", ["INV-001", "BR-BILL-001"], mode=mode) for mode in BOTH_MODES]
+        units = ("BILL", "MENU", "POST")
+        m = self.inv(bill, units=units)
+        self.assertEqual(dict(m.gaps)["INV-001"], "POST: no passing test that cites INV-001 together with an item of POST "
+                                                  "(2 passing tests cite it for other units or none)")
+        m = self.inv(bill + [r("p", ["INV-001", "BR-POST-001"], mode="LEGACY")], units=units)
+        self.assertEqual(dict(m.gaps)["INV-001"], "POST: no passing test in the decided mode (fixed, or a test without a mode)")
+        m = self.inv(bill + [r("p", ["INV-001", "BR-POST-001"])], units=units)
+        self.assertEqual(m.gaps, [])
+        self.assertEqual(m.rows["INV-001"].units["POST"]["requirement"], "decided-mode")
+
+    def test_co_cited_switch_item_makes_the_unit_test_both_modes(self):
+        m = self.inv([r("t", ["INV-001", "BR-TRNA-003"], mode="FIXED")], units=("BILL", "MENU", "TRNA"))
+        self.assertEqual(m.rows["INV-001"].units["TRNA"]["requirement"], "both-modes")
+        self.assertIn("TRNA: no passing test in legacy mode", [x for g, x in m.gaps if g == "INV-001"])
+
+    def test_unit_selection_gates_each_unit_with_its_own_gate(self):
+        m = self.inv([], units=("BILL", "MENU", "POST"), select=["BILL"])
+        self.assertEqual([x for g, x in m.gaps if g == "INV-001"], ["BILL: no passing test that cites INV-001 together with an item of BILL"])
+        self.assertEqual([x for g, x in m.ungated if g == "INV-001"], ["POST: no passing test that cites INV-001 together with an item of POST"])
+        m = self.inv([], units=("BILL", "MENU", "POST"), select=["MENU"])
+        self.assertNotIn("INV-001", dict(m.gaps))
+
+    def test_failing_test_counts_against_its_unit_or_every_unit(self):
+        both = [r("b", ["INV-001", "BR-BILL-001"], mode=mode) for mode in BOTH_MODES]
+        m = self.inv(both + [r("f", ["INV-001"], status="failed")])
+        self.assertEqual(dict(m.gaps)["INV-001"], "BILL: 1 failing test")
+        m = self.inv(both + [r("f", ["INV-001", "BR-POST-001"], status="failed")], units=("BILL", "MENU", "POST"))
+        self.assertEqual([x for g, x in m.gaps if g == "INV-001"], ["POST: 1 failing test"])
+
+    def test_no_unit_in_scope_is_out_of_scope(self):
+        m = self.inv([], units=("MENU",))
+        self.assertEqual((m.rows["INV-001"].status, m.rows["INV-001"].in_scope), ("out-of-scope", False))
+        self.assertNotIn("INV-001", dict(m.gaps))
+
+    def test_missing_gate_units_fails_in_every_gate(self):
+        entry = {k: v for k, v in INV.items() if k != "gate_units"}
+        m = self.inv([], select=["MENU"], entry=entry)
+        self.assertIn("without gate_units", dict(m.gaps)["INV-001"])
+
+    def test_whole_item_invariant_deviation_needs_nothing(self):
+        entry = {k: v for k, v in INV.items() if k not in ("retained", "requires_test", "gate_units")}
+        m = self.inv([], entry=entry)
+        self.assertEqual((m.rows["INV-001"].status, m.gaps), ("deviation", []))
+
+    def test_matrix_shows_partial_entries_and_unit_obligations(self):
+        m = self.inv([r("b", ["INV-001", "BR-BILL-001"], mode="FIXED")], units=("BILL", "MENU", "POST"))
+        m.rows["BR-BILL-001"].deviation = dict(PARTIAL)
+        md = trace_cli.render_md(m, [], "now")
+        self.assertIn("## Invariants tested per unit", md)
+        self.assertIn("| INV-001 | BILL | both-modes | 1 | gap: no passing test in legacy mode |", md)
+        self.assertIn("| INV-001 | TRNA | none | 0 | out-of-scope |", md)
+        self.assertIn("(partial: retained part requires a test)", md)
+        data = json.loads(trace_cli.render_json(m, [], "now"))
+        row = next(x for x in data["items"] if x["id"] == "INV-001")
+        self.assertEqual(row["units"]["POST"]["status"], "gap")
+        self.assertEqual(row["deviation"]["gate_units"], ["BILL", "TRNA", "POST"])
+
+
 class ReportsTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -416,7 +646,8 @@ class CliTest(unittest.TestCase):
         self.assertEqual(rc, 1)
         data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
         self.assertEqual(data["gate"]["units"], ["BILL"])
-        bill = [g["id"] for g in all_gaps if g["id"].split("-")[1] == "BILL"]
+        bill = [g["id"] for g in all_gaps if g["id"].split("-")[1] == "BILL" or g["reason"].startswith("BILL: ")]
+        self.assertIn("INV-001", bill)
         self.assertEqual([g["id"] for g in data["gate"]["gaps"]], bill)
         self.assertEqual(len(data["gate"]["gaps"]) + len(data["gate"]["ungated_gaps"]), len(all_gaps))
         self.assertIn("BR-TRNA-003", {g["id"] for g in data["gate"]["ungated_gaps"]})
@@ -482,7 +713,9 @@ class CliTest(unittest.TestCase):
         (self.tmp / "reports").mkdir()
         rc, out = self.run_cli(self.tmp / "reports", ["POST"])
         self.assertEqual(rc, 1)
-        self.assertEqual(out.strip(), "trace: FAILED (--unit POST not in scope.toml; units in scope: BILL, MENU, SGN)")
+        self.assertEqual(out.strip(), "trace: FAILED (--unit POST not in scope.toml; units in scope: "
+                         "BILL, DBUL, DTFT, JCSDD, JCSDM, JCSDUP, JDBPA, JDCUST, JESRR, JFTP, JGDGD, JIRD1, JIRD2, "
+                         "JLDPA, JREPT, JRPROC, JULGS, JULPA, MENU, MWAT, PDLD, PDUL, SGN, WAIT)")
 
     def test_bracketed_ids_are_reported(self):
         results = self.tmp / "reports/web/test-results"
@@ -506,7 +739,14 @@ class CliTest(unittest.TestCase):
         self.assertIn("DEF-BILL-010: no passing test in legacy or fixed mode", out)
         data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
         self.assertFalse(data["gate"]["ok"])
-        self.assertEqual(data["scope"], ["BILL", "MENU", "SGN"])
+        self.assertEqual(data["scope"], ["BILL", "DBUL", "DTFT", "JCSDD", "JCSDM", "JCSDUP", "JDBPA", "JDCUST", "JESRR",
+                                         "JFTP", "JGDGD", "JIRD1", "JIRD2", "JLDPA", "JREPT", "JRPROC", "JULGS", "JULPA",
+                                         "MENU", "MWAT", "PDLD", "PDUL", "SGN", "WAIT"])
+        # These units entered scope because none of their items needs a test: each is incidental, a deviation,
+        # or excluded by an architect ruling.
+        for unit in ("JCSDUP", "JDCUST", "JIRD1", "JIRD2", "JREPT", "WAIT", "MWAT", "DTFT", "JESRR", "JFTP", "JCSDD",
+                     "JCSDM", "DBUL", "PDUL", "PDLD", "JDBPA", "JLDPA", "JULPA", "JULGS", "JGDGD", "JRPROC"):
+            self.assertNotIn("gap", data["summary"][unit], unit)
         md = (self.tmp / "out/matrix.md").read_text(encoding="utf-8")
         self.assertIn("### BILL", md)
         self.assertIn("| DEF-BILL-001 |", md)
@@ -518,7 +758,7 @@ class CliTest(unittest.TestCase):
         lines = []
         for gap in data["gate"]["gaps"]:
             for mode in ("LEGACY", "FIXED"):
-                lines.append(json.dumps({"class": "T", "method": gap["id"], "displayName": mode, "items": [gap["id"]],
+                lines.append(json.dumps({"class": "T", "method": gap["id"], "displayName": mode, "items": closing_items(gap),
                                          "status": "SUCCESSFUL", "mode": mode}))
         spec_items = self.tmp / "reports/svc/target/spec-items"
         spec_items.mkdir(parents=True)
@@ -529,8 +769,9 @@ class CliTest(unittest.TestCase):
         data = json.loads((self.tmp / "out/matrix.json").read_text(encoding="utf-8"))
         statuses = {i["id"]: i["status"] for i in data["items"]}
         self.assertEqual(statuses["DEF-BILL-001"], "deviation")
-        self.assertEqual(statuses["BR-MENU-002"], "excluded")
+        self.assertEqual(statuses["BR-MENU-002"], "covered")
         self.assertEqual(statuses["DEF-BILL-010"], "covered")
+        self.assertEqual(statuses["INV-001"], "covered")
         # A green gate still lists the planned switches, and never as covered.
         planned = {g["id"] for g in data["gate"]["planned"]}
         self.assertEqual(bool(planned), data["gate"]["declared_switches"] is not None)
@@ -560,7 +801,7 @@ class ManifestTest(unittest.TestCase):
                            io.StringIO(), ["BILL"])
         self.assertEqual(rc, 1)
         gaps = json.loads((self.tmp / "probe/matrix.json").read_text(encoding="utf-8"))["gate"]["gaps"]
-        return "\n".join(json.dumps({"class": "T", "method": g["id"], "displayName": mode, "items": [g["id"]],
+        return "\n".join(json.dumps({"class": "T", "method": g["id"], "displayName": mode, "items": closing_items(g),
                                      "status": status, "mode": mode})
                          for g in gaps for mode in ("LEGACY", "FIXED")) + "\n"
 

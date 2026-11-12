@@ -18,8 +18,10 @@ SCHEMA = 1
 VALUES = ("legacy", "fixed")
 SWITCH_FIELDS = {"value", "code_switch", "setting", "decision", "approved_by", "approved_on", "note"}
 SWITCH_REQUIRED = ("value", "code_switch", "decision", "approved_by", "approved_on")
-DEVIATION_FIELDS = {"kind", "decision", "group", "legacy", "target", "scenarios", "source", "note",
-                    "approved_by", "approved_on"}
+DEVIATION_FIELDS = {"kind", "decision", "group", "legacy", "target", "scenarios", "retained", "requires_test",
+                    "gate_units", "gate_excluded", "source", "note", "approved_by", "approved_on"}
+NOT_STRINGS = {"approved_on", "code_switch", "scenarios", "retained", "requires_test", "gate_units", "gate_excluded"}
+COMPONENTS_DOC = "components.md"
 DEVIATION_REQUIRED = ("kind", "decision", "target", "approved_by", "approved_on")
 DEVIATION_KINDS = ("architecture-dependent", "security-c1", "incidental-ui", "decision")
 UNIT_FIELDS = {"spec", "excluded", "note"}
@@ -33,6 +35,46 @@ def covering_switch(entry: dict | None) -> str | None:
     note = (entry or {}).get("note")
     m = COVERED_RE.search(note) if isinstance(note, str) else None
     return m.group(1) if m else None
+
+
+def decided_fix(entry: dict) -> bool:
+    """An entry that records a catalog decision changing an item the spec does not class defect-decide
+    (a must-preserve check that the decision fixes). Such an item has no legacy mode, so the entry can
+    only be fixed, without a switch. The entry leaves the trace requirement of the item's class unchanged."""
+    decision = entry.get("decision")
+    return (entry.get("value") == "fixed" and entry.get("code_switch") is False and isinstance(decision, str)
+            and decision.strip() not in ("", "none") and covering_switch(entry) is None)
+
+
+def requires_test(entry: dict | None) -> bool:
+    """A partial deviation: the item keeps outcomes of its own (retained), so trace still requires a
+    passing test of it in the decided mode, as if the item had no entry."""
+    return (entry or {}).get("requires_test") is True
+
+
+PARTIAL_FIELDS = ("retained", "requires_test", "gate_units", "gate_excluded")
+
+
+def partial_problem(entry: dict | None) -> str | None:
+    """Why trace cannot read the partial fields of a deviation, or None. verify-ledger reports every
+    problem; trace checks only enough to fail closed instead of exempting the item as a whole."""
+    e = entry or {}
+    if not any(k in e for k in PARTIAL_FIELDS):
+        return None
+    if e.get("requires_test") is not True:
+        return "the entry has partial fields but requires_test is not true"
+    retained = e.get("retained")
+    if not (isinstance(retained, list) and retained and all(isinstance(s, str) and s.strip() for s in retained)):
+        return "retained is not a non-empty list of statements"
+    if "gate_units" in e and not gate_units(e):
+        return "gate_units is not a non-empty list of unit codes"
+    return None
+
+
+def gate_units(entry: dict | None) -> tuple[str, ...]:
+    """The units that each owe a test of a partial deviation of an invariant (the units of its components)."""
+    units = (entry or {}).get("gate_units")
+    return tuple(units) if isinstance(units, list) and all(isinstance(u, str) for u in units) else ()
 
 
 @dataclass
@@ -90,7 +132,7 @@ def _common(where: str, e: dict, allowed: set[str], required: tuple[str, ...], d
     for key in required:
         if key not in e:
             problems.append(f"{where}: {key} missing")
-    for key in sorted(allowed & set(e) - {"approved_on", "code_switch", "scenarios"}):
+    for key in sorted(allowed & set(e) - NOT_STRINGS):
         if not isinstance(e[key], str) or (key in required and not e[key].strip()):
             problems.append(f"{where}: {key} must be a non-empty string")
     decision = e.get("decision")
@@ -115,8 +157,10 @@ def check_switches(ledger: Ledger, spec: Spec, decisions: set[str]) -> list[str]
         item = spec.items.get(ident)
         if item is None and ident not in spec.questions:
             problems.append(f"{where}: not an item the spec defines")
-        elif item is not None and not item.defect_decide:
-            problems.append(f"{where}: the spec classes it {item.fidelity or 'without a fidelity class'!r}; only defect-decide items and questions have a value")
+        elif item is not None and not item.defect_decide and not decided_fix(e):
+            problems.append(f"{where}: the spec classes it {item.fidelity or 'without a fidelity class'!r}; only defect-decide items "
+                            "and questions have a value, and other items only a decided fix "
+                            "(value = \"fixed\", code_switch = false, a catalog decision)")
         if "value" in e and e["value"] not in VALUES:
             problems.append(f"{where}: value must be legacy or fixed")
         if "code_switch" in e and not isinstance(e["code_switch"], bool):
@@ -155,6 +199,7 @@ def check_deviations(ledger: Ledger, spec: Spec, decisions: set[str], arch_rows:
             parts = scenario.split() if isinstance(scenario, str) else []
             if len(parts) != 2 or parts[1] not in spec.scenarios.get(parts[0], set()):
                 problems.append(f"{where}: scenario {scenario!r} is not a scenario of a spec (form: \"COSGN00C S10\")")
+        _check_partial(where, ident, e, spec, problems)
     for row in arch_rows:
         for ident in row:
             if not spec.defined(ident):
@@ -162,6 +207,69 @@ def check_deviations(ledger: Ledger, spec: Spec, decisions: set[str], arch_rows:
             elif ledger.deviations.get(ident, {}).get("kind") != "architecture-dependent":
                 problems.append(f"deviations.toml: {ident}: architecture-dependent item has no entry of kind \"architecture-dependent\"")
     return problems
+
+
+def _string_list(where: str, key: str, value, problems: list[str]) -> list[str]:
+    if not isinstance(value, list) or not value or not all(isinstance(s, str) and s.strip() for s in value):
+        problems.append(f"{where}: {key} must be a non-empty list of non-empty strings")
+        return []
+    seen = [s.strip() for s in value]
+    for dup in sorted({s for s in seen if seen.count(s) > 1}):
+        problems.append(f"{where}: {key} lists {dup!r} more than once")
+    return seen
+
+
+def _check_partial(where: str, ident: str, e: dict, spec: Spec, problems: list[str]) -> None:
+    """retained, requires_test, gate_units and gate_excluded: the fields of a partial deviation."""
+    partial = e.get("requires_test") is True
+    if "requires_test" in e and not partial:
+        problems.append(f"{where}: requires_test must be true; a whole-item deviation leaves it out")
+    if "retained" in e:
+        _string_list(where, "retained", e["retained"], problems)
+        if not partial:
+            problems.append(f"{where}: retained needs requires_test = true, or the retained parts go untested")
+    elif partial:
+        problems.append(f"{where}: requires_test = true needs retained, the parts the item keeps, as testable statements")
+    if partial and ident in spec.questions:
+        problems.append(f"{where}: requires_test on a question; trace never requires a test of a question")
+    invariant = ident in spec.invariants or ident in spec.proposed_invariants
+    if partial and invariant and "gate_units" not in e:
+        problems.append(f"{where}: an invariant with requires_test = true needs gate_units, the units of its components")
+    if "gate_excluded" in e and "gate_units" not in e:
+        problems.append(f"{where}: gate_excluded needs gate_units")
+    if "gate_units" not in e:
+        return
+    if not invariant:
+        problems.append(f"{where}: gate_units is only for an invariant; an item is gated with its own unit")
+    if not partial:
+        problems.append(f"{where}: gate_units needs requires_test = true")
+    units = _string_list(where, "gate_units", e["gate_units"], problems)
+    for unit in units:
+        if unit not in spec.units:
+            problems.append(f"{where}: gate_units names {unit!r}, which is not the unit code of a spec")
+    excluded = e.get("gate_excluded", {})
+    if not isinstance(excluded, dict):
+        problems.append(f"{where}: gate_excluded must be a table of unit = reason")
+        excluded = {}
+    for unit, reason in excluded.items():
+        if not isinstance(reason, str) or not reason.strip():
+            problems.append(f"{where}: gate_excluded {unit} needs the reason the ruling gives")
+        if unit in units:
+            problems.append(f"{where}: {unit} is both in gate_units and in gate_excluded")
+    if not invariant:
+        return
+    components = spec.invariant_units.get(ident, ())
+    if not components:
+        problems.append(f"{where}: {COMPONENTS_DOC} names no component of {ident} with a unit, so gate_units cannot be checked")
+        return
+    missing = [u for u in components if u not in units and u not in excluded]
+    extra = [u for u in dict.fromkeys(units + list(excluded)) if u not in components]
+    if missing:
+        problems.append(f"{where}: gate_units leaves out {', '.join(missing)}, units of its components in {COMPONENTS_DOC}; "
+                        "a unit is left out only through gate_excluded with the ruling's reason")
+    if extra:
+        problems.append(f"{where}: {', '.join(extra)} is not a unit of its components in {COMPONENTS_DOC} "
+                        f"({', '.join(components)})")
 
 
 def check_scope(ledger: Ledger, spec: Spec) -> list[str]:
@@ -220,7 +328,8 @@ def summary(ledger: Ledger, code: Code | None) -> str:
     text = (f"{len(ledger.switches)} fidelity entries ({values['fixed']} fixed, {values['legacy']} legacy; "
             f"{in_code} code switches), {len(ledger.deviations)} deviations ("
             + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda kv: str(kv[0])))
-            + f"), {len(ledger.units)} units in scope")
+            + f"; {sum(1 for e in ledger.deviations.values() if requires_test(e))} partial with a retained part to test)"
+            + f", {len(ledger.units)} units in scope")
     if code is not None:
         text += f"; code: {len(code.switches)} switches, {len(code.config)} configured"
     return text

@@ -23,6 +23,9 @@ PINV_ROW_RE = re.compile(r"^\|\s*(PINV-[a-z0-9]+(?:-[a-z0-9]+)*-\d{2})\s*\|")
 SCENARIO_ROW_RE = re.compile(r"^\|\s*(S\d+)\s*\|")
 NEXT_HEAD_RE = re.compile(r"^#{1,4}\s")
 FIDELITY_RE = re.compile(r"\*\*Fidelity:\*\*\s*([^\n]*)")
+INV_ROW_RE = re.compile(r"^\|\s*(INV-\d{3})\s*\|")
+COMPONENT_RE = re.compile(r"\b[A-Z][A-Z0-9]{3,7}\b")
+COMPONENTS = "docs/modernization/spec/components.md"
 
 
 @dataclass
@@ -56,6 +59,9 @@ class Spec:
     entities: set[str] = field(default_factory=set)
     units: dict[str, str] = field(default_factory=dict)
     scenarios: dict[str, set[str]] = field(default_factory=dict)
+    # The units of the components that components.md lists for an invariant (the components that name
+    # a spec with a unit code), in the order listed.
+    invariant_units: dict[str, tuple[str, ...]] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
 
     def defined(self, ident: str) -> bool:
@@ -87,10 +93,12 @@ def load(root: Path) -> Spec:
     result = Spec(root)
     result.invariants = set(checker.invariants)
     result.entities = set(checker.entities)
+    unit_of: dict[str, str] = {}
     for s in checker.specs:
         unit = str(s.meta.get("unit_code", ""))
         if unit:
             result.units.setdefault(unit, s.rel)
+            unit_of[s.id] = unit
         result.scenarios[s.id] = {m.group(1) for line in s.lines if (m := SCENARIO_ROW_RE.match(line))}
         for ident, n in s.items.items():
             kind, iunit = ident.split("-")[0], ident.split("-")[1]
@@ -109,6 +117,14 @@ def load(root: Path) -> Spec:
     for ident, where in checker.defined.items():
         if ident.startswith("Q-") and ident not in result.questions:
             result.questions[ident] = where.split(":", 1)[0]
+    components = root / COMPONENTS
+    if components.is_file():
+        for line in components.read_text(encoding="utf-8").splitlines():
+            m = INV_ROW_RE.match(line)
+            cells = line.split("|")
+            if m and len(cells) > 3:
+                found = [unit_of[c] for c in COMPONENT_RE.findall(cells[3]) if c in unit_of]
+                result.invariant_units[m.group(1)] = tuple(dict.fromkeys(found))
     areas = root / "docs/modernization/spec/areas"
     for path in sorted(areas.glob("*.md")):
         for line in path.read_text(encoding="utf-8").splitlines():

@@ -16,7 +16,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * <p>Options: {@code --source-dir DIR} (default {@code CARDDEMO_LOAD_SOURCE_DIR}, else
  * {@code ../app/data/ASCII}), {@code --users-jcl FILE} (default {@code ../app/jcl/DUSRSECJ.jcl}),
  * {@code --fidelity DEF-ACUP-002=legacy|fixed} (the mode the accounts were loaded in; default as
- * {@link GroupIdMode} resolves it).
+ * {@link GroupIdMode} resolves it), {@code --account-layout-manifest FILE} (the layout manifest the
+ * load was given; read in fixed mode only, default the built-in lookup by the file's hash).
  */
 public final class VerifyData {
 
@@ -27,10 +28,12 @@ public final class VerifyData {
         String sourceDir = System.getenv().getOrDefault("CARDDEMO_LOAD_SOURCE_DIR", "../app/data/ASCII");
         String usersJcl = "../app/jcl/DUSRSECJ.jcl";
         String groupIdMode = null;
+        String manifest = null;
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--source-dir" -> sourceDir = value(args, ++i);
                 case "--users-jcl" -> usersJcl = value(args, ++i);
+                case "--account-layout-manifest" -> manifest = value(args, ++i);
                 case "--fidelity" -> {
                     String setting = value(args, ++i);
                     String prefix = BatchSwitches.DEF_ACUP_002.itemId() + "=";
@@ -56,14 +59,16 @@ public final class VerifyData {
         ds.setUser(settings.adminUser());
         ds.setPassword(settings.adminPassword());
         ds.setApplicationIntent("ReadOnly");
-        Report report = new DataReconciliation(JdbcClient.create(ds), Path.of(sourceDir), Path.of(usersJcl), mode).run();
+        Report report = new DataReconciliation(JdbcClient.create(ds), Path.of(sourceDir), Path.of(usersJcl), mode,
+                manifest == null ? null : Path.of(manifest)).run();
         System.out.println("database " + settings.databaseName() + ", sample files " + Path.of(sourceDir).toAbsolutePath().normalize());
         report.print(System.out);
         System.exit(report.ok() ? 0 : 1);
     }
 
     private static void usage() {
-        System.err.println("usage: verify-data [--source-dir DIR] [--users-jcl FILE] [--fidelity DEF-ACUP-002=legacy|fixed]");
+        System.err.println("usage: verify-data [--source-dir DIR] [--users-jcl FILE] [--fidelity DEF-ACUP-002=legacy|fixed]"
+                + " [--account-layout-manifest FILE]");
         System.exit(2);
     }
 

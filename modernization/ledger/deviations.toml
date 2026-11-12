@@ -5,6 +5,9 @@
 # decision     the decision of docs/modernization/decisions/README.md, or "none"
 # target       what the target does instead; legacy: what the COBOL does, when not obvious
 # group        the shared reason when several items deviate for it
+# retained     the parts of the item the target keeps, as testable statements, with requires_test = true:
+#              a partial deviation, whose item stays required by make trace in the decided mode
+# gate_units   for a partial invariant: the units of its components, each of which needs its own test
 # scenarios    equivalence scenarios whose legacy result the target does not reproduce ("COSGN00C S10")
 # approved_by, approved_on   who accepted the deviation, and when (YYYY-MM-DD)
 #
@@ -15,6 +18,20 @@
 schema = 1
 
 # invariants
+
+[deviation."INV-001"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-05"
+legacy = "Online writers compute highest + 1 and posting takes the file's IDs; nothing coordinates them."
+target = "TRAN-ID stays unique: in fixed mode generated IDs come from the reserved range, which file IDs may not use, and the claim check fails the ingest, in both modes, when a file ID meets another staged row, a waiting add or a master row, or in fixed mode is reserved (TRAN_ID_RESERVED); UX_tran_master is the backstop"
+retained = ["BILL: two payments never get the same ID (both modes); a payment whose master insert breaks UX_tran_master rolls back completely, with no core.transaction row, no change to core.account or core.tcat_bal and no billpay.payment row, and gives 409 TRAN_ID_EXISTS with Tran ID already exist..., as billpay-slice.md step 10 and ERR-BILL-001 give it; in fixed mode, generated IDs are reserved IDs.", "TRNA: two adds never get the same ID (both modes, S21); a UX_daily_waiting violation gives 409 TRAN_ID_EXISTS and writes nothing, not even the audit row; in fixed mode, generated IDs are reserved IDs.", "POST: a file ID that is duplicated, equal to a waiting add or master row, or reserved (fixed mode) fails the claim with nothing posted, and the post backstop never half-applies.", "INTC: interest IDs are unique within the run and against the cycle's posted rows; in fixed mode they are reserved IDs from the sequence, in legacy mode parm plus the 6-digit counter (DEF-INTC-010), and a second run of the cycle is refused (D-BAT-10); a UX_tran_master violation fails the chunk and rolls back that account's interest and balance update."]
+requires_test = true
+gate_units = ["BILL", "TRNA", "POST", "INTC"]
+source = "docs/modernization/architecture/batch.md (transaction IDs from the file and from the services), docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Each unit's test cites INV-001 together with that unit's own item: BR-BILL-004 (and ERR-BILL-001 for the forced duplicate), BR-TRNA-003, ERR-POST-004 or DEF-INTC-010. The ruling adds tests and a rollback obligation; it changes no response that an approved unit contract already gives. A tran_id is reserved when it is 16 ASCII digits starting with 9 (9000000000000000 to 9999999999999999), tested by characters, never by a numeric parse; the user approved the range on 2026-11-10."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
 
 [deviation."INV-002"]
 kind = "decision"
@@ -31,7 +48,8 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -83,7 +101,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -310,7 +329,18 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+
+[deviation."FLOW-JCSDD-003"]
+kind = "decision"
+decision = "D-07"
+group = "DEV-PRIVILEGE"
+legacy = "Db2 signs on with each task's CICS user ID and checks plan authority per user (AUTHTYPE(USERID))."
+target = "Per-service SQL login and grants for reference-service; no per-user database sign-on or plan authority. The ADMIN role check on the server replaces per-user Db2 privileges."
+note = "Whole item: per-user database authority is not reproduced. The target connects with one SQL login per service (data-model.md \"Ownership and grants\"), and the service checks the user: session and role under C1 (D-02, D-03). That only an authorised user changes the data stays gated by the C1 role tests of each service. Mechanism by the architect (trace tier rulings, 2026-11-11)."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -511,8 +541,8 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 group = "DEV-PLATFORM"
-target = "No legacy mode: the mechanism is replaced by the target platform."
-source = "docs/modernization/decisions/README.md Appendix B"
+target = "Validate the whole dated inbound file, then delete and insert in one fenced transaction; any validation or database failure leaves the old set unchanged."
+source = "docs/modernization/decisions/README.md Appendix B; target: docs/modernization/architecture/batch.md, DISCGRP in Spec-only validators (104321a)"
 note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -521,11 +551,22 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 group = "DEV-PLATFORM"
-target = "No legacy mode: the mechanism is replaced by the target platform."
-source = "docs/modernization/decisions/README.md Appendix B"
+target = "A failed reload stops the job; the one delete-and-insert transaction rolls back and checkDefaultGroup never follows a failed reload."
+source = "docs/modernization/decisions/README.md Appendix B; target: docs/modernization/architecture/batch.md, DISCGRP in Spec-only validators (104321a)"
 note = "IDCAMS delete/define return-code handling and step COND logic in a JCL reload job; the target loads data through its own batch framework with transactional steps, so it does not depend on this."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-JDISC-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "WRITES_BLOCKED prevents online writes; snapshot readers see the complete old set or the complete new set, never an empty, partial or mixed reload."
+retained = ["A concurrent reader sees only the old complete disclosure set or the new complete set."]
+requires_test = true
+source = "docs/modernization/architecture/batch.md, DISCGRP in Spec-only validators (104321a)"
+note = "The legacy exclusive-reader prohibition is replaced by snapshot isolation. JobLaunches requires the window held by the exact windowRunKey. The window is the D-18 mechanism (WRITES_BLOCKED), but D-18's catalog items do not include ERR-JDISC-002, so this is the architect's ruling in batch.md, not a catalog decision."
+approved_by = "architect (batch.md Spec-only validators, commit 104321a)"
+approved_on = "2026-11-11"
 
 # jobs/DUSRSECJ.md
 
@@ -698,6 +739,17 @@ legacy = "The cycle order comes from CA-7, Control-M, the README and scripts, no
 target = "The batch cycle runs as Airflow DAGs in option F (reset, post, interest, backup, combine, statements); the authorization purge never gates posting; task dependencies replace the waits."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+# jobs/PRTCATBL.md
+
+[deviation."SE-JPCAT-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "The pre-posting restore point is batch.snapshot_tcat_bal, captured by postDailyTransactionsJob's snapshotBalances step. categoryBalanceListingJob reads the current balances and writes no table."
+source = "docs/modernization/architecture/batch.md, PRTCATBL in Spec-only validators (104321a)"
+note = "No GDG or listing-time backup exists. The restore-point obligation belongs to the cycle snapshot, not to the read-only listing."
+approved_by = "architect (batch.md Spec-only validators, commit 104321a)"
+approved_on = "2026-11-11"
 
 # jobs/READACCT.md
 
@@ -1790,6 +1842,18 @@ source = "docs/modernization/architecture/decisions.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."DEF-POST-009"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-05"
+legacy = "Duplicate IDs are found only by the abend on the master write."
+target = "Duplicate transaction IDs are found before posting, by the claim check in both modes (DUPLICATE_TRAN_ID)"
+retained = ["Posting still adds none of the other checks: an inactive account, an inactive or expired card, a type or category missing from the reference tables, and a zero amount all post as in legacy, when the checks of BR-POST-001 to BR-POST-005 pass."]
+requires_test = true
+source = "docs/modernization/architecture/batch.md (transaction IDs from the file and from the services), docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
 [deviation."DEF-POST-011"]
 kind = "decision"
 decision = "D-10"
@@ -1798,6 +1862,18 @@ legacy = "Jobs print whole records with card numbers, CVVs and SSNs, and backup,
 target = "No sensitive data in logs, listings or extracts: logs carry counts and keys only, diagnostic listings are dropped, retained files get a retention period and access control."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-POST-004"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-ARCH-05"
+legacy = "A duplicate DALYTRAN-ID fails the master write after the record's balances were applied, and POSTTRAN abends."
+target = "The claim check fails ingestDailyFileJob before the first record is posted (DUPLICATE_TRAN_ID), in both modes, so nothing is half applied; UX_tran_master stays the backstop"
+retained = ["A failed master write fails the posting run: the job is FAILED and no later record is posted.", "The failing chunk leaves no balance changed (DEF-POST-008 fix)."]
+requires_test = true
+source = "docs/modernization/architecture/batch.md (transaction IDs from the file and from the services), docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
 
 # programs/CBTRN03C.md
 
@@ -1822,6 +1898,18 @@ approved_on = "2026-11-06"
 
 # programs/COACCT01.md
 
+[deviation."BR-MQAC-007"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "One MQ unit of work per request: each request got exactly one reply before the next get."
+target = "At least once on the crash path: a death between a confirmed reply and its acknowledgement redelivers the request, which is answered again; when the request has a message_id the duplicate repeats the first reply's message_id (the name-based UUID of \"MQAC:\" + the request's message_id in fixed mode) and correlation_id, and without one it cannot be matched by ID"
+retained = ["In every run without a crash, each request that is answered gets exactly one confirmed reply before its acknowledgement, and requests are answered one at a time in arrival order, with concurrency 1 per listener (I6).", "A request without a message_id is answered and never rejected or dead-lettered for the absence (I29)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 2 and 5 (architecture commit 2b5e102)"
+note = "Ratified under the product delegation on 2026-11-11. No duplicate store: the service is read-only and a second answer changes no data. A duplicate account reply is read again from the current row, so its body can differ; the requester keeps the first reply for an ID. A request held by the delayed retry is overtaken by later ones (section 5, Q5). Not yet implemented."
+approved_by = "architect (inquiry-service.md), ratified under the product delegation"
+approved_on = "2026-11-11"
+
 [deviation."DEF-MQAC-003"]
 kind = "architecture-dependent"
 decision = "D-73"
@@ -1840,6 +1928,28 @@ legacy = "Every program, job and requester can use every file, transaction and q
 target = "Least privilege: per-service SQL logins and grants, one RabbitMQ user per requester, report jobs run under the requesting user's identity."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."DEF-MQAC-005"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A key that is not 11 digits makes the comparison with zero undefined: it can pass and give not found, or abend, and the request is backed out and comes back with the next trigger."
+target = "The not-found outcome is kept and the abend outcome is not reproduced: a listener does not loop on one message (as DEV-ARCH-09)"
+retained = ["A key (bytes 5 to 15, or the JSON acctId) that is not exactly 11 ASCII digits gets the not-found reply INVALID REQUEST PARAMETERS ACCT ID : followed by the 11 key bytes as received (48 characters), or JSON {\"status\":\"NOT_FOUND\",\"acctId\":\"<as received>\"}, with no read (I9, I10).", "The key 00000000000 and any function other than INQA keep the invalid-request reply of BR-MQAC-004; the function is tested first."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md section 4 (architecture commit 2b5e102)"
+note = "DEF-MQAC-005 has no fidelity entry, so it keeps the COBOL behaviour that can be built (switches.md general rule). Not yet implemented."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."DEF-MQAC-006"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "The request length is ignored, and the uncleared buffer supplies missing bytes from the previous reply."
+target = "Each delivery is read into a fresh buffer; missing bytes are spaces (I9)"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
 
 [deviation."DEF-MQAC-008"]
 kind = "architecture-dependent"
@@ -1861,6 +1971,80 @@ source = "docs/modernization/architecture/decisions.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."ERR-MQAC-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed RETRIEVE of the trigger data puts an error record and ends the task."
+target = "Not applicable: there is no trigger data to retrieve"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQAC-002"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed open of the error queue is written to the console and ends the task."
+target = "A refused declaration or connection fails the service start and the health check; no request is read (W7)"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQAC-003"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed open of the input or reply queue puts an error record and ends the task."
+target = "A refused declaration or connection fails the service start and the health check; no request is read (W7)"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQAC-004"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed get (reason not 2033) puts INP MQGET ERR: and ends the task; for 2080 the message stays on the queue."
+target = "A request over 1000 bytes is dead-lettered after the confirmed INP MQGET ERR: record, with no reply, and the listener goes on (DEV-ARCH-09)"
+retained = ["A request over 1000 bytes gets the error record INP MQGET ERR: with condition 01, reason 02080 and the request queue name, confirmed before the reject, and no reply (I12)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQAC-005"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "The get, the read and the puts were one MQ unit of work, so a failed request left exactly one error record."
+target = "On the crash path a death between a record's confirm and the reject adds a second record with the same correlation_id and a higher x-carddemo-delivery-count (records of a request with neither message_id nor correlation_id cannot be matched to it), and no record is left when every delivery from the sixth to the eleventh ends (crash, lost channel or record not confirmed) before a record is confirmed; the broker backstop (x-delivery-limit 10) then dead-letters the request, and the broker log, the .dlq and the M006 lines are the only trace"
+retained = ["On the handled give-up of a failed account read, exactly one ERROR WHILE READING ACCTF record naming the request queue is confirmed, then one error reply is attempted, then the request is rejected without requeue to its .dlq (I17, I26b, I27).", "Each error record carries correlation_id = the request's message_id, else its correlation_id, else none, and the header x-carddemo-delivery-count; no request body and no account data (I12, I17, I29)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.2 to 1.5 (architecture commit 2b5e102)"
+note = "Intentional architecture deviation, ratified under the product delegation on 2026-11-11 (WP5 delivery semantics). AMQP has no transaction across a consume, a database read and a publish to another queue, and a stored outbox would need a write grant on a service that is read-only by design. The broker backstop is finite so that a message that crashes the service on every delivery still leaves the queue; a store is a possible stronger alternative and is not chosen. The error record is not an absolute at-least-once guarantee per request. Tests I17 and I23 to I30 against the real pinned broker, with genuine publisher nacks and channel closes, are required before acceptance. Not yet implemented."
+approved_by = "architect (inquiry-service.md), ratified under the product delegation"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQAC-006"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed reply put writes MQPUT ERR naming the reply queue and ends the task; the request is consumed without a reply."
+target = "A reply that is not confirmed (nack, timeout, lost channel) is retried with requeue below delivery count 5; at 5 or more the service confirms the MQPUT ERR record naming the reply destination, sends no error reply and dead-letters the request"
+retained = ["On the handled give-up, a request whose reply cannot be confirmed leaves exactly one confirmed MQPUT ERR record naming the reply destination and gets no error reply (I31).", "On the account-read give-up, an error reply that is not confirmed is logged as M004 and the request is still dead-lettered, with exactly one record and no requeue (I30)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQAC-007"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed error put is written to the console and the task ends; the error text is lost."
+target = "A record that is refused, not confirmed within 5 s or loses its channel is logged as M006 and the request is requeued, so the give-up runs again on the next delivery, up to the broker backstop (I26, I26b)"
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
 [deviation."ERR-MQAC-008"]
 kind = "architecture-dependent"
 decision = "none"
@@ -1870,6 +2054,92 @@ source = "docs/modernization/decisions/README.md Appendix B"
 note = "Error records and re-entry on MQ close failure are IBM MQ API handling the RabbitMQ client replaces."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-MQAC-009"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A data exception or a SYNCPOINT failure abends the task, and CICS backs out the get and puts."
+target = "No abend: any exception is a counted retry (reject with requeue) and is given up at delivery count 5 without a record or a reply (I17)"
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQAC-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A CKTI trigger starts the task, and the input queue name comes from the trigger message."
+target = "No trigger: a Spring AMQP listener with manual acknowledgement consumes the account request queue from service start; the reply destination is the routing of switch DEF-MQAC-002"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQAC-002"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "The error, input and reply queues are opened in order; a failure ends the task."
+target = "No opens: the service declares its topology at start, and a refused declaration or connection fails the start and the health check"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQAC-003"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "One task drains the queue, commits per request and ends after a 5-second wait with no message."
+target = "The listener consumes continuously and does not end when the queue is empty"
+retained = ["Requests are processed one at a time per listener (concurrency 1), each acknowledged only after its reply is confirmed (I6)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), docs/modernization/architecture/inquiry-service.md section 5, Q5: concurrency 1 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQAC-004"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "Termination closes the open queues, and the CICS RETURN commits the unit of work."
+target = "No termination per batch of requests: the listener runs until the service stops, and one acknowledgement per request replaces the commit"
+retained = ["A request is acknowledged only after its reply is confirmed; a request that fails is rejected, never acknowledged (I19)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."SE-MQAC-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "MQGET under syncpoint with a 5-second wait: the message leaves the queue when the unit of work commits and is backed out on an abend; the 1000-byte buffer is reused."
+target = "Delivery with manual acknowledgement: a lost channel or a crash returns the request, counted by x-delivery-count, and each delivery starts with a fresh buffer (DEF-MQAC-006)"
+retained = ["A request leaves its queue only by an acknowledgement after its confirmed reply (I6, I19), by a reject without requeue to its .dlq (I12, I17), or, when no delivery up to the eleventh ends in the service's acknowledgement or its reject without requeue, by the broker backstop (x-delivery-limit 10) after the eleventh delivery (I26)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."SE-MQAC-004"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "The get, the read and the puts were one MQ unit of work, so a failed request left exactly one error record."
+target = "On the crash path a death between a record's confirm and the reject adds a second record with the same correlation_id and a higher x-carddemo-delivery-count (records of a request with neither message_id nor correlation_id cannot be matched to it), and no record is left when every delivery from the sixth to the eleventh ends (crash, lost channel or record not confirmed) before a record is confirmed; the broker backstop (x-delivery-limit 10) then dead-letters the request, and the broker log, the .dlq and the M006 lines are the only trace; for an oversized request no record is left when every delivery up to the eleventh ends before a record is confirmed"
+retained = ["On the handled give-up (no crash on deliveries 6 to 11), exactly one error record is published and confirmed first; for an account-read failure one error reply is then attempted; then the request is rejected without requeue to its .dlq (I17, I26b).", "An oversized request gets one confirmed INP MQGET ERR: record before its reject, on whichever delivery finds it oversized (I12).", "Each error record carries correlation_id = the request's message_id, else its correlation_id, else none, and the header x-carddemo-delivery-count; no request body and no account data (I12, I17, I29)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.2 to 1.5 (architecture commit 2b5e102)"
+note = "Intentional architecture deviation, ratified under the product delegation on 2026-11-11 (WP5 delivery semantics). AMQP has no transaction across a consume, a database read and a publish to another queue, and a stored outbox would need a write grant on a service that is read-only by design. The broker backstop is finite so that a message that crashes the service on every delivery still leaves the queue; a store is a possible stronger alternative and is not chosen. The error record is not an absolute at-least-once guarantee per request. Tests I17 and I23 to I30 against the real pinned broker, with genuine publisher nacks and channel closes, are required before acceptance. Not yet implemented."
+approved_by = "architect (inquiry-service.md), ratified under the product delegation"
+approved_on = "2026-11-11"
+
+[deviation."SE-MQAC-005"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A SYNCPOINT per loop iteration and the final RETURN commit the get and its puts together; ACTION(BACKOUT) backs them out on an abend."
+target = "No unit of work across the consume and the publishes: the reply is confirmed, then the request is acknowledged; an error record is confirmed before the request is rejected (deviation SE-MQAC-004)"
+retained = ["The request is acknowledged only after its reply is confirmed (I19)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
 
 # programs/COACTUPC.md
 
@@ -1888,7 +2158,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: no page sets the role, which comes from the session on every request. Role from the session is tested through FLOW-CRDL-008 (partial, CRDL S21) and BR-MENU-003 (partial, billpay-slice.md section 11). The role scenarios ACUP S29, CRDU S27, ACVW S20 and CRDV S21 are further evidence."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -1897,7 +2169,11 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["The account and customer keys come from the path and the stored cross-reference, never from the body.", "A change that names a field the screen does not edit gets 400 FIELD_NOT_EDITABLE and writes nothing.", "The save runs the checks of the changed fields again (D-49), so a value the validate step would reject is rejected on save and nothing is written."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Partial item. Classed by the architect on 2026-11-10 (docs/modernization/architecture/account-service.md section 9). Tests: ACUP S31 and S43, and one new API test: a save with a changed field that fails its check, sent without a validate call, gets the field's 400 and writes nothing."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -1906,10 +2182,39 @@ kind = "architecture-dependent"
 decision = "none"
 group = "DEV-PLATFORM"
 target = "No legacy mode: the mechanism is replaced by the target platform."
-source = "docs/modernization/decisions/README.md Appendix B"
-note = "The CSUTLDTC/CEEDAYS parameter-length mismatch is an LE call detail; the target replaces it with standard date parsing."
+source = "docs/modernization/decisions/README.md Appendix B, docs/modernization/architecture/account-service.md section 9"
+note = "The CSUTLDTC/CEEDAYS parameter-length mismatch is an LE call detail; the target replaces it with standard date parsing. Whole item: no LE call is left (DEV-PLATFORM). Whether a date is valid is carried by VAL-ACUP-005 to VAL-ACUP-010 (VAL-ACUP-005 fixed under D-50, the others with no entry), which stay required."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-ACUP-005"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No commarea state byte exists (D-ARCH-12). An unknown state cannot reach the decision step, so UNEXPECTED DATA SCENARIO is never shown"
+source = "docs/modernization/architecture/account-service.md sections 3 and 7"
+note = "Its must-preserve part, that the conversation ends with an error, has no path left to apply to."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-ACUP-006"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail, and the page shows the error page."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md sections 3, 7 and 9"
+note = "The retained part says nothing about writes: legacy backs out nothing on an abend, because the files are RECOVERY(NONE) (DEF-ACUP-005). Both or neither is the D-16 target of DEF-ACUP-005 and of row 5 of ERR-ACUP-004 (fixed, D-16), which stays required; its test cites ERR-ACUP-004 and DEF-ACUP-005."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-ACUP-011"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens; the form and its row version are held by the page"
+source = "docs/modernization/architecture/account-service.md sections 3, 7 and 9"
+note = "Whole item: BR-ACUP-010 carries the context between screens, FLOW-ACUP-004 the state within the screen, and ERR-ACUP-004 (fixed, D-16, D-17, D-68) the save outcomes. All three stay required."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
 
 # programs/COACTVWC.md
 
@@ -1918,7 +2223,11 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["A request without a session reaches sign-on: 401 UNAUTHENTICATED from the API, and the web opens the sign-on page."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Partial item. Classed by the architect on 2026-11-10 (docs/modernization/architecture/account-service.md section 9). Tests: ACVW S1 and S17. The same retained text as FLOW-TRNL-001."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -1927,9 +2236,39 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: no page sets the role, which comes from the session on every request. Role from the session is tested through FLOW-CRDL-008 (partial, CRDL S21) and BR-MENU-003 (partial, billpay-slice.md section 11). The role scenarios ACUP S29, CRDU S27, ACVW S20 and CRDV S21 are further evidence."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-ACVW-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No client-held context: the unexpected-context path cannot occur; each request carries the account ID and the session only"
+source = "docs/modernization/architecture/account-service.md sections 2, 7 and 9"
+note = "Whole item: no path is left. No client-held context exists, so an unknown context cannot arrive (D-ARCH-12), as for ERR-ACUP-005."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-ACVW-004"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail, and the page shows the error page."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md sections 2, 7 and 9"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-ACVW-008"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens"
+source = "docs/modernization/architecture/account-service.md sections 2, 7 and 9"
+note = "Whole item: the context that survives between screens is the selected account and card. BR-ACVW-005 carries it, and has no entry, so it stays required."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
 
 # programs/COADM01C.md
 
@@ -1938,7 +2277,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2010,7 +2350,8 @@ decision = "D-29"
 group = "DEV-ARCH-01"
 legacy = "Balance changed without a payment record when a write fails."
 target = "All or nothing: one database transaction."
-source = "docs/modernization/architecture/decisions.md"
+source = "docs/modernization/architecture/decisions.md, docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: the defect's outcomes (a balance zeroed with no payment, a payment with a stale card or an unchanged balance) are not kept. What is kept is the failing step's message, which is ERR-BILL-001. ERR-BILL-001 stays required, and its test S21 asserts nothing committed at each step 6 to 12, so the D-29 target is tested through a required item. S21 also cites DEF-BILL-001."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2020,7 +2361,8 @@ decision = "none"
 group = "DEV-ARCH-02"
 legacy = "Two concurrent adds get the same transaction ID."
 target = "Unique IDs: iD allocation under a lock in the inserting transaction."
-source = "docs/modernization/architecture/decisions.md"
+source = "docs/modernization/architecture/decisions.md, docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "In fixed mode the ID comes from core.tran_id_seq in the reserved range, which daily-file IDs may not use (BR-TRNA-003). A tran_id is reserved when it is 16 ASCII digits starting with 9 (9000000000000000 to 9999999999999999), tested by characters, never by a numeric parse; the user approved the range on 2026-11-10. Whole item: the legacy outcome is the defect itself (two payments get one ID), so nothing is kept. Unique IDs are INV-001's BILL obligation, which is partial and gated (transaction-service.md section 9); S22 and the concurrent-payment test cite INV-001."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2028,7 +2370,8 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 target = "One response per request: the message of a failed rewrite cannot keep a stale colour"
-source = "docs/modernization/architecture/billpay-slice.md"
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: the stale colour is gone with one response per request. The failed account update's message, Unable to Update Account... as an error, is ERR-BILL-001's step message, which stays required."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2060,15 +2403,17 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 target = "One response per request: several screens per interaction cannot occur"
-source = "docs/modernization/architecture/billpay-slice.md"
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: the spec classes it incidental: the user sees only the last screen and its message. One response per request gives that last message, which is the step's message (ERR-BILL-001) or the success message (BR-BILL-001 to BR-BILL-007), all required."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 [deviation."DEF-BILL-012"]
 kind = "architecture-dependent"
 decision = "none"
-target = "No VSAM browse: the lowest card number comes from one query"
-source = "docs/modernization/architecture/billpay-slice.md"
+target = "No VSAM browse: the next transaction ID comes from the sequence (fixed) or from one query for the highest ID under an application lock (legacy), BR-BILL-004 and D-59; a failed read is a step failure (ERR-BILL-001)"
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: no browse is left, so no failed READPREV can abend. The next ID is BR-BILL-004's (D-59). A failed ID read is ERR-BILL-001's other-failure row, which stays required (S21). Target text corrected by the architect on 2026-11-10 (billpay-slice.md section 11): the lowest card number belongs to the card lookup, not to this item."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2076,7 +2421,8 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 target = "One database transaction: the balance is never edited without a successful account read"
-source = "docs/modernization/architecture/billpay-slice.md"
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: the balance shown always comes from an account read in the same request. The paths the defect names (confirm N, an invalid confirm value, account not found) are VAL-BILL-001 to VAL-BILL-005 and ERR-BILL-001, which stay required."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2092,7 +2438,8 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 target = "No 3270 screen receive: the request body is validated"
-source = "docs/modernization/architecture/billpay-slice.md"
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: there is no screen receive. The request body is checked by VAL-BILL-001 to VAL-BILL-005, which stay required."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2100,7 +2447,8 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 target = "No VSAM browse: a query either returns rows or fails"
-source = "docs/modernization/architecture/billpay-slice.md"
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Whole item: there is no browse to end. A failed ID read is a step failure: ERR-BILL-001's message, nothing committed (S21, DEF-BILL-001)."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2108,7 +2456,10 @@ approved_on = "2026-11-06"
 kind = "architecture-dependent"
 decision = "none"
 target = "No CICS abend: an unexpected error rolls back the transaction and returns a problem response"
-source = "docs/modernization/architecture/billpay-slice.md"
+retained = ["An unexpected failure that no step message covers ends the request with 500 INTERNAL_ERROR and An unexpected error occurred. Please try again later ..., with the correlation ID and no cause."]
+requires_test = true
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Partial item. Classed by the architect on 2026-11-10 (docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)). Tests: an API test with an exception thrown outside the mapped steps. Nothing committed stays with DEF-BILL-001 (D-29) and S21."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2155,7 +2506,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2166,7 +2518,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept. The sign-on requirement is FLOW-CRDL-001's retained part (CRDL S20)."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2175,7 +2529,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: no page sets the role, which comes from the session on every request. Role from the session is tested through FLOW-CRDL-008 (partial, CRDL S21) and BR-MENU-003 (partial, billpay-slice.md section 11). The role scenarios ACUP S29, CRDU S27, ACVW S20 and CRDV S21 are further evidence."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2184,34 +2540,76 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: no navigation clears the session. Session unchanged after Back is FLOW-CRDL-008's retained part."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-CRDL-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "After a file error the rows read so far are shown, with the page number already changed by PF7 or PF8."
+target = "A set-based read does not deliver part of a page: after a read failure the list shows no rows and the card read-error text, and the page number does not move"
+retained = ["A start read with no rows gives the notice NO RECORDS FOUND FOR THIS SEARCH CONDITION.", "An after read with no rows gives NO MORE RECORDS TO SHOW, and a before read with no rows gives NO PREVIOUS PAGES TO DISPLAY.", "At the end of the list no next page is offered."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md sections 4 and 7, docs/modernization/architecture/transaction-service.md section 9"
+note = "Only the after-failure display deviates. The end-of-list handling, the must-preserve part, is retained; the error texts are incidental in the spec, so there is no D-58 entry. DEF-CRDL-009 keeps its own entry."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
 
 [deviation."FLOW-CRDL-001"]
 kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["A request without a session reaches sign-on: 401 UNAUTHENTICATED from the API, and the web opens the sign-on page."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Partial item. Classed by the architect on 2026-11-10 (docs/modernization/architecture/account-service.md section 9). Tests: CRDL S20 (API and Playwright). The same retained text as FLOW-TRNL-001."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."FLOW-CRDL-005"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No AID mapping: the web key table and the 3270 shortcut toggle (D-WEB-03) replace it; PF13 to PF24 do not exist"
+source = "docs/modernization/architecture/account-service.md sections 4, 7 and 9"
+note = "Whole item: no key code is mapped, and PF13 to PF24 do not exist. Which keys act on each screen is carried by VAL-CRDL-006 and VAL-CRDU-011 (fixed, D-69) and by FLOW-CRDV-002 (no entry; its other-key outcome is DEF-CRDV-005, fixed under D-69). All three stay required. With the 3270 shortcuts on, every other key, PA3 included, shows the invalid-key message instead of acting as Enter."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
 
 [deviation."FLOW-CRDL-008"]
 kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["Back from card view or card update shows the list at page 1 of all cards with empty filters, and the session's user ID and role are unchanged."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Partial item. Classed by the architect on 2026-11-10 (docs/modernization/architecture/account-service.md section 9). Tests: CRDL S21."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."FLOW-CRDL-012"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests and keyset paging (D-ARCH-12); the paging position stays in the page, not in the URL"
+source = "docs/modernization/architecture/account-service.md sections 4, 7 and 9"
+note = "Whole item: no pseudo-conversational return is left (D-ARCH-12). What carries over between list requests is carried by BR-CRDL-005 and BR-CRDL-006 (paging from the page's first and last keys), FLOW-CRDL-011 (refresh with the current filters, page number unchanged) and FLOW-CRDL-003 (arrival from another page shows page 1 and loses the filter). None of them has an entry, so they stay required. The keys stay in the page, not in the URL (web.md, session state)."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
 
 [deviation."SE-CRDL-003"]
 kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: the must-preserve part, that the selected row's account and card are passed and not the filter values, is carried by BR-CRDL-007, FLOW-CRDL-009 and FLOW-CRDL-010 on the list side, and BR-CRDV-003 and FLOW-CRDU-005 on the receiving side. All five stay required. BR-CRDL-007's test types a different valid filter in the same request as the selection, and the selected row's card opens. The filter values passed back on Back are FLOW-CRDL-007's, which stays required. The user type and the clearing are DEF-CRDL-004 and FLOW-CRDL-008."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2222,7 +2620,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept. The session data comes from the token, and a start from the menu shows the empty search form, which is FLOW-CRDV-006 (required, CRDV S2)."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2231,9 +2631,75 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: no page sets the role, which comes from the session on every request. Role from the session is tested through FLOW-CRDL-008 (partial, CRDL S21) and BR-MENU-003 (partial, billpay-slice.md section 11). The role scenarios ACUP S29, CRDU S27, ACVW S20 and CRDV S21 are further evidence."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-CRDV-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail, and the page shows the error page."]
+requires_test = true
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-CRDV-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No client-held context: the unexpected-context path cannot occur; a bad card ID gets 404 CARD_NOT_FOUND"
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+note = "Whole item: no path is left. No client-held context exists, so an unknown context cannot arrive (D-ARCH-12), as for ERR-ACUP-005. The 404 CARD_NOT_FOUND the target names is VAL-CRDV-007's outcome, tested under that item."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-CRDV-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "The main decision on the commarea becomes two routes and two endpoints, card lookup and card view"
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+note = "Whole item: each row's outcome is carried by the item it names: row 1 by FLOW-CRDV-004, row 2 by FLOW-CRDV-005 and BR-CRDV-003, row 3 by FLOW-CRDV-006, row 4 by FLOW-CRDV-007. All stay required. Row 5 is FLOW-CRDV-014, which has no path left."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-CRDV-008"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens"
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+note = "Whole item: BR-CRDV-003 and FLOW-CRDV-005 carry the entry from the card list, with its account and card and its protected keys. Both have no entry, so they stay required."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-CRDV-011"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No BMS map send: the page renders the response"
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+note = "Whole item: no map is sent. What the screen shows is carried by FLOW-CRDV-009 (titles), FLOW-CRDV-010 (protection, red, * and focus) and BR-CRDV-002 (the card details), all required. Context 1 has no counterpart (D-ARCH-12): re-entry is FLOW-CRDV-007."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-CRDV-012"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No AID mapping: the web key table and the 3270 shortcut toggle (D-WEB-03) replace it; PF13 to PF24 do not exist"
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+note = "Whole item: no key code is mapped, and PF13 to PF24 do not exist. Which keys act on each screen is carried by VAL-CRDL-006 and VAL-CRDU-011 (fixed, D-69) and by FLOW-CRDV-002 (no entry; its other-key outcome is DEF-CRDV-005, fixed under D-69). All three stay required. With the 3270 shortcuts on, every other key, PA3 included, shows the invalid-key message instead of acting as Enter."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-CRDV-014"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No client-held context: the unknown-context path cannot occur; the nearest case, an unknown card ID, gets 404 CARD_NOT_FOUND"
+source = "docs/modernization/architecture/account-service.md sections 5, 7 and 9"
+note = "Whole item: no path is left. No client-held context exists, so an unknown context cannot arrive (D-ARCH-12), as for ERR-ACUP-005. The 404 CARD_NOT_FOUND the target names is VAL-CRDV-007's outcome, tested under that item."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
 
 # programs/COCRDUPC.md
 
@@ -2242,11 +2708,53 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/account-service.md section 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: no page sets the role, which comes from the session on every request. Role from the session is tested through FLOW-CRDL-008 (partial, CRDL S21) and BR-MENU-003 (partial, billpay-slice.md section 11). The role scenarios ACUP S29, CRDU S27, ACVW S20 and CRDV S21 are further evidence."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."FLOW-CRDU-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No AID mapping: the web key table and the 3270 shortcut toggle (D-WEB-03) replace it; PF13 to PF24 do not exist"
+source = "docs/modernization/architecture/account-service.md sections 6, 7 and 9"
+note = "Whole item: no key code is mapped, and PF13 to PF24 do not exist. Which keys act on each screen is carried by VAL-CRDL-006 and VAL-CRDU-011 (fixed, D-69) and by FLOW-CRDV-002 (no entry; its other-key outcome is DEF-CRDV-005, fixed under D-69). All three stay required. With the 3270 shortcuts on, every other key, PA3 included, shows the invalid-key message instead of acting as Enter."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-CRDU-019"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens"
+source = "docs/modernization/architecture/account-service.md sections 6, 7 and 9"
+note = "Whole item: FLOW-CRDU-005 carries the entry from the card list, and BR-CRDU-009 the return to the list or a new search after a save. Both stay required."
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+
 # programs/CODATE01.md
+
+[deviation."BR-MQDT-005"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "One MQ unit of work per request: each request got exactly one reply before the next get."
+target = "At least once on the crash path: a death between a confirmed reply and its acknowledgement redelivers the request, which is answered again; when the request has a message_id the duplicate repeats the first reply's message_id (the name-based UUID of \"MQDT:\" + the request's message_id in fixed mode) and correlation_id, and without one it cannot be matched by ID"
+retained = ["In every run without a crash, each request that is answered gets exactly one confirmed reply before its acknowledgement, and requests are answered one at a time in arrival order, with concurrency 1 per listener (D4).", "A request without a message_id is answered and never rejected or dead-lettered for the absence (W5)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 2 and 5 (architecture commit 2b5e102)"
+note = "Ratified under the product delegation on 2026-11-11. No duplicate store: the service is read-only and a second answer changes no data. A duplicate account reply is read again from the current row, so its body can differ; the requester keeps the first reply for an ID. A request held by the delayed retry is overtaken by later ones (section 5, Q5). Not yet implemented."
+approved_by = "architect (inquiry-service.md), ratified under the product delegation"
+approved_on = "2026-11-11"
+
+[deviation."DEF-MQDT-005"]
+kind = "architecture-dependent"
+decision = "none"
+group = "DEV-PLATFORM"
+target = "No legacy mode: the mechanism is replaced by the target platform."
+source = "inquiry-service contract v8 section 13 (row ERR-MQAC-008, DEF-MQAC-008, ERR-MQDT-007, DEF-MQDT-005), approved as drafted by docs/modernization/architecture/inquiry-service.md section 7 B6 (architecture commit 2b5e102)"
+note = "A loop when an IBM MQ close call fails is CICS/MQ API plumbing; RabbitMQ client connection handling in the target replaces it (as DEF-MQAC-008)."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
 
 [deviation."DEF-MQDT-009"]
 kind = "architecture-dependent"
@@ -2258,6 +2766,68 @@ source = "docs/modernization/architecture/decisions.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."ERR-MQDT-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed RETRIEVE of the trigger data puts an error record and ends the task."
+target = "Not applicable: there is no trigger data to retrieve"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQDT-002"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed open of the error queue is written to the console and ends the task."
+target = "A refused declaration or connection fails the service start and the health check; no request is read (W7)"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQDT-003"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed open of the input or reply queue puts an error record and ends the task."
+target = "A refused declaration or connection fails the service start and the health check; no request is read (W7)"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQDT-004"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed get (reason not 2033) puts INP MQGET ERR: and ends the task; for 2080 the message stays on the queue."
+target = "A request over 1000 bytes is dead-lettered after the confirmed INP MQGET ERR: record, with no reply, and the listener goes on (DEV-ARCH-09)"
+retained = ["A request over 1000 bytes gets the error record INP MQGET ERR: with condition 01, reason 02080 and the request queue name, confirmed before the reject, and no reply (D5)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQDT-005"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed reply put writes MQPUT ERR naming the reply queue and ends the task; the request is consumed without a reply."
+target = "A reply that is not confirmed (nack, timeout, lost channel) is retried with requeue below delivery count 5; at 5 or more the service confirms the MQPUT ERR record naming the reply destination and dead-letters the request"
+retained = ["On the handled give-up, a request whose reply cannot be confirmed leaves exactly one confirmed MQPUT ERR record naming the reply destination and gets no reply (D8)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."ERR-MQDT-006"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A failed error put is written to the console and the task ends; the error text is lost."
+target = "A record that is refused, not confirmed within 5 s or loses its channel is logged as M006 and the request is requeued, so the give-up runs again on the next delivery, up to the broker backstop"
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
 [deviation."ERR-MQDT-007"]
 kind = "architecture-dependent"
 decision = "none"
@@ -2268,6 +2838,92 @@ note = "Error records and re-entry on MQ close failure are IBM MQ API handling t
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."ERR-MQDT-008"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A clock, SYNCPOINT or data exception failure abends the task, and CICS backs out the get and put."
+target = "No abend: any exception is a counted retry (reject with requeue) and is given up at delivery count 5 without a record or a reply"
+source = "docs/modernization/architecture/inquiry-service.md sections 1.1 and 1.2 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQDT-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A CKTI trigger starts the task, and the input queue name comes from the trigger message."
+target = "No trigger: a Spring AMQP listener with manual acknowledgement consumes the date request queue from service start; the reply destination is the routing of switch DEF-MQDT-002"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQDT-002"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "The error, input and reply queues are opened in order; a failure ends the task."
+target = "No opens: the service declares its topology at start, and a refused declaration or connection fails the start and the health check"
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+note = "Whole item: no path of the legacy mechanism is left."
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQDT-003"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "One task drains the queue, commits per request and ends after a 5-second wait with no message."
+target = "The listener consumes continuously and does not end when the queue is empty"
+retained = ["Requests are processed one at a time per listener (concurrency 1), each acknowledged only after its reply is confirmed (D4)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), docs/modernization/architecture/inquiry-service.md section 5, Q5: concurrency 1 (architecture commit 2b5e102), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."FLOW-MQDT-004"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "Termination closes the open queues, and the CICS RETURN commits the unit of work."
+target = "No termination per batch of requests: the listener runs until the service stops, and one acknowledgement per request replaces the commit"
+retained = ["A request is acknowledged only after its reply is confirmed; a request that fails is rejected, never acknowledged (D4, D5, D8)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."SE-MQDT-001"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "MQGET under syncpoint with a 5-second wait: the message leaves the queue when the unit of work commits and is backed out on an abend."
+target = "Delivery with manual acknowledgement: a lost channel or a crash returns the request, counted by x-delivery-count"
+retained = ["A request leaves its queue only by an acknowledgement after its confirmed reply (D4), by a reject without requeue to its .dlq (D5, D8), or, when no delivery up to the eleventh ends in the service's acknowledgement or its reject without requeue, by the broker backstop (x-delivery-limit 10) after the eleventh delivery (I26 on the account queue; the date request queue has the same x-delivery-limit 10, read back by W7, and no scenario of its own)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
+[deviation."SE-MQDT-003"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "The get, the read and the puts were one MQ unit of work, so a failed request left exactly one error record."
+target = "On the crash path a death between a record's confirm and the reject adds a second record with the same correlation_id and a higher x-carddemo-delivery-count (records of a request with neither message_id nor correlation_id cannot be matched to it), and no record is left when every delivery from the sixth to the eleventh ends (crash, lost channel or record not confirmed) before a record is confirmed; the broker backstop (x-delivery-limit 10) then dead-letters the request, and the broker log, the .dlq and the M006 lines are the only trace; for an oversized request no record is left when every delivery up to the eleventh ends before a record is confirmed"
+retained = ["On the handled give-up of a reply that cannot be confirmed, exactly one MQPUT ERR record naming the reply destination is confirmed, then the request is rejected without requeue to its .dlq, with no error reply (D8).", "An oversized request gets one confirmed INP MQGET ERR: record before its reject (D5).", "Each error record carries correlation_id = the request's message_id, else its correlation_id, else none, and the header x-carddemo-delivery-count; no request body and no account data (D5, D8)."]
+requires_test = true
+source = "docs/modernization/architecture/inquiry-service.md sections 1.2 to 1.5 (architecture commit 2b5e102)"
+note = "Intentional architecture deviation, ratified under the product delegation on 2026-11-11 (WP5 delivery semantics). AMQP has no transaction across a consume, a database read and a publish to another queue, and a stored outbox would need a write grant on a service that is read-only by design. The broker backstop is finite so that a message that crashes the service on every delivery still leaves the queue; a store is a possible stronger alternative and is not chosen. The error record is not an absolute at-least-once guarantee per request. Tests I17 and I23 to I30 against the real pinned broker, with genuine publisher nacks and channel closes, are required before acceptance. Not yet implemented."
+approved_by = "architect (inquiry-service.md), ratified under the product delegation"
+approved_on = "2026-11-11"
+
+[deviation."SE-MQDT-004"]
+kind = "architecture-dependent"
+decision = "none"
+legacy = "A SYNCPOINT per loop iteration and the final RETURN commit the get and its put together; ACTION(BACKOUT) backs them out on an abend."
+target = "No unit of work across the consume and the publishes: the reply is confirmed, then the request is acknowledged; an error record is confirmed before the request is rejected (deviation SE-MQDT-003)"
+retained = ["The request is acknowledged only after its reply is confirmed (D4, D8)."]
+requires_test = true
+source = "docs/modernization/architecture/messaging.md Topology (the MQ trigger and the drain loops become Spring AMQP listeners), inquiry-service contract v8 section 13 (item treatment), approved as drafted by docs/modernization/architecture/inquiry-service.md preamble and section 7 B6 (architecture commit 2b5e102)"
+approved_by = "architect (inquiry-service.md, architecture commit 2b5e102)"
+approved_on = "2026-11-11"
+
 # programs/COMEN01C.md
 
 [deviation."BR-MENU-003"]
@@ -2275,7 +2931,11 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["The role from the session decides.", "A page of the other role sends the user to their own home: ADMIN001 on / lands on /admin (MENU S10), and USER0001 on /admin lands on / (MENU S11).", "An API of the other role answers 403 ACCESS_DENIED (BILL S20).", "The main menu lists no ADMIN-only option."]
+requires_test = true
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Partial item. Classed by the architect on 2026-11-10 (docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)). Tests: MENU S10 and S11, which cite BR-MENU-003, and BILL S20, which also cites it. No access - Admin Only option... is not kept: with the shipped option table the legacy check never fires (DEF-MENU-002), and under C1 the route guard and the server role check replace it."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2284,7 +2944,9 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: the menu offers every option to every USER (BR-MENU-001, MENU S2), and an ADMIN never sees it (MENU S10). Both stay required or partial. Whether an option should be ADMIN-only is decided by D-02 under C1."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2293,7 +2955,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: the part that is kept is a direct start without a session goes to sign-on, which is FLOW-MENU-001 (MENU S1). FLOW-MENU-001 is no longer excluded, so it stays required. The rest (any client-held identity accepted) is gone under C1."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2373,6 +3037,14 @@ source = "docs/modernization/architecture/decisions.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."DEF-AUTH-010"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No state between requests: each message is handled with fresh state and logged as JSON lines with the correlation ID and the masked card, so no log field carries over from an earlier request"
+source = "docs/modernization/architecture/authorization-service.md section 5"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+
 [deviation."DEF-AUTH-011"]
 kind = "decision"
 decision = "D-10"
@@ -2402,25 +3074,59 @@ source = "docs/modernization/architecture/decisions.md"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."FLOW-AUTH-001"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No triggered start: a listener consumes the request queue carddemo.pauth.request; there is no trigger message and no queue name to retrieve"
+source = "docs/modernization/architecture/authorization-service.md section 5"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+
 # programs/COPAUS0C.md
+
+[deviation."DEF-AUSM-001"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No state between requests: each read starts fresh; a missing account gives 404 ACCOUNT_NOT_FOUND, and a missing cross-reference or customer leaves the customer empty with its message, never stale data"
+source = "docs/modernization/architecture/authorization-service.md section 5"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+
+[deviation."DEF-AUSM-009"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No page-number table: paging uses keyset cursors (after and before), so no table can overflow"
+source = "docs/modernization/architecture/authorization-service.md section 5"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
 
 [deviation."DEF-AUSM-012"]
 kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
 # programs/COPAUS1C.md
+
+[deviation."DEF-AUDT-004"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No state between requests: a missing summary or detail gives 404 AUTHORIZATION_NOT_FOUND with Authorization not found..., never the content of a record area that was not loaded"
+source = "docs/modernization/architecture/authorization-service.md section 5"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
 
 [deviation."DEF-AUDT-006"]
 kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2429,9 +3135,20 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-AUDT-001"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No PSB to schedule, so the PSB-scheduling path cannot occur"
+retained = ["A failed read of the detail shows an error message and no detail, through ERR-AUDT-002's path: a connection or read failure gives 500 AUTH_DETAIL_READ_FAILED and System error while reading Auth Details."]
+requires_test = true
+source = "docs/modernization/architecture/authorization-service.md section 5, docs/modernization/architecture/transaction-service.md section 9"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
 
 # programs/CORPT00C.md
 
@@ -2444,6 +3161,16 @@ source = "docs/modernization/decisions/README.md Appendix B"
 note = "The 17-record JCL job stream is a z/OS submission mechanism; the target keeps only the dates and selection, which need no decision."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."BR-RPTS-007"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No job stream: the request inserts a report-run row and triggers the report DAG (D-ARCH-09, D-48)"
+retained = ["Confirm Y or y starts exactly one report for the requested type and dates.", "Any other confirm value starts none (VAL-RPTS-005).", "A start failure gives ERR-RPTS-001's text and leaves no run started."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
 
 [deviation."DEF-RPTS-004"]
 kind = "architecture-dependent"
@@ -2474,6 +3201,57 @@ source = "docs/modernization/decisions/README.md Appendix B"
 note = "The hard-coded job card, procedure library and DD names are JCL environment details; the target configures the report job outside the code."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-RPTS-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No 3270 screen receive: the request body is validated"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: there is no screen receive."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-RPTS-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives; the date check is a library call that cannot fail to load"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail.", "A write in progress (add, report request) leaves nothing behind."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-RPTS-001"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["A request without a session reaches sign-on: 401 UNAUTHENTICATED from the API, and the web opens the sign-on page."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-RPTS-006"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No pseudo-conversation: each request is answered on its own, so no check is skipped after a message"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: \"later checks are skipped after a message\" is carried by the RPTS check-order items (VAL-RPTS-001 to VAL-RPTS-005), which stay required."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."SE-RPTS-001"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No internal reader: the report-run row and the DAG trigger replace the JOBS queue writes (D-ARCH-09, D-48)"
+retained = ["A confirmed request leads to one run of the transaction report with the stored parameters (one batch.report_run row, one DAG trigger, 409 counted as success)."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
 
 # programs/COSGN00C.md
 
@@ -2508,7 +3286,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept: the identity comes from the session token. Role from the session is tested through BR-MENU-003 (partial, S10, S11, S20) and BR-SGN-004 (required: home by user type, SGN S4)."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2534,7 +3314,9 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+source = "docs/modernization/architecture/billpay-slice.md section 11 (whole and partial deviations)"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say. Whole item: nothing of the defect is kept. Every route needs a session: FLOW-MENU-001 (MENU S1) and FLOW-BILL-001 (BILL S1) stay required, and MENU S12 shows the admin menu stub refused without a session, citing DEF-SGN-012. The admin menu (COADM01C) is not a trace unit yet, so S12 is evidence, not a gate."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2556,6 +3338,67 @@ source = "docs/modernization/architecture/billpay-slice.md (resting on web.md, S
 approved_by = "architect (billpay-slice.md section 12)"
 approved_on = "2026-11-06"
 
+# programs/COTRN00C.md
+
+[deviation."ERR-TRNL-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No 3270 screen receive: the request body is validated"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: there is no screen receive."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-TRNL-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No VSAM browse: a keyset query either returns rows or fails, and the message is kept"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: there is no browse. The You are at the top of the page... outcome is carried by DEF-TRNL-004, which has no entry and so stays required."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-TRNL-004"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail.", "A write in progress (add, report request) leaves nothing behind."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNL-001"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["A request without a session reaches sign-on: 401 UNAUTHENTICATED from the API, and the web opens the sign-on page."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNL-008"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: no pseudo-conversation is left. One message per answer, then wait for the user, is D-WEB-02, tested through the unit's check order."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNL-009"]
+kind = "architecture-dependent"
+decision = "none"
+target = "XCTL replaced by a route change"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: where F3 leads is carried by FLOW-TRNL-004, which stays required. The XCTL and commarea fields are gone."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
 # programs/COTRN01C.md
 
 [deviation."DEF-TRNV-001"]
@@ -2568,7 +3411,67 @@ note = "The read-for-update lock on a display-only read is CICS/VSAM locking; th
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[deviation."ERR-TRNV-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No 3270 screen receive: the request body is validated"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: there is no screen receive."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-TRNV-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail.", "A write in progress (add, report request) leaves nothing behind."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNV-001"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["A request without a session reaches sign-on: 401 UNAUTHENTICATED from the API, and the web opens the sign-on page."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNV-008"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: no pseudo-conversation is left. One message per answer, then wait for the user, is D-WEB-02, tested through the unit's check order."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNV-009"]
+kind = "architecture-dependent"
+decision = "none"
+target = "XCTL replaced by a route change"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: where F3 leads is carried by FLOW-TRNV-004, which stays required. The XCTL and commarea fields are gone."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
 # programs/COTRN02C.md
+
+[deviation."BR-TRNA-004"]
+kind = "architecture-dependent"
+decision = "none"
+target = "The queued row has the daily-file layout (D-27) and its FILLER is spaces: the master keeps no legacy FILLER to inherit after load"
+retained = ["Each confirmed add queues one row built from the form.", "Type, category, source, description, amount, merchant ID, name, city and ZIP, card number and original date are as entered, after padding, and the processing date is today.", "Unset text fields are spaces and numeric fields zeros, in the 350-byte raw_record and in the parsed columns.", "Only the FILLER (spaces) and the target table change."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
 
 [deviation."DEF-TRNA-003"]
 kind = "architecture-dependent"
@@ -2577,6 +3480,7 @@ group = "DEV-ARCH-02"
 legacy = "Two concurrent adds get the same transaction ID."
 target = "Unique IDs: iD allocation under a lock in the inserting transaction."
 source = "docs/modernization/architecture/decisions.md"
+note = "In fixed mode the ID comes from core.tran_id_seq in the reserved range, which daily-file IDs may not use (BR-TRNA-003). A tran_id is reserved when it is 16 ASCII digits starting with 9 (9000000000000000 to 9999999999999999), tested by characters, never by a numeric parse; the user approved the range on 2026-11-10."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2585,9 +3489,79 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[deviation."ERR-TRNA-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No 3270 screen receive: the request body is validated"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: the Clear and PA-key outcome is carried by VAL-TRNA-013, which stays required."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."ERR-TRNA-003"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No CICS abend: an unexpected error gives the platform's 500 problem and error page, and the session survives; the date check is a library call (LegacyDateCheck) that cannot fail to load"
+retained = ["An unexpected failure ends the request with the platform's 500 problem, which has the correlation ID and no technical detail.", "A write in progress (add, report request) leaves nothing behind."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNA-001"]
+kind = "security-c1"
+decision = "D-01"
+group = "DEV-C1"
+legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+retained = ["A request without a session reaches sign-on: 401 UNAUTHENTICATED from the API, and the web opens the sign-on page."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNA-008"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Pseudo-conversational return replaced by stateless requests (D-ARCH-12): the session and the browser route carry the context between screens"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: no pseudo-conversation is left. One message per answer, then wait for the user, is D-WEB-02, tested through the unit's check order."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."FLOW-TRNA-009"]
+kind = "architecture-dependent"
+decision = "none"
+target = "XCTL replaced by a route change"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: where F3 leads is carried by FLOW-TRNA-004, which stays required. The XCTL and commarea fields are gone."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."SE-TRNA-001"]
+kind = "architecture-dependent"
+decision = "none"
+target = "No highest + 1 read: the ID comes from the shared sequence (D-59), and copy-last reads the master and the waiting adds"
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+note = "Whole item: what is left is carried by BR-TRNA-003 (both modes: the highest ID over master rows and waiting adds) and BR-TRNA-006 (copy last reads the highest ID), which stay required."
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+
+[deviation."SE-TRNA-002"]
+kind = "architecture-dependent"
+decision = "none"
+target = "Replaced per D-27: the add is inserted into core.daily_tran in one transaction and posted by the next cycle"
+retained = ["One row per confirmed add, written once, and nothing written when the add fails.", "The add commits with its audit row."]
+requires_test = true
+source = "docs/modernization/architecture/transaction-service.md sections 6 and 9"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
 
 # programs/COTRTLIC.md
 
@@ -2596,7 +3570,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2605,7 +3580,8 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2616,7 +3592,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2625,7 +3602,8 @@ kind = "security-c1"
 decision = "D-01"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2636,7 +3614,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2645,7 +3624,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2665,7 +3645,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
@@ -2685,7 +3666,8 @@ kind = "security-c1"
 decision = "D-02"
 group = "DEV-C1"
 legacy = "Menus and screens open without a sign-on, the identity lives in client-held fields that any program can set, and no function checks a role."
-target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every view is audited (D-09). The cardholder model C2 comes later."
+target = "Access model C1: every screen and API needs a session; user ID and role (ADMIN or USER from the user type) come only from the session; ADMIN-only functions check the role on the server; staff may open any account. Sensitive fields are masked by default, ADMIN may unmask, every unmasked view is audited (D-09, D-SEC-05); ADMIN reads the account and card views read-only and may unmask. The cardholder model C2 comes later."
+note = "Target text corrected by the architect on 2026-11-10 (account-service.md sections 1 and 7): only an unmask writes an audit row for a read, as D-09's option (log the reveal), D-SEC-05 and D-NFR-10 say."
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 

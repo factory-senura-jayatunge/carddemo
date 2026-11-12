@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The exporter's stdout carries only its result (the load report is parsed whole by the driver),
+  so every log line goes to stderr, and only warnings and errors. Logback's own status messages
+  would otherwise print to stdout.
+-->
+<configuration>
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+  <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder>
+      <pattern>%-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <root level="WARN">
+    <appender-ref ref="STDERR"/>
+  </root>
+</configuration>

@@ -1,5 +1,7 @@
-# Fidelity ledger: the decided behaviour of every defect-decide item that keeps a legacy mode, and
-# of the decided questions of the converted units. Items with no legacy mode are in deviations.toml.
+# Fidelity ledger: the decided behaviour of every defect-decide item that keeps a legacy mode, of the
+# decided questions of the converted units, and the decided fixes of items of another fidelity class
+# (value = "fixed", code_switch = false, a catalog decision). Items with no legacy mode are in
+# deviations.toml.
 #
 # value        legacy (the COBOL behaviour) or fixed (the fix the item describes)
 # code_switch  true when the code branches on the item through FidelitySwitches (exactly the items of
@@ -10,6 +12,9 @@
 # decision     the decision of docs/modernization/decisions/README.md, or "none"
 # approved_by, approved_on   who approved the value, and when (YYYY-MM-DD)
 # note         why, when it is not the plain fix
+#
+# A comment "Note on <ID> (no entry)" records an architect clarification of an item that keeps its class
+# and has no entry, so trace requires it as the spec states it.
 #
 # platform/fidelity loads value into carddemo.fidelity.<ID>; a missing entry means legacy.
 # make verify-ledger checks this file against the spec, the catalog and the code.
@@ -103,7 +108,18 @@ code_switch = false
 decision = "D-43"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
-note = "Covered by the switch DEF-STMT-001: no switch of its own; the tests of DEF-STMT-001 cite this item in both modes (docs/modernization/architecture/switches.md)."
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md)."
+
+# jobs/DISCGRP.md
+
+[switch."Q-JDISC-001"]
+value = "fixed"
+code_switch = false
+setting = "Dated operator inbound file, complete validation including DEFAULT before an atomic reload"
+decision = "D-67"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "D-67 approves rejecting a load without DEFAULT. The dated inbound file and whole-file validation mechanism are specified by the architect in batch.md Spec-only validators (104321a)."
 
 # jobs/INTCALC.md
 
@@ -143,6 +159,16 @@ approved_on = "2026-11-06"
 [switch."DEF-JPCAT-001"]
 value = "fixed"
 code_switch = true
+setting = "40 bytes plus LF; negative balances have a trailing minus at position 33 in fixed mode"
+decision = "D-75"
+approved_by = "user (decision catalog answers)"
+approved_on = "2026-11-06"
+note = "batch.md Spec-only validators defines the fixed format; legacy differs only in position 33 of negative lines."
+
+[switch."Q-JPCAT-001"]
+value = "fixed"
+code_switch = false
+setting = "A trailing minus at position 33, through DEF-JPCAT-001; no other column moves"
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
@@ -375,7 +401,7 @@ code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
-note = "Covered by the switch DEF-STMT-002: no switch of its own; the tests of DEF-STMT-002 cite this item in both modes (docs/modernization/architecture/switches.md)."
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 [switch."BR-STMT-006"]
 value = "fixed"
@@ -383,7 +409,7 @@ code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
-note = "Covered by the switch DEF-STMT-002: no switch of its own; the tests of DEF-STMT-002 cite this item in both modes (docs/modernization/architecture/switches.md)."
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 [switch."BR-STMT-008"]
 value = "fixed"
@@ -391,35 +417,39 @@ code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
-note = "Covered by the switch DEF-STMT-003: no switch of its own; the tests of DEF-STMT-003 cite this item in both modes (docs/modernization/architecture/switches.md)."
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md)."
 
 [switch."DEF-STMT-001"]
 value = "fixed"
-code_switch = true
+code_switch = false
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md). The statement build ruling couples it to the format that DEF-STMT-005 selects (the legacy records or the PDF), so it has no mixed setting; Q1 in docs/modernization/architecture/batch.md, Build rulings, records per item whether its fixed value would fit the legacy records. The legacy renderer's golden tests and the fixed PDF tests of the STMT unit must both cite it."
 
 [switch."DEF-STMT-002"]
 value = "fixed"
-code_switch = true
+code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md). The statement build ruling couples it to the format that DEF-STMT-005 selects (the legacy records or the PDF), so it has no mixed setting; Q1 in docs/modernization/architecture/batch.md, Build rulings, records per item whether its fixed value would fit the legacy records. The legacy renderer's golden tests and the fixed PDF tests of the STMT unit must both cite it."
 
 [switch."DEF-STMT-003"]
 value = "fixed"
-code_switch = true
+code_switch = false
 decision = "D-44"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md). The statement build ruling couples it to the format that DEF-STMT-005 selects (the legacy records or the PDF), so it has no mixed setting; Q1 in docs/modernization/architecture/batch.md, Build rulings, records per item whether its fixed value would fit the legacy records. The legacy renderer's golden tests and the fixed PDF tests of the STMT unit must both cite it."
 
 [switch."DEF-STMT-004"]
 value = "fixed"
-code_switch = true
+code_switch = false
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md). The statement build ruling couples it to the format that DEF-STMT-005 selects (the legacy records or the PDF), so it has no mixed setting; Q1 in docs/modernization/architecture/batch.md, Build rulings, records per item whether its fixed value would fit the legacy records. The legacy renderer's golden tests and the fixed PDF tests of the STMT unit must both cite it."
 
 [switch."DEF-STMT-005"]
 value = "fixed"
@@ -430,10 +460,11 @@ approved_on = "2026-11-06"
 
 [switch."DEF-STMT-007"]
 value = "fixed"
-code_switch = true
+code_switch = false
 decision = "D-45"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Covered by the switch DEF-STMT-005: no switch of its own; the tests of DEF-STMT-005 cite this item in both modes (docs/modernization/architecture/switches.md). The statement build ruling couples it to the format that DEF-STMT-005 selects (the legacy records or the PDF), so it has no mixed setting; Q1 in docs/modernization/architecture/batch.md, Build rulings, records per item whether its fixed value would fit the legacy records. The legacy renderer's golden tests and the fixed PDF tests of the STMT unit must both cite it."
 
 [switch."DEF-STMT-010"]
 value = "fixed"
@@ -546,6 +577,7 @@ code_switch = true
 decision = "D-73"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "One of the three inquiry code switches (DEF-MQAC-002, DEF-MQDT-002, DEF-MQDT-003); no fourth switch (inquiry-service.md, architecture commit 2b5e102). Covers BR-MQAC-005 and the correlation part of DEF-MQAC-003 (D-73 decided them together): they have no switch of their own, and the tests W1, W2 and W6 cite all three IDs in both modes. Legacy: replies go to the fixed reply queue and copy the request's message_id and correlation_id. Fixed: replies go to reply_to (else the fixed queue), with correlation_id = the request's message_id (else its correlation_id, else none) and message_id = the name-based UUID of \"MQAC:\" + the request's message_id, so a duplicate repeats both IDs. A request without a message_id is valid: it is answered and never rejected or dead-lettered for the absence. Legacy mode copies the IDs as they are, so an absent message_id stays absent; fixed mode sets the reply's correlation_id to the request's correlation_id, or none, and gives the reply a random message_id, so a duplicate of such a request cannot be matched by ID (a stated limit). No body-derived identity and no new mandatory header. The DEF-MQAC-003 deviation (DEV-ARCH-10, properties set explicitly) stays. Not yet implemented."
 
 [switch."DEF-MQAC-007"]
 value = "fixed"
@@ -553,6 +585,7 @@ code_switch = false
 decision = "D-74"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "D-74, fixed-only: a file error no longer loses the request or stops the server. The service owns the give-up (inquiry-service.md section 1, architecture commit 2b5e102). A failed account read with x-delivery-count below 5 is rejected with requeue and gets no reply; at 5 or more the service publishes the error record ERROR WHILE READING ACCTF and waits for its confirm, then publishes the error reply (ERROR WHILE READING ACCTFILE ACCT ID : and the 11 key bytes as received, or JSON status ERROR) and waits for its confirm, then rejects without requeue to the .dlq: record, reply, reject, in that order. Without a crash a failing request gets 6 deliveries. The two inquiry request queues have x-delivery-limit 10, only as a broker backstop. A record that is not confirmed requeues the request (M006) and the give-up runs again; an error reply that is not confirmed is logged (M004) and does not stop the path. The crash-path limits of the record are a ratified deviation (deviations.toml, ERR-MQAC-005 and SE-MQAC-004). Not yet implemented."
 
 [switch."DEF-MQAC-014"]
 value = "fixed"
@@ -567,6 +600,7 @@ code_switch = false
 decision = "D-74"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "D-74, fixed-only: an error reply plus the dead-letter after retries. The service owns the give-up (inquiry-service.md section 1, architecture commit 2b5e102). A failed account read with x-delivery-count below 5 is rejected with requeue and gets no reply; at 5 or more the service publishes the error record ERROR WHILE READING ACCTF and waits for its confirm, then publishes the error reply (ERROR WHILE READING ACCTFILE ACCT ID : and the 11 key bytes as received, or JSON status ERROR) and waits for its confirm, then rejects without requeue to the .dlq: record, reply, reject, in that order. Without a crash a failing request gets 6 deliveries. The two inquiry request queues have x-delivery-limit 10, only as a broker backstop. A record that is not confirmed requeues the request (M006) and the give-up runs again; an error reply that is not confirmed is logged (M004) and does not stop the path. The crash-path limits of the record are a ratified deviation (deviations.toml, ERR-MQAC-005 and SE-MQAC-004). Not yet implemented."
 
 # programs/COACTUPC.md
 
@@ -605,6 +639,7 @@ code_switch = true
 decision = "D-11"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Delegated decision of 2026-11-11 on the DEF-ACUP-002 full-input layout (D-11), approving the architect's ruling v4. Canonical text: architecture commit fd17316 (data-model.md, FILLER and layout quirks; the switches.md DEF-ACUP-002 row; account-service.md section 12). The implementation is pending. D-11's move of 103-112 into the group applies only to records whose layout is declared, never inferred from content, file name or place. Default in both modes: every account record is stored as read in the CVACT01Y layout, ZIP 103-112 and group 113-122, unknown groups and NUL kept as data, only trailing spaces removed. Fixed mode migrates a record (group = 103-112, ZIP empty) only when a layout manifest bound to the input file's SHA-256 declares it ACUP_UPDATE: one built-in entry for app/data/ASCII/acctdata.txt (SHA-256 c2a97b6a32dc4a87a7aafdf7f72e6712e560412d30b00c5526cca80fc9dfd260, every record), the population D-11 decided, or a validated manifest supplied through the property carddemo.data-load.account-layout-manifest. The EBCDIC copy has no entry (its account 49 holds ZEROAPR at 103), so it loads as read. Legacy mode ignores every manifest. The step hashes and classifies the same bytes it reads once; a restart whose input hashes differ fails with SOURCE_FILE_CHANGED before any write. A manifest that is invalid or names another hash, or a declared ACUP_UPDATE record whose 113-122 is not blank (blank: all spaces or all NUL), fails the step before any account is written. Undeclared records with a blank 113-122 and a non-blank 103-112 are reported by file line and count; diagnostics never name account IDs (D-NFR-04). Export is per row and state-based, with no mode-wide swap (Q-ACUP-001, Q-ACUP-010). verify-data checks the stored ZIP, group and origin independently. The harness supplies an explicit manifest for every prepared account file; on the stress data fixed INTCALC writes 128 interest records and changes accounts 4, 8, 9 and 10 only (legacy 124)."
 
 [switch."DEF-ACUP-003"]
 value = "fixed"
@@ -668,6 +703,7 @@ code_switch = false
 decision = "D-11"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Delegated decision of 2026-11-11 (Q-ACUP-010 part b, option O2). Canonical text: architecture commit 7c8e03e (data-model.md, FILLER and layout quirks, unset FILLER of the update layouts). Fixed-only with no switch: the rule holds in every mode, independent of the DEF-ACUP-002 mode, and no switch is added. The target never writes unset FILLER. Account 123-300 is kept as stored in legacy_filler, U+0000 included, with no constant check; account update never writes it and the exporter writes it back. Customer 333-500: the loader accepts any content there and stores nothing for it (no customer FILLER column is added and z/OS residue is never reproduced), and every customer export writes 168 spaces. The load report counts the customer records whose 333-500 was not all spaces and names their file lines, never a customer ID or the bytes (D-NFR-04). The bundled ASCII and EBCDIC customers hold spaces there, so their outputs do not change. What z/OS actually leaves there stays unobserved and is not needed (Q-ACUP-010 part a). Not yet implemented."
 
 [switch."DEF-ACUP-101"]
 value = "fixed"
@@ -816,6 +852,38 @@ decision = "D-50"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[switch."Q-ACUP-001"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "orchestrator (delegated decision of 2026-11-11, DEF-ACUP-002 layout ruling v4)"
+approved_on = "2026-11-11"
+note = "Answered for the target by D-11 as clarified on 2026-11-11 (DEF-ACUP-002). Canonical text: architecture commit fd17316 (data-model.md, FILLER and layout quirks; the switches.md DEF-ACUP-002 row; account-service.md section 12). Positions 103-112 are the account ZIP and 113-122 the group ID, the CVACT01Y layout every reader uses; the target stores them in addr_zip and group_id, and interest reads group_id. Records are kept in that layout as read. Only records whose update layout (group at 103) a SHA-256-bound manifest declares are migrated, in fixed mode only; the built-in manifest covers the ASCII sample alone. Content never decides: undeclared records whose 113-122 is blank and 103-112 is not are reported by file line and count, not moved. Account update writes group_id only. Not yet implemented."
+
+[switch."Q-ACUP-010"]
+value = "fixed"
+code_switch = false
+decision = "D-11"
+approved_by = "orchestrator (delegated decisions of 2026-11-11: DEF-ACUP-002 layout ruling v4; Q-ACUP-010 filler, option O2)"
+approved_on = "2026-11-11"
+note = "Answered for the target: part (b), what the target writes, by D-11 as clarified in two delegated decisions of 2026-11-11, the DEF-ACUP-002 layout ruling v4 (account 113-122) and option O2 for the rest of the unset FILLER (DEF-ACUP-020). Canonical text: architecture commits fd17316 (data-model.md, FILLER and layout quirks; the switches.md DEF-ACUP-002 row; account-service.md section 12) and 7c8e03e (data-model.md, unset FILLER of the update layouts). Account 113-122: the 20 characters of 103-122 as read and their origin (as read or migrated) are kept in the batch-only columns legacy_zip_group and zip_group_origin, which no service reads and which are dropped at cut-over with legacy_filler (D-DATA-03). Export is per row and state-based: when the current ZIP and group equal their load-time values, 103-122 is written back as read, NULs and padding included, also after an edit that was changed back; otherwise the CVACT01Y layout is written (ZIP at 103, group at 113, padded with spaces). A record declared in the update layout must have 113-122 blank (all spaces or all NUL), or the load fails before any write. Account 123-300 is kept as stored in legacy_filler, U+0000 included, with no constant check; account update never writes it and the exporter writes it back. Customer 333-500: the loader accepts any content there and stores nothing for it (no customer FILLER column is added and z/OS residue is never reproduced), and every customer export writes 168 spaces. The load report counts the customer records whose 333-500 was not all spaces and names their file lines, never a customer ID or the bytes (D-NFR-04). The bundled ASCII and EBCDIC customers hold spaces there, so their outputs do not change. Part (a), what z/OS actually leaves in the unset FILLER, stays an unobserved mainframe fact; the target does not depend on it. Not yet implemented."
+
+[switch."Q-ACUP-104"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "The date rules of DEF-ACUP-120: years have 4 digits and are not before 1900, with no upper limit; Open Date is not after today; Expiry Date is after Open Date; Reissue Date is between Open Date and Expiry Date. A cross-date rule runs when either date changed, after that date's own checks (D-49)."
+
+[switch."Q-ACUP-108"]
+value = "fixed"
+code_switch = false
+decision = "D-50"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Date of Birth may be today but not after today; there is no minimum age (DEF-ACUP-120)."
+
 [switch."SE-ACUP-006"]
 value = "fixed"
 code_switch = false
@@ -878,6 +946,28 @@ code_switch = false
 decision = "D-50"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+# Note on BR-ACUP-108 (no entry): Character set of the free-text fields (account-service.md section 12, 2026-11-10).
+#   No class change and no entry: the item stays must-preserve and required as the spec states it. Account update's
+#   groupId (10), addrLine1 (50), addrLine2 (50) and govtIssuedId (20) accept every character from U+0000 to U+00FF,
+#   the 256 characters a legacy X(n) byte holds, controls, NUL and U+00A0 included, up to the approved lengths, which
+#   are unchanged and count characters. A character above U+00FF, which no legacy byte holds, is refused with 400
+#   UNSUPPORTED_CHARACTER, <label> contains a character that is not supported., with that field, and nothing is
+#   written. Every value a 3270 terminal could enter is accepted with the same length. No ASCII or byte cap and no
+#   switch is added. Only trailing spaces (U+0020) are removed from these fields; whether that padding rule reaches
+#   other fields waits for an architect clarification, and card update keeps its own trim rules. The unit is not in
+#   scope.toml, so trace does not gate it yet; the tests are named when the unit is converted.
+
+# Note on VAL-ACUP-022 (no entry): Character set of the free-text fields (account-service.md section 12, 2026-11-10).
+#   No class change and no entry: the item stays must-preserve and required as the spec states it. Account update's
+#   groupId (10), addrLine1 (50), addrLine2 (50) and govtIssuedId (20) accept every character from U+0000 to U+00FF,
+#   the 256 characters a legacy X(n) byte holds, controls, NUL and U+00A0 included, up to the approved lengths, which
+#   are unchanged and count characters. A character above U+00FF, which no legacy byte holds, is refused with 400
+#   UNSUPPORTED_CHARACTER, <label> contains a character that is not supported., with that field, and nothing is
+#   written. Every value a 3270 terminal could enter is accepted with the same length. No ASCII or byte cap and no
+#   switch is added. Only trailing spaces (U+0020) are removed from these fields; whether that padding rule reaches
+#   other fields waits for an architect clarification, and card update keeps its own trim rules. The unit is not in
+#   scope.toml, so trace does not gate it yet; the tests are named when the unit is converted.
 
 # programs/COACTVWC.md
 
@@ -973,6 +1063,14 @@ decision = "D-58"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[switch."Q-ACVW-004"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Answered by D-75 (fix all, Appendix A): a missing account or customer stops the view with only the message (DEF-ACVW-002, VAL-ACVW-005); after a failed lookup the typed account ID stays and the customer and card panels clear (DEF-ACVW-018)."
+
 [switch."VAL-ACVW-003"]
 value = "fixed"
 code_switch = false
@@ -986,6 +1084,14 @@ code_switch = false
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[switch."VAL-ACVW-005"]
+value = "fixed"
+code_switch = false
+decision = "D-75"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "A customer that the cross-reference names but the customer table lacks stops the view: the response is the not-found problem (Customer <custId> not found.) only, with no account panel (Q-ACVW-004)."
 
 [switch."VAL-ACVW-006"]
 value = "fixed"
@@ -1179,6 +1285,38 @@ decision = "D-54"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[switch."Q-CRDL-007"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Answered by D-55 (fix): lower-case s and u are accepted as selection codes."
+
+[switch."Q-CRDL-009"]
+value = "fixed"
+code_switch = false
+decision = "D-69"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Answered by D-69 (fix): unknown keys show the invalid-key message instead of acting as Enter."
+
+[switch."VAL-CRDL-005"]
+value = "fixed"
+code_switch = false
+decision = "D-55"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "With the 3270 shortcuts on, lower-case s and u are accepted (upper-cased before the check, Q-CRDL-007), and the codes are checked on Enter and before Next and Previous: an invalid code gives its message and the page does not move (VAL-CRDL-007)."
+
+[switch."VAL-CRDL-006"]
+value = "fixed"
+code_switch = false
+decision = "D-69"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "With the 3270 shortcuts on, every key except Enter and the keys the screen names (F3, F7, F8) shows Invalid key pressed. Please see below... and keeps the input (Q-CRDL-009)."
+
 # programs/COCRDSLC.md
 
 [switch."DEF-CRDV-001"]
@@ -1253,6 +1391,14 @@ code_switch = false
 decision = "D-13"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[switch."BR-CRDU-005"]
+value = "fixed"
+code_switch = false
+decision = "D-68"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "A record changed since it was read (409 RECORD_CHANGED, at validate or at save) still writes nothing and shows the current values with the message; the user's edits are kept for review instead of dropped, as in account update (D-17)."
 
 [switch."BR-CRDU-006"]
 value = "fixed"
@@ -1360,6 +1506,38 @@ decision = "D-12"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[switch."Q-CRDU-007"]
+value = "fixed"
+code_switch = false
+decision = "D-68"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Answered by D-68 (fix): a lock or rewrite failure keeps the entered values and the user may save again; leaving the form with unsaved changes asks for confirmation; after a successful save the next action returns to the list or to a new search (BR-CRDU-009)."
+
+[switch."Q-CRDU-008"]
+value = "fixed"
+code_switch = false
+decision = "D-51"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Answered by D-51 (fix): lower-case y and n are accepted for the active status."
+
+[switch."VAL-CRDU-006"]
+value = "fixed"
+code_switch = false
+decision = "D-51"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "Lower-case y and n are accepted for Card Active Status (Q-CRDU-008); the legacy message stays."
+
+[switch."VAL-CRDU-011"]
+value = "fixed"
+code_switch = false
+decision = "D-69"
+approved_by = "architect (account-service.md section 7)"
+approved_on = "2026-11-10"
+note = "With the 3270 shortcuts on, every key except Enter and the keys the screen names shows Invalid key pressed. Please see below... and no state is lost (DEF-CRDU-012)."
+
 # programs/CODATE01.md
 
 [switch."DEF-MQDT-001"]
@@ -1376,6 +1554,7 @@ code_switch = true
 decision = "D-73"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "One of the three inquiry code switches (DEF-MQAC-002, DEF-MQDT-002, DEF-MQDT-003); no fourth switch (inquiry-service.md, architecture commit 2b5e102). Legacy: replies go to the fixed date reply queue; fixed: to the request's reply_to, else the fixed queue (D-73). Not yet implemented."
 
 [switch."DEF-MQDT-003"]
 value = "fixed"
@@ -1383,6 +1562,7 @@ code_switch = true
 decision = "D-73"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "One of the three inquiry code switches (DEF-MQAC-002, DEF-MQDT-002, DEF-MQDT-003); no fourth switch (inquiry-service.md, architecture commit 2b5e102). Fixed: the reply's correlation_id is the request's message_id (else its correlation_id, else none) and its message_id the name-based UUID of \"MQDT:\" + the request's message_id, so a duplicate repeats both IDs. A request without a message_id is valid: it is answered and never rejected or dead-lettered for the absence. Legacy mode copies the IDs as they are, so an absent message_id stays absent; fixed mode sets the reply's correlation_id to the request's correlation_id, or none, and gives the reply a random message_id, so a duplicate of such a request cannot be matched by ID (a stated limit). No body-derived identity and no new mandatory header. Not yet implemented."
 
 [switch."DEF-MQDT-004"]
 value = "fixed"
@@ -1409,6 +1589,14 @@ approved_on = "2026-11-06"
 note = "Back on a menu signs off."
 
 # programs/COPAUA0C.md
+
+[switch."BR-AUTH-002"]
+value = "fixed"
+code_switch = false
+decision = "D-32"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "An amount longer than 13 characters after trimming, with more than two decimals, or otherwise failing the contract's pattern is invalid: the request is declined 9000 and the amount is stored as 0.00. The legacy truncated such amounts."
 
 [switch."BR-AUTH-003"]
 value = "fixed"
@@ -1532,6 +1720,46 @@ decision = "D-54"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 
+[switch."ERR-AUSM-001"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the Resp and Reas codes; the log line carries them with the correlation ID."
+
+[switch."ERR-AUSM-002"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the Resp and Reas codes; the log line carries them with the correlation ID."
+
+[switch."ERR-AUSM-003"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the Resp and Reas codes; the log line carries them with the correlation ID."
+
+[switch."ERR-AUSM-004"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "Two parts. The summary-read part is reachable and drops the IMS status code (Code:) under D-58: the message is System error while reading AUTH Summary, and the log line carries the cause with the correlation ID. The PSB-scheduling part cannot occur, because there is no PSB; a connection failure takes the summary-read path (authorization-service.md section 2)."
+
+[switch."ERR-AUSM-005"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the IMS status code (Code:); the log line carries them with the correlation ID."
+
 # programs/COPAUS1C.md
 
 [switch."DEF-AUDT-001"]
@@ -1561,6 +1789,38 @@ code_switch = false
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[switch."ERR-AUDT-002"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the IMS status code (Code:); the log line carries them with the correlation ID."
+
+[switch."ERR-AUDT-003"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the IMS status code (Code:); the log line carries them with the correlation ID."
+
+[switch."ERR-AUDT-004"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "COPAUS2C's Db2 text (CODE and STATE) is no longer shown; that text is incidental (ERR-AUFR-001, ERR-AUFR-002, NUM-AUFR-003). The detail and the fraud row commit together, so the one failure path shows System error while FRAUD Tagging, ROLLBACK (the ERR-AUDT-006 text without the status) and rolls both writes back: the failure is reported and nothing is saved. That the stored status is shown afterwards is DEF-AUDT-003 (fixed, D-75) (authorization-service.md section 2)."
+
+[switch."ERR-AUDT-006"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (authorization-service.md section 5)"
+approved_on = "2026-11-10"
+note = "D-58: the message keeps its meaning without the IMS status code after ROLLBACK; the log line carries them with the correlation ID."
 
 # programs/COPAUS2C.md
 
@@ -1615,6 +1875,14 @@ decision = "D-03"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
 note = "Access model C1: staff may open any account; sign-on and roles apply. The ownership check comes with C2."
+
+[switch."ERR-RPTS-001"]
+value = "fixed"
+code_switch = false
+decision = "D-58"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+note = "A failed report trigger shows Unable to start the report. Try again later... instead of naming the JOBS queue; the log line carries the cause with the correlation ID."
 
 # programs/COSGN00C.md
 
@@ -1776,6 +2044,7 @@ code_switch = false
 decision = "D-09"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Fixed per D-09: the card number is masked by default; an ADMIN reveals it through the unmask endpoint, which writes one audit row. The ownership half (a USER may view any transaction) follows access model C1 (DEV-C1, D-SEC-01)."
 
 [switch."DEF-TRNV-006"]
 value = "fixed"
@@ -1783,6 +2052,14 @@ code_switch = false
 decision = "D-71"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+[switch."Q-TRNV-001"]
+value = "fixed"
+code_switch = false
+decision = "D-09"
+approved_by = "architect (transaction-service.md section 6)"
+approved_on = "2026-11-10"
+note = "Answered by D-09 for the mask (DEF-TRNV-004). The ownership half is not restricted: access model C1 (DEV-C1, D-SEC-01) lets a USER view any transaction."
 
 # programs/COTRN02C.md
 
@@ -1792,6 +2069,7 @@ code_switch = true
 decision = "D-59"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+note = "Fixed mode: every ID the services generate (online add, bill payment, interest) comes from core.tran_id_seq with MINVALUE 9000000000000000, MAXVALUE 9999999999999999 and NO CYCLE, so every generated ID is reserved. A tran_id is reserved when it is 16 ASCII digits starting with 9 (9000000000000000 to 9999999999999999), tested by characters, never by a numeric parse; the user approved the range on 2026-11-10. A daily file must not use reserved IDs: in fixed mode the claim check fails the ingest (TRAN_ID_RESERVED), and every other legacy file ID stays accepted. Legacy mode keeps highest + 1 under a lock."
 
 [switch."BR-TRNA-007"]
 value = "fixed"
@@ -1864,6 +2142,18 @@ code_switch = false
 decision = "D-75"
 approved_by = "user (decision catalog answers)"
 approved_on = "2026-11-06"
+
+# Note on VAL-TRNA-006 (no entry): Character set of the free-text fields (transaction-service.md section 11,
+#   2026-11-10). No class change and no entry: the item stays must-preserve and required as the spec states it.
+#   Transaction add's source (10), description (60), merchantName (30), merchantCity (25) and merchantZip (10) accept
+#   every character from U+0000 to U+00FF, the 256 characters a legacy X(n) byte holds, controls, NUL and U+00A0
+#   included, up to the approved lengths, which are unchanged and count characters. A character above U+00FF, which no
+#   legacy byte holds, is refused with 400 UNSUPPORTED_CHARACTER, <label> contains a character that is not supported.,
+#   with that field, and nothing is written. Every value a 3270 terminal could enter is accepted with the same length.
+#   No ASCII or byte cap and no switch is added. Only trailing spaces (U+0020) are removed from these fields; whether
+#   that padding rule reaches other fields waits for an architect clarification, and card update keeps its own trim
+#   rules. The unit is not in scope.toml, so trace does not gate it yet; the tests are named when the unit is
+#   converted.
 
 # programs/COTRTLIC.md
 

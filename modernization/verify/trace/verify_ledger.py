@@ -5,8 +5,9 @@ Passes when every switch the code declares or reads has a fidelity entry with co
 and no main configuration overrides the ledger's value; every fidelity entry names a defect-decide
 item or a question the spec defines, and every deviation an ID the spec defines, each with a
 decision, approved_by and approved_on; every defect-decide item has a fidelity entry or a deviation;
-and every architecture-dependent item has a deviation of that kind. A code switch the code does not
-declare yet is a warning. Prints the problems, then
+every architecture-dependent item has a deviation of that kind; and a partial deviation has retained
+statements with requires_test = true, and an invariant's gate_units are the units of its components.
+A code switch the code does not declare yet is a warning. Prints the problems, then
 "verify-ledger: OK" or "verify-ledger: FAILED (<reason>)". Exit status 0 or 1.
 """
 from __future__ import annotations

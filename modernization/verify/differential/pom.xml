@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.carddemo</groupId>
+    <artifactId>carddemo-modernization-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>verify-differential</artifactId>
+  <name>CardDemo differential batch exporter</name>
+  <description>make verify-batch: exports what a Spring Batch cycle job left in the database to the legacy files the GnuCOBOL reference run writes, with the counts its sysout prints.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>legacy-format</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>batch-service</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>db-migrate</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.microsoft.sqlserver</groupId>
+      <artifactId>mssql-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>org.carddemo.verify.differential.ExportBatch</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
