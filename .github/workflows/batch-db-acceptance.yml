@@ -1,0 +1,1253 @@
+name: Batch service database acceptance (pinned test list)
+on:
+  # One run per reviewed revision: only a push to modernization that adds or changes this file starts it.
+  push:
+    branches: [modernization]
+    paths: ['.github/workflows/batch-db-acceptance.yml']
+permissions:
+  contents: read
+concurrency:
+  group: batch-db-acceptance-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  # Reviewed constants of these bytes, never inputs.
+  TESTED_COMMIT: 825bae760505f198b94fed2e9189719924e63fa6
+  TESTED_TREE: 7ff792f1f749f728b05aa8f3f69454c015ebf787
+  MANIFEST_SHA256: 269b866d996668658a11570a35fdc566b11a371a4cf607deaa1d40baa29c816a
+  MANIFEST_SOURCE_COMMIT: d4f633f62986c46f1e64b41fab3dfb9519d0ef65
+  MANIFEST_SOURCE_TREE: 2180c39c180363b40891014248f456314cb7f2b5
+  APPLICABILITY_SHA256: e1ce4dad07e9417789c6dc33db275efaa16a62f5e403a6139ecb9371456d6b2d
+  TEST_CLASS_LIST_SHA256: 3e4bd11f12320a5ffe14c4acc64650bd26005ff3dbf6d008965201c036b5117f
+  TEST_CLASS_COUNT: '114'
+  # The test step's limit (its timeout-minutes, 266, times 60) and Maven's own limit inside that step.
+  TEST_STEP_LIMIT_S: '15960'
+  TEST_MAVEN_LIMIT_S: '15660'
+  MSSQL_IMAGE: mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04@sha256:245f6b1c8903edae52cb20fa31419cefcde1a49938bb8c3447099011fc871ca3
+  RYUK_IMAGE: testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
+  RYUK_IMAGE_TAG: testcontainers/ryuk:0.14.0
+  TOOLCHAIN: >-
+    {"maven": "3.9.11", "maven_core_sha256": "93d3c0523dda6c86c6620d9e692e7df39d0e2e4e4cd860061a8c0d274c2ad185",
+    "surefire": "3.5.6", "dependency_plugin": "3.10.0", "junit_platform": "6.0.3", "java_major": "21"}
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    # GitHub's job limit, 360 min. The fourteen steps other than the tests keep their own limits, 82 min
+    # in all, of which 14 min come after the tests (8 to reconcile and decide, 5 to upload, 1 for the
+    # verdict). 12 min are kept for the runner's own set-up and post steps. The test step gets the rest,
+    # 360 - 82 - 12 = 266 min, so a hang ends at a step limit and the decision, the upload and the verdict
+    # still run.
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with:
+          ref: ${{ env.TESTED_COMMIT }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Write the helper and the case list
+        timeout-minutes: 1
+        run: |
+          echo "ACCEPTANCE_DIR=$RUNNER_TEMP/acceptance" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/acceptance/home" "$RUNNER_TEMP/acceptance/tmp" "$RUNNER_TEMP/acceptance/private"
+          : > "$RUNNER_TEMP/acceptance/private/helper.stderr"
+          cat > "$RUNNER_TEMP/acceptance/helper.py" <<'HELPERPY'
+          """Helper for the batch service database acceptance run (standard library only).
+
+          Every printed or written value is a typed field: a fixed label, a count, a boolean, a reviewed
+          constant, a hash, or a source-derived class#method identifier. No log line, message, property,
+          host name or path is ever copied. The only clock readings kept are the test step's and Maven's start
+          and end, as whole seconds since the epoch, and their differences."""
+          import collections
+          import glob
+          import hashlib
+          import json
+          import os
+          import platform
+          import re
+          import subprocess
+          import sys
+          import time
+          import traceback
+          import xml.etree.ElementTree as ET
+
+          MODES = ("tree", "jdk", "images", "prep-summary", "before-test", "verdict")
+          GROUPS = ("U3", "C1T1", "POOL", "TRPT", "STMT", "JOB", "RST", "SCH", "GRT")
+          FULL = GROUPS[1:]
+          GROUP_TOTALS = {"U3": 3, "C1T1": 9, "POOL": 3, "TRPT": 86, "STMT": 170, "JOB": 14, "RST": 4, "SCH": 20, "GRT": 1}
+          MODULES = ("platform/fidelity", "platform/legacy-format", "platform/validation", "platform/ledger-core",
+                     "platform/web-support", "platform/output-root", "db/db-migrate", "platform/test-support",
+                     "services/identity-service", "services/billpay-service", "services/account-service",
+                     "services/authorization-service", "services/transaction-service", "batch/batch-service",
+                     "verify/data", "verify/differential")
+          TEST_ROOT = "modernization/batch/batch-service/src/test/java"
+          TEST_DIR = TEST_ROOT + "/org/carddemo/batch"
+          STMT_PKG = "org.carddemo.batch.statement"
+          REPORT_DIR = "batch/batch-service/target/surefire-reports"
+          DSR = "modernization/batch/batch-service/src/main/resources"
+          POMS = ("modernization/pom.xml", "modernization/**/pom.xml")
+          PARALLEL = (r"ExecutionMode\.CONCURRENT|@Execution\([^)]*CONCURRENT|junit\.jupiter\.execution\.parallel|<parallel>"
+                      r"|<threadCount>|<threadCountClasses>|<threadCountMethods>|<useUnlimitedThreads>|<perCoreThreadCount>"
+                      r"|<parallelOptimized>")
+          SOURCE_CHECKS = ("duplicate-rows", "class-in-two-groups", "outside-filter", "no-source", "refused-construct",
+                           "inherited-test-methods", "full-methods-differ", "methods-not-in-source", "statement-set-differs")
+          HEX40 = re.compile(r"[0-9a-f]{40}")
+          HEX64 = re.compile(r"[0-9a-f]{64}")
+          IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
+          FQCN = re.compile(r"org\.carddemo\.batch\.(?:\w+\.)*\w+")
+          KEY = re.compile(r"org\.carddemo\.batch\.[A-Za-z0-9_.]+#[A-Za-z_][A-Za-z0-9_]*")
+          TOKEN = re.compile(r"[A-Za-z0-9._+-][A-Za-z0-9._+ -]{0,63}")
+          DIGITS = re.compile(r"[0-9]{1,20}")
+          WORKFLOW_FILE = ".github/workflows/batch-db-acceptance.yml"
+          REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+          WORKFLOW_REF = re.compile(REPOSITORY.pattern + "/" + re.escape(WORKFLOW_FILE + "@refs/heads/modernization"))
+          STATES = ("pass", "skipped", "failure", "error")
+          RANK = {s: i for i, s in enumerate(STATES)}
+          HOLD_LABELS = ("helper-error", "helper-stderr", "pre-check", "test-not-started", "timeout", "report-set", "images",
+                         "evidence-schema")
+          W = WS = MOD = TOOLS = None
+
+
+          def setup():
+              global W, WS, MOD, TOOLS
+              W = os.environ["ACCEPTANCE_DIR"]
+              WS = os.environ["GITHUB_WORKSPACE"]
+              MOD = os.path.join(WS, "modernization")
+              TOOLS = json.loads(os.environ["TOOLCHAIN"])
+
+
+          def const(name):
+              return os.environ.get(name, "")
+
+
+          def sha(b):
+              return hashlib.sha256(b).hexdigest()
+
+
+          def run(args, env=None, timeout=120):
+              r = subprocess.run(args, cwd=WS, env=env, capture_output=True, text=True, timeout=timeout)
+              return r.returncode, r.stdout
+
+
+          def git(*args):
+              return run(["/usr/bin/git", "-C", WS, *args])
+
+
+          def docker(*args):
+              # A private HOME, so that no client configuration of the runner account is read.
+              return run(["/usr/bin/docker", *args], env={"HOME": os.path.join(W, "home"), "PATH": "/usr/bin:/bin"},
+                         timeout=300)
+
+
+          def emit(path_var, text):
+              path = os.environ.get(path_var)
+              if path:
+                  with open(path, "a", encoding="utf-8") as f:
+                      f.write(text)
+
+
+          def read(name, default=""):
+              try:
+                  with open(os.path.join(W, name), encoding="utf-8") as f:
+                      return f.read().strip()
+              except OSError:
+                  return default
+
+
+          def load(name):
+              try:
+                  with open(os.path.join(W, name), encoding="utf-8") as f:
+                      return json.load(f)
+              except (OSError, ValueError):
+                  return {}
+
+
+          def save(name, obj):
+              with open(os.path.join(W, name), "w", encoding="utf-8") as f:
+                  json.dump(obj, f, indent=1, sort_keys=True)
+
+
+          def show(mode, checks):
+              for k, v in checks.items():
+                  print(f"{mode} {k} {'yes' if v else 'no'}")
+
+
+          # ---- the case list and its binding to the source ----
+
+          def case_bytes():
+              with open(os.path.join(W, "cases.tsv"), "rb") as f:
+                  return f.read()
+
+
+          def parse_cases(data):
+              rows, totals, commits, trees, bad = [], [], [], [], 0
+              for line in data.decode("utf-8").splitlines():
+                  if not line.strip():
+                      continue
+                  if line.startswith("#"):
+                      m = re.fullmatch(r"# commit=([0-9a-f]{40})", line)
+                      if m:
+                          commits.append(m.group(1))
+                      m = re.fullmatch(r"# total((?: [A-Z0-9]+=[0-9]+)+)", line)
+                      if m:
+                          totals.append(dict((k, int(v)) for k, v in (t.split("=") for t in m.group(1).split())))
+                      trees += re.findall(r"at tree ([0-9a-f]{40})", line)
+                      continue
+                  f = line.split("\t")
+                  if (len(f) != 4 or f[0] not in GROUPS or not FQCN.fullmatch(f[1]) or not re.fullmatch(r"\w+", f[2])
+                          or not re.fullmatch(r"[1-9][0-9]*", f[3])):
+                      bad += 1
+                      continue
+                  rows.append((f[0], f[1], f[2], int(f[3])))
+              return rows, totals, commits, trees, bad
+
+
+          ANN = re.compile(r"@(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b")
+          DECL = re.compile(r"\bvoid\s+(\w+)\s*\(")
+
+
+          def strip_java(t):
+              # Blanks comments and the contents of string, char and text-block literals, keeping every offset,
+              # so a comment marker inside a string can neither hide nor invent a test method or an annotation.
+              o, i, n = list(t), 0, len(t)
+
+              def blank(a, b):
+                  for k in range(a, min(b, n)):
+                      if o[k] != "\n":
+                          o[k] = " "
+              while i < n:
+                  if t.startswith("//", i):
+                      j = t.find("\n", i)
+                      j = n if j < 0 else j
+                      blank(i, j)
+                      i = j
+                  elif t.startswith("/*", i):
+                      j = t.find("*/", i + 2)
+                      j = n if j < 0 else j + 2
+                      blank(i, j)
+                      i = j
+                  elif t.startswith('"""', i):
+                      j = i + 3
+                      while j < n and not t.startswith('"""', j):
+                          j += 2 if t[j] == "\\" else 1
+                      blank(i + 3, j)
+                      i = j + 3
+                  elif t[i] in "\"'":
+                      j = i + 1
+                      while j < n and t[j] != t[i] and t[j] != "\n":
+                          j += 2 if t[j] == "\\" else 1
+                      blank(i + 1, j)
+                      i = j + 1
+                  else:
+                      i += 1
+              return "".join(o)
+
+
+          def annotated(t):
+              out = set()
+              for a in ANN.finditer(t):
+                  d = DECL.search(t, a.end())
+                  if d:
+                      out.add(d.group(1))
+              return out
+
+
+          def source_checks(rows):
+              troot = os.path.join(WS, TEST_ROOT)
+              c = collections.Counter({k: 0 for k in SOURCE_CHECKS})
+              keys = [(cl, m) for _, cl, m, _ in rows]
+              c["duplicate-rows"] = len(keys) - len(set(keys))
+              group_of = {}
+              for g, cl, _, _ in rows:
+                  if group_of.setdefault(cl, g) != g:
+                      c["class-in-two-groups"] += 1
+              for cl in sorted(group_of):
+                  simple = cl.rsplit(".", 1)[1]
+                  if not (simple.endswith("Test") or simple.endswith("Tests")):
+                      c["outside-filter"] += 1
+                      continue
+                  src = os.path.join(troot, *cl.split(".")) + ".java"
+                  if not os.path.isfile(src):
+                      c["no-source"] += 1
+                      continue
+                  with open(src, encoding="utf-8") as f:
+                      t = strip_java(f.read())
+                  if re.search(r"@Nested\b|@(?:Disabled|EnabledOn|DisabledOn|EnabledIf|DisabledIf)\w*|\babstract\s+class\b", t):
+                      c["refused-construct"] += 1
+                  ext = re.search(r"\bclass\s+" + simple + r"\b[^{]*?\bextends\s+(\w+)", t)
+                  if ext:
+                      for d, _, fs in os.walk(troot):
+                          if ext.group(1) + ".java" in fs:
+                              with open(os.path.join(d, ext.group(1) + ".java"), encoding="utf-8") as f:
+                                  if ANN.search(strip_java(f.read())):
+                                      c["inherited-test-methods"] += 1
+                  have = annotated(t)
+                  mine = {m for _, cc, m, _ in rows if cc == cl}
+                  if group_of[cl] in FULL and mine != have:
+                      c["full-methods-differ"] += 1
+                  elif mine - have:
+                      c["methods-not-in-source"] += 1
+              sdir = os.path.join(troot, *STMT_PKG.split("."))
+              files = sorted(f[:-5] for f in (os.listdir(sdir) if os.path.isdir(sdir) else [])
+                             if re.fullmatch(r"\w+Tests?\.java", f))
+              stmt = sorted(cl[len(STMT_PKG) + 1:] for cl, g in group_of.items() if g == "STMT")
+              c["statement-set-differs"] = int(files != stmt)
+              return c
+
+
+          def expected_classes():
+              """The classes the test filter selects, from the checked-out tree, with the sha256 of their sorted
+              repository-relative paths (one per line)."""
+              rc, out = git("ls-tree", "-r", "--name-only", "HEAD", "--", TEST_DIR)
+              paths = sorted(x for x in out.splitlines() if re.search(r"/[^/]*(Test|Tests)\.java$", x))
+              digest = sha("".join(x + "\n" for x in paths).encode())
+              return rc == 0, digest, {x[len(TEST_ROOT) + 1:-5].replace("/", ".") for x in paths}
+
+
+          def static_checks():
+              ck = {}
+              rc, _ = git("grep", "-n", "-E", PARALLEL, "--", "modernization", ":!modernization/web", ":!modernization/airflow")
+              ck["no-parallel-settings"] = rc == 1
+              props = 0
+              for _, dirs, fs in os.walk(MOD):
+                  dirs[:] = [x for x in dirs if x != "node_modules"]
+                  props += fs.count("junit-platform.properties")
+              ck["no-junit-platform-properties"] = props == 0
+              rc, out = git("grep", "-h", "-E", "<forkCount>|<reuseForks>", "--", "modernization/pom.xml",
+                            "modernization/batch/batch-service/pom.xml")
+              ck["one-fork-reused"] = rc == 0 and [x.replace(" ", "") for x in out.splitlines()] == [
+                  "<forkCount>1</forkCount>", "<reuseForks>true</reuseForks>"]
+              ck["no-maven-or-jvm-config"] = not any(os.path.lexists(os.path.join(MOD, ".mvn", x))
+                                                     for x in ("maven.config", "jvm.config"))
+              rc, _ = git("grep", "-l", "-F", "java.io.tmpdir", "--", *POMS)
+              ck["no-pom-sets-tmpdir"] = rc == 1
+              rc, out = git("grep", "-h", "-F", "<argLine>", "--", *POMS)
+              ck["argline-only-utc"] = rc == 0 and out.replace(" ", "").strip() == "<argLine>-Duser.timezone=UTC</argLine>"
+              rc, _ = git("grep", "-l", "-E", "testFailureIgnore|rerunFailingTestsCount|skipAfterFailureCount", "--", *POMS)
+              ck["no-failure-ignore-or-rerun"] = rc == 1
+              # A fork timeout would end the tests before Maven's own limit does.
+              rc, _ = git("grep", "-l", "-E", r"forkedProcessTimeoutInSeconds|surefire\.timeout", "--", *POMS)
+              ck["no-surefire-fork-timeout"] = rc == 1
+              rc, out = git("grep", "-I", "-i", "-E", "jdbc:|datasource[^=]*url", "--", DSR)
+              lines = out.splitlines()
+              ck["one-loopback-datasource-url"] = rc == 0 and len(lines) == 1 and re.match(
+                  re.escape(DSR + "/application.properties:spring.datasource.url=jdbc:sqlserver://") + r"127\.0\.0\.1"
+                  + re.escape(":${MSSQL_HOST_PORT:"), lines[0]) is not None
+              rc, out = git("ls-files", "--", DSR + "/*.yml", DSR + "/*.yaml")
+              ck["no-yaml-configuration"] = rc == 0 and out.strip() == ""
+              pom = ET.parse(os.path.join(MOD, "pom.xml")).getroot()
+
+              def kids(e, tag):
+                  return [x for x in e if x.tag.split("}")[-1] == tag]
+              mods = [m.text.strip() for ms in kids(pom, "modules") for m in kids(ms, "module")]
+              inv = mods == list(MODULES)
+              for m in MODULES:
+                  d = os.path.join(MOD, m)
+                  inv = inv and os.path.isfile(os.path.join(d, "pom.xml"))
+                  for s in ("src/main/java", "src/test/java"):
+                      inv = inv and any(f.endswith(".java") for _, _, fs in os.walk(os.path.join(d, s)) for f in fs)
+              ck["reactor-sixteen-modules"] = inv
+              images = [x.text.strip() for x in pom.iter() if x.tag.split("}")[-1] == "carddemo.mssql.image" and x.text
+                        and x.text.strip() != "${carddemo.mssql.image}"]
+              ck["pom-database-image-pinned"] = images == [const("MSSQL_IMAGE")]
+              return ck
+
+
+          def workflow_checks():
+              """The workflow commit and file reference that the run reports, read outside the test environment from
+              the step's own variables. The workflow file is not in the tested checkout, so no blob is computed or
+              written here."""
+              wc, pc = const("WORKFLOW_COMMIT"), const("PUSHED_COMMIT")
+              repo, ref = const("REPOSITORY"), const("WORKFLOW_REF")
+              ck = {"workflow-commit-form": bool(HEX40.fullmatch(wc)),
+                    "pushed-commit-form": bool(HEX40.fullmatch(pc)),
+                    "workflow-ref-fixed-form": bool(REPOSITORY.fullmatch(repo))
+                    and ref == repo + "/" + WORKFLOW_FILE + "@refs/heads/modernization"}
+              save("workflow.json", {"workflow_commit": wc if ck["workflow-commit-form"] else "invalid",
+                                     "pushed_commit": pc if ck["pushed-commit-form"] else "invalid",
+                                     "workflow_ref": ref if ck["workflow-ref-fixed-form"] else "invalid"})
+              return ck
+
+
+          def cmd_tree():
+              data = case_bytes()
+              ck = {}
+              _, head = git("rev-parse", "HEAD")
+              _, tree = git("rev-parse", "HEAD^{tree}")
+              rc, st = git("status", "--porcelain", "--untracked-files=all")
+              ck["head-is-tested-commit"] = head.strip() == const("TESTED_COMMIT")
+              ck["tree-is-tested-tree"] = tree.strip() == const("TESTED_TREE")
+              ck["worktree-clean"] = rc == 0 and st == ""
+              # The hash comes first: nothing else is read from bytes that are not the reviewed ones.
+              ck["case-list-sha256"] = sha(data) == const("MANIFEST_SHA256")
+              names = ["case-list-commit-line", "case-list-source-tree", "case-list-rows-well-formed", "case-list-total-line",
+                       "case-list-group-totals"] + ["case-list-" + k for k in SOURCE_CHECKS]
+              if ck["case-list-sha256"]:
+                  rows, totals, commits, trees, bad = parse_cases(data)
+                  sums = {g: sum(n for gg, _, _, n in rows if gg == g) for g in GROUPS}
+                  ck["case-list-commit-line"] = commits == [const("MANIFEST_SOURCE_COMMIT")]
+                  ck["case-list-source-tree"] = trees == [const("MANIFEST_SOURCE_TREE")]
+                  ck["case-list-rows-well-formed"] = bad == 0 and all(any(r[0] == g for r in rows) for g in GROUPS)
+                  ck["case-list-total-line"] = len(totals) == 1 and totals[0] == sums
+                  ck["case-list-group-totals"] = sums == GROUP_TOTALS and sum(sums.values()) == 310
+                  sc = source_checks(rows)
+                  for k in SOURCE_CHECKS:
+                      ck["case-list-" + k] = sc[k] == 0
+              else:
+                  ck.update({k: False for k in names})
+              ck["source-commit-pinned"] = bool(HEX40.fullmatch(const("MANIFEST_SOURCE_COMMIT")))
+              ck["source-tree-pinned"] = bool(HEX40.fullmatch(const("MANIFEST_SOURCE_TREE")))
+              ck["applicability-pinned"] = bool(HEX64.fullmatch(const("APPLICABILITY_SHA256")))
+              ck.update(static_checks())
+              ok_list, digest, classes = expected_classes()
+              ck["test-class-list-pinned"] = (ok_list and digest == const("TEST_CLASS_LIST_SHA256")
+                                              and str(len(classes)) == const("TEST_CLASS_COUNT"))
+              ck.update(workflow_checks())
+              ok = all(ck.values())
+              save("tree.json", {"ok": ok, "checks": ck})
+              show("tree", ck)
+              print(f"tree ok {'yes' if ok else 'no'}")
+              sys.exit(0 if ok else 1)
+
+
+          # ---- toolchain and images ----
+
+          def cmd_jdk():
+              fields = {}
+              with open(os.path.join(os.environ["JAVA_HOME"], "release"), encoding="utf-8") as f:
+                  for line in f.read().splitlines():
+                      m = re.fullmatch(r'(JAVA_VERSION|JAVA_RUNTIME_VERSION|IMPLEMENTOR)="(.*)"', line)
+                      if m:
+                          fields[m.group(1)] = m.group(2) if TOKEN.fullmatch(m.group(2)) else "unknown"
+              rec = {"java_version": fields.get("JAVA_VERSION", "unknown"),
+                     "java_runtime_version": fields.get("JAVA_RUNTIME_VERSION", "unknown"),
+                     "implementor": fields.get("IMPLEMENTOR", "unknown")}
+              save("jdk.json", rec)
+              print(f"jdk {rec['implementor']} {rec['java_version']} {rec['java_runtime_version']}")
+              sys.exit(0 if rec["java_version"].split(".")[0] == TOOLS["java_major"] else 1)
+
+
+          def image_id(ref):
+              rc, out = docker("image", "inspect", "-f", "{{.Id}}", ref)
+              return out.strip() if rc == 0 and IMAGE_ID.fullmatch(out.strip()) else "none"
+
+
+          def image_ids():
+              rc, out = docker("image", "ls", "-q", "--no-trunc")
+              ids = sorted(set(out.split()))
+              return ids if rc == 0 and ids and all(IMAGE_ID.fullmatch(x) for x in ids) else None
+
+
+          def cmd_images():
+              ck = {"pull-rc-0": read("pull.rc") == "0"}
+              ids = {"mssql": image_id(const("MSSQL_IMAGE")), "ryuk": image_id(const("RYUK_IMAGE")),
+                     "ryuk_tag": image_id(const("RYUK_IMAGE_TAG"))}
+              for name, ref in (("mssql", const("MSSQL_IMAGE")), ("ryuk", const("RYUK_IMAGE"))):
+                  repo, digest = ref.split("@", 1)[0].rsplit(":", 1)[0], ref.split("@", 1)[-1]
+                  rc, out = docker("image", "inspect", "-f", "{{json .RepoDigests}}", ref)
+                  try:
+                      rd = json.loads(out) if rc == 0 else []
+                  except ValueError:
+                      rd = []
+                  ck[f"{name}-repo-digest-pinned"] = isinstance(rd, list) and (repo + "@" + digest) in rd
+                  ck[f"{name}-image-present"] = ids[name] != "none"
+              ck["ryuk-tag-same-image"] = ids["ryuk"] != "none" and ids["ryuk_tag"] == ids["ryuk"]
+              ok = all(ck.values())
+              save("images.json", {"ok": ok, "checks": ck, "ids": ids})
+              show("images", ck)
+              print(f"images ok {'yes' if ok else 'no'}")
+              sys.exit(0 if ok else 1)
+
+
+          def listing():
+              """sha256 of sorted 'root/relative-path  sha256' lines over every .jar and .pom. Any link (file or
+              folder) or any entry that is neither a regular file nor a folder is counted, and must be 0."""
+              lines, odd = [], 0
+              for name in ("m2", "mvnw"):
+                  root = os.path.join(W, name)
+                  for d, dirs, files in os.walk(root):
+                      odd += sum(1 for x in dirs if os.path.islink(os.path.join(d, x)))
+                      dirs.sort()
+                      for f in files:
+                          p = os.path.join(d, f)
+                          if os.path.islink(p) or not os.path.isfile(p):
+                              odd += 1
+                              continue
+                          if f.endswith((".jar", ".pom")):
+                              with open(p, "rb") as fh:
+                                  lines.append(name + "/" + os.path.relpath(p, root) + "  " + sha(fh.read()))
+              lines.sort()
+              return sha("".join(x + "\n" for x in lines).encode()), len(lines), odd
+
+
+          def maven_core():
+              jars = glob.glob(os.path.join(W, "mvnw", "wrapper", "dists", "apache-maven-" + TOOLS["maven"], "*", "lib",
+                                            "maven-core-" + TOOLS["maven"] + ".jar"))
+              if len(jars) != 1 or os.path.islink(jars[0]):
+                  return "none", len(jars)
+              with open(jars[0], "rb") as fh:
+                  return sha(fh.read()), 1
+
+
+          def own_jars():
+              return sum(1 for _ in glob.iglob(os.path.join(W, "m2", "org", "carddemo", "**", "*.jar"), recursive=True))
+
+
+          def cmd_prep_summary():
+              m2 = os.path.join(W, "m2")
+              core, ncore = maven_core()
+              sfdir = os.path.join(m2, "org", "apache", "maven", "plugins", "maven-surefire-plugin")
+              sf = sorted(os.listdir(sfdir)) if os.path.isdir(sfdir) else []
+              prov = os.path.isfile(os.path.join(m2, "org", "apache", "maven", "surefire", "surefire-junit-platform",
+                                                 TOOLS["surefire"], "surefire-junit-platform-" + TOOLS["surefire"] + ".jar"))
+              launcher = os.path.isfile(os.path.join(m2, "org", "junit", "platform", "junit-platform-launcher",
+                                                     TOOLS["junit_platform"],
+                                                     "junit-platform-launcher-" + TOOLS["junit_platform"] + ".jar"))
+              digest, n, odd = listing()
+              ck = {
+                  "prepare-rc-0": read("prepare.rc") == "0",
+                  "seed-rc-0": read("seed.rc") == "0",
+                  "maven-core-pinned": core == TOOLS["maven_core_sha256"] and ncore == 1,
+                  "surefire-version-pinned": sf == [TOOLS["surefire"]],
+                  "provider-present": prov,
+                  "launcher-present": launcher,
+                  "no-carddemo-artifact": not os.path.exists(os.path.join(m2, "org", "carddemo")),
+                  "no-links-or-special-files": odd == 0,
+              }
+              ok = all(ck.values())
+              save("prep.json", {"ok": ok, "checks": ck, "files": n, "m2_listing": digest, "maven_core_sha256": core})
+              show("prepare", ck)
+              print(f"prepare files {n} ok {'yes' if ok else 'no'}")
+              sys.exit(0 if ok else 1)
+
+
+          def cmd_before_test():
+              ids = image_ids()
+              rec = {"uid_not_root": os.getuid() != 0, "image_ids": ids, "t0": int(time.time()) - 1}
+              save("before.json", rec)
+              ck = {"uid-not-root": rec["uid_not_root"], "image-list-read": ids is not None}
+              show("before-test", ck)
+              sys.exit(0 if all(ck.values()) else 1)
+
+
+          # ---- results ----
+
+          def case_key(cls, name):
+              return re.sub(r"\[[0-9]+\]$", "", cls), name.split("(")[0].split("[")[0]
+
+
+          def reports():
+              rdir = os.path.join(MOD, REPORT_DIR)
+              mpath = os.path.join(W, "start.marker")
+              marker = os.path.getmtime(mpath) if os.path.isfile(mpath) else None
+              files = sorted(glob.glob(os.path.join(rdir, "TEST-*.xml")))
+              r = {"files": len(files), "marker": marker is not None, "parse_errors": 0, "parallel_not_false": 0,
+                   "attr_mismatch": 0, "tot": dict(tests=0, failures=0, errors=0, skipped=0), "obs": {},
+                   "raw": collections.Counter(), "suite_tests": {}, "props": {}}
+              r["stale"] = len(files) if marker is None else sum(1 for f in files if os.path.getmtime(f) <= marker)
+              r["outside"] = 0 if marker is None else sum(
+                  1 for p in glob.glob(os.path.join(MOD, "**", "target", "surefire-reports", "TEST-*.xml"), recursive=True)
+                  if not p.startswith(rdir + os.sep) and os.path.getmtime(p) > marker)
+              suites = collections.Counter()
+              for f in files:
+                  try:
+                      s = ET.parse(f).getroot()
+                      attrs = {k: int(s.get(k, "0")) for k in r["tot"]}
+                  except (ET.ParseError, OSError, ValueError):
+                      r["parse_errors"] += 1
+                      continue
+                  if s.tag != "testsuite":
+                      r["parse_errors"] += 1
+                      continue
+                  name = s.get("name", "")
+                  suites[name] += 1
+                  for k in r["tot"]:
+                      r["tot"][k] += attrs[k]
+                  props = {p.get("name"): p.get("value") for p in s.iter("property")}
+                  if props.get("junit.jupiter.execution.parallel.enabled") != "false":
+                      r["parallel_not_false"] += 1
+                  for pn in ("java.vendor", "java.version"):
+                      if TOKEN.fullmatch(props.get(pn) or ""):
+                          r["props"].setdefault(pn, props[pn])
+                  cnt = dict(tests=0, failures=0, errors=0, skipped=0)
+                  for tc in s.iter("testcase"):
+                      cnt["tests"] += 1
+                      state = "pass"
+                      for tag, k in (("skipped", "skipped"), ("failure", "failures"), ("error", "errors")):
+                          if tc.find(tag) is not None:
+                              state = tag
+                              cnt[k] += 1
+                      r["raw"][(tc.get("classname", ""), tc.get("name", ""))] += 1
+                      r["obs"].setdefault(case_key(tc.get("classname", ""), tc.get("name", "")), []).append(state)
+                  if attrs != cnt:
+                      r["attr_mismatch"] += 1
+                  r["suite_tests"][name] = r["suite_tests"].get(name, 0) + attrs["tests"]
+              r["dup_suites"] = sum(1 for c in suites.values() if c > 1)
+              return r
+
+
+          def reconcile(rep, rows):
+              exp = {(c, m): (g, n) for g, c, m, n in rows}
+              group_of = {c: g for g, c, _, _ in rows}
+              full = {c for c, g in group_of.items() if g != "U3"}
+              obs = rep["obs"]
+              dup = 0
+              for (c, n), k in rep["raw"].items():
+                  if k > 1:
+                      kk = case_key(c, n)
+                      if kk not in exp or len(obs.get(kk, [])) != exp[kk][1]:
+                          dup += 1
+              table = {g: {x: 0 for x in ("expected", "seen") + STATES} for g in GROUPS}
+              key_bad, inv = 0, []
+              for kk, (g, n) in sorted(exp.items()):
+                  st = obs.get(kk, [])
+                  table[g]["expected"] += n
+                  table[g]["seen"] += len(st)
+                  for x in st:
+                      table[g][x] += 1
+                  worst = max(st, key=RANK.get) if st else "missing"
+                  if len(st) != n or worst != "pass":
+                      key_bad += 1
+                  status = worst if worst != "pass" or len(st) == n else "count"
+                  inv.append(f"case {kk[0]}#{kk[1]} expected={n} actual={len(st)} status={status}")
+              full_extra = sum(1 for kk in obs if kk[0] in full and kk not in exp)
+              skips = sorted(f"{k[0]}#{k[1]}" for k, st in obs.items() if k not in exp and k[0] not in full and "skipped" in st)
+              named = [s for s in skips if KEY.fullmatch(s)]
+              inv += [f"skipped {s}" for s in named]
+              return {"dup": dup, "table": table, "key_bad": key_bad, "full_extra": full_extra, "skips": len(skips),
+                      "skips_unnamed": len(skips) - len(named), "inventory": inv}
+
+
+          INV_LINE = re.compile(r"(?:case " + KEY.pattern + r" expected=[0-9]+ actual=[0-9]+ "
+                                r"status=(?:pass|count|missing|skipped|failure|error)|skipped " + KEY.pattern + r")")
+
+
+          def scalar_ok(v):
+              if isinstance(v, bool) or v is None:
+                  return True
+              if isinstance(v, int):
+                  return True
+              return isinstance(v, str) and (v in ("", "none", "unknown", "invalid") or bool(TOKEN.fullmatch(v))
+                                             or bool(IMAGE_ID.fullmatch(v)) or bool(WORKFLOW_REF.fullmatch(v)))
+
+
+          def typed(v, depth=0):
+              if depth > 4:
+                  return False
+              if isinstance(v, dict):
+                  return all(isinstance(k, str) and TOKEN.fullmatch(k) and typed(x, depth + 1) for k, x in v.items())
+              if isinstance(v, list):
+                  return all(typed(x, depth + 1) for x in v)
+              return scalar_ok(v)
+
+
+          def valid_evidence(summary, inv, prov):
+              return (summary.get("verdict") in ("PASS", "FAIL", "HOLD") and isinstance(summary.get("rc"), int)
+                      and typed(summary) and typed(prov) and all(INV_LINE.fullmatch(x) for x in inv)
+                      and all(k in HOLD_LABELS for k in summary.get("hold", [])))
+
+
+          def write_evidence(summary, inv, prov):
+              ev = os.path.join(W, "evidence")
+              os.makedirs(ev, exist_ok=True)
+              with open(os.path.join(ev, "summary.json"), "w", encoding="utf-8") as f:
+                  json.dump(summary, f, indent=1, sort_keys=True)
+              if inv is not None:
+                  with open(os.path.join(ev, "inventory.txt"), "w", encoding="utf-8") as f:
+                      f.write("".join(x + "\n" for x in inv))
+              if prov is not None:
+                  with open(os.path.join(ev, "provenance.json"), "w", encoding="utf-8") as f:
+                      json.dump(prov, f, indent=1, sort_keys=True)
+
+
+          def helper_trouble():
+              modes = sorted({x.split()[0] for x in read("holds.txt").splitlines() if x.split() and x.split()[0] in MODES})
+              try:
+                  stderr_bytes = os.path.getsize(os.path.join(W, "private", "helper.stderr"))
+              except OSError:
+                  stderr_bytes = -1
+              return modes, stderr_bytes
+
+
+          def cmd_verdict():
+              tree, jdk, images, prep, before = (load(x) for x in ("tree.json", "jdk.json", "images.json", "prep.json",
+                                                                    "before.json"))
+              wf = load("workflow.json")
+              data = case_bytes()
+              rows = parse_cases(data)[0] if sha(data) == const("MANIFEST_SHA256") else []
+              rep = reports()
+              rec = reconcile(rep, rows)
+              ok_list, digest, classes = expected_classes()
+              seen = set(rep["suite_tests"])
+              _, head = git("rev-parse", "HEAD")
+              _, wtree = git("rev-parse", "HEAD^{tree}")
+              rc_st, st = git("status", "--porcelain", "--untracked-files=all")
+              m2, _, odd = listing()
+              core, _ = maven_core()
+              after = image_ids()
+              t0, t1 = before.get("t0"), read("test.t1")
+              pulls = None
+              if isinstance(t0, int) and DIGITS.fullmatch(t1):
+                  rc_ev, ev = docker("events", "--since", str(t0), "--until", t1, "--filter", "type=image",
+                                     "--filter", "event=pull", "--format", "{{.Actor.ID}}")
+                  pulls = len(ev.split()) if rc_ev == 0 else None
+              pre = {
+                  "tree-and-source-checks": tree.get("ok") is True,
+                  "jdk-major": str(jdk.get("java_version", "")).split(".")[0] == TOOLS["java_major"],
+                  "images-pinned": images.get("ok") is True,
+                  "prepare-ok": prep.get("ok") is True,
+                  "uid-not-root": before.get("uid_not_root") is True,
+                  "test-step-env": read("test.stepenv") == "ok",
+                  "case-list-read": bool(rows),
+              }
+              post = {
+                  "head-unchanged": head.strip() == const("TESTED_COMMIT"),
+                  "tree-unchanged": wtree.strip() == const("TESTED_TREE"),
+                  "worktree-clean-after": rc_st == 0 and st == "",
+                  "case-list-unchanged": sha(case_bytes()) == const("MANIFEST_SHA256"),
+                  "m2-listing-unchanged": bool(HEX64.fullmatch(str(prep.get("m2_listing", "")))) and m2 == prep["m2_listing"]
+                  and odd == 0,
+                  "maven-core-pinned": core == TOOLS["maven_core_sha256"],
+                  "no-carddemo-jar-in-repository": own_jars() == 0,
+                  "jdk-same-in-tests": rep["props"].get("java.version", "absent") == jdk.get("java_version", "unknown"),
+                  "reports-present": rep["files"] > 0,
+                  "reports-parsed": rep["parse_errors"] == 0,
+                  "start-marker-present": rep["marker"],
+                  "no-stale-report": rep["stale"] == 0,
+                  "no-report-outside-batch-service": rep["outside"] == 0,
+                  "parallel-off-in-every-suite": rep["parallel_not_false"] == 0,
+                  "suite-attributes-equal-testcases": rep["attr_mismatch"] == 0,
+                  "no-duplicate-suite-names": rep["dup_suites"] == 0,
+                  "no-failures-or-errors": rep["tot"]["failures"] == 0 and rep["tot"]["errors"] == 0,
+                  "tests-ran": rep["tot"]["tests"] > 0,
+                  "no-unexplained-duplicate-testcase": rec["dup"] == 0,
+                  "every-case-exact-and-passing": rec["key_bad"] == 0,
+                  "no-unlisted-method-in-full-group-class": rec["full_extra"] == 0,
+              }
+              report_set = {
+                  "test-class-list-pinned": ok_list and digest == const("TEST_CLASS_LIST_SHA256"),
+                  "no-missing-class-report": not (classes - seen),
+                  "no-extra-class-report": not (seen - classes),
+                  "tests-in-every-class": all(rep["suite_tests"].get(c, 0) > 0 for c in classes),
+              }
+              image_checks = {
+                  "image-set-unchanged": after is not None and after == before.get("image_ids"),
+                  "no-image-pull-during-test": pulls == 0,
+              }
+              mrc_s = read("test.rc")
+              started = bool(DIGITS.fullmatch(mrc_s))
+              mrc = int(mrc_s) if started else -1
+              clock = {}
+              for k, f in (("test_step_start", "test.step.t0"), ("test_step_end", "test.step.t1"),
+                           ("maven_start", "test.mvn.t0"), ("maven_end", "test.mvn.t1")):
+                  v = read(f)
+                  clock[k] = int(v) if DIGITS.fullmatch(v) else -1
+              timing = dict(clock)
+              for name, a, b, limit in (("test_step", "test_step_start", "test_step_end", "TEST_STEP_LIMIT_S"),
+                                        ("maven", "maven_start", "maven_end", "TEST_MAVEN_LIMIT_S")):
+                  el = clock[b] - clock[a] if clock[a] >= 0 and clock[b] >= clock[a] else -1
+                  lim = int(const(limit)) if DIGITS.fullmatch(const(limit)) else -1
+                  timing[name + "_elapsed_s"] = el
+                  timing[name + "_limit_s"] = lim
+                  # Disclosure only: whether this run stayed within half its limit. It never changes the verdict.
+                  timing[name + "_margin_shown"] = el >= 0 and lim > 0 and 2 * el <= lim
+              post_fail = not all(post.values())
+              # Maven's own non-zero code is reported first; 9 only when Maven passed and a later check did not.
+              rc = mrc if mrc != 0 else (9 if post_fail else 0)
+              hold = []
+              if not all(pre.values()):
+                  hold.append("pre-check")
+              if clock["maven_start"] < 0:
+                  hold.append("test-not-started")
+              elif not started or mrc in (124, 137):
+                  # Maven started but left no exit code (the step reached its own limit), or its own limit stopped it.
+                  hold.append("timeout")
+              if not all(report_set.values()):
+                  hold.append("report-set")
+              if not all(image_checks.values()):
+                  hold.append("images")
+              tok_or = lambda v: v if TOKEN.fullmatch(v) else "unknown"
+              hex_or = lambda v, p: v if p.fullmatch(v) else "invalid"
+              ids = images.get("ids", {})
+              prov = {
+                  "tested_commit": hex_or(head.strip(), HEX40),
+                  "tested_tree": hex_or(wtree.strip(), HEX40),
+                  "case_list_sha256": sha(data),
+                  "case_list_source_commit": hex_or(const("MANIFEST_SOURCE_COMMIT"), HEX40),
+                  "case_list_source_tree": hex_or(const("MANIFEST_SOURCE_TREE"), HEX40),
+                  "applicability_sha256": hex_or(const("APPLICABILITY_SHA256"), HEX64),
+                  "test_class_list_sha256": digest,
+                  "workflow_commit": hex_or(str(wf.get("workflow_commit", "")), HEX40),
+                  "workflow_ref": (str(wf.get("workflow_ref", "")) if WORKFLOW_REF.fullmatch(str(wf.get("workflow_ref", "")))
+                                   else "invalid"),
+                  "pushed_commit": hex_or(str(wf.get("pushed_commit", "")), HEX40),
+                  "run_id": os.environ.get("GITHUB_RUN_ID", "") if DIGITS.fullmatch(os.environ.get("GITHUB_RUN_ID", "")) else "invalid",
+                  "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "") if DIGITS.fullmatch(os.environ.get("GITHUB_RUN_ATTEMPT", "")) else "invalid",
+                  "event": tok_or(os.environ.get("GITHUB_EVENT_NAME", "")),
+                  "image_os": tok_or(os.environ.get("ImageOS", "")),
+                  "image_version": tok_or(os.environ.get("ImageVersion", "")),
+                  "arch": tok_or(platform.machine()),
+                  "jdk_release_version": jdk.get("java_version", "unknown"),
+                  "jdk_runtime_version": jdk.get("java_runtime_version", "unknown"),
+                  "jdk_implementor": jdk.get("implementor", "unknown"),
+                  "tests_java_vendor": rep["props"].get("java.vendor", "unknown"),
+                  "tests_java_version": rep["props"].get("java.version", "unknown"),
+                  "mssql_image_id": ids.get("mssql", "none") if IMAGE_ID.fullmatch(str(ids.get("mssql", ""))) else "none",
+                  "ryuk_image_id": ids.get("ryuk", "none") if IMAGE_ID.fullmatch(str(ids.get("ryuk", ""))) else "none",
+                  "maven": TOOLS["maven"],
+                  "maven_core_sha256": core,
+                  "m2_listing": prep.get("m2_listing", "invalid") if HEX64.fullmatch(str(prep.get("m2_listing", ""))) else "invalid",
+                  "helper_sha256": sha(open(os.path.abspath(__file__), "rb").read()),
+              }
+              summary = {
+                  "rc": rc, "maven_rc": mrc,
+                  "checks": {"before": pre, "after": post, "report_set": report_set, "images": image_checks},
+                  "groups": rec["table"],
+                  "totals": rep["tot"],
+                  "report_files": rep["files"],
+                  "classes_expected": len(classes), "classes_with_report": len(seen & classes),
+                  "skipped_outside_groups": rec["skips"], "skipped_unnamed": rec["skips_unnamed"],
+                  "image_pulls_during_test": pulls if pulls is not None else -1,
+                  "test_env_names": read("test.envnames").split(),
+                  "timing": timing,
+              }
+              for part in ("before", "after", "report_set", "images"):
+                  show("verdict", summary["checks"][part])
+              for g, t in rec["table"].items():
+                  print(f"verdict group {g} invocations {t['seen']}/{t['expected']} pass {t['pass']} skipped {t['skipped']} "
+                        f"failure {t['failure']} error {t['error']}")
+              print(f"verdict skipped-outside-groups {rec['skips']}")
+              print(f"verdict timing test-step-elapsed {timing['test_step_elapsed_s']} maven-elapsed {timing['maven_elapsed_s']}")
+              # Read last, so that anything this mode itself sent to stderr is counted.
+              modes, stderr_bytes = helper_trouble()
+              if modes:
+                  hold.append("helper-error")
+              if stderr_bytes != 0:
+                  hold.append("helper-stderr")
+              verdict = "HOLD" if hold else ("PASS" if rc == 0 else "FAIL")
+              summary.update(ok=verdict == "PASS", verdict=verdict, hold=hold)
+              if not valid_evidence(summary, rec["inventory"], prov):
+                  summary = {"ok": False, "verdict": "HOLD", "rc": rc, "hold": ["evidence-schema"]}
+                  write_evidence(summary, None, None)
+              else:
+                  write_evidence(summary, rec["inventory"], prov)
+              print(f"verdict rc {rc} maven-rc {mrc} hold {' '.join(summary['hold']) or 'none'}")
+              print(f"verdict {summary['verdict']}")
+              emit("GITHUB_OUTPUT", f"ok={'true' if summary['verdict'] == 'PASS' else 'false'}\n")
+
+
+          def main():
+              cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+              if cmd not in MODES:
+                  sys.exit(2)
+              try:
+                  setup()
+                  {"tree": cmd_tree, "jdk": cmd_jdk, "images": cmd_images, "prep-summary": cmd_prep_summary,
+                   "before-test": cmd_before_test, "verdict": cmd_verdict}[cmd]()
+              except SystemExit:
+                  raise
+              except BaseException:
+                  # The traceback goes to stderr, which the workflow sends to a private file that is never uploaded
+                  # or printed. The job log gets only the fixed line below.
+                  traceback.print_exc()
+                  try:
+                      with open(os.path.join(os.environ.get("ACCEPTANCE_DIR", "."), "holds.txt"), "a", encoding="utf-8") as f:
+                          f.write(f"{cmd} unexpected-error\n")
+                      if cmd == "verdict":
+                          write_evidence({"ok": False, "verdict": "HOLD", "rc": -1, "hold": ["helper-error"]}, None, None)
+                  except BaseException:
+                      traceback.print_exc()
+                  if cmd == "verdict":
+                      emit("GITHUB_OUTPUT", "ok=false\n")
+                  print(f"helper {cmd} HOLD unexpected-error")
+                  sys.exit(3)
+
+
+          if __name__ == "__main__":
+              main()
+          HELPERPY
+          cat > "$RUNNER_TEMP/acceptance/cases.tsv" <<'CASESTSV'
+          # bt-gate-v2.4 case manifest: build-test source derivation at tree 2180c39c180363b40891014248f456314cb7f2b5; rows = cases-d4f633f6.tsv (fadd8249) unchanged, plus JOB RST SCH GRT from a static recount of their sources at d4f633f6 (blobs e194d103 9e26e779 ff8c8793 2a5c81cb, the same at 14f6c4fc); JOB is a @BothModes class template (x2)
+          # commit=d4f633f62986c46f1e64b41fab3dfb9519d0ef65
+          # total U3=3 C1T1=9 POOL=3 TRPT=86 STMT=170 JOB=14 RST=4 SCH=20 GRT=1
+          # columns: GROUP<TAB>FQCN<TAB>method<TAB>invocations; every invocation must pass
+          U3	org.carddemo.batch.load.ConfiguredInputPathsLoadTest	anUnreadableLoadFileIsReportedByTheCauseTypeOnly	1
+          U3	org.carddemo.batch.load.ConfiguredInputPathsLoadTest	anUnreadableUnloadIsReportedByTheCauseTypeOnly	1
+          U3	org.carddemo.batch.cycle.CycleRerunTest	anIoFailureWhilePreparingTheReturnLeavesNoTemporaryCopy	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aStartPreparedBeforeARerunsRestoreIsRefusedAndTheSameRequestThenStartsTheNewAttempt	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aRestartPreparedBeforeARerunsRestoreIsRefusedAndAddsNoExecution	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aCompletedCycleIsRefusedEvenWhereItsWindowIsHeld	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	thePurgeOfACompletedCycleIsNotRefusedAndTakesNoLaunchLock	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aClearedCompletedTaskStillCompletesAfterItsCyclesClose	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aClearedCompletedTaskOfTheReplacedAttemptStillCompletesAfterTheRerun	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aLiveExecutionOfTheReplacedAttemptIsStillAnsweredAsRunning	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aRecoverableExecutionOfTheReplacedAttemptIsRefusedAndNotRecovered	1
+          C1T1	org.carddemo.batch.cycle.CycleLaunchRecheckTest	aLaunchWaitingOnTheLaunchLockReadsTheAttemptTheRestoreCommitted	1
+          POOL	org.carddemo.batch.internal.WindowedLaunchPoolTest	theDefaultPoolIsTheOneUnderTest	1
+          POOL	org.carddemo.batch.internal.WindowedLaunchPoolTest	launchesQueuedBehindAWindowCloseGetContractAnswersWhenItEnds	1
+          POOL	org.carddemo.batch.internal.WindowedLaunchPoolTest	moreParallelLaunchesAndRestartsThanConnectionsGetContractAnswers	1
+          TRPT	org.carddemo.batch.transactionreport.ReportPublicationTest	theTargetIsWhereTransactionServiceLooksForIt	1
+          TRPT	org.carddemo.batch.transactionreport.ReportPublicationTest	publishesOwnerOnlyAndNeverReplaces	1
+          TRPT	org.carddemo.batch.transactionreport.ReportPublicationTest	refusesAnyWorkNameButThisOutputs	6
+          TRPT	org.carddemo.batch.transactionreport.ReportPublicationTest	lookingForTheTargetCreatesNothing	1
+          TRPT	org.carddemo.batch.transactionreport.ReportPublicationTest	eachRunHasItsOwnFolder	1
+          TRPT	org.carddemo.batch.transactionreport.ReportRunFailuresTest	aFailedExecutionMarksItsRunningRowFailedInAFencedTransaction	1
+          TRPT	org.carddemo.batch.transactionreport.ReportRunFailuresTest	aStoppedExecutionIsRecordedAsStopped	3
+          TRPT	org.carddemo.batch.transactionreport.ReportRunFailuresTest	otherStatusesLeaveTheRowAlone	4
+          TRPT	org.carddemo.batch.transactionreport.ReportRunFailuresTest	aWriteThatCannotCommitIsLeftToRecovery	1
+          TRPT	org.carddemo.batch.transactionreport.ReportRunFailuresTest	codesAreTheDataModelsFailureCodes	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportConfigurationTest	adapterDelegatesTheExactExecutionWithoutCreatingPaths	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportGoldenTest	legacyModeIsByteIdenticalToTheProgram	6
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportGoldenTest	theSampleIsTheSpecsRun	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportGoldenTest	aLookupThatAbendsTheProgramFailsTheReport	2
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportGoldenTest	everyCaseIsUsedOrExplained	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportModesTest	accountTotalsFollowTheModesBreakAndOrder	2
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportModesTest	anEmptySelectionPrintsNothingInLegacyAndOnlyTheTotalsWhenFixed	2
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportModesTest	theQueryAppliesTheStoredRangeInBothModes	2
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	buildCommitsTheIntentAndOnlyTheNextTransactionPublishesAndCompletes	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	anIntentLostWithItsTransactionLeavesNothingForTheContextSave	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	aCommittedIntentBuildsNothingAgain	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	aRefusedCompletionAfterThePublicationIsRepeatedByTheRetryWithoutReplacingTheFile	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	bothCompletionFormsStoreTheHashOfThePublishedBytes	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	theStoredHashIsTheThirtyTwoBytesOfTheIntentsHex	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	aLostLeaseCannotPublishOrComplete	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	thePublishRenewalPrecedesTheInstanceFence	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	aRunThatIsNotRunningForThisExecutionReadsNothingAndCreatesNoFolder	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	anExistingTargetWithoutAnIntentFailsBeforeReadingTheMaster	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	halfAnIntentFailsBeforeAnyStatement	2
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	anIntentNamingAForeignPathIsRefused	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	cleanUpRemovesOnlyTerminalUnreferencedWork	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	aMissingLookupFailsTheReportWithoutAnyValueAndCommitsNoIntent	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	lookupsAreCheckedInTheProgramsOrder	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	startMarksTheRunRunningForThisExecution	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	startRefusesARowItCannotRunWithoutAFinishedPublication	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	startWritesNothingForARowAnEarlierExecutionOfTheInstanceCompleted	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	startRefusesAnyOtherCompletedRow	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	printOnlyVerifiesAReportAnEarlierExecutionOfTheInstanceCompleted	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	printAcceptsARowCompletedBeforeItHadAHashOnTheIntentAlone	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	printFailsWhenTheRowHashDiffersFromTheIntentBeforeTouchingAFile	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	printFailsWhenTheReportAnEarlierExecutionCompletedHasOtherBytes	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	printNeverPublishesAMissingReportAnEarlierExecutionCompleted	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	aCarriedOutputKeyAloneDoesNotSkipTheCompletion	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	theOutputKeyOfARolledBackCompletionIsNotCarried	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	theCompletedCommitHookRunsOnlyAfterTheCommit	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportTaskletTest	anExecutionWithoutRunIdIsNotRunnable	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	headerColumnsAreTheCopybookPositions	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	oneTransactionMatchesTheSampleRunLineAndGetsAllThreeTotals	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	editsAmountsAsTheSpecExamples	8
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	sampleTotalsLineUp	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	totalsKeepTheLowOrderElevenDigitsAndTheSign	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	theSeventeenthDetailOfOneCardStartsAPage	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	anAccountTotalThatStepsOverAMultipleOfTwentyDelaysThePageBreak	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	descriptionsAreCutAndCodesKeepTheirWidth	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	valuesOutsideTheLayoutFailWithoutNamingTheRow	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	aRowNeverShowsItsCardNumber	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	legacyEndsTheReportAtTheFirstRowOutsideTheRange	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	fixedSkipsRowsOutsideTheRangeAndAlwaysWritesTheTotals	1
+          TRPT	org.carddemo.batch.transactionreport.TransactionReportWriterTest	legacyTotalsEachCardAndFixedEachAccount	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	theSampleAfterPosttranIsByteIdenticalToTheHarnessDefault	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	theEdgeCaseIsByteIdenticalToTheHarness	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	theTotalOverflowCaseIsByteIdenticalToTheHarness	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	theMaxTableCaseIsByteIdenticalToTheHarness	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	theOrphanOnlyCaseIsByteIdenticalToTheHarness	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	anEmptyWorkFileGivesTheStatementsOfCardsWithoutTransactions	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererGoldenTest	aWorkFileBeyondTheTableIsRefusedBeforeAnyByte	3
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	theTableLimitsAreTheProgramsOccursClauses	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	aCardOutsideTheCrossReferenceCountsAgainstTheTable	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	crossReferenceCardsWithoutTransactionsTakeNoSlot	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	aMissingCustomerIsRefusedBeforeAnyByte	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	aMissingAccountIsRefusedBeforeAnyByte	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	aWorkFileOutOfKeyOrderIsRejectedBeforeAnyByte	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	theResultCountsStatementsListedAndUnlistedTransactions	1
+          STMT	org.carddemo.batch.statement.LegacyStatementRendererTest	aWorkRecordMustHaveTheLegacyFieldSizes	1
+          STMT	org.carddemo.batch.statement.MinimumPaymentTest	theVectors	10
+          STMT	org.carddemo.batch.statement.MinimumPaymentTest	negativeInterestCountsAsZero	2
+          STMT	org.carddemo.batch.statement.MinimumPaymentTest	theFloorAndPercentageAreSettings	3
+          STMT	org.carddemo.batch.statement.StatementCaptureGrantsTest	updateIsDeniedAndSelectInsertDeleteAreNot	1
+          STMT	org.carddemo.batch.statement.StatementCaptureGrantsTest	anUpdateProbeIsRefusedWhileSelectAndDeleteRun	1
+          STMT	org.carddemo.batch.statement.StatementCaptureGrantsTest	theOnlyDenyOfBatchSvcIsUpdateOnTheCapture	1
+          STMT	org.carddemo.batch.statement.StatementCaptureGrantsTest	theGrantsResetRevokesADenyOnReplay	1
+          STMT	org.carddemo.batch.statement.StatementCaptureLockTest	anInsertOutsideTheGuardCommittedWithinTheLockWaitIsOnTheStatement	1
+          STMT	org.carddemo.batch.statement.StatementCaptureLockTest	anInsertOutsideTheGuardHeldPastTheLockWaitFailsTheStartBusy	1
+          STMT	org.carddemo.batch.statement.StatementCaptureLockTest	aBillPayTransactionInFlightDelaysTheCaptureUntilItCommits	1
+          STMT	org.carddemo.batch.statement.StatementCaptureLockTest	aBillPayTransactionHeldPastTheLockWaitFailsTheStartBusy	1
+          STMT	org.carddemo.batch.statement.StatementCaptureLockTest	theWindowLockHeldPastTheLockWaitFailsTheStartBusy	1
+          STMT	org.carddemo.batch.statement.StatementCaptureSessionTest	aCaptureThatCommitsLeavesItsSessionAtTheDefaults	1
+          STMT	org.carddemo.batch.statement.StatementCaptureSessionTest	aCaptureThatFailsOnALockTimeoutLeavesItsSessionAtTheDefaults	1
+          STMT	org.carddemo.batch.statement.StatementCaptureSessionTest	aRestoreThatFailsAbortsTheConnection	1
+          STMT	org.carddemo.batch.statement.StatementCaptureSourceTest	noCodeUpdatesOrDeletesCaptureRows	1
+          STMT	org.carddemo.batch.statement.StatementFiguresTest	theTotalsAreMutuallyExclusiveAndInterestIsSigned	1
+          STMT	org.carddemo.batch.statement.StatementFiguresTest	aPreviousStatementGivesTheOpeningBalanceAndTheAdjustmentReconciles	1
+          STMT	org.carddemo.batch.statement.StatementFiguresTest	theMinimumPaymentUsesOnlyPositiveInterest	1
+          STMT	org.carddemo.batch.statement.StatementFiguresTest	aFirstStatementWithoutRowsOrWithOnlyLaterOnlineRowsStartsOnTheStatementDate	1
+          STMT	org.carddemo.batch.statement.StatementFixedPrivacyTest	aChangedWorkingStatementFailsTheIntentNamingNoAccount	1
+          STMT	org.carddemo.batch.statement.StatementFixedPrivacyTest	anOtherAccountsFileInTheWorkingFolderFailsTheIntentNamingNoAccount	1
+          STMT	org.carddemo.batch.statement.StatementFixedPrivacyTest	aRemovedWorkingStatementFailsThePublicationNamingNoAccount	1
+          STMT	org.carddemo.batch.statement.StatementFixedPrivacyTest	anotherOutputsClaimFailsThePublicationNamingNoAccount	1
+          STMT	org.carddemo.batch.statement.StatementFixedPrivacyTest	aChangedFinalStatementFailsTheCheckNamingNoAccount	1
+          STMT	org.carddemo.batch.statement.StatementFixedPrivacyTest	aRemovedFinalStatementFailsTheCheckNamingNoAccount	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	theManifestHasOneLinePerFileSortedByNameInByteOrder	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	aMatchingFolderGivesItsManifestsSha256	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	theFinalFolderMayHoldItsClaimAndNothingElse	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	anExtraOrMissingFileIsAMismatch	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	aChangedFileIsAMismatch	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	anAccountFileWhoseHashDiffersFromItsRowIsAMismatch	1
+          STMT	org.carddemo.batch.statement.StatementFoldersTest	aMissingFolderIsAMismatch	1
+          STMT	org.carddemo.batch.statement.StatementInvalidationTest	aDataLoadAfterAFailedRunRefusesItsRestart	1
+          STMT	org.carddemo.batch.statement.StatementInvalidationTest	aCycleRerunAfterAFailedRunInvalidatesItAndTheNextAttemptPublishesItsOwnRun	1
+          STMT	org.carddemo.batch.statement.StatementInvalidationTest	aCycleRerunInvalidatesTheFailedRunsOfTheCycleAndOfALaterCycleAndTheirRestartsAreRefused	1
+          STMT	org.carddemo.batch.statement.StatementInvalidationTest	aWatermarkAboveTheHighestTransactionRefusesTheRestart	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	consecutivePeriodsChainAndPutEveryRowOnExactlyOneStatement	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	aRestartAfterAWriteOutsideTheGuardKeepsTheCaptureAndTheRowGoesOnTheNextStatement	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	aBalanceEditedWithoutARowGivesTheAdjustmentLineAndCompletedWithRejects	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	anUnassignedRowIsCounted	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	anAccountNewSinceThePreviousRunGetsAFirstStatement	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	moreThanFiftyOneAccountsAndElevenRowsOnOneCardAllGetStatements	1
+          STMT	org.carddemo.batch.statement.StatementJobFixedTest	noHtmlIsWrittenAndMarkupCharactersPrintAsText	1
+          STMT	org.carddemo.batch.statement.StatementJobModeChangeTest	theFirstFixedStatementAfterLegacyRunsOpensAtTheLegacyCapture	1
+          STMT	org.carddemo.batch.statement.StatementJobModeChangeTest	anEndedLegacyRunIsNeverThePreviousRun	2
+          STMT	org.carddemo.batch.statement.StatementJobTest	theLegacyRunPublishesTheHarnessFilesAndCompletesItsRun	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	anUnassignedMasterRowLeavesTheFilesAndCountsAsAReject	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aRestartAtPublishingFinishesWithoutRendering	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aRestartOfACompletedRunOnlyChecksTheFolder	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aMismatchFailsTheRestartAndLeavesTheRunPublishing	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aRestartOfAnInvalidatedRunIsRefused	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aRestartWithAWatermarkAboveTheMasterIsRefused	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aRestartOfAFailedRunRendersAgainAndCompletes	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	aRestartAfterAWriteOutsideTheGuardRendersTheCapturedBalanceAndMaster	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	fiftyOneCrossReferenceCardsAndAnOrphanCardAreRefusedAsFiftyTwoSlots	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	fiftyTwoCrossReferenceCardsAreRefused	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	elevenTransactionsOnOneCardAreRefused	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	fiftyOneCardsWithTenTransactionsOnOneAreWithinTheTable	1
+          STMT	org.carddemo.batch.statement.StatementJobTest	masterRowsAboveTheWatermarkDoNotCountAgainstTheTableOnARestart	1
+          STMT	org.carddemo.batch.statement.StatementLeaseLossTest	anOwnerRecoveredBeforeItsIntentPublishesNothingAfterTheNextOwnerPublished	1
+          STMT	org.carddemo.batch.statement.StatementLeaseLossTest	anOwnerRecoveredBeforeItsIntentCommitsNothingWhenItResumesFirst	1
+          STMT	org.carddemo.batch.statement.StatementLeaseLossTest	anOwnerRecoveredAfterItsIntentLeavesTheNextOwnersPublicationUnchanged	1
+          STMT	org.carddemo.batch.statement.StatementLeaseLossTest	anOwnerRecoveredAfterSomeLinksHasNoLinkedFileReplaced	1
+          STMT	org.carddemo.batch.statement.StatementOwnerBindingTest	aClaimOnAStaleReadFailsAndTheRowKeepsTheWinner	1
+          STMT	org.carddemo.batch.statement.StatementOwnerBindingTest	failedAndPublishingRunsAreClaimedAndOnlyTheClaimantCompletes	1
+          STMT	org.carddemo.batch.statement.StatementOwnerBindingTest	endedRunsAreNeverClaimed	1
+          STMT	org.carddemo.batch.statement.StatementOwnerBindingTest	aNonOwnerNeitherRendersNorDeletesAccountRows	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	theSameStatementGivesTheSameBytesAndTheMetadataIsFixed	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	theStatementShowsItsHeaderSummaryAndLines	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	thereIsNoFicoScoreAndCardsShowOnlyTheirLastFourDigits	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	everyValuePrintsInFull	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	markupCharactersPrintAsThemselves	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	invisibleAndUnknownCharactersPrintVisibly	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	anEmptyPeriodStillPrints	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	anAdjustmentPrintsItsOwnLine	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	manyLinesSpillOntoFurtherPagesWithTheHeaderOnEach	1
+          STMT	org.carddemo.batch.statement.StatementPdfTest	moneyIsNeverRounded	1
+          STMT	org.carddemo.batch.statement.StatementPropertiesTest	theDefaults	1
+          STMT	org.carddemo.batch.statement.StatementPropertiesTest	aBadValueFailsTheStartWithThePropertyName	5
+          STMT	org.carddemo.batch.statement.StatementPropertiesTest	theLimitsAreAccepted	2
+          STMT	org.carddemo.batch.statement.StatementPropertiesTest	aValueIsNeverClamped	1
+          STMT	org.carddemo.batch.statement.StatementPropertiesTest	theCaptureWaitsBatchServicesLockWait	1
+          STMT	org.carddemo.batch.statement.StatementPropertiesTest	aLockWaitTheCaptureCannotUseFailsWithItsPropertyName	4
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aCrashAfterTheRenderAndBeforeTheIntentRendersTheSameFilesAndRowsAgain	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	theRestartOfAFailedRunRemovesOnlyTheTerminalOwnersWorkingFolder	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aCrashAfterTheIntentAndBeforeTheFirstLinkPublishesTheCommittedFolder	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aCrashAfterSomeLinksIsCompletedWithoutReplacingALinkedFile	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aCrashAfterTheManifestAndBeforeCompletedOnlyVerifies	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aRestartOfACompletedRunOnlyChecksTheFolder	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aWorkingFileChangedBeforeTheIntentFailsAndNothingIsPublished	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aFinalFileChangedBeforeStepThreeFailsAndStaysPublishing	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aFinalFileRemovedAfterThePublicationFailsStepThreeAndStaysPublishing	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aFinalFolderMadeInAdvanceWithOtherBytesFailsBeforeAnyLink	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aStatementsFolderOpenToOthersFailsTheStartAndKeepsItsMode	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	aStatementsFolderThatIsALinkFailsTheStart	1
+          STMT	org.carddemo.batch.statement.StatementPublicationJobTest	everyFolderIsPrivateToTheServiceAndEveryFileToo	1
+          STMT	org.carddemo.batch.statement.StatementPublicationLegacyJobTest	aCrashAfterTheRenderAndBeforePublishingRendersTheSameFilesAgain	1
+          STMT	org.carddemo.batch.statement.StatementPublicationLegacyJobTest	aCrashAfterPublishingAndBeforeTheFirstLinkPublishesTheLegacyFiles	1
+          STMT	org.carddemo.batch.statement.StatementPublicationLegacyJobTest	aCrashAfterTheManifestAndBeforeCompletedOnlyVerifiesTheLegacyFiles	1
+          STMT	org.carddemo.batch.statement.StatementPublicationLegacyJobTest	aFixedFileInTheLegacyWorkingFolderFailsTheIntent	1
+          STMT	org.carddemo.batch.statement.StatementPublicationModesTest	thePublicationNeverReadsTheMode	1
+          STMT	org.carddemo.batch.statement.StatementPublicationModesTest	bothModesPublishAndVerifyThroughTheSameCalls	1
+          STMT	org.carddemo.batch.statement.StatementPublicationModesTest	theExpectedFileSetIsTheOnlyDifference	1
+          STMT	org.carddemo.batch.statement.StatementSwitchesTest	aSelectorOfACoveredItemStopsTheStartAndNamesOnlyTheKey	10
+          STMT	org.carddemo.batch.statement.StatementSwitchesTest	theEnvironmentVariableFormIsRefusedToo	10
+          STMT	org.carddemo.batch.statement.StatementSwitchesTest	batchServiceDoesNotStartWithASelectorOfACoveredItem	5
+          STMT	org.carddemo.batch.statement.StatementSwitchesTest	withoutASelectorTheProcessStartsAndDeclaresOnlyDefStmt005	1
+          STMT	org.carddemo.batch.statement.StatementSwitchesTest	defStmt005IsTheOneStatementSelector	2
+          JOB	org.carddemo.batch.transactionreport.TransactionReportJobTest	reportsTheMasterInTheRunsRangeAndCompletesTheRunWithoutChangingData	2
+          JOB	org.carddemo.batch.transactionreport.TransactionReportJobTest	anEmptySelectionCompletes	2
+          JOB	org.carddemo.batch.transactionreport.TransactionReportJobTest	aRunThatFailedBeforeItsTriggerIsNeverStarted	2
+          JOB	org.carddemo.batch.transactionreport.TransactionReportJobTest	aMissingLookupFailsTheRunWithoutValuesAndARestartCompletesIt	6
+          JOB	org.carddemo.batch.transactionreport.TransactionReportJobTest	aCompletedRunIsNeverRunAgain	2
+          RST	org.carddemo.batch.transactionreport.TransactionReportRestartTest	aRestartAfterAnOwnerLostPastItsCompletedCommitVerifiesAndCompletes	1
+          RST	org.carddemo.batch.transactionreport.TransactionReportRestartTest	aFailureAfterTheCompletedCommitKeepsTheRowAndTheRestartCompletes	1
+          RST	org.carddemo.batch.transactionreport.TransactionReportRestartTest	aRestartThatFindsOtherBytesFailsAndKeepsTheCompletedRow	1
+          RST	org.carddemo.batch.transactionreport.TransactionReportRestartTest	aRestartWhoseCompletedRowHoldsAnotherHashFailsAndChangesNothing	1
+          SCH	org.carddemo.batch.BatchSchemaTest	oneCyclePerBusinessDate	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aCycleIsOpenUntilCompletedAndCountsItsAttempts	1
+          SCH	org.carddemo.batch.BatchSchemaTest	anExecutionLeaseBelongsToAJobExecutionAndIsRevokedWithAReason	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aReportRunTiesEachStatusToItsColumns	1
+          SCH	org.carddemo.batch.BatchSchemaTest	onlyARequestedReportRunCanBeTriggerFailedAndANoOpLeavesTheRowAsItWas	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aRunningReportRunIsStalledOnlyWhenItsExecutionIsRunningAndItsLeaseRecoverable	1
+          SCH	org.carddemo.batch.BatchSchemaTest	anExportRunBelongsToOneJobInstance	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aBatchWindowNamesExactlyOneHolder	1
+          SCH	org.carddemo.batch.BatchSchemaTest	transactionsAndBatchWindowsReferToAnExistingCycle	1
+          SCH	org.carddemo.batch.BatchSchemaTest	theDatabaseInstanceMarkerIsOneRowWithAnId	1
+          SCH	org.carddemo.batch.BatchSchemaTest	theStage1TextColumnsHoldTheLegacyRepertoireWithTheirDefaultsAndMasks	1
+          SCH	org.carddemo.batch.BatchSchemaTest	theAccountZipGroupProvenanceIsAPairThatKeepsTheTwentyCharactersAsRead	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aRecordOfEveryByteValueIsStoredAndMaskedUnchanged	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aTransactionTypeOrCategoryDescriptionHoldsFiftyOfAnyLegacyCharacter	1
+          SCH	org.carddemo.batch.BatchSchemaTest	onlineAddsWaitUntilACycleClaimsThem	1
+          SCH	org.carddemo.batch.BatchSchemaTest	anIdempotencyKeyIsUniquePerUserAndOnlyOnlineAddsCarryOne	1
+          SCH	org.carddemo.batch.BatchSchemaTest	rejectViewMasksTheCardNumberInTheRecord	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aRejectKeepsEveryFailingReasonBesidesTheLegacyOne	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aCycleSnapshotKeepsTheBalancesAndEveryFillerByte	1
+          SCH	org.carddemo.batch.BatchSchemaTest	aReaderOfTheRejectViewOnlySeesTheMaskedRecord	1
+          GRT	org.carddemo.batch.BatchGrantsTest	batchSvcHoldsExactlyItsGrants	1
+          CASESTSV
+      - name: Tested tree, workflow commit, case list and source checks (before any network use)
+        timeout-minutes: 3
+        env:
+          # Read here, outside the test environment, and recorded under plain names.
+          WORKFLOW_COMMIT: ${{ github.workflow_sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          PUSHED_COMMIT: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: /usr/bin/python3 -I -B "$ACCEPTANCE_DIR/helper.py" tree 2>> "$ACCEPTANCE_DIR/private/helper.stderr"
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        timeout-minutes: 10
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          overwrite-settings: false
+          # Otherwise the action exports MAVEN_ARGS=-ntp, which the preflight forbids; -ntp is on every command.
+          show-download-progress: true
+          cache-jdk: false
+          problem-matcher: false
+      - name: Record the JDK (patch level recorded, not pinned)
+        timeout-minutes: 2
+        run: /usr/bin/python3 -I -B "$ACCEPTANCE_DIR/helper.py" jdk 2>> "$ACCEPTANCE_DIR/private/helper.stderr"
+      - name: Preflight and settings (fails, never installs)
+        timeout-minutes: 2
+        run: |
+          test "$(id -u)" -ne 0
+          for p in /bin/sh /usr/bin/env /usr/bin/timeout /usr/bin/python3 /usr/bin/git /usr/bin/docker /usr/bin/date \
+                   /usr/bin/touch; do test -x "$p"; done
+          /usr/bin/python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'
+          bad=$(env | cut -d= -f1 | grep -cE '^(CARDDEMO_[A-Z0-9_]*|MSSQL_SA_PASSWORD|MSSQL_HOST_PORT|MAVEN_OPTS|MAVEN_ARGS|JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|TESTCONTAINERS_[A-Z0-9_]*)$' || true)
+          test "$bad" -eq 0
+          cat > "$ACCEPTANCE_DIR/settings.xml" <<'XML'
+          <settings>
+            <mirrors><mirror><id>central-only</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>
+          </settings>
+          XML
+          cat > "$ACCEPTANCE_DIR/settings-offline.xml" <<'XML'
+          <settings>
+            <offline>true</offline>
+            <mirrors><mirror><id>central-only</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>
+          </settings>
+          XML
+      # ---- bounded online prepare: images by digest, fresh private repository and wrapper home, no cache ----
+      - name: Pull the database and reaper images by digest (online)
+        timeout-minutes: 10
+        run: |
+          D=(env -i HOME="$ACCEPTANCE_DIR/home" PATH=/usr/bin:/bin)
+          L="$ACCEPTANCE_DIR/pull.log"
+          rc=0
+          "${D[@]}" /usr/bin/timeout -k 10 420 /usr/bin/docker pull -q "$MSSQL_IMAGE" > "$L" 2>&1 < /dev/null || rc=$?
+          if [ "$rc" = 0 ]; then
+            "${D[@]}" /usr/bin/timeout -k 10 120 /usr/bin/docker pull -q "$RYUK_IMAGE" >> "$L" 2>&1 < /dev/null || rc=$?
+          fi
+          if [ "$rc" = 0 ]; then
+            id=$("${D[@]}" /usr/bin/docker image inspect -f '{{.Id}}' "$RYUK_IMAGE" 2>> "$L") || rc=$?
+          fi
+          if [ "$rc" = 0 ]; then
+            "${D[@]}" /usr/bin/docker tag "$id" "$RYUK_IMAGE_TAG" >> "$L" 2>&1 < /dev/null || rc=$?
+          fi
+          echo "$rc" > "$ACCEPTANCE_DIR/pull.rc"
+      - name: Image digests and reaper tag (typed lines only)
+        timeout-minutes: 2
+        run: /usr/bin/python3 -I -B "$ACCEPTANCE_DIR/helper.py" images 2>> "$ACCEPTANCE_DIR/private/helper.stderr"
+      - name: Populate (online, strict checksums; compiles, runs no test)
+        timeout-minutes: 16
+        working-directory: modernization
+        run: |
+          E=(env -i HOME="$ACCEPTANCE_DIR/home" PATH="$JAVA_HOME/bin:/usr/bin:/bin" LANG=C.UTF-8 TMPDIR="$ACCEPTANCE_DIR/tmp"
+             JAVA_HOME="$JAVA_HOME" MAVEN_USER_HOME="$ACCEPTANCE_DIR/mvnw" MAVEN_SKIP_RC=true)
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 900 ./mvnw -C -B -ntp -Dstyle.color=never \
+            -s "$ACCEPTANCE_DIR/settings.xml" -gs "$ACCEPTANCE_DIR/settings.xml" -Dmaven.repo.local="$ACCEPTANCE_DIR/m2" \
+            clean test -pl batch/batch-service -am '-Dtest=NoSuchTestClass' -Dsurefire.failIfNoSpecifiedTests=false \
+            > "$ACCEPTANCE_DIR/prepare.log" 2>&1 < /dev/null || rc=$?
+          echo "$rc" > "$ACCEPTANCE_DIR/prepare.rc"
+      - name: Seed the Surefire JUnit Platform provider (online, strict checksums, pinned versions)
+        timeout-minutes: 12
+        working-directory: modernization
+        run: |
+          T() { /usr/bin/python3 -I -c 'import json, os, sys; print(json.loads(os.environ["TOOLCHAIN"])[sys.argv[1]])' "$1"; }
+          E=(env -i HOME="$ACCEPTANCE_DIR/home" PATH="$JAVA_HOME/bin:/usr/bin:/bin" LANG=C.UTF-8 TMPDIR="$ACCEPTANCE_DIR/tmp"
+             JAVA_HOME="$JAVA_HOME" MAVEN_USER_HOME="$ACCEPTANCE_DIR/mvnw" MAVEN_SKIP_RC=true)
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 300 ./mvnw -C -B -ntp -N -Dstyle.color=never \
+            -s "$ACCEPTANCE_DIR/settings.xml" -gs "$ACCEPTANCE_DIR/settings.xml" -Dmaven.repo.local="$ACCEPTANCE_DIR/m2" \
+            "org.apache.maven.plugins:maven-dependency-plugin:$(T dependency_plugin):get" \
+            "-Dartifact=org.apache.maven.surefire:surefire-junit-platform:$(T surefire)" -Dtransitive=true \
+            > "$ACCEPTANCE_DIR/seed.log" 2>&1 < /dev/null || rc=$?
+          "${E[@]}" /usr/bin/timeout -k 10 300 ./mvnw -C -B -ntp -N -Dstyle.color=never \
+            -s "$ACCEPTANCE_DIR/settings.xml" -gs "$ACCEPTANCE_DIR/settings.xml" -Dmaven.repo.local="$ACCEPTANCE_DIR/m2" \
+            "org.apache.maven.plugins:maven-dependency-plugin:$(T dependency_plugin):get" \
+            "-Dartifact=org.junit.platform:junit-platform-launcher:$(T junit_platform)" -Dtransitive=true \
+            >> "$ACCEPTANCE_DIR/seed.log" 2>&1 < /dev/null || rc=$?
+          echo "$rc" > "$ACCEPTANCE_DIR/seed.rc"
+      - name: Typed prepare summary (no raw log in the job log)
+        timeout-minutes: 5
+        run: /usr/bin/python3 -I -B "$ACCEPTANCE_DIR/helper.py" prep-summary 2>> "$ACCEPTANCE_DIR/private/helper.stderr"
+      # ---- offline tests: the same repository and wrapper home, Maven offline, the same images ----
+      - name: Batch service tests on SQL Server (Maven offline, pinned filter, parallel off; output private)
+        # Maven's own limit is 300 s below this step's limit. The 300 s cover the rest of this step: the check
+        # before the tests (stopped after 240 s, killed 5 s later), the environment check and the start files
+        # (seconds), Maven's 10 s kill grace, and the exit code and end files (seconds).
+        timeout-minutes: 266
+        working-directory: modernization
+        run: |
+          /usr/bin/date +%s > "$ACCEPTANCE_DIR/test.step.t0"
+          /usr/bin/timeout -k 5 240 /usr/bin/python3 -I -B "$ACCEPTANCE_DIR/helper.py" before-test \
+            2>> "$ACCEPTANCE_DIR/private/helper.stderr" \
+            || { echo not-started > "$ACCEPTANCE_DIR/test.rc"; /usr/bin/date +%s > "$ACCEPTANCE_DIR/test.step.t1"; exit 0; }
+          E=(env -i HOME="$ACCEPTANCE_DIR/home" PATH="$JAVA_HOME/bin:/usr/bin:/bin" LANG=C.UTF-8 TMPDIR="$ACCEPTANCE_DIR/tmp"
+             JAVA_HOME="$JAVA_HOME" MAVEN_USER_HOME="$ACCEPTANCE_DIR/mvnw" MAVEN_SKIP_RC=true)
+          names=$("${E[@]}" /usr/bin/env | cut -d= -f1 | LC_ALL=C sort | tr '\n' ' ')
+          echo "$names" > "$ACCEPTANCE_DIR/test.envnames"
+          if [ "$names" != "HOME JAVA_HOME LANG MAVEN_SKIP_RC MAVEN_USER_HOME PATH TMPDIR " ]; then
+            echo bad > "$ACCEPTANCE_DIR/test.stepenv"; echo not-started > "$ACCEPTANCE_DIR/test.rc"
+            /usr/bin/date +%s > "$ACCEPTANCE_DIR/test.step.t1"; exit 0
+          fi
+          echo ok > "$ACCEPTANCE_DIR/test.stepenv"
+          /usr/bin/touch "$ACCEPTANCE_DIR/start.marker"
+          /usr/bin/date +%s > "$ACCEPTANCE_DIR/test.mvn.t0"
+          rc=0
+          "${E[@]}" /usr/bin/timeout -k 10 "$TEST_MAVEN_LIMIT_S" ./mvnw -o -B -ntp -Dstyle.color=never \
+            -s "$ACCEPTANCE_DIR/settings-offline.xml" -gs "$ACCEPTANCE_DIR/settings-offline.xml" -Dmaven.repo.local="$ACCEPTANCE_DIR/m2" \
+            clean test -pl batch/batch-service -am '-Dtest=org/carddemo/batch/**/*Test,org/carddemo/batch/**/*Tests' \
+            -Dsurefire.failIfNoSpecifiedTests=false -Djunit.jupiter.execution.parallel.enabled=false \
+            > "$ACCEPTANCE_DIR/test.log" 2>&1 < /dev/null || rc=$?
+          /usr/bin/date +%s > "$ACCEPTANCE_DIR/test.mvn.t1"
+          echo "$rc" > "$ACCEPTANCE_DIR/test.rc"
+          echo $(( $(/usr/bin/date +%s) + 1 )) > "$ACCEPTANCE_DIR/test.t1"
+          /usr/bin/date +%s > "$ACCEPTANCE_DIR/test.step.t1"
+      # ---- evidence ----
+      - name: Reconcile and decide (typed lines only)
+        id: verdict
+        if: ${{ !cancelled() }}
+        timeout-minutes: 8
+        run: /usr/bin/python3 -I -B "$ACCEPTANCE_DIR/helper.py" verdict 2>> "$ACCEPTANCE_DIR/private/helper.stderr"
+      - name: Upload typed evidence only
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: batch-db-acceptance-evidence
+          path: ${{ runner.temp }}/acceptance/evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verdict
+        if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        env:
+          VERDICT_OK: ${{ steps.verdict.outputs.ok }}
+        run: test "$VERDICT_OK" = true
