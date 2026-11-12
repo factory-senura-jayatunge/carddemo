@@ -4,13 +4,14 @@ import java.time.Duration;
 
 import org.carddemo.platform.web.Message;
 import org.carddemo.platform.web.MessageCatalog;
+import org.carddemo.platform.web.SafeErrors;
 import org.springframework.http.HttpStatus;
 
 /**
  * A refused auth call: the HTTP status, the catalogue message (code, text, severity) and the
  * field to focus. Unlike the platform's ApiException it can clear the auth cookies.
  */
-public class AuthFailure extends RuntimeException {
+public class AuthFailure extends RuntimeException implements SafeErrors.MessageFree {
 
     private final HttpStatus status;
     private final Message catalogMessage;

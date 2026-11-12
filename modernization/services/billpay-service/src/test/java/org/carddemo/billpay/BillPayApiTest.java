@@ -60,7 +60,10 @@ class BillPayApiTest extends BillPayTestBase {
     static final String CUST = "000000001";
     static final String CARD = "4111111111111111";
     static final String HIGHEST_ID = "0000000000000041";
-    static final String NEXT_ID = "0000000000000042";
+    /** Legacy mode: the highest master ID + 1. */
+    static final String LEGACY_NEXT_ID = "0000000000000042";
+    /** Fixed mode: the first ID of the online range, where the load restarts the sequence. */
+    static final long FIXED_FIRST_ID = 9_000_000_000_000_000L;
 
     private final JdbcClient admin = DB.admin();
 
@@ -82,7 +85,7 @@ class BillPayApiTest extends BillPayTestBase {
                 .card(CARD, ACCT, CUST)
                 .categoryBalance(ACCT, "01", "0001", "194.00")
                 .transaction(HIGHEST_ID, CARD, "194.00")
-                .restartTranIdSequence(Long.parseLong(HIGHEST_ID) + 1);
+                .restartTranIdSequence(FIXED_FIRST_ID);
     }
 
     @AfterEach
@@ -92,6 +95,16 @@ class BillPayApiTest extends BillPayTestBase {
 
     private static boolean fixed() {
         return FidelityOverrides.current() == FidelityMode.FIXED;
+    }
+
+    /** The ID the first payment of a test gets in the current mode. */
+    private static String nextId() {
+        return fixed() ? String.valueOf(FIXED_FIRST_ID) : LEGACY_NEXT_ID;
+    }
+
+    /** The ID the second payment of a test gets in the current mode. */
+    private static String secondId() {
+        return fixed() ? String.valueOf(FIXED_FIRST_ID + 1) : "0000000000000043";
     }
 
     private static String key() {
@@ -140,6 +153,20 @@ class BillPayApiTest extends BillPayTestBase {
         mvc.perform(get("/api/billpay/accounts/{a}", ACCT).cookie(session)).andExpect(status().isOk());
         mvc.perform(paymentRequest(ACCT, "Y", key()).cookie(session, new Cookie("XSRF-TOKEN", "t0k3n"))
                         .header("X-XSRF-TOKEN", "t0k3n"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("BILL-S1: a bearer header next to the cookie session does not lift the CSRF check")
+    void cookieAndBearerTogetherStillNeedTheCsrfToken() throws Exception {
+        Cookie session = new Cookie("cd_at", TestTokens.user(USER));
+        String header = bearer(TestTokens.user(USER));
+        mvc.perform(paymentRequest(ACCT, "Y", key()).cookie(session).header("Authorization", header))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_REJECTED"));
+        assertNoWrites();
+        mvc.perform(paymentRequest(ACCT, "Y", key()).cookie(session, new Cookie("XSRF-TOKEN", "t0k3n"))
+                        .header("Authorization", header).header("X-XSRF-TOKEN", "t0k3n"))
                 .andExpect(status().isCreated());
     }
 
@@ -273,15 +300,15 @@ class BillPayApiTest extends BillPayTestBase {
         String key = key();
         pay(ACCT, "Y", key).andExpect(status().isCreated())
                 .andExpect(header().doesNotExist("Idempotent-Replayed"))
-                .andExpect(jsonPath("$.tranId").value(NEXT_ID))
+                .andExpect(jsonPath("$.tranId").value(nextId()))
                 .andExpect(jsonPath("$.amount").value("194.00"))
                 .andExpect(jsonPath("$.acctId").value(ACCT))
-                .andExpect(jsonPath("$.message").value("Payment successful.  Your Transaction ID is " + NEXT_ID + "."))
+                .andExpect(jsonPath("$.message").value("Payment successful.  Your Transaction ID is " + nextId() + "."))
                 .andExpect(jsonPath("$.severity").value("success"))
                 .andExpect(jsonPath("$.field").value("acctId"));
 
         String stored = fixed() ? "-194.00" : "194.00";
-        Map<String, Object> tran = transaction(NEXT_ID);
+        Map<String, Object> tran = transaction(nextId());
         assertThat(tran).containsEntry("type_cd", "02").containsEntry("cat_cd", "0002")
                 .containsEntry("source", "POS TERM").containsEntry("description", "BILL PAYMENT - ONLINE")
                 .containsEntry("merchant_id", "999999999").containsEntry("merchant_name", "BILL PAYMENT")
@@ -315,7 +342,7 @@ class BillPayApiTest extends BillPayTestBase {
                                CASE WHEN p.tran_pk = t.tran_pk THEN 1 ELSE 0 END AS same_row
                         FROM billpay.payment p JOIN core.[transaction] t ON t.tran_id = p.tran_id AND t.in_master = 1""")
                 .query().singleRow();
-        assertThat(payment).containsEntry("tran_id", NEXT_ID).containsEntry("acct_id", ACCT)
+        assertThat(payment).containsEntry("tran_id", nextId()).containsEntry("acct_id", ACCT)
                 .containsEntry("paid_by", USER).containsEntry("same_row", 1);
         assertThat(((String) payment.get("idempotency_key")).toLowerCase()).isEqualTo(key);
         assertThat((BigDecimal) payment.get("amount")).isEqualByComparingTo(stored);
@@ -342,7 +369,7 @@ class BillPayApiTest extends BillPayTestBase {
     @DisplayName("BILL-S16: one-step payment without a preview")
     @SpecItem("BR-BILL-007")
     void s16_oneStepPayment() throws Exception {
-        pay(ACCT, "y", key()).andExpect(status().isCreated()).andExpect(jsonPath("$.tranId").value(NEXT_ID));
+        pay(ACCT, "y", key()).andExpect(status().isCreated()).andExpect(jsonPath("$.tranId").value(nextId()));
         assertThat(account(ACCT).get("curr_bal")).isEqualTo(new BigDecimal("0.00"));
     }
 
@@ -354,7 +381,7 @@ class BillPayApiTest extends BillPayTestBase {
         preview(OTHER_ACCT).andExpect(jsonPath("$.currentBalanceDisplay").value("+1234567890.12"));
         pay(OTHER_ACCT, "Y", key()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.amount").value("234567890.12"));
-        assertThat((BigDecimal) transaction(NEXT_ID).get("amount"))
+        assertThat((BigDecimal) transaction(nextId()).get("amount"))
                 .isEqualByComparingTo(fixed() ? "-234567890.12" : "234567890.12");
         Map<String, Object> after = account(OTHER_ACCT);
         assertThat(after.get("curr_bal")).isEqualTo(new BigDecimal("1000000000.00"));
@@ -368,7 +395,7 @@ class BillPayApiTest extends BillPayTestBase {
         DB.fixtures().account(CoreFixtures.Account.of(OTHER_ACCT, "20.00"))
                 .card("4000000000000002", OTHER_ACCT, CUST).card("4000000000000001", OTHER_ACCT, CUST);
         pay(OTHER_ACCT, "Y", key()).andExpect(status().isCreated());
-        assertThat(transaction(NEXT_ID)).containsEntry("card_num", "4000000000000001");
+        assertThat(transaction(nextId())).containsEntry("card_num", "4000000000000001");
     }
 
     @Test
@@ -439,6 +466,29 @@ class BillPayApiTest extends BillPayTestBase {
     }
 
     @Test
+    @DisplayName("BILL-S15: payments on two accounts at once get distinct IDs, each bound to its own payment")
+    @SpecItem({"INV-001", "BR-BILL-004"})
+    void s15_concurrentPaymentsOnTwoAccounts() throws Exception {
+        String otherCard = "4111111111110002";
+        DB.fixtures().account(CoreFixtures.Account.of(OTHER_ACCT, "20.00")).card(otherCard, OTHER_ACCT, CUST);
+        List<MvcResult> results = whileAccountsLocked(List.of(ACCT, OTHER_ACCT), 2,
+                () -> pay(ACCT, "Y", key()), () -> pay(OTHER_ACCT, "Y", key()));
+        assertThat(results).allSatisfy(r -> assertThat(r.getResponse().getStatus()).isEqualTo(201));
+        String first = com.jayway.jsonpath.JsonPath.read(results.get(0).getResponse().getContentAsString(), "$.tranId");
+        String second = com.jayway.jsonpath.JsonPath.read(results.get(1).getResponse().getContentAsString(), "$.tranId");
+        assertThat(List.of(first, second)).containsExactlyInAnyOrder(nextId(), secondId());
+        assertThat(transaction(first)).containsEntry("card_num", CARD);
+        assertThat(transaction(second)).containsEntry("card_num", otherCard);
+        assertThat(admin.sql("SELECT tran_id FROM billpay.payment WHERE acct_id = :id").param("id", ACCT)
+                .query(String.class).single()).isEqualTo(first);
+        assertThat(admin.sql("SELECT tran_id FROM billpay.payment WHERE acct_id = :id").param("id", OTHER_ACCT)
+                .query(String.class).single()).isEqualTo(second);
+        assertThat(count("core.[transaction]")).isEqualTo(3);
+        assertThat(account(ACCT).get("curr_bal")).isEqualTo(new BigDecimal("0.00"));
+        assertThat(account(OTHER_ACCT).get("curr_bal")).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
     @DisplayName("BILL-S14: a retry that races the first call with the same key gets the first answer")
     void s14_concurrentRetry() throws Exception {
         String key = key();
@@ -460,7 +510,9 @@ class BillPayApiTest extends BillPayTestBase {
     void s21_failureAtEachStep() throws Exception {
         Map<String, Object> before = account(ACCT);
         List<String[]> steps = new ArrayList<>();
-        steps.add(new String[] {"6", "SELECT ON OBJECT::core.account", "ACCOUNT_LOOKUP_FAILED"});
+        // The login reads core.account by column, and a table-level DENY does not override a column-level
+        // GRANT, so the account read is refused on the one column every account read names.
+        steps.add(new String[] {"6", "SELECT ON OBJECT::core.account (acct_id)", "ACCOUNT_LOOKUP_FAILED"});
         steps.add(new String[] {"8", "SELECT ON OBJECT::core.card_xref", "XREF_LOOKUP_FAILED"});
         steps.add(fixed()
                 ? new String[] {"9", "UPDATE ON OBJECT::core.tran_id_seq", "TRAN_LOOKUP_FAILED"}
@@ -488,19 +540,64 @@ class BillPayApiTest extends BillPayTestBase {
     }
 
     @Test
-    @DisplayName("BILL-S21: an ID already in the master is TRAN_ID_EXISTS")
-    @SpecItem({"SE-BILL-004", "ERR-BILL-001", "BR-TRNA-003"})
+    @DisplayName("BILL-S21: an ID already in the master is TRAN_ID_EXISTS, and nothing of the payment is applied")
+    @SpecItem({"SE-BILL-004", "ERR-BILL-001", "BR-TRNA-003", "INV-001"})
     void s21_duplicateTranId() throws Exception {
-        DB.fixtures().restartTranIdSequence(Long.parseLong(HIGHEST_ID));
+        Map<String, Object> before = account(ACCT);
+        Map<String, BigDecimal> balancesBefore = categoryBalances();
         if (fixed()) {
+            // A master row in the online range that the sequence was not restarted above.
+            DB.fixtures().transaction(nextId(), CARD, "1.00");
             pay(ACCT, "Y", key()).andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("TRAN_ID_EXISTS"))
                     .andExpect(jsonPath("$.message").value("Tran ID already exist..."));
-            assertNoWrites();
+            assertThat(count("core.[transaction]")).isEqualTo(2);
+            assertThat(count("billpay.payment")).isZero();
+            assertThat(account(ACCT)).isEqualTo(before);
+            assertThat(categoryBalances()).isEqualTo(balancesBefore);
         } else {
             // The legacy ID is the highest master ID + 1, which cannot exist.
-            pay(ACCT, "Y", key()).andExpect(status().isCreated()).andExpect(jsonPath("$.tranId").value(NEXT_ID));
+            pay(ACCT, "Y", key()).andExpect(status().isCreated()).andExpect(jsonPath("$.tranId").value(nextId()));
         }
+        assertThat(admin.sql("SELECT COUNT(*) - COUNT(DISTINCT tran_id) FROM core.[transaction] WHERE in_master = 1")
+                .query(Integer.class).single()).isZero();
+    }
+
+    @Test
+    @DisplayName("BILL NUM-BILL-005: the last ID is paid once, then TRAN_ID_EXHAUSTED with nothing written and no wrap")
+    @SpecItem({"NUM-BILL-005", "BR-TRNA-003", "ERR-BILL-001"})
+    void lastIdThenExhausted() throws Exception {
+        String otherCard = "4111111111110002";
+        DB.fixtures().account(CoreFixtures.Account.of(OTHER_ACCT, "20.00")).card(otherCard, OTHER_ACCT, CUST);
+        if (fixed()) {
+            DB.fixtures().restartTranIdSequence(9_999_999_999_999_999L);
+        } else {
+            DB.fixtures().transaction("9999999999999998", CARD, "1.00");
+        }
+        pay(ACCT, "Y", key()).andExpect(status().isCreated()).andExpect(jsonPath("$.tranId").value("9999999999999999"));
+
+        int transactions = count("core.[transaction]");
+        Map<String, Object> before = account(OTHER_ACCT);
+        String retryKey = key();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            pay(OTHER_ACCT, "Y", retryKey).andExpect(status().isInternalServerError())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value("TRAN_ID_EXHAUSTED"))
+                    .andExpect(jsonPath("$.message").value("Unable to Add Bill pay Transaction..."))
+                    .andExpect(jsonPath("$.field").value("acctId"))
+                    .andExpect(jsonPath("$.severity").value("error"))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(
+                            org.hamcrest.Matchers.containsStringIgnoringCase("sequence"))));
+        }
+        assertThat(count("core.[transaction]")).isEqualTo(transactions);
+        assertThat(count("billpay.payment")).isEqualTo(1);
+        assertThat(account(OTHER_ACCT)).isEqualTo(before);
+        assertThat(admin.sql("SELECT COUNT(*) FROM core.tcat_bal WHERE acct_id = :id").param("id", OTHER_ACCT)
+                .query(Integer.class).single()).isZero();
+        assertThat(admin.sql("SELECT COUNT(*) FROM core.[transaction] WHERE tran_id = '0000000000000000'")
+                .query(Integer.class).single()).isZero();
+        // The failure ends only the call: the same session reads the account again.
+        preview(OTHER_ACCT).andExpect(status().isOk()).andExpect(jsonPath("$.currentBalance").value("20.00"));
     }
 
     @Test
@@ -509,7 +606,7 @@ class BillPayApiTest extends BillPayTestBase {
     void paymentAfterAWaitingOnlineAdd() throws Exception {
         String added = "0000000000000050";
         DB.fixtures().waitingOnlineAdd(added, CARD, "5.00");
-        String expected = fixed() ? NEXT_ID : "0000000000000051";
+        String expected = fixed() ? nextId() : "0000000000000051";
         pay(ACCT, "Y", key()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tranId").value(expected))
                 .andExpect(jsonPath("$.message").value("Payment successful.  Your Transaction ID is " + expected + "."));
@@ -553,7 +650,7 @@ class BillPayApiTest extends BillPayTestBase {
             assertThat(paid.getResponse().getStatus()).isEqualTo(201);
             String paymentId = com.jayway.jsonpath.JsonPath.read(paid.getResponse().getContentAsString(), "$.tranId");
             assertThat(paymentId).isNotEqualTo(otherId);
-            assertThat(List.of(otherId, paymentId)).containsExactlyInAnyOrder(NEXT_ID, "0000000000000043");
+            assertThat(List.of(otherId, paymentId)).containsExactlyInAnyOrder(nextId(), secondId());
             assertThat(count("core.[transaction]")).isEqualTo(3);
         } finally {
             release.countDown();
@@ -587,21 +684,28 @@ class BillPayApiTest extends BillPayTestBase {
         }
     }
 
-    /**
-     * Holds an update lock on the sample account from the admin login while the calls start, and
-     * releases it once {@code waiting} of them wait for a lock, so the calls really overlap. Update
-     * locks queue, so the second call waits behind the first, not behind the admin session.
-     */
     private List<MvcResult> whileAccountLocked(int waiting, Call... calls) throws Exception {
+        return whileAccountsLocked(List.of(ACCT), waiting, calls);
+    }
+
+    /**
+     * Holds an update lock on the accounts from the admin login while the calls start, and
+     * releases them once {@code waiting} of the calls wait for a lock, so the calls really overlap.
+     * Update locks queue, so a second call on one account waits behind the first, not behind the
+     * admin session.
+     */
+    private List<MvcResult> whileAccountsLocked(List<String> accounts, int waiting, Call... calls) throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(calls.length);
         List<CompletableFuture<MvcResult>> futures = new ArrayList<>();
         try (Connection c = DB.adminDataSource().getConnection()) {
             c.setAutoCommit(false);
             try {
-                try (PreparedStatement s = c.prepareStatement(
-                        "SELECT curr_bal FROM core.account WITH (UPDLOCK, ROWLOCK) WHERE acct_id = ?")) {
-                    s.setString(1, ACCT);
-                    s.executeQuery().close();
+                for (String acctId : accounts) {
+                    try (PreparedStatement s = c.prepareStatement(
+                            "SELECT curr_bal FROM core.account WITH (UPDLOCK, ROWLOCK) WHERE acct_id = ?")) {
+                        s.setString(1, acctId);
+                        s.executeQuery().close();
+                    }
                 }
                 for (Call call : calls) {
                     futures.add(CompletableFuture.supplyAsync(() -> call(call), pool));

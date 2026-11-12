@@ -21,8 +21,8 @@ import org.carddemo.identity.token.RefreshTokens;
 import org.carddemo.identity.user.AppUser;
 import org.carddemo.identity.user.Roles;
 import org.carddemo.identity.user.UserRepository;
+import org.carddemo.platform.web.SafeTransactionTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Sessions (D-ARCH-11, D-05): a refresh token is used once; a refresh is refused after 15 idle
@@ -38,10 +38,10 @@ public class SessionService {
     private final IdentityFidelity fidelity;
     private final IdentityProperties props;
     private final Clock clock;
-    private final TransactionTemplate tx;
+    private final SafeTransactionTemplate tx;
 
     public SessionService(SessionRepository sessions, UserRepository users, AuditLog audit, AccessTokens tokens,
-            IdentityFidelity fidelity, IdentityProperties props, Clock clock, TransactionTemplate tx) {
+            IdentityFidelity fidelity, IdentityProperties props, Clock clock, SafeTransactionTemplate tx) {
         this.sessions = sessions;
         this.users = users;
         this.audit = audit;

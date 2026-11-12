@@ -9,19 +9,22 @@ import org.springframework.security.oauth2.server.resource.web.DefaultBearerToke
 
 /**
  * The access token from cookie {@code cd_at}, else from {@code Authorization: Bearer} (scripts
- * and tests). Only the endpoints that need a session read it: an expired cookie sent along with
- * sign-on or refresh must not turn those calls into a 401.
+ * and tests). Only the endpoints that need a session read it ({@code /api/auth/me},
+ * {@code /api/features} and user administration under {@code /api/users}): an expired cookie sent
+ * along with sign-on or refresh must not turn those calls into a 401.
  */
 public final class SessionTokenResolver implements BearerTokenResolver {
 
     private static final Set<String> SESSION_PATHS = Set.of("/api/auth/me", "/api/features");
+    private static final String USERS = "/api/users";
 
     private final DefaultBearerTokenResolver header = new DefaultBearerTokenResolver();
 
     @Override
     public String resolve(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return SESSION_PATHS.contains(path) ? fromRequest(request) : null;
+        boolean users = path.equals(USERS) || path.startsWith(USERS + "/");
+        return SESSION_PATHS.contains(path) || users ? fromRequest(request) : null;
     }
 
     /** The token wherever the request carries it, for endpoints where a session is optional. */

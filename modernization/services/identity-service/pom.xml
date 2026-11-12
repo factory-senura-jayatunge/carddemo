@@ -24,6 +24,15 @@
       <artifactId>web-support</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.carddemo</groupId>
+      <artifactId>legacy-format</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Argon2PasswordEncoder needs BouncyCastle (identity-service.md, section 6). -->
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
@@ -66,6 +75,12 @@
     <dependency>
       <groupId>org.carddemo</groupId>
       <artifactId>test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- The parity tests run the web forms' rule table against the services. -->
+      <groupId>org.carddemo</groupId>
+      <artifactId>validation</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

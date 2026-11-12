@@ -14,6 +14,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** D-06: users at startup when iam.app_user is empty. {@code dataLoadJob} never touches users. */
 @Component
@@ -42,20 +43,22 @@ public class UserSeeder implements ApplicationRunner {
     private final IdentityFidelity fidelity;
     private final IdentityProperties.Seed seed;
     private final Clock clock;
+    private final TransactionTemplate tx;
 
     @Autowired
     public UserSeeder(UserRepository users, PasswordHasher hasher, IdentityFidelity fidelity,
-            IdentityProperties props, Clock clock) {
-        this(users, hasher, fidelity, props.seed(), clock);
+            IdentityProperties props, Clock clock, TransactionTemplate tx) {
+        this(users, hasher, fidelity, props.seed(), clock, tx);
     }
 
     UserSeeder(UserRepository users, PasswordHasher hasher, IdentityFidelity fidelity, IdentityProperties.Seed seed,
-            Clock clock) {
+            Clock clock, TransactionTemplate tx) {
         this.users = users;
         this.hasher = hasher;
         this.fidelity = fidelity;
         this.seed = seed;
         this.clock = clock;
+        this.tx = tx;
     }
 
     @Override
@@ -97,6 +100,7 @@ public class UserSeeder implements ApplicationRunner {
 
     private int insert(SeedUser u, String hash, boolean mustChange, LocalDateTime now) {
         AppUser user = new AppUser(u.userId(), u.firstName(), u.lastName(), hash, u.userType(), mustChange, 0, null);
-        return users.insertIfAbsent(user, now) ? 1 : 0;
+        // The user row and its sign-on state row commit together.
+        return Boolean.TRUE.equals(tx.execute(t -> users.insertIfAbsent(user, now))) ? 1 : 0;
     }
 }

@@ -1,0 +1,48 @@
+server:
+  address: 127.0.0.1
+  port: 28084
+
+spring:
+  application:
+    name: transaction-service
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:sqlserver://127.0.0.1:${MSSQL_HOST_PORT:21433};databaseName=${CARDDEMO_DB_NAME:carddemo};encrypt=true;trustServerCertificate=true
+    username: ${CARDDEMO_DB_TRANSACTION_USER:${CARDDEMO_DB_NAME:carddemo}_transaction}
+    password: ${CARDDEMO_DB_TRANSACTION_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  mvc:
+    problemdetails:
+      enabled: false
+
+carddemo:
+  security:
+    issuer: carddemo-identity
+    audience: carddemo-api
+    cookie-secure: true
+  transaction:
+    report:
+      not-started-after: 15m
+      trigger:
+        url: ${CARDDEMO_AIRFLOW_URL:http://127.0.0.1:28080}
+        username: ${CARDDEMO_AIRFLOW_REPORT_USER:transaction-service}
+        password: ${CARDDEMO_AIRFLOW_REPORT_PASSWORD:}
+        retries: 3
+        backoff: 1s
+        timeout: 10s
+        deadline: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+springdoc:
+  api-docs:
+    version: openapi_3_1
+  override-with-generic-response: false
+  writer-with-order-by-keys: true
+  writer-with-default-pretty-printer: true

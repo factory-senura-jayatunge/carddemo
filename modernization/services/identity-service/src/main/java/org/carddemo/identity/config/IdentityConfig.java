@@ -18,9 +18,12 @@ import org.carddemo.identity.token.SigningKeys;
 import org.carddemo.identity.user.PasswordHasher;
 import org.carddemo.platform.fidelity.FidelitySwitch;
 import org.carddemo.platform.fidelity.FidelitySwitchCatalog;
+import org.carddemo.platform.web.AuditLog;
 import org.carddemo.platform.web.CarddemoSecurityProperties;
+import org.carddemo.platform.web.SafeTransactionTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtClaimNames;
@@ -32,6 +35,7 @@ import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.JwtTypeValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration(proxyBeanMethods = false)
 class IdentityConfig {
@@ -44,6 +48,23 @@ class IdentityConfig {
     @Bean
     FidelitySwitchCatalog identitySwitchCatalog() {
         return FidelitySwitchCatalog.of(IdentitySwitches.ALL.toArray(FidelitySwitch[]::new));
+    }
+
+    /**
+     * Sign-on, password change, sign-off, user administration and the seeder; replaces the template
+     * Spring Boot would configure. A callback's exception leaves it redacted (an {@code ApiException}
+     * passes through, any other DataAccessException becomes a plain one), so a mapping by exception
+     * type, such as DuplicateKeyException to 409, has to happen inside the callback.
+     */
+    @Bean
+    SafeTransactionTemplate transactionTemplate(PlatformTransactionManager transactionManager) {
+        return new SafeTransactionTemplate(transactionManager);
+    }
+
+    /** ops.audit rows of user administration (D-56); iam.audit_event keeps the sign-on events. */
+    @Bean
+    AuditLog opsAuditLog(JdbcClient jdbc) {
+        return new AuditLog(jdbc, "identity-service");
     }
 
     @Bean
@@ -83,7 +104,7 @@ class IdentityConfig {
     OpenAPI identityOpenApi() {
         return new OpenAPI()
                 .info(new Info().title("CardDemo identity-service")
-                        .description("Sign-on, password change, sessions and the JWKS of the CardDemo API.")
+                        .description("Sign-on, password change, sessions, the JWKS and user administration of the CardDemo API.")
                         .version("1"))
                 .servers(List.of(new Server().url("/")));
     }

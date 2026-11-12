@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.List;
 
 import org.carddemo.db.ServiceLogin;
-import org.carddemo.identity.user.EbcdicSortKey;
 import org.carddemo.platform.testsupport.TestDatabase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +40,9 @@ class GrantsTest {
                 "CONNECT",
                 "SELECT iam.app_user", "INSERT iam.app_user", "UPDATE iam.app_user",
                 "SELECT iam.session", "INSERT iam.session", "UPDATE iam.session",
-                "INSERT iam.audit_event");
+                "SELECT iam.user_signon_state", "INSERT iam.user_signon_state", "UPDATE iam.user_signon_state",
+                "INSERT iam.audit_event",
+                "INSERT ops.audit", "SELECT ops.batch_window");
         Integer roles = admin.sql("""
                 SELECT COUNT(*) FROM sys.database_role_members m
                 JOIN sys.database_principals u ON u.principal_id = m.member_principal_id
@@ -53,16 +54,28 @@ class GrantsTest {
     @Test
     void theServiceCanDoWhatSignOnNeeds() {
         service.sql("""
-                INSERT INTO iam.app_user (user_id, first_name, last_name, password_hash, user_type, ebcdic_sort_key)
-                VALUES ('GRANT001', 'G', 'T', '{bcrypt}x', 'U', :key)
-                """).param("key", EbcdicSortKey.of("GRANT001")).update();
-        service.sql("UPDATE iam.app_user SET failed_attempts = 1 WHERE user_id = 'GRANT001'").update();
+                INSERT INTO iam.app_user (user_id, first_name, last_name, password_hash, user_type)
+                VALUES ('GRANT001', 'G', 'T', '{bcrypt}x', 'U')
+                """).update();
+        service.sql("INSERT INTO iam.user_signon_state (user_id) VALUES ('GRANT001')").update();
+        service.sql("UPDATE iam.user_signon_state SET failed_attempts = 1 WHERE user_id = 'GRANT001'").update();
+        assertThat(service.sql("SELECT failed_attempts FROM iam.user_signon_state WHERE user_id = 'GRANT001'")
+                .query(Integer.class).single()).isEqualTo(1);
         assertThat(service.sql("SELECT COUNT(*) FROM iam.app_user").query(Integer.class).single()).isEqualTo(1);
         assertThat(service.sql("SELECT COUNT(*) FROM iam.session").query(Integer.class).single()).isZero();
         service.sql("""
                 INSERT INTO iam.audit_event (occurred_at, event_type, subject_key, client_ip)
                 VALUES (SYSUTCDATETIME(), 'SIGN_ON_FAILED', 'X', '127.0.0.1')
                 """).update();
+    }
+
+    @Test
+    void theServiceCanDoWhatUserAdministrationNeeds() {
+        service.sql("""
+                INSERT INTO ops.audit (service, actor_user_id, action, subject_type, subject_key)
+                VALUES ('identity-service', 'ADMIN001', 'CREATE', 'USER', 'GRANT001')
+                """).update();
+        assertThat(service.sql("SELECT COUNT(*) FROM ops.batch_window").query(Integer.class).single()).isZero();
     }
 
     @ParameterizedTest
@@ -72,9 +85,13 @@ class GrantsTest {
             "DELETE FROM iam.audit_event WHERE 1 = 0",
             "DELETE FROM iam.app_user WHERE 1 = 0",
             "DELETE FROM iam.session WHERE 1 = 0",
+            "DELETE FROM iam.user_signon_state WHERE 1 = 0",
             "SELECT COUNT(*) FROM core.account",
             "SELECT COUNT(*) FROM core.customer",
-            "SELECT COUNT(*) FROM ops.batch_window",
+            "SELECT COUNT(*) FROM ops.audit",
+            "UPDATE ops.audit SET field_names = NULL WHERE 1 = 0",
+            "DELETE FROM ops.audit WHERE 1 = 0",
+            "INSERT INTO ops.batch_window (mode) VALUES ('WRITES_BLOCKED')",
             "SELECT COUNT(*) FROM billpay.payment",
             "CREATE TABLE iam.extra (x INT)"})
     void everythingElseIsRefused(String statement) {

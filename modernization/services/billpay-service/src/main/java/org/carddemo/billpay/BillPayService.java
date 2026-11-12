@@ -17,17 +17,19 @@ import org.carddemo.platform.ledger.BatchWindowGuard;
 import org.carddemo.platform.ledger.DuplicateTranIdException;
 import org.carddemo.platform.ledger.NewTransaction;
 import org.carddemo.platform.ledger.Origin;
+import org.carddemo.platform.ledger.TranIdExhaustedException;
 import org.carddemo.platform.ledger.TransactionIds;
 import org.carddemo.platform.ledger.TransactionWriter;
 import org.carddemo.platform.web.ApiException;
 import org.carddemo.platform.web.Message;
 import org.carddemo.platform.web.MessageCatalog;
+import org.carddemo.platform.web.SafeErrors;
+import org.carddemo.platform.web.SafeTransactionTemplate;
 import org.carddemo.platform.web.Severity;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * COBIL00C as two calls: the balance preview and the full-balance payment. The checks run in the
@@ -59,11 +61,11 @@ public class BillPayService {
     private final BalancePosting balances;
     private final FidelitySwitches switches;
     private final Clock clock;
-    private final TransactionTemplate tx;
+    private final SafeTransactionTemplate tx;
 
     public BillPayService(BillPayRepository repository, BatchWindowGuard batchWindow, TransactionIds transactionIds,
                           TransactionWriter transactions, BalancePosting balances, FidelitySwitches switches,
-                          Clock clock, TransactionTemplate billPayTransaction) {
+                          Clock clock, SafeTransactionTemplate billPayTransaction) {
         this.repository = repository;
         this.batchWindow = batchWindow;
         this.transactionIds = transactionIds;
@@ -132,6 +134,8 @@ public class BillPayService {
         String tranId;
         try {
             tranId = transactionIds.next();
+        } catch (TranIdExhaustedException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, MessageCatalog.TRAN_ID_EXHAUSTED, ACCT_ID, e);
         } catch (DataAccessException | IllegalStateException e) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, MessageCatalog.TRAN_LOOKUP_FAILED, ACCT_ID, e);
         }
@@ -226,9 +230,9 @@ public class BillPayService {
     }
 
     /** Rolls the payment back; the caller answers with the payment stored under the same key. */
-    private static final class KeyAlreadyUsed extends RuntimeException {
+    private static final class KeyAlreadyUsed extends RuntimeException implements SafeErrors.MessageFree {
         KeyAlreadyUsed(Throwable cause) {
-            super("idempotency key already stored", cause);
+            super("idempotency key already stored", cause == null ? null : SafeErrors.sanitized(cause), false, true);
         }
     }
 }

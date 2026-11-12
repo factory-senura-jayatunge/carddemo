@@ -35,7 +35,43 @@ class OpenApiExportTest extends IdentityTestBase {
         List<String> operations = new ArrayList<>();
         exported.path("paths").forEach(path -> path.forEach(op -> operations.add(op.path("operationId").asString())));
         assertThat(operations).containsExactlyInAnyOrder("signOn", "changePassword", "refresh", "signOff", "me",
-                "jwks", "features");
+                "jwks", "features", "listUsers", "addUser", "getUser", "updateUser", "deleteUser", "getUserByKey",
+                "updateUserByKey", "deleteUserByKey");
+
+        JsonNode schemes = exported.path("components").path("securitySchemes");
+        assertThat(schemes.path("sessionCookie").path("in").asString()).isEqualTo("cookie");
+        assertThat(schemes.path("sessionCookie").path("name").asString()).isEqualTo("cd_at");
+        assertThat(schemes.path("csrfHeader").path("name").asString()).isEqualTo("X-XSRF-TOKEN");
+        assertThat(schemes.path("bearerToken").path("scheme").asString()).isEqualTo("bearer");
+        for (String path : List.of("/api/users", "/api/users/{userId}", "/api/users/key/{userKey}")) {
+            exported.path("paths").path(path).properties().forEach(e -> {
+                String where = e.getKey() + " " + path;
+                JsonNode op = e.getValue();
+                boolean safe = e.getKey().equals("get");
+                assertThat(op.path("responses").path("401").path("description").asString()).as(where)
+                        .isEqualTo("UNAUTHENTICATED");
+                assertThat(op.path("responses").path("403").path("description").asString()).as(where)
+                        .contains("ACCESS_DENIED");
+                assertThat(op.path("responses").path("403").path("description").asString().contains("CSRF_REJECTED"))
+                        .as(where).isEqualTo(!safe);
+                assertThat(op.path("security").toString()).as(where).isEqualTo(safe
+                        ? "[{\"sessionCookie\":[]},{\"bearerToken\":[]}]"
+                        : "[{\"csrfHeader\":[],\"sessionCookie\":[]},{\"bearerToken\":[]}]");
+            });
+        }
+        assertThat(schemes.path("refreshCookie").path("in").asString()).isEqualTo("cookie");
+        assertThat(schemes.path("refreshCookie").path("name").asString()).isEqualTo("cd_rt");
+        JsonNode auth = exported.path("paths");
+        assertThat(auth.path("/api/auth/refresh").path("post").path("security").toString())
+                .isEqualTo("[{\"csrfHeader\":[],\"refreshCookie\":[]}]");
+        assertThat(auth.path("/api/auth/sign-off").path("post").path("security").toString())
+                .isEqualTo("[{\"csrfHeader\":[],\"refreshCookie\":[]},{\"csrfHeader\":[],\"sessionCookie\":[]}]");
+        for (String path : List.of("/api/auth/refresh", "/api/auth/sign-off")) {
+            assertThat(auth.path(path).path("post").path("responses").path("403").path("description").asString())
+                    .as(path).isEqualTo("CSRF_REJECTED");
+        }
+        assertThat(exported.path("paths").path("/api/auth/sign-on").path("post").has("security")).isFalse();
+        assertThat(exported.path("paths").path("/api/auth/password").path("post").has("security")).isFalse();
 
         assumeTrue(Files.exists(SNAPSHOT), "no committed snapshot at " + SNAPSHOT.toAbsolutePath().normalize());
         assertThat(exported)

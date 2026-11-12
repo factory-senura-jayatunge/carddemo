@@ -194,11 +194,14 @@ class SignOnScenariosTest extends IdentityTestBase {
     void s12_lockoutAfterFiveFailures(FidelityMode mode) {
         switches.all(mode);
         db.demoUsers();
+        // Sign-on state is not the user record: the version user administration saves against stays.
+        String version = db.rowVersion("USER0001");
         ApiClient c = client();
         for (int i = 0; i < 5; i++) {
             assertThat(c.signOn("USER0001", "WRONGPWD").status()).isEqualTo(401);
         }
         Response right = c.signOn("USER0001", "PASSWORD");
+        assertThat(db.rowVersion("USER0001")).isEqualTo(version);
         if (mode == FidelityMode.LEGACY) {
             assertSignedOn(right, "USER0001", "U", "USER", "/");
             assertThat(db.audit()).noneMatch(a -> a.eventType().equals("USER_LOCKED"));
@@ -217,6 +220,21 @@ class SignOnScenariosTest extends IdentityTestBase {
         clock.advance(Duration.ofSeconds(1));
         assertSignedOn(c.signOn("USER0001", "PASSWORD"), "USER0001", "U", "USER", "/");
         assertThat(db.user("USER0001").lockedUntil()).isNull();
+        assertThat(db.rowVersion("USER0001")).isEqualTo(version);
+    }
+
+    @Test
+    @SpecItem({"DEF-SGN-002"})
+    void aUserWithoutASignOnStateRowHasNoFailuresAndGetsARow() {
+        switches.all(FidelityMode.FIXED);
+        db.demoUsers().withoutSignOnState("USER0001").withoutSignOnState("USER0002");
+        String version = db.rowVersion("USER0001");
+        assertThat(client().signOn("USER0001", "WRONGPWD").status()).isEqualTo(401);
+        assertThat(db.hasSignOnState("USER0001")).isTrue();
+        assertThat(db.user("USER0001").failedAttempts()).isEqualTo(1);
+        assertSignedOn(client().signOn("USER0002", "PASSWORD"), "USER0002", "U", "USER", "/");
+        assertThat(db.user("USER0002").lastSignOnAt()).isNotNull();
+        assertThat(db.rowVersion("USER0001")).isEqualTo(version);
     }
 
     @ParameterizedTest

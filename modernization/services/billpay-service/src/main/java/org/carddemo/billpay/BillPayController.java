@@ -81,7 +81,7 @@ public class BillPayController {
         @ApiResponse(responseCode = "422", description = "NOTHING_TO_PAY (with the balance) or IDEMPOTENCY_KEY_REUSED.",
                 content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PAYMENT_PROBLEM))),
         @ApiResponse(responseCode = "500", description = "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED, TRAN_LOOKUP_FAILED, "
-                + "TRAN_ADD_FAILED or ACCOUNT_UPDATE_FAILED.",
+                + "TRAN_ADD_FAILED, TRAN_ID_EXHAUSTED or ACCOUNT_UPDATE_FAILED.",
                 content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM))),
         @ApiResponse(responseCode = "503", description = "BATCH_WINDOW.",
                 headers = @Header(name = "Retry-After", description = "Seconds.", schema = @Schema(type = "integer")),

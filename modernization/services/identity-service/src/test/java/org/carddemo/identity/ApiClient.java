@@ -42,6 +42,10 @@ public final class ApiClient {
             return n.isNull() || n.isMissingNode() ? null : n.asString();
         }
 
+        public String header(String name) {
+            return raw.getHeader(name);
+        }
+
         public SetCookie cookie(String name) {
             return setCookies.stream().filter(c -> c.name().equals(name)).findFirst().orElse(null);
         }
@@ -53,6 +57,7 @@ public final class ApiClient {
     private final MockMvc mvc;
     private final Map<String, Stored> jar = new LinkedHashMap<>();
     private boolean sendCsrfHeader = true;
+    private String bearer;
     private String remoteAddr;
 
     public ApiClient(MockMvc mvc) {
@@ -61,6 +66,17 @@ public final class ApiClient {
 
     public ApiClient withoutCsrfHeader() {
         sendCsrfHeader = false;
+        return this;
+    }
+
+    public ApiClient withCsrfHeader() {
+        sendCsrfHeader = true;
+        return this;
+    }
+
+    /** Also sends {@code Authorization: Bearer token} on every request, as a script does; null stops it. */
+    public ApiClient withBearer(String token) {
+        bearer = token;
         return this;
     }
 
@@ -97,9 +113,23 @@ public final class ApiClient {
     }
 
     public Response post(String path, String body) {
-        MockHttpServletRequestBuilder req = MockMvcRequestBuilders.post(path);
+        return unsafe(path, MockMvcRequestBuilders.post(path), body, null);
+    }
+
+    public Response put(String path, String body, String ifMatch) {
+        return unsafe(path, MockMvcRequestBuilders.put(path), body, ifMatch);
+    }
+
+    public Response delete(String path, String ifMatch) {
+        return unsafe(path, MockMvcRequestBuilders.delete(path), null, ifMatch);
+    }
+
+    private Response unsafe(String path, MockHttpServletRequestBuilder req, String body, String ifMatch) {
         if (body != null) {
             req.contentType(MediaType.APPLICATION_JSON).content(body);
+        }
+        if (ifMatch != null) {
+            req.header(HttpHeaders.IF_MATCH, ifMatch);
         }
         Stored xsrf = jar.get("XSRF-TOKEN");
         if (sendCsrfHeader && xsrf != null) {
@@ -110,6 +140,11 @@ public final class ApiClient {
 
     public Response get(String path) {
         return send(path, MockMvcRequestBuilders.get(path));
+    }
+
+    /** A GET whose {@code {name}} variables are expanded and percent-encoded, as a browser encodes a form value. */
+    public Response get(String template, Object... vars) {
+        return send(template, MockMvcRequestBuilders.get(template, vars));
     }
 
     public String cookieValue(String name) {
@@ -138,6 +173,9 @@ public final class ApiClient {
         });
         if (!cookies.isEmpty()) {
             req.cookie(cookies.toArray(Cookie[]::new));
+        }
+        if (bearer != null) {
+            req.header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
         }
         if (remoteAddr != null) {
             req.with(r -> {

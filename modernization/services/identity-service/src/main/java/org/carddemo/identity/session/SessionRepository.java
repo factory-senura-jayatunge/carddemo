@@ -96,6 +96,18 @@ public class SessionRepository {
                 .update() == 1;
     }
 
+    /** Ends every active session of the user; returns how many. */
+    public int endAllFor(String userId, LocalDateTime now, EndReason reason) {
+        return jdbc.sql("""
+                UPDATE iam.session SET ended_at = :now, end_reason = :reason
+                WHERE user_id = :user AND ended_at IS NULL
+                """)
+                .param("now", now)
+                .param("reason", reason.name())
+                .param("user", userId)
+                .update();
+    }
+
     private static SessionRow row(ResultSet rs, int n) throws SQLException {
         return new SessionRow(
                 UUID.fromString(rs.getString("session_id")),

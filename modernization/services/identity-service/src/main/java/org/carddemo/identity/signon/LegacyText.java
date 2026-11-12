@@ -6,16 +6,6 @@ public final class LegacyText {
     private LegacyText() {
     }
 
-    /** COBOL FUNCTION UPPER-CASE: only a-z change (NUM-SGN-002). */
-    public static String upper(String s) {
-        StringBuilder b = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            b.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
-        }
-        return b.toString();
-    }
-
     /** Spaces or low-values, as the screen sends an empty field (VAL-SGN-001, VAL-SGN-002). */
     public static boolean isBlank(String s) {
         if (s == null) {

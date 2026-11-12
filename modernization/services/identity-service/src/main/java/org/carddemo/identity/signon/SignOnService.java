@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.carddemo.identity.IdentityProperties;
 import org.carddemo.identity.audit.AuditLog;
@@ -15,17 +16,20 @@ import org.carddemo.identity.fidelity.IdentityFidelity;
 import org.carddemo.identity.session.SessionService;
 import org.carddemo.identity.session.StartedSession;
 import org.carddemo.identity.user.AppUser;
+import org.carddemo.identity.user.NewPasswords;
 import org.carddemo.identity.user.PasswordHasher;
 import org.carddemo.identity.user.Roles;
 import org.carddemo.identity.user.UserRepository;
+import org.carddemo.platform.legacyformat.LegacyCase;
 import org.carddemo.platform.web.Message;
 import org.carddemo.platform.web.MessageCatalog;
+import org.carddemo.platform.web.SafeErrors;
+import org.carddemo.platform.web.SafeTransactionTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Sign-on (COSGN00C decision table 8.1 with the switched items) and the password change
@@ -39,8 +43,6 @@ public class SignOnService {
 
     private static final int MAX_USER_ID = 8;
     private static final int MAX_PASSWORD = 64;
-    private static final int FIXED_MIN_NEW = 8;
-    private static final int LEGACY_MAX_NEW = 8;
 
     /** The session of a password change made while signed on. */
     public record SignedOn(String userId, UUID sessionId) {
@@ -57,11 +59,11 @@ public class SignOnService {
     private final IdentityFidelity fidelity;
     private final IdentityProperties props;
     private final Clock clock;
-    private final TransactionTemplate tx;
+    private final SafeTransactionTemplate tx;
 
     public SignOnService(UserRepository users, PasswordHasher hasher, SessionService sessions, AuditLog audit,
             AttemptThrottle throttle, IdentityFidelity fidelity, IdentityProperties props, Clock clock,
-            TransactionTemplate tx) {
+            SafeTransactionTemplate tx) {
         this.users = users;
         this.hasher = hasher;
         this.sessions = sessions;
@@ -79,7 +81,85 @@ public class SignOnService {
             throw failed(a.user().userId(), "PASSWORD_CHANGE_REQUIRED", clientIp,
                     new AuthFailure(HttpStatus.FORBIDDEN, MessageCatalog.PASSWORD_CHANGE_REQUIRED, "newPassword", null, false));
         }
-        return tx.execute(t -> sessions.start(a.user(), a.role(), clientIp));
+        String userId = a.user().userId();
+        // Hashed before the transaction, so no row lock is held while Argon2 runs.
+        String upgrade = hasher.needsUpgrade(a.user().passwordHash()) ? hasher.hash(a.preparedPassword()) : null;
+        AtomicBoolean upgraded = new AtomicBoolean();
+        Outcome outcome = tx.execute(t -> {
+            Rechecked r = recheck(a, "password");
+            if (r.refusal() != null) {
+                return Outcome.refused(r.refusal());
+            }
+            AppUser current = r.user();
+            if (fidelity.caseSensitivePasswords() && current.mustChangePassword()) {
+                return Outcome.refused(new Refusal("PASSWORD_CHANGE_REQUIRED", new AuthFailure(HttpStatus.FORBIDDEN,
+                        MessageCatalog.PASSWORD_CHANGE_REQUIRED, "newPassword", null, false)));
+            }
+            // The {bcrypt} hash the password was just checked against, under the row lock: the
+            // same prepared value (legacy mode's upper-cased one) replaces it.
+            if (upgrade != null && hasher.needsUpgrade(current.passwordHash())
+                    && users.upgradeHash(userId, current.passwordHash(), upgrade)) {
+                upgraded.set(true);
+            }
+            return Outcome.started(sessions.start(current, r.role(), clientIp));
+        });
+        if (outcome.refusal() != null) {
+            throw failed(userId, outcome.refusal().reason(), clientIp, outcome.refusal().failure());
+        }
+        if (upgraded.get()) {
+            log.info("Upgraded the password hash of {} to Argon2id", userId);
+        }
+        return outcome.session();
+    }
+
+    /**
+     * Inside the transaction that starts the session: reads the user and its sign-on state again
+     * under an update lock and applies the rules that a change committed since {@link #authenticate}
+     * could break. A deleted user is unknown; a changed hash must still match the password
+     * (another sign-on's upgrade, or a change to the same value), else it is a wrong password; a
+     * lock set meanwhile refuses; the role comes from the type read now. Nothing is counted: the
+     * password was right when it was checked.
+     */
+    private Rechecked recheck(Authenticated a, String passwordField) {
+        Optional<AppUser> found = users.findLocked(a.user().userId());
+        if (found.isEmpty()) {
+            return Rechecked.refused(new Refusal("USER_NOT_FOUND", fidelity.neutralMessages() ? neutral(passwordField)
+                    : AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.USER_NOT_FOUND, "userId")));
+        }
+        AppUser current = found.get();
+        if (!current.passwordHash().equals(a.user().passwordHash())
+                && !hasher.matches(a.preparedPassword(), current.passwordHash())) {
+            return Rechecked.refused(new Refusal("WRONG_PASSWORD", wrongPassword(passwordField)));
+        }
+        if (fidelity.lockout() && current.lockedAt(now())) {
+            return Rechecked.refused(new Refusal("USER_LOCKED", neutral(passwordField)));
+        }
+        Optional<String> role = Roles.forType(current.userType(), fidelity.onlyKnownUserTypes());
+        if (role.isEmpty()) {
+            return Rechecked.refused(new Refusal("USER_TYPE_NOT_ALLOWED", AuthFailure.of(HttpStatus.FORBIDDEN,
+                    MessageCatalog.USER_TYPE_NOT_ALLOWED, "userId")));
+        }
+        return new Rechecked(current, role.get(), null);
+    }
+
+    /** A refusal decided inside a transaction; audited after it, so the audit row survives. */
+    private record Refusal(String reason, AuthFailure failure) {
+    }
+
+    private record Rechecked(AppUser user, String role, Refusal refusal) {
+        static Rechecked refused(Refusal refusal) {
+            return new Rechecked(null, null, refusal);
+        }
+    }
+
+    private record Outcome(StartedSession session, Refusal refusal) {
+        static Outcome started(StartedSession session) {
+            return new Outcome(session, null);
+        }
+
+        static Outcome refused(Refusal refusal) {
+            return new Outcome(null, refusal);
+        }
     }
 
     /**
@@ -94,14 +174,22 @@ public class SignOnService {
         String prepared = checkNewPassword(a, newPassword);
         String hash = hasher.hash(prepared);
         String userId = a.user().userId();
-        return tx.execute(t -> {
+        Outcome outcome = tx.execute(t -> {
+            Rechecked r = recheck(a, "currentPassword");
+            if (r.refusal() != null) {
+                return Outcome.refused(r.refusal());
+            }
             users.changePassword(userId, hash, now());
             signedOn.ifPresent(s -> sessions.endForPasswordChange(s.sessionId()));
             audit.record(EventType.PASSWORD_CHANGED, userId, userId, null, clientIp);
-            AppUser u = a.user();
+            AppUser u = r.user();
             AppUser changed = new AppUser(userId, u.firstName(), u.lastName(), hash, u.userType(), false, 0, null);
-            return sessions.start(changed, a.role(), clientIp);
+            return Outcome.started(sessions.start(changed, r.role(), clientIp));
         });
+        if (outcome.refusal() != null) {
+            throw failed(userId, outcome.refusal().reason(), clientIp, outcome.refusal().failure());
+        }
+        return outcome.session();
     }
 
     /**
@@ -127,7 +215,7 @@ public class SignOnService {
             throw failed(typedId, "INVALID_INPUT", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
                     MessageCatalog.INVALID_INPUT_PASSWORD, passwordField));
         }
-        String userId = LegacyText.upper(typedId);
+        String userId = LegacyCase.upper(typedId);
         if (sessionUser != null && !userId.equals(sessionUser)) {
             throw failed(userId, "USER_ID_MISMATCH", clientIp, AuthFailure.of(HttpStatus.BAD_REQUEST,
                     MessageCatalog.USER_ID_MISMATCH, "userId"));
@@ -145,7 +233,7 @@ public class SignOnService {
         try {
             found = users.find(userId);
         } catch (DataAccessException e) {
-            log.warn("Cannot read iam.app_user: {}", e.getMostSpecificCause().getMessage());
+            log.warn("Cannot read iam.app_user: {}", SafeErrors.describe(e));
             auditQuietly(userId, clientIp);
             throw AuthFailure.of(HttpStatus.SERVICE_UNAVAILABLE, MessageCatalog.UNABLE_TO_VERIFY,
                     "userId");
@@ -174,9 +262,7 @@ public class SignOnService {
                     audit.record(EventType.USER_LOCKED, null, userId, "MAX_FAILURES", clientIp);
                 }
             }
-            throw failed(userId, "WRONG_PASSWORD", clientIp, neutral ? neutral(passwordField)
-                    : AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.WRONG_PASSWORD,
-                            passwordField));
+            throw failed(userId, "WRONG_PASSWORD", clientIp, wrongPassword(passwordField));
         }
         Optional<String> role = Roles.forType(user.userType(), fidelity.onlyKnownUserTypes());
         if (role.isEmpty()) {
@@ -193,20 +279,15 @@ public class SignOnService {
         }
         String trimmed = LegacyText.rtrim(raw);
         boolean caseSensitive = fidelity.caseSensitivePasswords();
-        int length = length(trimmed);
-        if (caseSensitive) {
-            boolean printable = trimmed.codePoints().noneMatch(Character::isISOControl);
-            if (length < FIXED_MIN_NEW || length > MAX_PASSWORD || !printable || !PasswordHasher.fits(trimmed)) {
-                throw newPassword(MessageCatalog.NEW_PASSWORD_LENGTH_FIXED);
-            }
-        } else if (length > LEGACY_MAX_NEW) {
-            throw newPassword(MessageCatalog.NEW_PASSWORD_LENGTH_LEGACY);
+        Message length = NewPasswords.lengthProblem(trimmed, caseSensitive);
+        if (length != null) {
+            throw newPassword(length);
         }
         String prepared = PasswordHasher.prepare(trimmed, caseSensitive);
         if (prepared.equals(a.preparedPassword())) {
             throw newPassword(MessageCatalog.NEW_PASSWORD_SAME);
         }
-        if (caseSensitive && trimmed.equalsIgnoreCase(a.user().userId())) {
+        if (caseSensitive && NewPasswords.isUserId(trimmed, a.user().userId())) {
             throw newPassword(MessageCatalog.NEW_PASSWORD_IS_USER_ID);
         }
         return prepared;
@@ -221,8 +302,13 @@ public class SignOnService {
         try {
             audit.record(EventType.SIGN_ON_FAILED, null, subject, "UNABLE_TO_VERIFY", clientIp);
         } catch (DataAccessException e) {
-            log.warn("Cannot write the audit row of a failed sign-on: {}", e.getMostSpecificCause().getMessage());
+            log.warn("Cannot write the audit row of a failed sign-on: {}", SafeErrors.describe(e));
         }
+    }
+
+    private AuthFailure wrongPassword(String field) {
+        return fidelity.neutralMessages() ? neutral(field)
+                : AuthFailure.of(HttpStatus.UNAUTHORIZED, MessageCatalog.WRONG_PASSWORD, field);
     }
 
     private static AuthFailure neutral(String field) {

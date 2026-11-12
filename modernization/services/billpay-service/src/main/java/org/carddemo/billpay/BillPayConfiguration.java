@@ -13,12 +13,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.carddemo.platform.fidelity.FidelitySwitchCatalog;
+import org.carddemo.platform.web.SafeTransactionTemplate;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration(proxyBeanMethods = false)
 public class BillPayConfiguration {
@@ -35,8 +35,8 @@ public class BillPayConfiguration {
 
     /** Step 5 of the payment: one READ COMMITTED transaction for every write (D-29). */
     @Bean
-    public TransactionTemplate billPayTransaction(PlatformTransactionManager transactionManager) {
-        TransactionTemplate template = new TransactionTemplate(transactionManager);
+    public SafeTransactionTemplate billPayTransaction(PlatformTransactionManager transactionManager) {
+        SafeTransactionTemplate template = new SafeTransactionTemplate(transactionManager);
         template.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         return template;
     }

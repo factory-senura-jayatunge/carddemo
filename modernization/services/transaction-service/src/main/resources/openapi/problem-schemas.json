@@ -1,0 +1,69 @@
+{
+  "Problem": {
+    "type": "object",
+    "description": "RFC 9457 problem details with the CardDemo fields. message is the exact catalogue text.",
+    "required": ["code", "message", "severity"],
+    "properties": {
+      "type": {"type": "string"},
+      "title": {"type": "string"},
+      "status": {"type": "integer", "format": "int32"},
+      "detail": {"type": "string"},
+      "instance": {"type": "string"},
+      "code": {"type": "string", "examples": ["TRAN_NOT_FOUND"]},
+      "message": {"type": "string"},
+      "field": {"type": ["string", "null"], "description": "Field to focus, or null."},
+      "severity": {"$ref": "#/components/schemas/Severity"}
+    }
+  },
+  "ValidationProblem": {
+    "allOf": [
+      {"$ref": "#/components/schemas/Problem"},
+      {
+        "type": "object",
+        "properties": {
+          "invalidFields": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "On a field-rule failure: every field that failed, in screen order."
+          }
+        }
+      }
+    ]
+  },
+  "TransactionProblem": {
+    "allOf": [
+      {"$ref": "#/components/schemas/Problem"},
+      {
+        "type": "object",
+        "description": "A transaction add check. After the keys passed, the values the earlier checks changed, for the page to show with the message.",
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "CARD_CHOICE_REQUIRED: the account's card numbers, masked, in card-number order."
+          },
+          "acctId": {"type": "string", "description": "Padded, or looked up from the card."},
+          "cardNum": {"type": "string", "description": "Masked; the looked-up card when only the account was typed."},
+          "typeCd": {"type": "string"},
+          "catCd": {"type": "string"},
+          "amount": {"type": "string"},
+          "amountDisplay": {"type": "string"},
+          "merchantId": {"type": "string"}
+        }
+      }
+    ]
+  },
+  "ReportProblem": {
+    "allOf": [
+      {"$ref": "#/components/schemas/Problem"},
+      {
+        "type": "object",
+        "description": "CONFIRM_REQUIRED of a report request: the range the user is asked to confirm.",
+        "properties": {
+          "startDate": {"type": "string", "description": "YYYY-MM-DD."},
+          "endDate": {"type": "string", "description": "YYYY-MM-DD."}
+        }
+      }
+    ]
+  }
+}
