@@ -124,7 +124,7 @@ Generated files, never edited by hand: `docs/inventory.md` (`python3 scripts/gen
 
 ## Operations
 
-The [runbooks](docs/runbooks/README.md) cover restarting the batch cycle, closing and opening the CICS files, the daily rejects file and the authorization purge on the mainframe.
+The [runbooks](docs/runbooks/README.md) cover restarting the batch cycle, closing and opening the CICS files, the daily rejects file and the authorization purge on the mainframe, and, for the modernized stack, the one-time replacement of the authorization request queue ([authorization-request-queue.md](docs/runbooks/authorization-request-queue.md)) and the restore of its database ([modernized-database-restore.md](docs/runbooks/modernized-database-restore.md)).
 
 ## Skills
 

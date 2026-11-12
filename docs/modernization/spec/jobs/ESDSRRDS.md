@@ -9,7 +9,7 @@ sources:
   - {path: app/jcl/ESDSRRDS.jcl, sha256: 9bec76602996, role: job}
   - {path: app/cpy/CSUSR01Y.cpy, sha256: 37c34094dc41, role: record-layout, lines: "17-23"}
   - {path: README.md, sha256: 952958322286, role: runbook, lines: "351-379"}
-  - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "18-38"}
+  - {path: docs/security/secrets.md, sha256: 0c4e6269523e, role: security, lines: "18-38"}
 entry_points: [{type: manual, job: ESDSRRDS}]
 programs: [IEFBR14, IEBGENER, IDCAMS]
 data_stores:

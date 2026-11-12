@@ -15,7 +15,7 @@ sources:
   - {path: scripts/remote_refresh.sh, sha256: 65be63e4c382, role: script, lines: "12-13, 43-44"}
   - {path: docs/runbooks/batch-cycle-restart.md, sha256: 436d0afbdb77, role: runbook, lines: "11-21"}
   - {path: docs/runbooks/cics-vsam-files.md, sha256: 99c8f80bbe9d, role: runbook, lines: "19, 37, 69"}
-  - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "18-54"}
+  - {path: docs/security/secrets.md, sha256: 0c4e6269523e, role: security, lines: "18-54"}
 entry_points: [{type: manual, job: DUSRSECJ}, {type: script, file: scripts/run_full_batch.sh, lines: "40-41"}, {type: script, file: scripts/remote_refresh.sh, lines: "43-44"}]
 programs: [IEFBR14, IEBGENER, IDCAMS]
 data_stores:

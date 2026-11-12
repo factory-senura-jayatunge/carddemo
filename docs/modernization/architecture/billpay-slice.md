@@ -9,7 +9,7 @@ Units in scope: **BILL** (COBIL00C), **SGN** (COSGN00C), **MENU** (COMEN01C). Th
 | Topic | Decision (catalog / architecture ID) | Effect in this slice |
 | :-- | :-- | :-- |
 | Access | C1 (D-01, D-02, D-03, D-SEC-01) | Every route and API needs a session; roles `USER` and `ADMIN`; any `USER` may pay any account; the paying user is recorded. |
-| Passwords | D-04, D-SEC-03, D-SEC-07 | bcrypt hashes; fixed mode: case-sensitive passwords, case-insensitive user IDs, forced change for migrated users. |
+| Passwords | D-04, D-SEC-03, D-SEC-07 | Salted hashes, Argon2id for new ones and bcrypt still verified ([identity-service.md](identity-service.md#6-password-hashing)); fixed mode: case-sensitive passwords, case-insensitive user IDs, forced change for migrated users. |
 | Lockout and session | D-05, D-SEC-04 | Fixed mode: 5 failures lock the user for 15 minutes; one neutral failure message; 15-minute idle timeout; explicit sign-off; sign-on audit. |
 | Seed and bootstrap users | D-06 | Demo seed users only in the `demo` profile; elsewhere one bootstrap admin with a forced change. |
 | Unknown user types | D-02 (DEF-SGN-005) | Fixed mode refuses them. |
@@ -100,8 +100,9 @@ Types follow [data-model.md](data-model.md); changes from the decisions are mark
 - `core.customer`, `core.card`, `core.card_xref`: as in data-model.md, including `IX_xref_acct (acct_id, card_num)`.
 - `core.tcat_bal`: PK `(acct_id, type_cd, cat_cd)`, `balance DECIMAL(11,2)`, `legacy_filler CHAR(22) NULL`, `row_version`.
 - `core.transaction` (**changed by D-60**): `tran_pk BIGINT IDENTITY` PK; `tran_id CHAR(16)` BIN2 with filtered unique index `UX_tran_master (tran_id) WHERE in_master = 1`; `type_cd CHAR(2)`, `cat_cd CHAR(4)`; `source VARCHAR(10)`; `description VARCHAR(100)`; `amount DECIMAL(11,2)`; `merchant_id CHAR(9)`; `merchant_name`, `merchant_city VARCHAR(50)`; `merchant_zip VARCHAR(10)`; `card_num CHAR(16)`; `orig_ts`, `proc_ts DATETIME2(6)`; `proc_date AS CAST(proc_ts AS DATE) PERSISTED` with index `(proc_date, card_num)`; `legacy_filler CHAR(20) NULL`; `origin VARCHAR(12)` (`LOADED`, `POSTED`, `INTEREST`, `ONLINE_ADD`, `BILL_PAY`); `cycle_id INT NULL` with a foreign key to the minimal `batch.cycle` (the slice writes `NULL`; the batch slice sets the stamping rule); `in_master BIT NOT NULL DEFAULT 1`; `created_by CHAR(8) NULL`.
-- `core.tran_id_seq` (**D-59**): `CREATE SEQUENCE core.tran_id_seq AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9999999999999999 NO CYCLE CACHE 50`. `make load` restarts it above the highest loaded `tran_id`.
-- `iam.app_user`: `user_id CHAR(8)` BIN2 PK (stored upper case); `first_name`, `last_name VARCHAR(20)`; `password_hash VARCHAR(100)` (Spring `DelegatingPasswordEncoder` format, `{bcrypt}` with strength 12); `user_type CHAR(1)` (as loaded, no check constraint, because legacy mode accepts unknown types); `must_change_password BIT`; `failed_attempts SMALLINT`; `locked_until DATETIME2(3) NULL`; `last_sign_on_at DATETIME2(3) NULL`; `ebcdic_sort_key BINARY(8)`; `created_at`, `created_by`, `updated_at`, `updated_by`; `row_version`.
+- `core.tran_id_seq` (**D-59**): `CREATE SEQUENCE core.tran_id_seq AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9999999999999999 NO CYCLE CACHE 50`. `make load` restarts it above the highest loaded `tran_id`. **Changed 2026-11-10 (user approval):** generated IDs use the reserved range `9000000000000000` to `9999999999999999`. A data migration sets `MINVALUE 9000000000000000` and restarts the sequence there. `make load` restarts it with `9000000000000000`, or with the highest reserved loaded ID plus 1 ([batch.md](batch.md#transaction-ids-from-the-file-and-from-the-services)).
+- `iam.app_user`: `user_id CHAR(8)` BIN2 PK (stored upper case); `first_name`, `last_name VARCHAR(20)`; `password_hash VARCHAR(255)` after `V205` (Spring `DelegatingPasswordEncoder` format: `{argon2}` for new hashes, older `{bcrypt}` hashes with strength 12 still verified and upgraded at the next successful sign-on, [identity-service.md](identity-service.md#6-password-hashing)); `user_type CHAR(1)` (as loaded, no check constraint, because legacy mode accepts unknown types); `must_change_password BIT`; `ebcdic_sort_key BINARY(8)` (dropped by `V204`, [identity-service.md](identity-service.md#versions)); `created_at`, `created_by`, `updated_at`, `updated_by`; `row_version`, changed by user writes and password changes, and by a sign-on only for the one-time upgrade of a `{bcrypt}` hash ([identity-service.md](identity-service.md#6-password-hashing)).
+- `iam.user_signon_state` (`V206`, [identity-service.md](identity-service.md#7-sign-on-state)): `user_id NCHAR(8)` BIN2 PK, FK to `iam.app_user` `ON DELETE CASCADE`; `failed_attempts SMALLINT`; `locked_until DATETIME2(3) NULL`; `last_sign_on_at DATETIME2(3) NULL`; no `row_version`. The sign-on steps below read and write these columns here.
 - `iam.session`: `session_id UNIQUEIDENTIFIER` PK; `user_id`; `created_at`, `last_activity_at`, `absolute_expiry_at`, `ended_at NULL`, `end_reason VARCHAR(20) NULL` (`SIGN_OFF`, `IDLE`, `EXPIRED`, `REUSE_DETECTED`, `PASSWORD_CHANGE`, `USER_REFUSED`); `refresh_hash BINARY(32)` (SHA-256 of the current refresh token); `previous_refresh_hash BINARY(32) NULL`.
 - `iam.audit_event`: `event_id BIGINT IDENTITY` PK; `occurred_at DATETIME2(3)`; `actor_user_id CHAR(8) NULL`; `event_type VARCHAR(40)` (`SIGN_ON_OK`, `SIGN_ON_FAILED`, `USER_LOCKED`, `SIGN_OFF`, `SESSION_EXPIRED`, `PASSWORD_CHANGED`, `REFRESH_REUSE`); `subject_key VARCHAR(40) NULL`; `detail VARCHAR(200) NULL` (reason codes only, never a password or PII value); `client_ip VARCHAR(45) NULL`.
 - `billpay.payment`: `payment_id BIGINT IDENTITY` PK; `tran_pk BIGINT` unique (FK `core.transaction`); `tran_id CHAR(16)`; `acct_id CHAR(11)`; `paid_by CHAR(8)`; `idempotency_key UNIQUEIDENTIFIER` unique; `amount DECIMAL(11,2)` (as stored on the transaction); `balance_before DECIMAL(12,2)`; `created_at DATETIME2(6)`.
@@ -113,7 +114,7 @@ Types follow [data-model.md](data-model.md); changes from the decisions are mark
 | Database user (login) | Grants |
 | :-- | :-- |
 | `identity_svc` (`carddemo_identity`) | `SELECT, INSERT, UPDATE` on `iam.app_user`, `iam.session`; `INSERT` on `iam.audit_event`; nothing else. |
-| `billpay_svc` (`carddemo_billpay`) | `SELECT` on `core.account`, `core.card_xref`, `core.transaction`, `core.tcat_bal`, `ops.batch_window`; `UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` on `core.account`; `INSERT` on `core.transaction`; `INSERT, UPDATE (balance)` on `core.tcat_bal`; `UPDATE` on `core.tran_id_seq`; `SELECT, INSERT` on `billpay.payment`; `EXECUTE` on `sp_getapplock` (implicit). |
+| `billpay_svc` (`carddemo_billpay`) | column-level `SELECT` on the 14 `core.account` columns (`acct_id` to `row_version`, never the DEF-ACUP-002 provenance columns; [data-model.md](data-model.md#ownership-and-grants)); `SELECT` on `core.card_xref`, `core.transaction`, `core.tcat_bal`, `ops.batch_window`; `UPDATE (curr_bal, curr_cyc_credit, curr_cyc_debit)` on `core.account`; `INSERT` on `core.transaction`; `INSERT, UPDATE (balance)` on `core.tcat_bal`; `UPDATE` on `core.tran_id_seq`; `SELECT, INSERT` on `billpay.payment`; `EXECUTE` on `sp_getapplock` (implicit). |
 | `batch_svc` (`carddemo_batch`) | `SELECT, INSERT, DELETE` on the core tables; `ALTER` on `core.tran_id_seq` (restart after load). |
 
 `make db-reset` passes only when each login is refused one table outside its grants (for example `carddemo_billpay` reading `core.customer`).
@@ -156,14 +157,14 @@ public interface BalancePosting {
 public interface BatchWindowGuard { void requireWritesAllowed(); }   // BatchWindowException
 ```
 
-- `TransactionIds.next()`, switch `BR-TRNA-003` (D-59). Fixed: `NEXT VALUE FOR core.tran_id_seq`, formatted `%016d`. Legacy: `sp_getapplock 'carddemo.tran_id', Exclusive, Transaction`, then `MAX(tran_id) WHERE in_master = 1` plus 1 (0 when empty), so the result equals the reference "highest + 1" (BR-BILL-004) and two writers cannot get the same ID.
+- `TransactionIds.next()`, switch `BR-TRNA-003` (D-59). Fixed: `NEXT VALUE FOR core.tran_id_seq`, formatted `%016d`. Legacy: `sp_getapplock 'carddemo.tran_id', Exclusive, Transaction`, then the highest `tran_id` over master rows (`in_master = 1`) and waiting online adds (`core.daily_tran`, `origin = ONLINE_ADD`, `cycle_id` NULL) plus 1 (1 when both are empty), so the result equals the reference "highest + 1" (BR-BILL-004) and no two writers get the same ID ([batch.md](batch.md#online-writes-between-cycles)). This needs `SELECT (tran_id, origin, cycle_id)` on `core.daily_tran` for `billpay_svc`, never `card_num` or `raw_record`.
 - `BalancePosting.post` applies the rule POSTTRAN applies: `tcat_bal(acct, type, cat).balance += amount`, inserting the row when missing; `curr_bal += amount`; `curr_cyc_credit += amount` when `amount >= 0`, else `curr_cyc_debit += amount`. Sums go through `LegacyNumbers.truncate` to the column's digits, as POSTTRAN has no size check (NUM-POST-003). `batch-service` posting must call the same method later; it is the "same posting service" of D-27 and D-28. It does **not** run posting's validations (over-limit, expiry); callers do their own.
 - `BatchWindowGuard.requireWritesAllowed()` takes `sp_getapplock 'carddemo.batch_window', Shared, Transaction`, then fails when `ops.batch_window` has an open row. Opening a window (batch, later) takes the same lock exclusively, so no payment is half-way when the window opens.
 
 **platform/web-support**
 
 - Resource-server security: JWT validation against the JWKS URI with issuer and audience checks; `role` claim to `ROLE_USER` or `ROLE_ADMIN`. A cookie-aware `BearerTokenResolver` reads cookie `cd_at` first, then `Authorization: Bearer` (scripts and tests).
-- CSRF for the SPA: `CookieCsrfTokenRepository.withHttpOnlyFalse()` (cookie `XSRF-TOKEN`, `Path=/`), header `X-XSRF-TOKEN`, the plain `CsrfTokenRequestAttributeHandler`. Required on every unsafe method except `POST /api/auth/sign-on` and `POST /api/auth/password` (no session yet; `SameSite=Strict` covers them).
+- CSRF for the SPA: `CookieCsrfTokenRepository.withHttpOnlyFalse()` (cookie `XSRF-TOKEN`, `Path=/`), header `X-XSRF-TOKEN`, the plain `CsrfTokenRequestAttributeHandler`. Required on every unsafe method except `POST /api/auth/sign-on` and `POST /api/auth/password` (no session yet; `SameSite=Strict` covers them). Applied by `CarddemoHttpSecurity`'s own `CsrfFilter` (identity-service: its own `CsrfFilter` with the same matcher), never by `http.csrf()` ([api-security.md](api-security.md#authentication)).
 - Error model: RFC 9457 problem details with `code`, `message` (exact catalogue text), `field` (focus target or `null`) and `severity` (`error` = red, `success` = green, `info` = neutral). Platform texts, which have no legacy source:
 
   | Code | Status | Message |
@@ -175,7 +176,7 @@ public interface BatchWindowGuard { void requireWritesAllowed(); }   // BatchWin
   | `INTERNAL_ERROR` | 500 | `An unexpected error occurred. Please try again later ...` |
 
   `INTERNAL_ERROR` is only for failures no step message covers; the response carries the correlation ID, never the cause.
-- `MessageCatalog`: every text of section 9, keyed by code; the TypeScript copy in `web/src/messages.ts` is generated from it at build time (`web-support` writes `target/messages.json`) and committed, with a contract test that they agree.
+- `MessageCatalog`: every text of section 9, keyed by code; the TypeScript copy in `web/src/messages/` (one file per message group, written by `web/scripts/gen-messages.mjs`) is generated from it at build time (`web-support` writes `target/messages.json`) and committed, with a contract test that they agree.
 
 **platform/test-support**: a SQL Server Testcontainer using the compose image (`mcr.microsoft.com/mssql/server:2025-CU10-ubuntu-24.04` by digest, `MSSQL_MEMORY_LIMIT_MB=2048`), started once per JVM and migrated with the real migrations; fixture builders for accounts, cards, cross-references, category balances and users (seeded with the public demo password `PASSWORD`); a test RSA key and `TestTokens.user("USER0001")` / `.admin(...)` so Bill Pay tests need no identity-service; a fixed `Clock`; a JUnit extension that runs a test class in both modes (`@BothModes("DEF-BILL-010")`).
 
@@ -231,13 +232,13 @@ Decided items with no code switch (ledger entry with `code_switch = false`): `DE
 2. `password` blank: `400 PASSWORD_REQUIRED`, `Please enter Password ...`, field `password` (VAL-SGN-002).
 3. Longer than 8 (`userId`) or 64 (`password`) characters: `400 INVALID_INPUT`, `Please enter User ID ...` or `Please enter Password ...` on the field. The web form caps the fields, so only scripts see this.
 4. Fixed `DEF-SGN-002` only: an in-memory limit on failed attempts per client address, shared by sign-on and password change. Once an address has reached the limit (default 30 failed attempts per minute, configurable under `carddemo.identity.rate-limit.*`), every request from it gets `429 TOO_MANY_ATTEMPTS` with `Retry-After`, `Too many sign-on attempts. Try again later ...`, field `userId`, with nothing read or counted, even when the password is right: the check runs before the credentials are known, otherwise a 200 among the 429s would still reveal the password. A failed attempt is a `401` from steps 6 to 8 (unknown user, locked user, wrong password, including the current password of a password change). Successes, the `400` input errors, `USER_ID_MISMATCH`, the `403` from steps 9 and 10, `503` and `429` count nothing, so CI and Playwright can sign on from `127.0.0.1` as often as they need. There is no per-user limit; the 5-failure lockout in step 8 covers each user. The limit is per instance, which is enough for the single local instance; a deployment with two instances (D-NFR-03) needs a shared store.
-5. The user ID is upper-cased (BR-SGN-001) and read. A database failure: `503 UNABLE_TO_VERIFY`, `Unable to verify the User ...`, field `userId` (ERR-SGN-001).
+5. The user ID is upper-cased (BR-SGN-001), `a` to `z` only ([data-model.md](data-model.md#inventory)), and read. A database failure: `503 UNABLE_TO_VERIFY`, `Unable to verify the User ...`, field `userId` (ERR-SGN-001).
 6. Not found: legacy `401 USER_NOT_FOUND`, `User not found. Try again ...`, field `userId` (VAL-SGN-003). Fixed (`DEF-SGN-003`): `401 SIGN_ON_FAILED`, `Wrong User ID or Password. Try again ...`, field `password`.
 7. Fixed `DEF-SGN-002` only: `locked_until > now` gives the same neutral `401 SIGN_ON_FAILED`, whatever the password; nothing else is checked.
-8. Password check: legacy `DEF-SGN-011` compares `upper(password)`, fixed compares the password as typed, against the bcrypt hash; trailing spaces are trimmed first, as the 3270 field pads them. Wrong: legacy `401 WRONG_PASSWORD`, `Wrong Password. Try again ...`, field `password` (VAL-SGN-004); fixed: the neutral message. Fixed `DEF-SGN-002`: `failed_attempts += 1`; at 5, `locked_until = now + 15 min`, the counter resets and `USER_LOCKED` is audited. Unknown user IDs count nothing.
+8. Password check: legacy `DEF-SGN-011` compares `upper(password)` (`a` to `z` only, the same helper), fixed compares the password as typed, against the stored hash (`{argon2}` or older `{bcrypt}`); trailing spaces are trimmed first, as the 3270 field pads them. Wrong: legacy `401 WRONG_PASSWORD`, `Wrong Password. Try again ...`, field `password` (VAL-SGN-004); fixed: the neutral message. Fixed `DEF-SGN-002`: `failed_attempts += 1` on `iam.user_signon_state`, in one atomic update; at 5, `locked_until = now + 15 min`, the counter resets and `USER_LOCKED` is audited. Unknown user IDs count nothing.
 9. Fixed `DEF-SGN-005`: `user_type` not `A` or `U` gives `403 USER_TYPE_NOT_ALLOWED`, `User not authorized. Contact your administrator ...`, field `userId`. Legacy: any type other than `A` gets role `USER` (BR-SGN-004).
 10. Fixed `DEF-SGN-011` and `must_change_password = 1`: `403 PASSWORD_CHANGE_REQUIRED`, `Password change required. Enter a new Password ...`, field `newPassword`, `severity: info`; no session.
-11. Success: counter reset, `last_sign_on_at`, a new session, cookies, `SIGN_ON_OK` audited. `home` is `/admin` for type `A`, else `/` (BR-SGN-004).
+11. Success: counter reset, `last_sign_on_at`, a verified `{bcrypt}` hash replaced by `{argon2}` (guarded on the old value, [identity-service.md](identity-service.md#6-password-hashing)), a new session, cookies, `SIGN_ON_OK` audited. `home` is `/admin` for type `A`, else `/` (BR-SGN-004).
 
 Every failure writes `SIGN_ON_FAILED` with the reason code. Sign-on, password change and refresh do not consult the batch window (WRITES_BLOCKED covers business tables, not session bookkeeping).
 
@@ -252,7 +253,7 @@ After the current password passes steps 1 to 10 (step 10 does not apply):
 | Different from current | yes (after upper-casing in legacy) | yes | `NEW_PASSWORD_SAME`, `New Password must differ from the current one ...` |
 | Not the user ID | - | not equal to the user ID, ignoring case | `NEW_PASSWORD_IS_USER_ID`, `New Password must not be the User ID ...` |
 
-Legacy stores the hash of the upper-cased value, so the result can always sign on under BR-SGN-003. Success clears `must_change_password`, audits `PASSWORD_CHANGED` and starts a session. The user-admin screens (D-53) apply the same rule when they are converted.
+Legacy stores the hash of the upper-cased value, so the result can always sign on under BR-SGN-003. Success clears `must_change_password`, audits `PASSWORD_CHANGED` and starts a session. The user-admin screens (D-53) apply the same rule ([identity-service.md](identity-service.md)).
 
 ### Seeding (D-06)
 
@@ -318,14 +319,14 @@ Each service exports its OpenAPI document in a test (`OpenApiExportTest`) to `ta
 | `/sign-on/change-password` | public | Reached on `PASSWORD_CHANGE_REQUIRED` with the user ID in route state: current password, new password, repeat new password (client check: `New Password and confirmation do not match ...`), Change (Enter), Back. |
 | `/signed-off` | public | `Thank you for using CardDemo application...` and a link to sign on (FLOW-SGN-003). |
 | `/` | USER | Main menu. |
-| `/admin` | ADMIN | Admin menu stub: options 1 to 4 show `This option <name> is coming soon ...` (green); options 5 and 6 hidden (D-70). |
+| `/admin` | ADMIN | Admin menu: options 1 to 4 open the user pages (1 `/admin/users`, 2 `/admin/users/new`, 3 and 4 `/admin/users` to pick the user to update or delete), option 7 opens `/admin/lookup` (D-09); options 5 and 6 are hidden while the reference module is off (D-70, D-WEB-04). |
 | `/bill-pay` | USER | Bill Pay. |
 
 A route without a session goes to `/sign-on` (no message); a route for the other role goes to that user's `home`. Every page header shows the two legacy titles, the date `mm/dd/yy` and time `hh:mm:ss`, and the screen's legacy IDs (`CB00 · COBIL00C`, `CC00 · COSGN00C`, `CM00 · COMEN01C`) (FLOW-BILL-009, FLOW-SGN-007, FLOW-MENU-007). The message line is red for `error`, green for `success`, neutral for `info`; focus moves to `field`. An API `401` triggers one refresh and a retry; a failed refresh goes to `/sign-on`.
 
 **Function keys (D-WEB-03).** A header toggle (stored in `localStorage` as `carddemo.fkeys`) turns on 3270 shortcuts: F3 = Back or Exit, F4 = Clear; any other function key shows `Invalid key pressed. Please see below...` and keeps the input (VAL-BILL-006, VAL-SGN-005, VAL-MENU-002). With the toggle off, other function keys do nothing. Tests of S12 (BILL), S9 (SGN) and S9 (MENU) switch it on.
 
-**Main menu.** Lines `01. Account View` to `11. Pending Authorization View` (BR-MENU-001), clickable, plus the option field (2 characters) and Enter. Option `10` opens `/bill-pay`. Options 1 to 9: `This option <name> is coming soon ...` in green (the option name as listed). Option 11 with `modules.authorization` false: `This option Pending Authorization View is not installed...` in red (BR-MENU-004). Invalid (NUM-MENU-001 normalisation, then not 1 to 11): `Please enter a valid option number...`. Back (F3) calls sign-off and shows an empty `/sign-on` with no message (FLOW-MENU-004, D-05).
+**Main menu.** Lines `01. Account View` to `11. Pending Authorization View` (BR-MENU-001), clickable, plus the option field (2 characters) and Enter. Every option 1 to 11 opens its route of [web.md](web.md#menu-mapping) (BR-MENU-002): option `10` opens `/bill-pay`, and option 11 opens `/authorizations` when `modules.authorization` is true. Option 11 with `modules.authorization` false: `This option Pending Authorization View is not installed...` in red (BR-MENU-004). No shipped option reaches `This option <name> is coming soon ...` (BR-MENU-005 is dormant; the text is the DEF-MENU-004 deviation). Invalid (NUM-MENU-001 normalisation, then not 1 to 11): `Please enter a valid option number...`. Back (F3) calls sign-off and shows an empty `/sign-on` with no message (FLOW-MENU-004, D-05).
 
 **Bill Pay page.** Confirm is a Yes/No radio group with nothing selected at first; "nothing selected" is the legacy blank. The VAL-BILL-002 decision table lives in one client function that takes the raw value (`Y`, `y`, `N`, `n`, blank or anything else), so the invalid-value branch (S8) is tested by a Vitest unit test of that function and by the API test; the radio group cannot produce it. The balance shows as currency (`$194.00`), with the legacy display `+0000000194.00` in small text below it (NUM-BILL-001). On Enter:
 
@@ -404,13 +405,15 @@ Added: S12 five wrong passwords, then the right one: legacy signs on; fixed give
 | S1 | `/` without a session | `/sign-on` |
 | S2 | signed on as `USER0001` | lines `01. Account View` to `11. Pending Authorization View` |
 | S3 | option `10` | `/bill-pay` |
-| S4 | option `5` | green `This option Credit Card Update is coming soon ...` (not converted; scope exclusion for BR-MENU-002 options 1 to 9) |
+| S4 | each option `1` to `9` | its route of [web.md](web.md#menu-mapping), for example option `5` opens `/cards/edit` (BR-MENU-002) |
 | S5 | option blank, `00`, `12`, `99` | `Please enter a valid option number...` |
 | S6 | option `11`, module not installed | red `This option Pending Authorization View is not installed...` |
-| S7 | option `11`, module installed | out of scope (no authorization module in this slice) |
+| S7 | option `11`, module installed | `/authorizations` (BR-MENU-002, BR-MENU-004) |
 | S8 | Back (F3) | session ended, empty `/sign-on` |
 | S9 | F7 with shortcuts on | `Invalid key pressed. Please see below...` |
 | S10 | `ADMIN001` opens `/` | redirected to `/admin` |
+| S11 | `USER0001` opens `/admin` | redirected to `/` |
+| S12 | `/admin` without a session | `/sign-on` |
 
 ## 11. Item treatment for unit BILL
 
@@ -436,7 +439,8 @@ Added: S12 five wrong passwords, then the right one: legacy signs on; fixed give
 | FLOW-BILL-009 | page header | Vitest |
 | SE-BILL-001 to 005 | steps 6, 8, 9, 10, 11 | API S9, S21 |
 | ERR-BILL-001 | the step messages | API S21 |
-| ERR-BILL-002, 003, 004 | no screen receive, no browse, no abend: deviation (architecture-dependent) | - |
+| ERR-BILL-002, 003 | no screen receive, no browse: deviation (architecture-dependent, whole) | - |
+| ERR-BILL-004 | no abend: deviation (architecture-dependent, partial) | API test, unexpected exception gives `500 INTERNAL_ERROR` |
 | NUM-BILL-001 | `editSigned(…, 10, 2)` | unit test (positive, zero, negative), API S5, S6 |
 | NUM-BILL-002 | `truncate(…, 9)` | API S17 |
 | NUM-BILL-003 | whole-second `DATETIME2`; legacy layout from `LegacyTimestamps.online` in the exporter | unit test, API S9 |
@@ -456,6 +460,33 @@ Added: S12 five wrong passwords, then the right one: legacy signs on; fixed give
 | Q-BILL-005 | class c, no entry | - |
 
 SGN and MENU follow the same rule: every must-preserve item and every switch is cited by a test of section 10.
+
+### Whole and partial deviations (2026-11-10)
+
+The ledger's partial mechanism ([transaction-service.md](transaction-service.md#9-partial-deviations-what-stays-tested)) classes every architecture-dependent and `security-c1` entry of the slice's units, whatever the item's fidelity class. Entries already classed elsewhere keep their class: INV-001 and BR-BILL-004 in transaction-service.md, and the incidental-ui commarea entries in section 12. A whole entry exempts the item, and what must be preserved is carried by an item that stays required, or nothing is left of it. A partial entry gets `retained` (the sentences below) and `requires_test = true`. No row needs a user decision.
+
+| Item | Class | Retained, or the items that carry what is kept | Tests |
+| :-- | :-- | :-- | :-- |
+| DEF-BILL-003 | whole | The legacy outcome is the defect itself (two payments get one ID), so nothing is kept. Unique IDs are INV-001's BILL obligation, which is partial and gated ([transaction-service.md](transaction-service.md#9-partial-deviations-what-stays-tested)). | - (S22 and the concurrent-payment test cite INV-001) |
+| DEF-BILL-005 | whole | The stale colour is gone with one response per request. The failed account update's message, `Unable to Update Account...` as an error, is ERR-BILL-001's step message, which stays required. | - |
+| DEF-BILL-012 | whole | No browse is left, so no failed `READPREV` can abend. The next ID is BR-BILL-004's (D-59). A failed ID read is ERR-BILL-001's other-failure row, which stays required (S21). | - |
+| DEF-BILL-013 | whole | The balance shown always comes from an account read in the same request. The paths the defect names (confirm `N`, an invalid confirm value, account not found) are VAL-BILL-001 to VAL-BILL-005 and ERR-BILL-001, which stay required. | - |
+| ERR-BILL-002 | whole | There is no screen receive. The request body is checked by VAL-BILL-001 to VAL-BILL-005, which stay required. | - |
+| ERR-BILL-003 | whole | There is no browse to end. A failed ID read is a step failure: ERR-BILL-001's message, nothing committed (S21, DEF-BILL-001). | - |
+| ERR-BILL-004 | partial | An unexpected failure that no step message covers ends the request with `500 INTERNAL_ERROR` and `An unexpected error occurred. Please try again later ...`, with the correlation ID and no cause. | An API test with an exception thrown outside the mapped steps. "Nothing committed" stays with DEF-BILL-001 (D-29) and S21. |
+| BR-MENU-003 | partial (`security-c1`) | The role from the session decides. A page of the other role sends the user to their own home: `ADMIN001` on `/` lands on `/admin` (MENU S10), and `USER0001` on `/admin` lands on `/` (MENU S11). An API of the other role answers `403 ACCESS_DENIED` (BILL S20). The main menu lists no ADMIN-only option. | MENU S10 and S11, which cite BR-MENU-003, and BILL S20, which also cites it |
+| DEF-BILL-001 | whole | The defect's outcomes (a balance zeroed with no payment, a payment with a stale card or an unchanged balance) are not kept. What is kept is the failing step's message, which is ERR-BILL-001. ERR-BILL-001 stays required, and its test S21 asserts "nothing committed" at each step 6 to 12, so the D-29 target is tested through a required item. | - (S21 also cites DEF-BILL-001) |
+| DEF-BILL-011 | whole | The spec classes it incidental: the user sees only the last screen and its message. One response per request gives that last message, which is the step's message (ERR-BILL-001) or the success message (BR-BILL-001 to BR-BILL-007), all required. | - |
+| DEF-MENU-002 | whole | The menu offers every option to every `USER` (BR-MENU-001, MENU S2), and an `ADMIN` never sees it (MENU S10). Both stay required or partial. Whether an option should be ADMIN-only is decided by D-02 under C1. | - |
+| DEF-MENU-003 | whole | The part that is kept is "a direct start without a session goes to sign-on", which is FLOW-MENU-001 (MENU S1). FLOW-MENU-001 is no longer excluded (below), so it stays required. The rest (any client-held identity accepted) is gone under C1. | - |
+| DEF-SGN-006 | whole | Nothing of the defect is kept: the identity comes from the session token. Role from the session is tested through BR-MENU-003 (partial, S10, S11, S20) and BR-SGN-004 (required: `home` by user type, SGN S4). | - |
+| DEF-SGN-012 | whole | Nothing of the defect is kept. Every route needs a session: FLOW-MENU-001 (MENU S1) and FLOW-BILL-001 (BILL S1) stay required, and MENU S12 shows the admin menu stub refused without a session, citing DEF-SGN-012. The admin menu (COADM01C) is not a trace unit yet, so S12 is evidence, not a gate. | - |
+
+**FLOW-MENU-001 is not excluded.** Its outcome, that a start without a session goes to sign-on, is observable and tested by MENU S1. "Replaced by the route guard" describes how the outcome is produced, not a reason to drop it. `scope.toml` has no MENU exclusion: every option has a route, so BR-MENU-002 is required, closed by tests tagged with it that cover every option (S3, S4, S7). MENU S1 cites FLOW-MENU-001.
+
+`No access - Admin Only option...` is not kept. With the shipped option table the legacy check never fires (DEF-MENU-002, `security-c1`), and under C1 the route guard and the server role check replace it.
+
+**Ledger target to correct.** The `target` text of DEF-BILL-012 says "the lowest card number comes from one query". That belongs to the card lookup, not to this item. The `target` becomes: "No VSAM browse: the next transaction ID comes from the sequence (fixed) or from one query for the highest ID under an application lock (legacy), BR-BILL-004 and D-59; a failed read is a step failure (ERR-BILL-001)."
 
 ## 12. Ledger files (P5)
 
@@ -499,7 +530,7 @@ spec = "docs/modernization/spec/programs/COBIL00C.md"
 spec = "docs/modernization/spec/programs/COSGN00C.md"
 [unit.MENU]
 spec = "docs/modernization/spec/programs/COMEN01C.md"
-excluded = { "BR-MENU-002" = "options 1-9 and 11 not converted", "FLOW-MENU-001" = "replaced by the route guard" }
+note = "BR-MENU-005 (incidental, not gated) is dormant in target: ..."   # shortened here
 ```
 
 ## 13. Make targets: done means
@@ -510,7 +541,7 @@ Each target prints `<target>: OK` and exits 0 only when every condition holds. H
 | :-- | :-- |
 | `setup` | as today, plus the new `.env` keys filled (seed password 8 upper-case letters and digits) and `var/secrets/identity-jwt.pem` present. |
 | `db-reset` | the database is recreated; every migration of section 4 is applied and `flyway validate` is clean; each login connects and is refused one table outside its grants. |
-| `load` | `dataLoadJob` (batch-service, one-shot) loads accounts, customers, cards, cross-references and category balances with 50 rows each, `COMPLETED`; `core.transaction` is empty; `core.tran_id_seq` restarted at highest `tran_id` + 1 (1 on the sample). |
+| `load` | `dataLoadJob` (batch-service, one-shot) loads accounts, customers, cards, cross-references and category balances with 50 rows each, `COMPLETED`; `core.transaction` is empty; `core.tran_id_seq` restarted at `9000000000000000` on the sample ([batch.md](batch.md#transaction-ids-from-the-file-and-from-the-services)). |
 | `up` | infrastructure, `identity-service` (seeds users if none), `billpay-service` and Vite are healthy within `UP_TIMEOUT`; `make status` lists them. |
 | `smoke` | in under 60 s and with no row count change: both health endpoints, sign-on as `USER0001`, `GET /api/auth/me`, `GET /api/features`, a preview of `00000000001`, the JWKS. Sign-on bookkeeping rows (`iam.session`, `iam.audit_event`) are the only writes allowed. |
 | `billpay` | starts SQL Server, identity, Bill Pay and Vite; runs `db-reset` and `load` when `core.account` is empty; signs on `USER0001`, previews and pays `00000000001` (or the first account with a positive balance), and checks the success message, a new transaction and `curr_bal` 0.00; leaves the slice up at `http://127.0.0.1:25173/bill-pay`. |
@@ -525,6 +556,6 @@ CI (`.github/workflows/modernization.yml`) runs `backend` (`test-backend`), `bil
 
 ## 14. Left for later slices
 
-- Batch: whether posting keeps the daily file's transaction IDs alongside `core.tran_id_seq` (D-59), and how the sequence is kept above them; the `cycle_id` stamping rule for online writes; `batch-service` posting must call `BalancePosting.post`.
+- Batch: posting keeps the daily file's IDs, and generated IDs use a reserved range the file may not use, and a check at the claim stops any collision (settled 2026-11-10, [batch.md](batch.md#transaction-ids-from-the-file-and-from-the-services)). Still open: the `cycle_id` stamping rule for online writes; `batch-service` posting must call `BalancePosting.post`.
 - D-28 consequence to watch in the batch slice (the user confirmed "same as batch posting" with the over-limit formula kept): with posting's over-limit formula kept (D-19), a payment's negative amount in `curr_cyc_debit` raises `curr_cyc_credit - curr_cyc_debit`, so later charges in the same cycle are more likely to be rejected as over limit (DEF-POST-005). The sample disclosure groups give type 02 a zero rate, so interest does not change (CBACT04C BR-INTC-001).
 - Online transaction add (D-27) writes the posting input, not `core.transaction`; settled in [batch.md](batch.md#online-writes-between-cycles).

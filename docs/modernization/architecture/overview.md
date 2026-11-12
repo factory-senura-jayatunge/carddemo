@@ -39,12 +39,12 @@ carddemo:
 | Identity and access | COSGN00C (SGN), COUSR00C-03C (USRL, USRA, USRU, USRD), menus COMEN01C (MENU) and COADM01C (ADMN) for the role rules | `iam` schema: users, sessions, audit | `identity-service` |
 | Payments (first slice) | COBIL00C (BILL) | `billpay` schema: payment audit and idempotency | `billpay-service` |
 | Accounts and cards | COACTVWC (ACVW), COACTUPC (ACUP), COCRDLIC (CRDL), COCRDSLC (CRDV), COCRDUPC (CRDU) | account, customer and card profile columns in `core` | `account-service` |
-| Transactions | COTRN00C (TRNL), COTRN01C (TRNV), COTRN02C (TRNA), CORPT00C (RPTS), CSUTLDTC (DTCK) | online inserts into `core.transaction`; report requests | `transaction-service` |
+| Transactions | COTRN00C (TRNL), COTRN01C (TRNV), COTRN02C (TRNA), CORPT00C (RPTS), CSUTLDTC (DTCK) | online adds into `core.daily_tran`, posted by the next cycle (D-27); report requests | `transaction-service` |
 | Posting and cycle (batch) | CBTRN02C (POST), CBACT04C (INTC), CBTRN03C (TRPT), CBSTM03A/B (STMT, STIO), the cycle jobs | balances, category balances, posted and interest transactions, rejects, reports, statements | `batch-service` (Spring Batch) and the Airflow DAGs |
 | Reference data | COTRTLIC (TTLS), COTRTUPC (TTUP), COBTUPDT (TTBU); transaction type, category and disclosure group files; the state, ZIP-prefix and area-code lists | `ref` schema | `reference-service` |
 | Authorizations (optional module) | COPAUA0C (AUTH), COPAUS0C (AUSM), COPAUS1C (AUDT), COPAUS2C (AUFR), CBPAUP0C (AUPG) | `pauth` schema | `authorization-service` |
 | Account and date inquiry (optional module) | COACCT01 (MQAC), CODATE01 (MQDT) | nothing (read-only) | `inquiry-service` |
-| Branch migration | CBEXPORT (EXPT), CBIMPORT (IMPT) | migration file format | optional jobs in `batch-service` |
+| Branch migration | CBEXPORT (EXPT), CBIMPORT (IMPT) | migration file format | jobs in `batch-service` |
 
 The candidate seams in `components.md` (payments first, posting, accounts and cards, identity, reference data, branch migration, authorizations, MQ inquiries) map one to one onto these contexts.
 
@@ -153,7 +153,7 @@ Bill Pay goes first because it is small (one screen, three stores), touches the 
 
 The server re-reads the balance inside the transaction; it never trusts the balance the screen showed (BR-BILL-001). Errors return the exact legacy text and the field to focus, for example `404 {"code":"ACCOUNT_NOT_FOUND","message":"Account ID NOT found...","field":"acctId"}`.
 
-**Navigation fit.** Main menu option 10 opens `/bill-pay`. Back (PF3) returns to the menu, Clear (PF4) clears the form, and the confirmation is a Y/N field, so the legacy decision table (VAL-BILL-002) holds unchanged. Options 1 to 9 show `This option <name> is coming soon ...` until their context is converted, which reuses the menu's own message (BR-MENU-005); option 11 shows the "not installed" message while the authorization module is absent (BR-MENU-004).
+**Navigation fit.** Main menu option 10 opens `/bill-pay`. Back (PF3) returns to the menu, Clear (PF4) clears the form, and the confirmation is a Y/N field, so the legacy decision table (VAL-BILL-002) holds unchanged. Every other option opens its own page ([web.md](web.md#menu-mapping)); option 11 shows the "not installed" message while the authorization module is absent (BR-MENU-004).
 
 **What it shares and what it proves.** The core tables and their Flyway migrations, `ledger-core` (ID allocation shared with transaction add and the batch), the batch-window guard (Bill Pay is unavailable while posting runs, INV-002), identity and roles, the message catalogue, the fidelity switches, the traceability check and the CI pipeline. `make billpay` brings up only SQL Server, `identity-service`, `billpay-service` and the web app.
 
@@ -169,12 +169,12 @@ DEF-BILL-001 (balance zeroed without a payment record) and DEF-BILL-003 (two pay
 | IDCAMS DELETE, DEFINE, REPRO, BLDINDEX, AIX and PATH | Flyway migrations for tables and indexes; the `load` jobs for data; SQL Server maintains the indexes. |
 | GDGs and relative generations | Rows tagged with `cycle_id` and run IDs; report and statement files under a per-run folder with a retention setting. |
 | VSAM `RECOVERY(NONE)` and missing rollbacks | One SQL Server transaction per online action and per batch chunk. |
-| IMS HIDAM pending-authorization database | Two tables in `pauth` with a cascade delete. |
+| IMS HIDAM pending-authorization database | Two tables in `pauth`; a summary delete removes its details explicitly first (no cascade). |
 | IBM MQ queues and CKTI triggers | RabbitMQ quorum queues and Spring AMQP listeners. |
 | TDQ `JOBS` and the JES internal reader (report submit) | `transaction-service` triggers the report DAG through the Airflow REST API. |
 | Fixed waits (WAITSTEP, COBSWAIT, MVSWAIT) | Dropped; Airflow task dependencies. |
 | FTP (FTPJCL), INTRDR chaining (INTRDRJ1/2) | Dropped; demo jobs with no business content. |
-| TXT2PDF | A PDF writer in the statement job, if the business wants PDFs (Q-JPDF-001). |
+| TXT2PDF | The statement job's fixed-mode PDF renderer: one PDF per account statement (D-45). |
 | CA-7 and Control-M | Airflow DAG dependencies and schedules. |
 | Diagnostic readers that print every record (READACCT, READCARD, READCUST, READXREF) | Dropped; `make verify-data` checks counts and checksums without printing PII. |
 | CEE3ABD abends and return codes | Spring Batch exit statuses; Airflow task success, success with warnings, or failure. |

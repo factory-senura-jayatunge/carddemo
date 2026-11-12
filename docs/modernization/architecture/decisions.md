@@ -18,9 +18,9 @@ The user approved this proposal (D10) and answered the decision catalog (`docs/m
 | D-ARCH-01 to D-ARCH-16 | As proposed. |
 | D-SEC-01 | **C1**: sign-on for every screen and API, roles `ADMIN` and `USER`, staff model (D-01, D-02, D-03). Unknown user types are refused (DEF-SGN-005 fixed). Masking applies under C1 as in D-SEC-05. |
 | D-SEC-02 | Local password check in `identity-service`; OIDC later only changes that service. |
-| D-SEC-03 | Salted bcrypt hashes; case-sensitive passwords, case-insensitive user IDs; legacy passwords hashed once at migration and changed at first sign-on (D-04, DEF-SGN-011 fixed). |
+| D-SEC-03 | Salted hashes (D-04: bcrypt or Argon2): Argon2id for every new hash, existing bcrypt hashes still verified and upgraded at the next successful sign-on ([identity-service.md](identity-service.md#6-password-hashing)); case-sensitive passwords, case-insensitive user IDs; legacy passwords hashed once at migration and changed at first sign-on (D-04, DEF-SGN-011 fixed). |
 | D-SEC-04 | On: 5 failures lock the user for 15 minutes; one neutral failure message for unknown user, wrong password and locked user; 15-minute idle timeout; explicit sign-off; sign-on audit (D-05). |
-| D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. Mechanism (ruled 2026-11-06): masking is done in the application, with one SQL login per service. A service gets column-level `GRANT UNMASK` only on the masked columns it must use or reveal; every other login sees SQL Server dynamic data masking. No second unmask login: it would run in the same process with the same secrets, so it would not contain a bug in the service, and it would double the connection setup. Details in [data-model.md](data-model.md#ownership-and-grants). |
+| D-SEC-05 | PII (SSN, government ID, date of birth, EFT account, card number) masked on screens and in API responses; `ADMIN` may unmask; every unmasked view is audited (D-09 under C1). There is no `PII_VIEWER` role under C1. Reveal (user ruling 2026-11-10): `ADMIN` reads account view, card list and card view read-only from admin option 7 and unmasks per field; updates stay `USER` only ([account-service.md](account-service.md#access-admin-reads-user-writes-user-decision-on-d-09)). The same rule covers the transaction list and view, with an audited reveal of the card number ([transaction-service.md](transaction-service.md#access-and-the-card-number-reveal-d-09)). Mechanism (ruled 2026-11-06): masking is done in the application, with one SQL login per service. A service gets column-level `GRANT UNMASK` only on the masked columns it must use or reveal; every other login sees SQL Server dynamic data masking. No second unmask login: it would run in the same process with the same secrets, so it would not contain a bug in the service, and it would double the connection setup. Details in [data-model.md](data-model.md#ownership-and-grants). |
 | D-SEC-06 | As proposed (D-07). |
 | D-SEC-07 | New-password rule as in the security table above. |
 | D-28 (catalog) | Payments post like batch postings (user answer): negative amount, POSTTRAN rule, so the amount lands in `curr_cyc_debit` and category balance `02/0002`. With D-19 kept, a payment raises the over-limit figure for later charges in the cycle (DEF-POST-005). |
@@ -28,7 +28,7 @@ The user approved this proposal (D10) and answered the decision catalog (`docs/m
 | D-DATA-02 | `card_xref` owns the card-to-account link; `card.acct_id` follows it (D-13, D-61). |
 | D-DATA-03 | `legacy_filler` kept until cut-over for the differential checks, then dropped. |
 | D-DATA-04 | **Dropped** (ruled 2026-11-06 on the recommended value): no converted function reads the CVV. Card list and card view read it but neither show nor use it, card update keeps the stored value (D-12) and checks concurrency with `If-Match` (D-17), and export and reports never output it (D-10). `cvv_cd` is in no API, DTO, log or export. The column stays, masked, with no login holding `UNMASK` on it, until cut-over; then a migration drops it and the loader field. |
-| D-DATA-05 | **Now**, not after cut-over: one SQL Server sequence `core.tran_id_seq`, 16 digits, no seed record (D-59), switch `BR-TRNA-003`. Legacy mode ("highest + 1" under a lock) stays for parity tests. |
+| D-DATA-05 | **Now**, not after cut-over: one SQL Server sequence `core.tran_id_seq`, 16 digits, no seed record (D-59), switch `BR-TRNA-003`. Legacy mode ("highest + 1" under a lock) stays for parity tests. Generated IDs use the reserved range `9000000000000000` to `9999999999999999`, which daily-file IDs may not use (user approval 2026-11-10, [batch.md](batch.md#transaction-ids-from-the-file-and-from-the-services)). |
 | D-DATA-06 | **Now**: `orig_ts` and `proc_ts` are `DATETIME2(6)`; legacy layouts are produced by the exporter (D-60). |
 | D-DATA-07 | `tran_pk` kept. |
 | D-BAT-01 | Interest monthly on a chosen day (D-24). |
@@ -63,7 +63,7 @@ Answers to the open questions of the table further down:
 | Q-MQAC-002 | `reply_to` (D-73). |
 | Q-ENT-001 | Moved at migration (D-11). |
 | Q-ENT-002 | Surrogate key kept (D-59, D-DATA-07). |
-| Q-USRL-002 | Standard server-side paging and order (D-54): the `ebcdic_sort_key` column stays only for the legacy mode. |
+| Q-USRL-002 | Standard server-side paging and order (D-54). USRL has no switch, so there is no legacy mode: `ebcdic_sort_key` is dropped (`V204`, [identity-service.md](identity-service.md#versions)). |
 | Q-SGN-003, Q-SGN-004 | Lockout and neutral message (D-05). |
 | Q-JTTYP-001 | One reference store (D-63). |
 | Q-JCLOSE-001 | The window covers the same tables, with `WRITES_BLOCKED` (D-BAT-05). |
@@ -100,7 +100,7 @@ The Bill Pay slice applies these values in [billpay-slice.md](billpay-slice.md).
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | D-SEC-01 | Access model | C1: sign-on for every screen and API, roles `ADMIN` and `USER` from the user type, any `USER` works on any account ([api-security.md](api-security.md#the-no-sign-on-defect-inv-006-under-each-choice)) | C2 (linked accounts, extra roles, masking) for production once the business supplies the user-to-account link | D-01, D-02, D-03 (same: sign-on, two roles, staff model for parity) | INV-006, DEF-BILL-009, Q-BILL-004 |
 | D-SEC-02 | Identity provider | Local password check in `identity-service` | An OIDC provider when one exists; only `identity-service` changes | - | - |
-| D-SEC-03 | Password storage and case | bcrypt hash of the upper-cased password; user IDs and passwords case-insensitive, as today | Case-sensitive passwords with a forced reset at migration | D-04 (same) | DEF-SGN-001, INV-007, BR-SGN-001 |
+| D-SEC-03 | Password storage and case | Salted hash of the upper-cased password (Argon2id for new hashes, bcrypt still verified); user IDs and passwords case-insensitive, as today | Case-sensitive passwords with a forced reset at migration | D-04 (same) | DEF-SGN-001, INV-007, BR-SGN-001 |
 | D-SEC-04 | Lockout, rate limit, failure message | Off; the two legacy messages stay | On, with a neutral message | D-05 (same) | Q-SGN-003, Q-SGN-004 |
 | D-SEC-05 | PII on screens | Shown as today, every view audited | Masked unless the user holds `PII_VIEWER` | D-09 (same) | DEF-ACVW-010, DEF-CRDL-002 |
 | D-SEC-07 | New-password rule | Legacy mode: 1 to 8 characters, upper-cased before hashing, different from the current one | Fixed mode (with D-04): 8 to 64 characters, case-sensitive, any printable character, different from the current one, not the user ID; the user-admin screens use the same rule ([billpay-slice.md](billpay-slice.md#new-password-rules-d-sec-07)) | D-04, D-53 (decided: fixed) | DEF-SGN-011 |
@@ -130,7 +130,7 @@ The Bill Pay slice applies these values in [billpay-slice.md](billpay-slice.md).
 | D-BAT-06 | Failure policy | Stop the chain, keep the window open, alert; no automatic retry of a business step | same | D-57 (same) | ERR-JCA7-001, DEF-JAUPG-003 |
 | D-BAT-07 | Batch transaction type maintenance (MNTTRDB2) | Built only if a producer of its input file is named; otherwise types are kept online only | same | D-66 (same) | Q-TTBU-003 |
 | D-BAT-08 | Master-data reloads | Seed load for new environments only; `carddemo_data_load` refuses to run on non-empty tables outside a local environment | same | D-41 (same) | Q-JACCT-001, DEF-JTCAT-002 |
-| D-BAT-09 | Export and import jobs | Not built until a receiver of the file is named | same | D-62 (same) | Q-JEXPT-001, Q-JIMPT-001 |
+| D-BAT-09 | Export and import jobs | Built as D-62's replacement: a database export and load with counts and validation, since no receiver of the legacy file is named ([batch.md](batch.md#export-and-import-ruled-2026-11-11), corrected 2026-11-11) | same | D-62 (same) | Q-JEXPT-001, Q-JIMPT-001 |
 | D-BAT-10 | Double posting and double interest | Refused: a completed cycle is a completed job instance | same | D-23 (same) | DEF-INTC-005 |
 
 On D-BAT-05: the catalog recommends no window, with snapshot reads and optimistic locking. This proposal keeps blocking writes for the first release, for two reasons. Posting's over-limit check reads cycle totals that earlier records changed (BR-POST-007), so online writes during the run would make the result depend on timing. And the differential and cycle checks need a stable input. `NONE` becomes safe once account update can no longer edit balances (catalog D-08) and online transactions and payments go through posting (catalog D-27, D-28).
@@ -176,11 +176,11 @@ On D-BAT-05: the catalog recommends no window, with snapshot reads and optimisti
 | Q-TRNA-001 | An online transaction is only inserted | Online adds feed posting: `transaction-service` writes to the posting input instead (catalog D-27). |
 | Q-BILL-004 | Any user may pay any account (C1) | Ownership check: table `iam.user_account` and a data feed for it (C2). |
 | Q-JINTC-002, Q-JCTLM-002 | Interest every cycle | The `interest_due` branch and its calendar. |
-| Q-JSTMT-001 | Statements every cycle | The statement task moves to the statement-period branch. |
+| Q-JSTMT-001 | Decided (D-38): once per statement period, on the interest day | Built: the statement task runs on the statement-period branch. |
 | Q-JCA7-003 | Purge after the cycle | The purge task moves before posting (`purge_position`). |
 | Q-JGDGB-001, Q-JREPT-001 | Five generations | The retention task and the run-folder clean-up. |
-| Q-JEXPT-001, Q-JIMPT-001 | No file receiver | Two jobs and two DAGs are built. |
-| Q-JPDF-001 | No PDF | The PDF writer of `statementJob` and its layout. |
+| Q-JEXPT-001, Q-JIMPT-001 | No file receiver: the D-62 replacement is built ([batch.md](batch.md#export-and-import-ruled-2026-11-11)) | A named receiver would fix the file format to its contract. |
+| Q-JPDF-001 | Decided (D-45): one PDF per account statement from a template, no HTML in fixed mode | Built: the PDF renderer of `statementJob` and its layout ([batch.md](batch.md#statements-statementjob-ruled-2026-11-11)). |
 | Q-AUTH-005 | At most once | The outbox and processed-message tables. |
 | Q-AUTH-004 | Unparsable request dead-lettered | A decline reply path. |
 | Q-MQAC-002 | Fixed reply queues | Reply routing by `reply_to`, and per-requester reply queues. |

@@ -7,7 +7,7 @@ unit_code: JFTP
 source_rev: 8a8a80a
 sources:
   - {path: app/jcl/FTPJCL.JCL, sha256: f8460de177d9, role: job}
-  - {path: docs/security/secrets.md, sha256: 0c6dc2bd12ef, role: security, lines: "63-101"}
+  - {path: docs/security/secrets.md, sha256: 0c4e6269523e, role: security, lines: "63-101"}
   - {path: docs/security/data-handling.md, sha256: 560a2e2a86e9, role: security, lines: "147-154"}
   - {path: README.md, sha256: 952958322286, role: runbook, lines: "57"}
 entry_points: [{type: manual, job: FTPJCLS}]

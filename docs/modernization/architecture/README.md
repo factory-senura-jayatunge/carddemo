@@ -11,7 +11,7 @@ The proposal is derived **only** from these inputs. No COBOL, copybook, BMS, JCL
 - The natural-language specification in `docs/modernization/spec/` on branch `modernization` at commit `72c47cc`: program specs, job, procedure, CSD and schedule specs (`jobs/`, including `jobs/README.md` with the batch-cycle options), `entities.md`, `components.md`, `interactions.md`, `areas/`, `evidence/` and `checks/README.md`. The area G job specs in it were merged from `nl/G` at `d0e7f1a`, after their review.
 - `modernization/README.md`, `modernization/Makefile` and `modernization/docker-compose.yml`.
 
-[decisions.md](decisions.md) also names the matching entries (D-01 to D-75) of the workstream's user decision catalog, which is itself derived from the spec, so the two lists can be answered together.
+[decisions.md](decisions.md) also names the matching entries (D-01 to D-75) of the user decision catalog, which is itself derived from the spec, so the two lists can be answered together.
 
 ## Documents
 
@@ -21,6 +21,7 @@ The proposal is derived **only** from these inputs. No COBOL, copybook, BMS, JCL
 | [overview.md](overview.md) | Principles, bounded contexts, context diagram, services, the Bill Pay first slice, phasing. |
 | [mapping.md](mapping.md) | Every program and job spec (100) and where it goes: service, endpoint, route, batch step, DAG task, queue, or "dropped" with the reason. |
 | [data-model.md](data-model.md) | SQL Server schemas and tables, keys, how VSAM keys, alternate indexes, Db2 and IMS map, numeric and text types, FILLER and layout quirks, sample-data migration and reconciliation. |
+| [data-load-mapping.md](data-load-mapping.md) | Appendix to the data model: every loaded field's column, type, transform and default, the load steps' counters and context keys, the built-in account layout manifest, and the known differences of the build. |
 | [api-security.md](api-security.md) | REST API sketch per service, error model, users and roles, authentication, the no-sign-on defect (INV-006) under each choice. |
 | [web.md](web.md) | React routes per screen, navigation, menu mapping, how 3270 keys and messages carry over. |
 | [batch.md](batch.md) | Spring Batch jobs per JCL job and step, Airflow DAGs, the batch-cycle option, restart, idempotency, files versus tables, report reproduction. |
@@ -31,6 +32,12 @@ The proposal is derived **only** from these inputs. No COBOL, copybook, BMS, JCL
 | [switches.md](switches.md) | The authoritative list of fidelity switches under the targeted policy, with the reason for each and the items that are fixed-only. |
 | [batch-execution-contract.md](batch-execution-contract.md) | The approved contract between Airflow and `batch-service`: cycles, job launch and poll, run identity, execution leases, fencing and recovery, operator rules, the batch window. |
 | [d33-matching-brief.md](d33-matching-brief.md) | Decided rule for releasing pending authorizations "when matched" (D-33): conditions, schema, grants, batch steps and tests. |
+| [account-service.md](account-service.md) | Architect rulings on the account-service contract (account view and update, card list, view and update): access, audit, texts, dates, paging, concurrency and the ledger entries they need. |
+| [transaction-service.md](transaction-service.md) | Architect rulings on the transaction-service contract: the transaction card number reveal for `ADMIN`, list and key rules, the add's check order, processing date and idempotency, report runs during a window, and the ledger entries. |
+| [authorization-service.md](authorization-service.md) | Architect rulings on the authorization-service contract: request parsing, decline order, reply forms, outbox delivery, summary column widths, fraud marking and purge concurrency. |
+| [identity-service.md](identity-service.md) | Architect rulings on user administration (list, add, update, delete): ID normalisation, password rule and forced change, the last administrator, logical delete, list order and search, message codes. |
+| [inquiry-service.md](inquiry-service.md) | Architect rulings on the inquiry-service contract (account and date inquiry over RabbitMQ): failed requests, error records and the D-74 error reply, duplicate replies, account correlation, non-numeric keys, order and timeouts. |
+| [reference-service.md](reference-service.md) | Architect rulings on the reference-service contract (transaction type list and maintenance): deferred lookup reads, the zero type code, the delete text naming categories, one text per outcome, the description column type and the feature flag. |
 | [billpay-slice.md](billpay-slice.md) | The build contract for the first slice (sign-on, main menu, Bill Pay): modules, Flyway ranges, tables, endpoints, tokens, switches, scenarios in both modes, and when each make target is done. |
 
 ## Terms
