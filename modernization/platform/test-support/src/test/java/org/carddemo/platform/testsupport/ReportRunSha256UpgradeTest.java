@@ -98,9 +98,9 @@ class ReportRunSha256UpgradeTest {
                             WHERE report_run_id = :id AND status = 'COMPLETED' AND output_sha256 IS NULL""")
                     .param("id", old).query(Integer.class).single()).isOne();
 
-            assertThatThrownBy(() -> jdbc.sql("UPDATE batch.report_run SET finished_at = SYSUTCDATETIME()"
-                    + " WHERE report_run_id = :id").param("id", old).update())
-                    .as("a changed old row is checked like a new one")
+            assertThatThrownBy(() -> jdbc.sql("UPDATE batch.report_run SET status = 'COMPLETED',"
+                    + " finished_at = SYSUTCDATETIME() WHERE report_run_id = :id").param("id", old).update())
+                    .as("an old row that an update completes again, as a producer does, is checked like a new one")
                     .hasMessageContaining("CK_report_run_completed_sha256");
             assertThatThrownBy(() -> jdbc.sql("""
                     INSERT INTO batch.report_run (report_type, start_date, end_date, requested_by, job_execution_id,
@@ -110,6 +110,17 @@ class ReportRunSha256UpgradeTest {
                     .hasMessageContaining("CK_report_run_completed_sha256");
             assertThat(jdbc.sql("SELECT row_version FROM batch.report_run WHERE report_run_id = :id").param("id", old)
                     .query(byte[].class).single()).isEqualTo((byte[]) before.get("row_version"));
+
+            // SQL Server checks a CHECK constraint on UPDATE only when the statement sets a column the
+            // constraint names, so an update of other columns is not checked and the old row keeps
+            // its missing hash.
+            assertThat(jdbc.sql("UPDATE batch.report_run SET finished_at = SYSUTCDATETIME() WHERE report_run_id = :id")
+                    .param("id", old).update()).as("an update outside status and output_sha256 is not checked")
+                    .isOne();
+            assertThat(jdbc.sql("""
+                            SELECT COUNT(*) FROM batch.report_run
+                            WHERE report_run_id = :id AND status = 'COMPLETED' AND output_sha256 IS NULL""")
+                    .param("id", old).query(Integer.class).single()).isOne();
         } finally {
             try (Stream<Path> files = Files.walk(versioned)) {
                 files.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
