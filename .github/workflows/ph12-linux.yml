@@ -26,9 +26,9 @@ env:
 jobs:
   ph12:
     runs-on: ubuntu-24.04
-    # The sum of the step limits below (113 min) plus 12 min for the runner's own set-up and post steps,
+    # The sum of the step limits below (119 min) plus 12 min for the runner's own set-up and post steps,
     # so that a hang always ends at a step limit and the gate, upload and verdict still run.
-    timeout-minutes: 125
+    timeout-minutes: 131
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 5
@@ -642,7 +642,12 @@ jobs:
             <mirrors><mirror><id>central-only</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>
           </settings>
           XML
-          printf '%s\n' '<settings><offline>true</offline></settings>' > "$PH12/settings-offline.xml"
+          cat > "$PH12/settings-offline.xml" <<'XML'
+          <settings>
+            <offline>true</offline>
+            <mirrors><mirror><id>central-only</id><mirrorOf>*</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>
+          </settings>
+          XML
       # ---- bounded online prepare: fresh private repository and wrapper home, no cache ----
       - name: Populate (online, strict checksums; compiles, runs no test)
         timeout-minutes: 16
@@ -657,7 +662,7 @@ jobs:
             > "$PH12/prepare.log" 2>&1 < /dev/null || rc=$?
           echo "$rc" > "$PH12/prepare.rc"
       - name: Seed the Surefire JUnit Platform provider (online, strict checksums, pinned versions)
-        timeout-minutes: 6
+        timeout-minutes: 12
         working-directory: modernization
         run: |
           T() { /usr/bin/python3 -I -c 'import json, os, sys; print(json.loads(os.environ["PH12_TOOLCHAIN"])[sys.argv[1]])' "$1"; }
@@ -669,6 +674,11 @@ jobs:
             "org.apache.maven.plugins:maven-dependency-plugin:$(T dependency_plugin):get" \
             "-Dartifact=org.apache.maven.surefire:surefire-junit-platform:$(T surefire)" -Dtransitive=true \
             > "$PH12/seed.log" 2>&1 < /dev/null || rc=$?
+          "${E[@]}" /usr/bin/timeout -k 10 300 ./mvnw -C -B -ntp -N -Dstyle.color=never \
+            -s "$PH12/settings.xml" -gs "$PH12/settings.xml" -Dmaven.repo.local="$PH12/m2" \
+            "org.apache.maven.plugins:maven-dependency-plugin:$(T dependency_plugin):get" \
+            "-Dartifact=org.junit.platform:junit-platform-launcher:$(T junit_platform)" -Dtransitive=true \
+            >> "$PH12/seed.log" 2>&1 < /dev/null || rc=$?
           echo "$rc" > "$PH12/seed.rc"
       - name: Typed prepare summary (no raw log in the job log)
         timeout-minutes: 5
