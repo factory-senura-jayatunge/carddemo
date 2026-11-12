@@ -412,7 +412,7 @@ class Harness:
     def pause(self, execution):
         """SIGSTOP the server's own JVM for less than TTL + grace (4 s)."""
         pid = self.proc.pid
-        command = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
+        command = stack.command_line(pid)
         if "batch-service" not in command or self.proc.poll() is not None:
             raise Failed(f"pid {pid} is not this run's server; not stopping it")
         os.kill(pid, signal.SIGSTOP)

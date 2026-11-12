@@ -470,6 +470,16 @@ def read_pid_marker(name):
         return None, ""
 
 
+def command_line(pid) -> str:
+    """pid's whole command line as ps prints it; "" when there is no such process.
+
+    -ww: procps ps on Linux cuts the command column to $COLUMNS even when it
+    writes to a pipe, which can cut off the marker. Twice -w lifts that limit
+    there, and macOS ps accepts it too."""
+    return subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)],
+                          capture_output=True, text=True).stdout
+
+
 def alive(pid, marker) -> bool:
     """True when pid runs and its command line still names our component, so
     a reused PID is never mistaken for (or killed as) a stack process."""
@@ -481,8 +491,7 @@ def alive(pid, marker) -> bool:
         return False
     except PermissionError:
         return False
-    out = subprocess.run(["ps", "-o", "command=", "-p", str(pid)],
-                         capture_output=True, text=True).stdout
+    out = command_line(pid)
     if marker in out:
         return True
     # npm starts vite as a child; the leader is "npm run dev".

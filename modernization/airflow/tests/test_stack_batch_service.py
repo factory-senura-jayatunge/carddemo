@@ -127,7 +127,8 @@ def test_stop_signals_the_recorded_process_itself(monkeypatch, tmp_path):
         while not (tmp_path / "ready").exists() and time.time() < deadline:
             time.sleep(0.05)
         assert (tmp_path / "ready").read_text() == str(pid)
-        command = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
+        command = subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)], capture_output=True,
+                                 text=True).stdout
         assert os.path.basename(command.split()[0]) not in ("sh", "bash", "zsh", "dash")
         assert str(script) in command and " -c " not in command
         # Its own session: the group that stop signals is led by this pid.
@@ -140,3 +141,24 @@ def test_stop_signals_the_recorded_process_itself(monkeypatch, tmp_path):
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+
+
+def test_a_long_command_line_is_read_whole_when_columns_is_narrow(monkeypatch, tmp_path):
+    # procps ps on Linux cuts its command column to $COLUMNS, even into a pipe.
+    stack = load_stack(monkeypatch, tmp_path)
+    folder = tmp_path / ("d" * 90)
+    folder.mkdir()
+    script = folder / "fake_batch_server.py"
+    script.write_text(FAKE_SERVER, encoding="utf-8")
+    monkeypatch.setenv("COLUMNS", "80")
+    proc = subprocess.Popen([sys.executable, str(script), str(tmp_path)])
+    try:
+        deadline = time.time() + 20
+        while not (tmp_path / "ready").exists() and time.time() < deadline:
+            time.sleep(0.05)
+        assert (tmp_path / "ready").read_text() == str(proc.pid)
+        assert str(script) in stack.command_line(proc.pid)
+        assert stack.alive(proc.pid, str(script))
+    finally:
+        proc.kill()
+        proc.wait()
