@@ -10,8 +10,10 @@
 # running its checks.
 #
 # No secrets: every job runs `make setup`, which generates throwaway
-# passwords and keys. The tests use Testcontainers (CARDDEMO_TEST_MSSQL_URL
-# stays empty, as in .env.example).
+# passwords and keys. The tests' SQL Server is Testcontainers
+# (CARDDEMO_TEST_MSSQL_URL stays empty, as in .env.example). The backend
+# job also starts the compose infrastructure (make infra-up), because the
+# authorization-service broker tests use the compose RabbitMQ (ruling B4).
 name: Modernization
 
 on:
@@ -144,6 +146,8 @@ jobs:
           node-version-file: modernization/.nvmrc
       - name: make setup
         run: make -C modernization setup
+      - name: make infra-up (compose RabbitMQ for the authorization-service broker tests)
+        run: make -C modernization infra-up
       - name: make test-backend (unit, Testcontainers integration, contract, ArchUnit; both fidelity modes)
         run: make -C modernization test-backend
       - name: Upload test results
