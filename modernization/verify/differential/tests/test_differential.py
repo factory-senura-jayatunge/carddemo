@@ -456,6 +456,15 @@ class DifferentialTest(unittest.TestCase):
         self.assertEqual(d.expected("TRANREPT", d.Mode("legacy", frozenset()), self.tmp, refs["POSTTRAN"],
                                     refs["POSTTRAN"], self.tmp / "x", manifest=None), refs["POSTTRAN"])
 
+    def test_the_statement_switch_changes_only_creastmt_and_has_no_rule_yet(self):
+        refs = write_refs(self.tmp / "refs")
+        self.assertEqual(d.EFFECTS["DEF-STMT-005"], {"CREASTMT"})
+        with self.assertRaisesRegex(d.ExpectationError, "CREASTMT: no expectation"):
+            d.expected("CREASTMT", d.Mode("t", frozenset({"DEF-STMT-005"})), self.tmp, refs["POSTTRAN"],
+                       refs["POSTTRAN"], self.tmp / "x", manifest=None)
+        self.assertEqual(d.expected("CREASTMT", d.Mode("legacy", frozenset()), self.tmp, refs["POSTTRAN"],
+                                    refs["POSTTRAN"], self.tmp / "x", manifest=None), refs["POSTTRAN"])
+
     # DEF-ACUP-002 (ruling v4) ----------------------------------------------
     @staticmethod
     def account(i: int, bal: str = "00000100000{", zip_: str = " " * 10, grp: str = " " * 10) -> str:

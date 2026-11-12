@@ -622,6 +622,9 @@ EFFECTS: dict[str, frozenset[str]] = {
     # expected() has no TRANREPT rule yet, so a fixed mode of either fails the job.
     "DEF-TRPT-001": frozenset({"TRANREPT"}),
     "DEF-TRPT-004": frozenset({"TRANREPT"}),
+    # CREASTMT's statements: fixed mode writes one PDF per account and period instead of
+    # STATEMNT.txt and STATEMNT.html (D-43). expected() has no CREASTMT rule, so it fails the job.
+    "DEF-STMT-005": frozenset({"CREASTMT"}),
 }
 
 
