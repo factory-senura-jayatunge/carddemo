@@ -32,7 +32,8 @@ record ExportOptions(Path exportDir, Job job, long cycleId, FidelityMode groupId
             + " --fidelity " + BatchSwitches.DEF_ACUP_002.itemId() + "=legacy|fixed [--output-dir DIR]\n"
             + "       verify-differential --export DIR --job POSTTRAN|INTCALC --cycle-id N --load-execution-id L"
             + " [--output-dir DIR]\n"
-            + "       verify-differential --load-report N";
+            + "       verify-differential --load-report N\n"
+            + RefusalOptions.USAGE;
 
     private static final java.util.regex.Pattern CANONICAL_ID = java.util.regex.Pattern.compile("0|[1-9][0-9]*");
 

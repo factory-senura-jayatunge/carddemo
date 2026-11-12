@@ -28,18 +28,25 @@ import org.springframework.transaction.TransactionException;
  * <p>{@code --load-report N} prints the {@link LoadReport} of {@code dataLoadJob} execution N as
  * one JSON object on stdout and nothing else: exit 0 when printed, 1 when N is not a valid,
  * completed, last load or the database cannot be read, 2 for a bad command line or settings.
+ *
+ * <p>{@code --refusal} selects {@link RefusalMode}, which reads the arguments alone and has its own
+ * closed set of failure lines; none of the handlers here sees it.
  */
 public final class ExportBatch {
 
     /** batch-service's {@code spring.batch.jdbc.table-prefix} (V401). */
     static final String TABLE_PREFIX = "batch.BATCH_";
 
-    private static final int BAD_SETTINGS = 2;
+    static final int BAD_SETTINGS = 2;
 
     private ExportBatch() {
     }
 
     public static void main(String[] args) {
+        if (RefusalOptions.requested(args)) {
+            System.exit(RefusalMode.main(args));
+            return;
+        }
         ExportOptions options;
         OptionalLong loadReport;
         try {
@@ -86,7 +93,7 @@ public final class ExportBatch {
     }
 
     /** @return the admin data source, or {@code null} after one stderr line when the settings are missing or invalid */
-    private static SQLServerDataSource dataSource() {
+    static SQLServerDataSource dataSource() {
         DbSettings settings;
         try {
             settings = DbSettings.fromEnvironment(System::getenv);

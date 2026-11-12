@@ -34,7 +34,7 @@ final class CycleJobs {
         this.label = "cycle " + cycleId + " attempt " + attempt;
     }
 
-    private static JobParameters identity(long cycleId, LocalDate businessDate, int attempt) {
+    static JobParameters identity(long cycleId, LocalDate businessDate, int attempt) {
         return new JobParametersBuilder().addLong("cycleId", cycleId, true)
                 .addLocalDate("businessDate", businessDate, true).addLong("attempt", (long) attempt, true)
                 .toJobParameters();

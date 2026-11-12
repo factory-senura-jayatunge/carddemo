@@ -91,7 +91,35 @@ class ExportBatchStdoutTest {
     private static final String[][] EVERY_MODE = {
             {"--load-report", "1"},
             {"--export", "unused", "--job", "POSTTRAN", "--cycle-id", "1", "--fidelity", "DEF-ACUP-002=legacy"},
-            {"--export", "unused", "--job", "INTCALC", "--cycle-id", "1", "--load-execution-id", "1"}};
+            {"--export", "unused", "--job", "INTCALC", "--cycle-id", "1", "--load-execution-id", "1"},
+            {"--refusal", "--job", "CREASTMT", "--cycle-id", "1", "--load-execution-id", "0", "--job-execution-id", "1",
+                "--output-dir", "unused"}};
+
+    private static final String[] REFUSAL = EVERY_MODE[3];
+
+    /**
+     * The refusal mode through the exporter's real entry point: a database it cannot reach is one of
+     * its own codes, with nothing on stdout, no message of the driver's error and no destination.
+     */
+    @Test
+    void theRefusalModeThatCannotReadTheDatabasePrintsOnlyItsFailedLine() throws Exception {
+        Run run = run(deadDatabase(), ExportBatch.class.getName(), REFUSAL);
+
+        assertThat(run.exit()).isEqualTo(1);
+        assertThat(run.stdout()).isEmpty();
+        assertThat(run.stderrLines()).containsExactly("verify-differential: FAILED database-read-failed");
+    }
+
+    @Test
+    void theRefusalModesUsageErrorIsExitTwo() throws Exception {
+        String[] bad = REFUSAL.clone();
+        bad[4] = "0";
+        Run run = run(deadDatabase(), ExportBatch.class.getName(), bad);
+
+        assertThat(run.exit()).isEqualTo(2);
+        assertThat(run.stdout()).isEmpty();
+        assertThat(run.stderrLines()).first().asString().isEqualTo("verify-differential: --cycle-id must be at least 1");
+    }
 
     @Test
     void everyModeWithoutTheSettingsExitsTwoWithOneLineOnStderr() throws Exception {
