@@ -3,7 +3,13 @@ package org.carddemo.platform.testsupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.carddemo.db.CarddemoMigrations;
 import org.carddemo.db.DatabaseProvisioner;
@@ -33,13 +39,22 @@ class ReportRunSha256UpgradeTest {
         DatabaseProvisioner provisioner = new DatabaseProvisioner(settings);
         provisioner.recreateDatabase();
         provisioner.provisionLogins();
+        Path versioned = Files.createTempDirectory("report-run-before-v424");
         try {
             DataSource admin = provisioner.databaseAdmin();
-            Flyway.configure().configuration(CarddemoMigrations.flyway(admin).getConfiguration()).target("421").load()
-                    .migrate();
+            // Flyway runs every repeatable on each migrate whatever the target, and the grants name
+            // objects that only later versions create (output_sha256 from V424, pauth from V500). So
+            // the step to V421 runs the versioned files alone; the last migrate runs the repeatables
+            // after every versioned migration, as on an upgraded database.
+            List<String> repeatables = copyVersionedMigrations(versioned);
+            assertThat(repeatables).isNotEmpty();
+            Flyway.configure().configuration(CarddemoMigrations.flyway(admin).getConfiguration())
+                    .locations("filesystem:" + versioned).target("421").load().migrate();
             JdbcClient jdbc = JdbcClient.create(admin);
             assertThat(jdbc.sql("SELECT COL_LENGTH('batch.report_run', 'output_sha256')").query(Integer.class)
                     .optional()).isEmpty();
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM flyway_schema_history WHERE version IS NULL")
+                    .query(Integer.class).single()).as("no repeatable before V424").isZero();
 
             jdbc.sql("INSERT INTO batch.BATCH_JOB_INSTANCE (JOB_INSTANCE_ID, VERSION, JOB_NAME, JOB_KEY) "
                     + "VALUES (:e, 0, 'reportUpgradeTest', 'reportUpgradeTest')").param("e", EXECUTION).update();
@@ -60,6 +75,9 @@ class ReportRunSha256UpgradeTest {
 
             assertThat(jdbc.sql("SELECT success FROM flyway_schema_history WHERE version = '424'")
                     .query(Boolean.class).single()).isTrue();
+            assertThat(jdbc.sql("SELECT script FROM flyway_schema_history WHERE version IS NULL AND success = 1")
+                    .query(String.class).list()).as("every repeatable after the upgrade")
+                    .containsExactlyInAnyOrderElementsOf(repeatables);
             Map<String, Object> after = jdbc.sql("""
                     SELECT status, started_at, finished_at, failure_code, row_version
                     FROM batch.report_run WHERE report_run_id = :id""").param("id", old).query().singleRow();
@@ -93,7 +111,34 @@ class ReportRunSha256UpgradeTest {
             assertThat(jdbc.sql("SELECT row_version FROM batch.report_run WHERE report_run_id = :id").param("id", old)
                     .query(byte[].class).single()).isEqualTo((byte[]) before.get("row_version"));
         } finally {
-            PauthSummaryUpgradeTest.drop(provisioner, settings);
+            try (Stream<Path> files = Files.walk(versioned)) {
+                files.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            } finally {
+                PauthSummaryUpgradeTest.drop(provisioner, settings);
+            }
+        }
+    }
+
+    /**
+     * Copies the versioned files of modernization/db/migrations, found from the module directory,
+     * into {@code target}, and returns the names of the repeatable files left out.
+     */
+    private static List<String> copyVersionedMigrations(Path target) throws IOException {
+        Path dir = Path.of("").toAbsolutePath();
+        while (dir != null && !Files.isDirectory(dir.resolve("db/migrations"))) {
+            dir = dir.getParent();
+        }
+        if (dir == null) {
+            throw new IllegalStateException("db/migrations not found above " + Path.of("").toAbsolutePath());
+        }
+        try (Stream<Path> files = Files.list(dir.resolve("db/migrations"))) {
+            List<Path> sql = files.filter(f -> f.getFileName().toString().endsWith(".sql")).toList();
+            for (Path f : sql) {
+                if (f.getFileName().toString().startsWith("V")) {
+                    Files.copy(f, target.resolve(f.getFileName()));
+                }
+            }
+            return sql.stream().map(f -> f.getFileName().toString()).filter(n -> n.startsWith("R__")).toList();
         }
     }
 }
