@@ -54,7 +54,8 @@ jobs:
       billpay: ${{ steps.plan.outputs.billpay }}
       web: ${{ steps.plan.outputs.web }}
       airflow: ${{ steps.plan.outputs.airflow }}
-      batch: ${{ steps.plan.outputs.batch }}
+      batch: ${{ steps.batch.outputs.batch }}
+      batchlive: ${{ steps.plan.outputs.batchlive }}
       data: ${{ steps.plan.outputs.data }}
       e2e: ${{ steps.plan.outputs.e2e }}
       cycle: ${{ steps.plan.outputs.cycle }}
@@ -90,11 +91,17 @@ jobs:
           job billpay load test-billpay
           job web web-build
           job airflow test-airflow
-          job batch verify-harness verify-batch
+          job batchlive test-batch-live
           job data db-reset load up verify-data
           job e2e load test-e2e
           job cycle db-reset load up verify-cycle
           job ledger verify-ledger trace
+      # verify-batch is no stub: it fails until every required job has its
+      # Spring Batch producer. The batch job runs only once that is so; until
+      # then the summary row names the jobs that lack one.
+      - name: Decide whether verify-batch can pass (a Spring Batch producer for every required job)
+        id: batch
+        run: python3 modernization/verify/differential/verify_batch.py --plan --github-output batch
 
   spec:
     name: spec
@@ -291,6 +298,32 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  harness:
+    name: batch-harness
+    needs: spec
+    # Also when spec failed: the comparison step is checked on its own.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the dev container image (GnuCOBOL 3.2)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          tags: carddemo-dev:ci
+          load: true
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+      - name: make verify-harness (seeded differences of real GnuCOBOL outputs must be reported)
+        run: tools/ci-run.sh make -C modernization verify-harness
+      - name: Unit tests of the differential harness (verify/differential/tests)
+        run: tools/ci-run.sh python3 -m unittest discover -s modernization/verify/differential/tests
+      - name: Unit tests of the validator adapter (verify/adapter/tests)
+        run: tools/ci-run.sh python3 -m unittest discover -s modernization/verify/adapter/tests -t .
+
   batch:
     name: batch
     needs: [plan, spec]
@@ -319,8 +352,8 @@ jobs:
           cache-dependency-path: modernization/**/pom.xml
       - name: make setup
         run: make -C modernization setup
-      - name: make verify-harness verify-batch (Spring Batch against GnuCOBOL, sample and stress data)
-        run: make -C modernization verify-harness verify-batch
+      - name: make verify-batch (Spring Batch against GnuCOBOL, every required job, sample and stress data)
+        run: make -C modernization verify-batch
       - name: Upload results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -328,6 +361,36 @@ jobs:
           name: test-results-batch
           path: modernization/build/test-results/
           if-no-files-found: error
+          retention-days: 14
+
+  batchlive:
+    name: batch-live
+    needs: plan
+    if: ${{ needs.plan.outputs.batchlive == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARDDEMO_SETUP_SKIP: node airflow
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version-file: modernization/.java-version
+          cache: maven
+          cache-dependency-path: modernization/**/pom.xml
+      - name: make setup
+        run: make -C modernization setup
+      # Linux runner, so the lease pause (SIGSTOP of the server's JVM) runs too.
+      - name: make test-batch-live SIGSTOP=1 (batch-service's internal API on its own database and port)
+        run: make -C modernization test-batch-live SIGSTOP=1
+      - name: Upload the server log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-batchlive
+          path: modernization/var/log/
+          if-no-files-found: warn
           retention-days: 14
 
   data:
@@ -488,7 +551,7 @@ jobs:
 
   ledger:
     name: ledger
-    needs: [plan, spec, backend, billpay, web, airflow, batch, data, e2e]
+    needs: [plan, spec, backend, billpay, web, airflow, harness, batch, data, e2e]
     # Runs after every other job that ran, also when one failed, so the
     # matrix shows which items lost their passing test.
     if: ${{ !cancelled() && needs.plan.outputs.ledger == 'true' }}
