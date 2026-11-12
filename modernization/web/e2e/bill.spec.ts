@@ -9,6 +9,7 @@ import {
   expectNoMessage,
   expectReadOnly,
   mode,
+  signOn,
   signOnAsUser,
   target,
   test,
@@ -93,6 +94,22 @@ test('@FLOW-BILL-001 BILL-S1: without a session the page and both APIs refuse', 
   });
   expect(pay.status).toBe(401);
   expect(pay.body?.code).toBe('UNAUTHENTICATED');
+});
+
+test('@BR-MENU-003 BILL-S20: an ADMIN session is refused by both APIs and the page sends it to the admin menu', async ({ page }) => {
+  await signOn(page, 'ADMIN001');
+  await expect(page).toHaveURL(/\/admin$/);
+  const read = await callApi(page, 'GET', '/api/billpay/accounts/00000000001');
+  expect(read.status).toBe(403);
+  expect(read.body?.code).toBe('ACCESS_DENIED');
+  const pay = await callApi(page, 'POST', '/api/billpay/accounts/00000000001/payments', {
+    body: { confirm: 'Y' },
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+  });
+  expect(pay.status).toBe(403);
+  expect(pay.body?.code).toBe('ACCESS_DENIED');
+  await page.goto('/bill-pay');
+  await expect(page).toHaveURL(/\/admin$/);
 });
 
 test('@FLOW-BILL-002 @FLOW-BILL-009 BILL-S2: menu option 10 opens an empty form with focus on Account ID', async ({ page }) => {

@@ -1,0 +1,226 @@
+.sections {
+  display: grid;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.section {
+  padding-top: 18px;
+  border-top: 1px solid var(--cd-border);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 14px;
+  font-size: var(--mantine-font-size-md);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.titleNote {
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 24px;
+  margin-bottom: 16px;
+}
+
+.row > * {
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+}
+
+.field:has(.grow) {
+  flex: 1 1 220px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  display: block;
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  color: var(--cd-text);
+}
+
+.parts {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.part {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.part label {
+  font-size: var(--mantine-font-size-xs);
+  color: var(--cd-text-muted);
+  font-weight: 500;
+}
+
+.sep {
+  padding-top: 31px;
+  color: var(--cd-text-muted);
+}
+
+.hint {
+  margin-top: 4px;
+  font-size: var(--mantine-font-size-xs);
+  color: var(--cd-text-muted);
+}
+
+.masked {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.maskedValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px dashed var(--cd-border-strong);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--cd-surface-sunken);
+  letter-spacing: 0.04em;
+}
+
+.maskedAction {
+  margin-bottom: 4px;
+}
+
+.fact {
+  margin: 0;
+}
+
+/* A read-only value in a row of inputs sits level with the inputs, not with their labels. */
+.inlineFact {
+  align-self: flex-end;
+}
+
+.inlineFact dd {
+  display: flex;
+  align-items: center;
+  min-height: var(--input-height-sm, 36px);
+}
+
+.fact dt {
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 560;
+  margin-bottom: 3px;
+}
+
+.fact dd {
+  margin: 0;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.balances {
+  padding: 14px 16px;
+  border-radius: var(--mantine-radius-md);
+  background: var(--cd-surface-sunken);
+}
+
+[data-moved] {
+  position: relative;
+}
+
+[data-moved]::before {
+  content: '';
+  position: absolute;
+  inset: -4px auto -4px -10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--mantine-color-amber-6);
+}
+
+.moved {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-amber-8);
+  font-weight: 560;
+}
+
+.empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--cd-border-strong);
+  border-radius: var(--mantine-radius-md);
+  background: var(--cd-surface-sunken);
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-sm);
+}
+
+/* The same for the sticky action bar; it wraps to two rows on narrow screens. */
+:global(html):has(.actionBar) {
+  scroll-padding-bottom: 120px;
+}
+
+.actionBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px -24px -22px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--cd-border);
+  border-radius: 0 0 var(--mantine-radius-lg) var(--mantine-radius-lg);
+  background: color-mix(in srgb, var(--cd-surface-card) 94%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.actionBar .infoLine,
+.actionBar > p {
+  margin: 0;
+}
+
+.actionBar[data-stage='confirm'] {
+  background: var(--cd-surface-sunken);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 52em) {
+  .actionBar {
+    margin: 18px -18px -18px;
+    padding: 12px 18px;
+  }
+}

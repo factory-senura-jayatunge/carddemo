@@ -11,39 +11,47 @@ import { useFeatures } from '@/session/features';
 import { useSession, useUser } from '@/session/SessionProvider';
 import { parseMenuOption } from '@/validation/rules';
 import classes from './MenuPage.module.css';
+import type { UserListState } from './UserParts';
 
 type OptionStatus = 'available' | 'coming-soon' | 'not-installed';
 
-interface MenuOption {
+export interface MenuOption {
   number: number;
   name: string;
   /** Route of a converted option. */
   to?: string;
+  /** Route state the option opens its page with. */
+  state?: unknown;
   /** The optional module the option belongs to. */
   module?: 'authorization';
 }
 
 /** COMEN02Y, in order (BR-MENU-001). */
 export const MAIN_OPTIONS: MenuOption[] = [
-  { number: 1, name: 'Account View' },
-  { number: 2, name: 'Account Update' },
-  { number: 3, name: 'Credit Card List' },
-  { number: 4, name: 'Credit Card View' },
-  { number: 5, name: 'Credit Card Update' },
-  { number: 6, name: 'Transaction List' },
-  { number: 7, name: 'Transaction View' },
-  { number: 8, name: 'Transaction Add' },
-  { number: 9, name: 'Transaction Reports' },
+  { number: 1, name: 'Account View', to: '/accounts/view' },
+  { number: 2, name: 'Account Update', to: '/accounts/edit' },
+  { number: 3, name: 'Credit Card List', to: '/cards' },
+  { number: 4, name: 'Credit Card View', to: '/cards/lookup' },
+  { number: 5, name: 'Credit Card Update', to: '/cards/edit' },
+  { number: 6, name: 'Transaction List', to: '/transactions' },
+  { number: 7, name: 'Transaction View', to: '/transactions/lookup' },
+  { number: 8, name: 'Transaction Add', to: '/transactions/new' },
+  { number: 9, name: 'Transaction Reports', to: '/reports/transactions' },
   { number: 10, name: 'Bill Payment', to: '/bill-pay' },
-  { number: 11, name: 'Pending Authorization View', module: 'authorization' },
+  { number: 11, name: 'Pending Authorization View', to: '/authorizations', module: 'authorization' },
 ];
 
-/** COADM02Y options 1 to 4; 5 and 6 belong to a module that is not installed and are hidden (D-70). */
+/**
+ * COADM02Y options 1 to 4; 5 and 6 belong to a module that is not installed
+ * and are hidden (D-70). Options 3 and 4 open the user list, where the user is
+ * chosen. Option 7 is the read-only account and card lookup that D-09 gives an ADMIN.
+ */
 export const ADMIN_OPTIONS: MenuOption[] = [
-  { number: 1, name: 'User List (Security)' },
-  { number: 2, name: 'User Add (Security)' },
-  { number: 3, name: 'User Update (Security)' },
-  { number: 4, name: 'User Delete (Security)' },
+  { number: 1, name: 'User List (Security)', to: '/admin/users' },
+  { number: 2, name: 'User Add (Security)', to: '/admin/users/new' },
+  { number: 3, name: 'User Update (Security)', to: '/admin/users', state: { intent: 'update' } satisfies UserListState },
+  { number: 4, name: 'User Delete (Security)', to: '/admin/users', state: { intent: 'delete' } satisfies UserListState },
+  { number: 7, name: 'Account and Card View', to: '/admin/lookup' },
 ];
 
 const STATUS_LABEL: Record<OptionStatus, string> = {
@@ -56,15 +64,17 @@ const two = (n: number) => String(n).padStart(2, '0');
 
 interface MenuPageProps {
   variant: 'main' | 'admin';
+  /** The variant's list unless given; an option without a route is coming soon (BR-MENU-005). */
+  options?: MenuOption[];
 }
 
 /** COMEN01C (main menu) and the COADM01C stub (admin menu). */
-export function MenuPage({ variant }: MenuPageProps) {
+export function MenuPage({ variant, options: given }: MenuPageProps) {
   const user = useUser();
   const { signOff } = useSession();
   const features = useFeatures();
   const navigate = useNavigate();
-  const options = variant === 'main' ? MAIN_OPTIONS : ADMIN_OPTIONS;
+  const options = given ?? (variant === 'main' ? MAIN_OPTIONS : ADMIN_OPTIONS);
   const [typed, setTyped] = useState('');
   const [screenMessage, setScreenMessage] = useState<ScreenMessage | null>(null);
   const optionField = useRef<HTMLInputElement>(null);
@@ -73,9 +83,8 @@ export function MenuPage({ variant }: MenuPageProps) {
   useEffect(() => optionField.current?.focus(), []);
 
   const statusOf = (option: MenuOption): OptionStatus => {
-    if (option.to) return 'available';
     if (option.module === 'authorization' && !features?.modules.authorization) return 'not-installed';
-    return 'coming-soon';
+    return option.to ? 'available' : 'coming-soon';
   };
 
   const show = (next: ScreenMessage) => {
@@ -86,7 +95,7 @@ export function MenuPage({ variant }: MenuPageProps) {
   const choose = (option: MenuOption) => {
     const status = statusOf(option);
     if (status === 'available' && option.to) {
-      void navigate(option.to);
+      void navigate(option.to, { state: option.state });
     } else if (status === 'not-installed') {
       show(message('OPTION_NOT_INSTALLED', { name: option.name }));
     } else {
@@ -96,8 +105,8 @@ export function MenuPage({ variant }: MenuPageProps) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const number = parseMenuOption(typed, options.length);
-    const option = number === null ? undefined : options[number - 1];
+    const number = parseMenuOption(typed, Math.max(...options.map((o) => o.number)));
+    const option = number === null ? undefined : options.find((o) => o.number === number);
     if (!option) {
       show(message('INVALID_OPTION'));
       optionField.current?.focus();

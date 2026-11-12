@@ -19,7 +19,11 @@
     "useDefineForClassFields": true,
     "types": ["vite/client", "node", "@testing-library/jest-dom/vitest"],
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@carddemo/validation/*": ["src/api/generated/validation/*"],
+      "@carddemo/validation-data/*": ["../platform/validation/src/main/resources/org/carddemo/platform/validation/*"]
+    }
   },
-  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "e2e", "vite.config.ts", "playwright.config.ts", "scripts/*.d.mts"]
 }

@@ -87,3 +87,19 @@
 .tile[data-status='coming-soon'] .name {
   color: var(--cd-text);
 }
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.description {
+  font-size: var(--mantine-font-size-sm);
+  color: var(--cd-text-muted);
+}
+
+a.tile {
+  text-decoration: none;
+}

@@ -1,0 +1,816 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "description" : "Snapshot of the authorization-service OpenAPI document. The service's OpenApiExportTest fails when its export differs from this file.",
+    "title" : "authorization-service",
+    "version" : "0.1.0"
+  },
+  "servers" : [ {
+    "url" : "/"
+  } ],
+  "paths" : {
+    "/api/accounts/{acctId}/authorizations" : {
+      "get" : {
+        "operationId" : "listAuthorizations",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "lastKey of the page shown: the next, older page.",
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "firstKey of the page shown: the previous, newer page.",
+          "in" : "query",
+          "name" : "before",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only 5, the screen's rows.",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 5,
+            "enum" : [ "5" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationPage"
+                }
+              }
+            },
+            "description" : "Up to five authorizations, newest first. An account with no summary has an empty page."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_ID_REQUIRED, ACCOUNT_ID_NOT_NUMERIC, INVALID_PAGE_SIZE, INVALID_PAGE_REQUEST or INVALID_CURSOR."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (USER only)."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "AUTH_ACCOUNT_READ_FAILED or AUTH_DETAIL_READ_FAILED."
+          }
+        }
+      }
+    },
+    "/api/accounts/{acctId}/authorizations/summary" : {
+      "get" : {
+        "operationId" : "getAuthorizationSummary",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationSummary"
+                }
+              }
+            },
+            "description" : "Header, limits and totals. Without a cross-reference row or a customer, customer is null and message (error) says which read found nothing; the totals are still returned. Without a summary, summaryFound is false and the totals are zeros."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_ID_REQUIRED or ACCOUNT_ID_NOT_NUMERIC."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (USER only)."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "AUTH_ACCOUNT_READ_FAILED, AUTH_XREF_READ_FAILED, AUTH_CUSTOMER_READ_FAILED or AUTH_SUMMARY_READ_FAILED."
+          }
+        }
+      }
+    },
+    "/api/authorizations/{authId}" : {
+      "get" : {
+        "operationId" : "getAuthorization",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "authId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationDetail"
+                }
+              }
+            },
+            "description" : "The detail with the next older authorization of the account.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "INVALID_AUTH_ID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (USER only)."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "AUTHORIZATION_NOT_FOUND, for example purged since the list was shown."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "AUTH_DETAIL_READ_FAILED or AUTH_NEXT_READ_FAILED; no detail."
+          }
+        }
+      }
+    },
+    "/api/authorizations/{authId}/fraud" : {
+      "post" : {
+        "operationId" : "changeAuthorizationFraud",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "authId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FraudRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FraudResponse"
+                }
+              }
+            },
+            "description" : "Committed: AUTH_MARKED_FRAUD or AUTH_FRAUD_REMOVED, with the detail read back.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "INVALID_AUTH_ID, INVALID_FRAUD_ACTION or INVALID_IF_MATCH."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (USER only) or CSRF_REJECTED."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "AUTHORIZATION_NOT_FOUND."
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthorizationConflictProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED: the version differs, or the action is not the toggle of the stored flag; with current and a fresh ETag. Nothing is written.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "AUTH_DETAIL_READ_FAILED (the locking read), AUTH_NEXT_READ_FAILED or FRAUD_UPDATE_FAILED; nothing is written."
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "AuthorizationConflictProblem" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Problem"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "current" : {
+              "$ref" : "#/components/schemas/AuthorizationDetail",
+              "description" : "On RECORD_CHANGED: the stored detail now, with the fresh ETag."
+            }
+          }
+        } ]
+      },
+      "AuthorizationDetail" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "examples" : [ "00000000001" ]
+          },
+          "approval" : {
+            "type" : "string",
+            "description" : "A when the response code is 00, else D.",
+            "examples" : [ "A" ]
+          },
+          "approvedAmount" : {
+            "type" : "string",
+            "description" : "0.00 for declines.",
+            "examples" : [ "50.00" ]
+          },
+          "authId" : {
+            "type" : "integer",
+            "format" : "int64",
+            "examples" : [ 1234 ]
+          },
+          "authIdCode" : {
+            "type" : "string",
+            "description" : "The authorization ID code (DEF-AUDT-002 fixed).",
+            "examples" : [ "001234" ]
+          },
+          "authType" : {
+            "type" : "string",
+            "examples" : [ "SALE" ]
+          },
+          "cardExpiry" : {
+            "type" : "string",
+            "description" : "Characters 1-2, /, characters 3-4 of the stored expiry (NUM-AUDT-003).",
+            "examples" : [ "04/26" ]
+          },
+          "cardNum" : {
+            "type" : "string",
+            "description" : "Masked (D-09).",
+            "examples" : [ "************1111" ]
+          },
+          "fraud" : {
+            "$ref" : "#/components/schemas/AuthorizationFraud"
+          },
+          "matchStatus" : {
+            "type" : "string",
+            "description" : "P, D, E or M.",
+            "examples" : [ "M" ]
+          },
+          "matchedTranId" : {
+            "type" : [ "string", "null" ],
+            "description" : "The matched transaction; set only when matchStatus is M.",
+            "examples" : [ "0000000000000301" ]
+          },
+          "merchant" : {
+            "$ref" : "#/components/schemas/AuthorizationMerchant"
+          },
+          "merchantCategoryCode" : {
+            "type" : "string",
+            "examples" : [ "5411" ]
+          },
+          "messageSource" : {
+            "type" : "string",
+            "examples" : [ "POS" ]
+          },
+          "nextOlderAuthId" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The next older authorization of the account in list order; null at the oldest (BR-AUDT-006).",
+            "examples" : [ 1201 ]
+          },
+          "posEntryMode" : {
+            "type" : "string",
+            "examples" : [ "01" ]
+          },
+          "processingCode" : {
+            "type" : "string",
+            "examples" : [ "000000" ]
+          },
+          "reason" : {
+            "type" : "string",
+            "examples" : [ "0000" ]
+          },
+          "reasonText" : {
+            "type" : "string",
+            "description" : "Code and description from the fixed table (BR-AUDT-003); 9999-ERROR for a code not in it.",
+            "examples" : [ "0000-APPROVED" ]
+          },
+          "requestDate" : {
+            "type" : "string",
+            "description" : "The request's YYMMDD as MM/DD/YY, rearranged without validation (NUM-AUDT-002).",
+            "examples" : [ "04/05/24" ]
+          },
+          "requestTime" : {
+            "type" : "string",
+            "description" : "The request's HHMMSS as HH:MM:SS.",
+            "examples" : [ "14:30:15" ]
+          },
+          "respCode" : {
+            "type" : "string",
+            "examples" : [ "00" ]
+          },
+          "transactionAmount" : {
+            "type" : "string",
+            "examples" : [ "50.00" ]
+          },
+          "transactionId" : {
+            "type" : "string",
+            "examples" : [ "TRN000000000001" ]
+          },
+          "version" : {
+            "type" : "string",
+            "description" : "Same value as the ETag, without quotes.",
+            "examples" : [ "00000000000007d3" ]
+          }
+        },
+        "required" : [ "acctId", "approval", "approvedAmount", "authId", "authIdCode", "authType", "cardExpiry", "cardNum", "fraud", "matchStatus", "matchedTranId", "merchant", "merchantCategoryCode", "messageSource", "nextOlderAuthId", "posEntryMode", "processingCode", "reason", "reasonText", "requestDate", "requestTime", "respCode", "transactionAmount", "transactionId", "version" ]
+      },
+      "AuthorizationFraud" : {
+        "type" : "object",
+        "properties" : {
+          "display" : {
+            "type" : "string",
+            "description" : "flag-MM/DD/YY, or - when there is no flag.",
+            "examples" : [ "F-11/10/26" ]
+          },
+          "flag" : {
+            "type" : [ "string", "null" ],
+            "description" : "F (marked), R (removed) or null (never marked).",
+            "examples" : [ "F" ]
+          },
+          "reportDate" : {
+            "type" : [ "string", "null" ],
+            "format" : "date",
+            "description" : "The date of the last change.",
+            "examples" : [ "2026-11-10" ]
+          }
+        },
+        "required" : [ "display", "flag", "reportDate" ]
+      },
+      "AuthorizationMerchant" : {
+        "type" : "object",
+        "properties" : {
+          "city" : {
+            "type" : "string",
+            "examples" : [ "SPRINGFIELD" ]
+          },
+          "id" : {
+            "type" : "string",
+            "examples" : [ "MERCH0000000001" ]
+          },
+          "name" : {
+            "type" : "string",
+            "examples" : [ "GROCERY STORE" ]
+          },
+          "state" : {
+            "type" : "string",
+            "examples" : [ "IL" ]
+          },
+          "zip" : {
+            "type" : "string",
+            "examples" : [ "62701" ]
+          }
+        },
+        "required" : [ "city", "id", "name", "state", "zip" ]
+      },
+      "AuthorizationPage" : {
+        "type" : "object",
+        "properties" : {
+          "firstKey" : {
+            "type" : [ "string", "null" ]
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "hasPrevious" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AuthorizationRow"
+            }
+          },
+          "lastKey" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "firstKey", "hasNext", "hasPrevious", "items", "lastKey" ]
+      },
+      "AuthorizationRow" : {
+        "type" : "object",
+        "properties" : {
+          "approval" : {
+            "type" : "string",
+            "description" : "A when the response code is 00, else D.",
+            "examples" : [ "A" ]
+          },
+          "approvedAmount" : {
+            "type" : "string",
+            "description" : "0.00 for declines.",
+            "examples" : [ "50.00" ]
+          },
+          "authId" : {
+            "type" : "integer",
+            "format" : "int64",
+            "examples" : [ 1234 ]
+          },
+          "authType" : {
+            "type" : "string",
+            "examples" : [ "SALE" ]
+          },
+          "matchStatus" : {
+            "type" : "string",
+            "description" : "P, D, E or M.",
+            "examples" : [ "P" ]
+          },
+          "requestDate" : {
+            "type" : "string",
+            "description" : "The request's YYMMDD as MM/DD/YY, rearranged without validation (NUM-AUSM-003).",
+            "examples" : [ "04/05/24" ]
+          },
+          "requestTime" : {
+            "type" : "string",
+            "description" : "The request's HHMMSS as HH:MM:SS.",
+            "examples" : [ "14:30:15" ]
+          },
+          "transactionId" : {
+            "type" : "string",
+            "examples" : [ "TRN000000000001" ]
+          }
+        },
+        "required" : [ "approval", "approvedAmount", "authId", "authType", "matchStatus", "requestDate", "requestTime", "transactionId" ]
+      },
+      "AuthorizationSummary" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "examples" : [ "00000000001" ]
+          },
+          "approvedAmount" : {
+            "type" : "string",
+            "examples" : [ "50.00" ]
+          },
+          "approvedCount" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Zero when summaryFound is false."
+          },
+          "cashBalance" : {
+            "type" : "string"
+          },
+          "cashLimit" : {
+            "type" : "string",
+            "examples" : [ "10200.00" ]
+          },
+          "creditBalance" : {
+            "type" : "string",
+            "description" : "Pending approvals."
+          },
+          "creditLimit" : {
+            "type" : "string",
+            "description" : "From core.account.",
+            "examples" : [ "20200.00" ]
+          },
+          "customer" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/SummaryCustomer"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Null when the account has no cross-reference row or the customer is missing."
+          },
+          "declinedAmount" : {
+            "type" : "string"
+          },
+          "declinedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "Account:00000000001 not found in XREF file." ]
+          },
+          "severity" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Severity"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "summaryFound" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "acctId", "approvedAmount", "approvedCount", "cashBalance", "cashLimit", "creditBalance", "creditLimit", "customer", "declinedAmount", "declinedCount", "message", "severity", "summaryFound" ]
+      },
+      "FraudRequest" : {
+        "type" : "object",
+        "properties" : {
+          "action" : {
+            "type" : "string",
+            "description" : "R when the detail shown is F, else F.",
+            "enum" : [ "F", "R" ],
+            "examples" : [ "F" ]
+          }
+        },
+        "required" : [ "action" ]
+      },
+      "FraudResponse" : {
+        "type" : "object",
+        "properties" : {
+          "detail" : {
+            "$ref" : "#/components/schemas/AuthorizationDetail",
+            "description" : "The detail read back after the commit."
+          },
+          "message" : {
+            "type" : "string",
+            "examples" : [ "AUTH MARKED FRAUD..." ]
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          }
+        },
+        "required" : [ "detail", "message", "severity" ]
+      },
+      "Problem" : {
+        "type" : "object",
+        "description" : "RFC 9457 problem details with the CardDemo fields. message is the exact catalogue text.",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "examples" : [ "ACCOUNT_ID_REQUIRED" ]
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "field" : {
+            "type" : [ "string", "null" ],
+            "description" : "Field to focus, or null."
+          },
+          "instance" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "message", "severity" ]
+      },
+      "Severity" : {
+        "type" : "string",
+        "enum" : [ "error", "success", "info" ]
+      },
+      "SummaryCustomer" : {
+        "type" : "object",
+        "properties" : {
+          "addressLine1" : {
+            "type" : "string",
+            "description" : "Address lines 1 and 2 joined by \",\", each without its trailing spaces.",
+            "examples" : [ "618 Deshaun Route,Apt. 802" ]
+          },
+          "addressLine2" : {
+            "type" : "string",
+            "description" : "Address line 3, state and the first five characters of the ZIP, joined by \",\", each without its trailing spaces.",
+            "examples" : [ "Altenwerthshire,NC,12546" ]
+          },
+          "custId" : {
+            "type" : "string",
+            "examples" : [ "000000001" ]
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "First word of the first name, the middle initial and the first word of the last name, one space apart; a blank middle name leaves three spaces. Not cut to a width.",
+            "examples" : [ "Immanuel M Kessler" ]
+          },
+          "phone" : {
+            "type" : "string",
+            "description" : "Phone 1 as stored, up to 15 characters.",
+            "examples" : [ "(908)119-8310" ]
+          }
+        },
+        "required" : [ "addressLine1", "addressLine2", "custId", "name", "phone" ]
+      }
+    }
+  }
+}

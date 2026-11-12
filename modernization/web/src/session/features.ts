@@ -4,15 +4,18 @@ import { unwrap } from '@/api/http';
 import { useSession } from './SessionProvider';
 
 /** GET /api/features: installed modules and the UI fidelity switches. */
-export function useFeatures(): Features | undefined {
+export function useFeaturesQuery() {
   const { state } = useSession();
-  const { data } = useQuery({
+  return useQuery({
     queryKey: ['features'],
     queryFn: () => unwrap(identityApi.GET('/api/features')),
     enabled: state.status === 'authenticated',
     staleTime: Infinity,
   });
-  return data;
+}
+
+export function useFeatures(): Features | undefined {
+  return useFeaturesQuery().data;
 }
 
 /** A UI switch from the ledger; the fixed behaviour is assumed until features load. */

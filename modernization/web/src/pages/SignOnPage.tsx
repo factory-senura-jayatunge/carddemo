@@ -9,15 +9,16 @@ import { usePageKeys } from '@/keys/KeyboardShortcuts';
 import { formatClockTime } from '@/lib/format';
 import { message, type ScreenMessage } from '@/lib/messages';
 import { useFieldFocus } from '@/lib/useFieldFocus';
-import { messages } from '@/messages';
+import { coreMessages } from '@/messages/core';
 import { holdPasswordForChange } from '@/session/pendingPassword';
 import { useSession, type SignOnRouteState, type SignedOffRouteState } from '@/session/SessionProvider';
-import { checkSignOn } from '@/validation/rules';
+import { signOnProblem } from '@/validation/authRules';
 import classes from './SignOnPage.module.css';
 
 type Field = 'userId' | 'password';
 
 export interface ChangePasswordRouteState {
+  /** As typed on the sign-on page, padding and case included. */
   userId: string;
   message?: string;
 }
@@ -71,7 +72,7 @@ export function SignOnPage() {
   };
 
   const exit = () => {
-    const state: SignedOffRouteState = { message: messages.SIGNED_OFF.text };
+    const state: SignedOffRouteState = { message: coreMessages.SIGNED_OFF.text };
     void navigate('/signed-off', { replace: true, state });
   };
 
@@ -83,9 +84,9 @@ export function SignOnPage() {
     event.preventDefault();
     // The fields are read-only while busy, so the answer always belongs to the values on screen.
     if (busy) return;
-    const problem = checkSignOn(userId, password);
+    const problem = signOnProblem(userId, password);
     if (problem) {
-      show(message(problem.key), problem.field);
+      show(problem.message, problem.field);
       return;
     }
     setBusy(true);
@@ -96,7 +97,7 @@ export function SignOnPage() {
       setBusy(false);
       if (error instanceof ApiError && error.code === 'PASSWORD_CHANGE_REQUIRED') {
         holdPasswordForChange(userId, password);
-        const state: ChangePasswordRouteState = { userId: userId.trim().toUpperCase(), message: error.message };
+        const state: ChangePasswordRouteState = { userId, message: error.message };
         void navigate('/sign-on/change-password', { state });
         return;
       }
@@ -127,7 +128,6 @@ export function SignOnPage() {
                 name="userId"
                 value={userId}
                 onChange={(event) => setUserId(event.currentTarget.value)}
-                maxLength={8}
                 readOnly={busy}
                 autoComplete="username"
                 autoCapitalize="characters"
@@ -144,11 +144,11 @@ export function SignOnPage() {
                 name="password"
                 value={password}
                 onChange={(event) => setPassword(event.currentTarget.value)}
-                maxLength={64}
                 readOnly={busy}
                 autoComplete="current-password"
                 description="Upper and lower case count."
                 error={invalid('password')}
+                aria-invalid={invalid('password')}
                 aria-describedby={invalid('password') ? messageId : undefined}
                 data-testid="password"
               />

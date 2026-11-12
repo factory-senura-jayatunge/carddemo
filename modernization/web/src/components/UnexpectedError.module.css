@@ -1,0 +1,5 @@
+.actions {
+  display: flex;
+  gap: var(--mantine-spacing-sm);
+  margin-top: var(--mantine-spacing-lg);
+}

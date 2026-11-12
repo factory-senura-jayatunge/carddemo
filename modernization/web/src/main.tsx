@@ -1,5 +1,5 @@
 import '@fontsource-variable/inter';
-import '@mantine/core/styles.css';
+import './theme/mantineStyles';
 import './theme/global.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -1,0 +1,81 @@
+.tableWrap {
+  margin-top: 20px;
+  overflow-x: auto;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.table {
+  min-width: 560px;
+}
+
+.table thead th {
+  background: var(--cd-surface-sunken);
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table tr[data-invalid] td {
+  background: var(--mantine-color-red-0);
+}
+
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.srOnly {
+  composes: caption;
+}
+
+.selCol {
+  width: 64px;
+}
+
+.selInput {
+  width: 38px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.actionsCol {
+  text-align: right;
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.empty {
+  padding: 18px 16px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pageLabel {
+  min-width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

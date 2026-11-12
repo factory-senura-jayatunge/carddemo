@@ -21,8 +21,9 @@ if (missing.length) {
   process.exit(1);
 }
 
-rmSync(outDir, { recursive: true, force: true });
+// Only this script's files: validation/ belongs to gen:validation.
 mkdirSync(outDir, { recursive: true });
+for (const old of readdirSync(outDir).filter((f) => f.endsWith('.ts'))) rmSync(join(outDir, old));
 for (const file of files.sort()) {
   const name = basename(file, '.json');
   const ast = await openapiTS(pathToFileURL(join(source, file)));

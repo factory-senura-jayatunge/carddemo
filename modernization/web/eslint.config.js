@@ -6,7 +6,7 @@ import globals from 'globals';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'src/api/generated/**', 'test-results/**', 'playwright-report/**'],
+    ignores: ['dist/**', 'node_modules/**', 'src/api/generated/**', 'test-results/**', 'playwright-report/**', 'e2e-output/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -26,6 +26,28 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // The merged catalogue would pull every group into whatever chunk imports it; the mocks re-export it.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/mocks/**', 'src/test/**', 'src/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)messages/all(\\.[jt]sx?)?$',
+              message: 'The merged catalogue is for the mocks and tests. Import the group tables the page needs and pass them to catalogue() (src/lib/messages.ts).',
+            },
+            {
+              regex: '^(@|\\.{1,2}(/\\.\\.)*)/mocks(/|$)',
+              message: 'The mocks are for mock mode and the tests; main.tsx loads them with import() in mock mode only.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

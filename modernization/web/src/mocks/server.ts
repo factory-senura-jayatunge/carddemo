@@ -1,7 +1,16 @@
+import { legacyUpper } from '@carddemo/validation/legacyCase';
 import { legacyBalanceEdit } from '@/lib/format';
-import { fillMessage } from '@/lib/messages';
-import { messages, type MessageKey } from '@/messages';
+import type { MessageKey } from '@/messages';
+import { form, today, type FieldProblem } from '@/validation/forms';
+import { initialCore, routeAccounts, type CoreData } from './accounts';
+import { initialPauth, routeAuthorizations, type PauthData } from './authorizations';
 import { initialAccounts, initialUsers, type MockUser } from './data';
+import { decimal, json, problem, readBody, text } from './http';
+import { initialReports, routeReports, type ReportState } from './reports';
+import { initialAdds, routeTransactionAdd, type AddState } from './transactionAdd';
+import { routeTransactions } from './transactions';
+import { routeUsers } from './users';
+import { fillMessage, messages } from './messages';
 
 /**
  * An in-browser stand-in for identity-service and billpay-service that
@@ -14,6 +23,18 @@ export interface MockSettings {
   batchWindowOpen: boolean;
   uiSwitches: Record<string, 'legacy' | 'fixed'>;
   authorizationInstalled: boolean;
+  /**
+   * Database steps that fail while listed, as the contract scenarios inject them
+   * with DENY: account-read, xref-read, customer-read, card-read, audit,
+   * account-lock, customer-lock, card-lock, account-update, card-update; for
+   * authorization-service also auth-summary-read, auth-detail-read,
+   * auth-next-read and fraud-update; for transaction-service tran-read (and
+   * audit for its unmask), xref-read, reference-read and tran-add for its add,
+   * and report-trigger, report-job, report-stall, report-not-started and report-file for its
+   * reports; and unexpected, an exception no step
+   * message covers (the platform's 500 problem).
+   */
+  faults?: string[];
 }
 
 interface MockState {
@@ -25,6 +46,14 @@ interface MockState {
   csrf: string;
   nextTranId: number;
   payments: Record<string, { acctId: string; userId: string; result: unknown }>;
+  /** Accounts, customers, cards and the cross-reference; balances stay in accounts above. */
+  core?: CoreData;
+  /** Pending authorizations: summaries and details. */
+  pauth?: PauthData;
+  /** Transaction adds waiting for the batch cycle, and their Idempotency-Keys. */
+  tranAdds?: AddState;
+  /** Transaction report runs. */
+  reports?: ReportState;
 }
 
 export interface MockStore {
@@ -45,36 +74,28 @@ const WINDOW_MS = 60_000;
 // identity-service's default (carddemo.identity.rate-limit.*); there is no per-user limit.
 const FAILURES_PER_CLIENT = 30;
 
-const decimal = (cents: number) => {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(cents);
-  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-};
+const signOnRules = form('signOn');
+const changeRules = form('passwordChange');
 
-const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json', ...headers },
-  });
-
-/** A problem response with a catalogue message; the API code is the key's code. */
-const problem = (status: number, key: MessageKey, field: string | null, extra: Record<string, unknown> = {}, headers?: Record<string, string>) =>
-  json(
-    status,
-    { type: 'about:blank', status, code: messages[key].code, message: fillMessage(key), field, severity: messages[key].severity, ...extra },
-    headers,
-  );
+/** A 400 problem for a failed rule of the table: its own code, text and field. */
+const refused = (failed: FieldProblem) =>
+  json(400, { type: 'about:blank', status: 400, code: failed.code, message: failed.message, field: failed.field, severity: 'error' });
 
 export function createMockServer(store: MockStore, settings: () => MockSettings) {
-  const fresh = (): MockState => ({
-    accounts: initialAccounts(),
-    users: initialUsers(),
-    session: null,
-    failures: {},
-    csrf: random(),
-    nextTranId: 1,
-    payments: {},
-  });
+  const fresh = (): MockState => {
+    const core = initialCore();
+    return {
+      accounts: initialAccounts(),
+      users: initialUsers(),
+      session: null,
+      failures: {},
+      csrf: random(),
+      nextTranId: 1,
+      payments: {},
+      core,
+      pauth: initialPauth(core),
+    };
+  };
 
   const sessionView = (userId: string, user: MockUser) => ({
     userId,
@@ -110,18 +131,25 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     allowMustChange: boolean,
     sessionUserId?: string,
   ): [string, MockUser] | Response => {
-    if (rawUserId.trim() === '') return problem(400, 'USER_ID_REQUIRED', 'userId');
-    if (password.trim() === '') return problem(400, 'PASSWORD_REQUIRED', 'password');
-    if (rawUserId.length > 8) return problem(400, 'INVALID_INPUT_USER_ID', 'userId');
-    if (password.length > 64) return problem(400, 'INVALID_INPUT_PASSWORD', 'password');
-    const userId = rawUserId.trim().toUpperCase();
+    // SignOnService.authenticate on form signOn: only trailing spaces and NULs are padding, so a
+    // leading space, a tab or U+3000 stays in the value and is checked as typed.
+    const problems = signOnRules.validate({ userId: rawUserId, password }, today()).problems;
+    const idProblem = problems.find((p) => p.field === 'userId');
+    const passwordProblem = problems.find((p) => p.field === 'password');
+    if (idProblem) return refused(idProblem);
+    if (passwordProblem?.code === 'PASSWORD_REQUIRED') return refused(passwordProblem);
+    const typedId = signOnRules.value('userId', rawUserId);
+    // Rule 3 is not in the form: only the service limits the user ID, after both blank checks.
+    if ([...typedId].length > 8) return problem(400, 'INVALID_INPUT_USER_ID', 'userId');
+    if (passwordProblem) return refused(passwordProblem);
+    const userId = legacyUpper(typedId);
     if (sessionUserId !== undefined && userId !== sessionUserId) return problem(400, 'USER_ID_MISMATCH', 'userId');
     const wait = throttled(state);
     if (wait > 0) return problem(429, 'TOO_MANY_ATTEMPTS', 'userId', {}, { 'Retry-After': String(Math.ceil(wait / 1000)) });
     const user = state.users[userId];
-    if (!user) return failed(state);
+    if (!user || user.deleted) return failed(state);
     if (user.lockedUntil > Date.now()) return failed(state);
-    if (user.password !== password.replace(/ +$/, '')) {
+    if (user.password !== signOnRules.value('password', password)) {
       user.failedAttempts += 1;
       if (user.failedAttempts >= 5) {
         user.lockedUntil = Date.now() + LOCK_MS;
@@ -140,15 +168,6 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     return json(200, sessionView(userId, user));
   };
 
-  const readBody = async (request: Request): Promise<Record<string, unknown>> => {
-    try {
-      return (await request.json()) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
-  };
-  const text = (value: unknown) => (typeof value === 'string' ? value : '');
-
   async function route(request: Request, state: MockState): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -156,11 +175,12 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     state.failures ??= {};
     if (state.session && Date.now() - state.session.lastSeen > IDLE_MS) state.session = null;
     if (state.session) state.session.lastSeen = Date.now();
-    const current = state.session ? state.users[state.session.userId] : undefined;
+    const stored = state.session ? state.users[state.session.userId] : undefined;
+    const current = stored && !stored.deleted ? stored : undefined;
     const signedOn = state.session && current ? { userId: state.session.userId, user: current } : null;
     const csrfOk = request.headers.get('X-XSRF-TOKEN') === state.csrf;
 
-    if (method === 'POST' && !['/api/auth/sign-on', '/api/auth/password'].includes(path) && !csrfOk) {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !['/api/auth/sign-on', '/api/auth/password'].includes(path) && !csrfOk) {
       return problem(403, 'CSRF_REJECTED', null);
     }
 
@@ -171,18 +191,19 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
     }
     if (path === '/api/auth/password' && method === 'POST') {
       const body = await readBody(request);
-      const userId = text(body.userId) || signedOn?.userId || '';
+      const rawUserId = text(body.userId);
+      const userId = signedOn && signOnRules.value('userId', rawUserId) === '' ? signedOn.userId : rawUserId;
       const result = verify(state, userId, text(body.currentPassword), true, signedOn?.userId);
       if (result instanceof Response) return result;
       const [id, user] = result;
       const next = text(body.newPassword);
-      const field = 'newPassword';
-      if (next === '') return problem(400, 'NEW_PASSWORD_REQUIRED', field);
-      if ([...next].length < 8 || [...next].length > 64) return problem(400, 'NEW_PASSWORD_LENGTH_FIXED', field);
-      if (next === user.password) return problem(400, 'NEW_PASSWORD_SAME', field);
-      if (next.toUpperCase() === id) return problem(400, 'NEW_PASSWORD_IS_USER_ID', field);
-      user.password = next;
+      // Form passwordChange (fixed mode). The current password passed sign-on, so it is the stored one.
+      const input = { userId, currentPassword: text(body.currentPassword), newPassword: next };
+      const newProblem = changeRules.validate(input, today()).problems.find((p) => p.field === 'newPassword');
+      if (newProblem) return refused(newProblem);
+      user.password = changeRules.value('newPassword', next);
       user.mustChange = false;
+      user.version = (user.version ?? 1) + 1;
       return startSession(state, id, user);
     }
     if (path === '/api/auth/refresh' && method === 'POST') {
@@ -258,6 +279,82 @@ export function createMockServer(store: MockStore, settings: () => MockSettings)
         state.payments[key] = { acctId, userId: signedOn.userId, result };
         return json(201, result);
       }
+    }
+    if (/^\/api\/(accounts\/[^/]*\/authorizations|authorizations\/)/.test(path)) {
+      // Without the module the service does not run, so nothing answers its paths.
+      if (!settings().authorizationInstalled) return problem(404, 'NOT_FOUND', null);
+      state.core ??= initialCore();
+      state.pauth ??= initialPauth(state.core);
+      const answer = await routeAuthorizations(method, url, {
+        request,
+        core: state.core,
+        pauth: state.pauth,
+        userId: signedOn.userId,
+        role: signedOn.user.type === 'A' ? 'ADMIN' : 'USER',
+        faults: settings().faults ?? [],
+      });
+      return answer ?? problem(404, 'NOT_FOUND', null);
+    }
+    const users = await routeUsers(method, path, {
+      request,
+      url,
+      users: state.users,
+      actor: signedOn.userId,
+      role: signedOn.user.type === 'A' ? 'ADMIN' : 'USER',
+      faults: settings().faults ?? [],
+      batchWindowOpen: settings().batchWindowOpen,
+      legacyPasswords: settings().uiSwitches['DEF-SGN-011'] === 'legacy',
+      endSessions: (userId) => {
+        if (state.session?.userId === userId) state.session = null;
+      },
+    });
+    if (users) return users;
+    if (path.startsWith('/api/accounts/') || path.startsWith('/api/cards/')) {
+      state.core ??= initialCore();
+      const answer = await routeAccounts(method, path, {
+        request,
+        balances: state.accounts,
+        core: state.core,
+        userId: signedOn.userId,
+        role: signedOn.user.type === 'A' ? 'ADMIN' : 'USER',
+        faults: settings().faults ?? [],
+        batchWindowOpen: settings().batchWindowOpen,
+      });
+      if (answer) return answer;
+    }
+    if (path === '/api/transactions' || path.startsWith('/api/transactions/')) {
+      state.core ??= initialCore();
+      state.tranAdds ??= initialAdds();
+      const added = await routeTransactionAdd(method, path, {
+        request,
+        core: state.core,
+        adds: state.tranAdds,
+        userId: signedOn.userId,
+        role: signedOn.user.type === 'A' ? 'ADMIN' : 'USER',
+        faults: settings().faults ?? [],
+        batchWindowOpen: settings().batchWindowOpen,
+      });
+      if (added) return added;
+      const answer = await routeTransactions(method, path, {
+        request,
+        url,
+        core: state.core,
+        userId: signedOn.userId,
+        role: signedOn.user.type === 'A' ? 'ADMIN' : 'USER',
+        faults: settings().faults ?? [],
+      });
+      if (answer) return answer;
+    }
+    if (path === '/api/reports/transactions' || path.startsWith('/api/reports/transactions/')) {
+      state.reports ??= initialReports();
+      const answer = await routeReports(method, path, {
+        request,
+        reports: state.reports,
+        userId: signedOn.userId,
+        role: signedOn.user.type === 'A' ? 'ADMIN' : 'USER',
+        faults: settings().faults ?? [],
+      });
+      if (answer) return answer;
     }
     return problem(404, 'NOT_FOUND', null);
   }

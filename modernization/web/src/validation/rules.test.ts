@@ -1,17 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billPayStep, checkPasswordChange, checkSignOn, parseMenuOption } from './rules';
-
-describe('sign-on checks', () => {
-  it('@VAL-SGN-001 a blank user ID comes first', () => {
-    expect(checkSignOn('', '')).toEqual({ field: 'userId', key: 'USER_ID_REQUIRED' });
-    expect(checkSignOn('   ', 'PASSWORD')).toEqual({ field: 'userId', key: 'USER_ID_REQUIRED' });
-  });
-
-  it('@VAL-SGN-002 then a blank password', () => {
-    expect(checkSignOn('ADMIN001', ' ')).toEqual({ field: 'password', key: 'PASSWORD_REQUIRED' });
-    expect(checkSignOn('ADMIN001', 'PASSWORD')).toBeNull();
-  });
-});
+import { billPayStep, parseMenuOption } from './rules';
 
 describe('Bill Pay Enter, in COBIL00C order', () => {
   it('@VAL-BILL-001 a blank account ID wins over any confirmation', () => {
@@ -42,25 +30,5 @@ describe('menu option', () => {
     expect(parseMenuOption('05', 11)).toBe(5);
     for (const typed of ['', '  ', '00', '0', '12', '99', 'A', '1A', '-1']) expect(parseMenuOption(typed, 11)).toBeNull();
     expect(parseMenuOption('5', 4)).toBeNull();
-  });
-});
-
-describe('password change (D-SEC-07, fixed mode)', () => {
-  const check = (next: string, confirm = next) => checkPasswordChange('USER0001', 'PASSWORD', next, confirm);
-
-  it('checks the new password in the contract order', () => {
-    expect(checkPasswordChange('USER0001', '', 'Abcdefgh', 'Abcdefgh')?.key).toBe('PASSWORD_REQUIRED');
-    expect(check('')?.key).toBe('NEW_PASSWORD_REQUIRED');
-    expect(check('Short1')?.key).toBe('NEW_PASSWORD_LENGTH_FIXED');
-    expect(check('x'.repeat(65))?.key).toBe('NEW_PASSWORD_LENGTH_FIXED');
-    expect(check('PASSWORD')?.key).toBe('NEW_PASSWORD_SAME');
-    expect(check('user0001')?.key).toBe('NEW_PASSWORD_IS_USER_ID');
-    expect(check('New pass 1', 'New pass 2')).toEqual({ field: 'confirmPassword', key: 'NEW_PASSWORD_MISMATCH' });
-    expect(check('New pass 1')).toBeNull();
-    expect(check('x'.repeat(64))).toBeNull();
-  });
-
-  it('is case-sensitive: the current password in another case is a new password', () => {
-    expect(check('password')).toBeNull();
   });
 });

@@ -1,0 +1,134 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.card {
+  padding: 24px 28px 28px;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--cd-surface-card);
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+.types {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.typeCard {
+  padding: 14px 16px;
+  border: 1px solid var(--cd-border-strong);
+  border-radius: var(--mantine-radius-md);
+  background: var(--cd-surface-card);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.typeCard:has(input:checked) {
+  border-color: var(--mantine-color-brand-6);
+  background: var(--mantine-color-brand-0);
+}
+
+.typeCard:has(input:focus-visible) {
+  outline: 2px solid var(--mantine-color-brand-6);
+  outline-offset: 2px;
+}
+
+.typeLabel {
+  font-weight: 600;
+}
+
+.dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  margin-top: 20px;
+}
+
+.dateGroup {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.dateLegend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+}
+
+.dateParts {
+  display: flex;
+  gap: 10px;
+}
+
+.part {
+  width: 72px;
+}
+
+.year {
+  width: 96px;
+}
+
+.aside {
+  position: sticky;
+  top: 24px;
+}
+
+.steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.steps li {
+  flex: 1;
+  padding-top: 8px;
+  border-top: 3px solid var(--cd-border-strong);
+  color: var(--cd-text-muted);
+}
+
+.steps li[data-state='done'] {
+  border-top-color: var(--mantine-color-green-7);
+  color: var(--cd-text);
+}
+
+.steps li[data-state='current'] {
+  border-top-color: var(--mantine-color-brand-6);
+  color: var(--cd-text);
+}
+
+.statusLine {
+  margin: 0 0 18px;
+  font-size: var(--mantine-font-size-sm);
+}
+
+@media (max-width: 62em) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .aside {
+    position: static;
+  }
+}
+
+@media (max-width: 40em) {
+  .card {
+    padding: 18px;
+  }
+
+  .types {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,4 +1,4 @@
-import type { MessageKey } from '@/messages';
+import type { EntryKey } from '@/messages';
 
 /**
  * The checks the web app runs before calling a service, in the legacy edit
@@ -6,40 +6,12 @@ import type { MessageKey } from '@/messages';
  */
 export interface FieldProblem<F extends string = string> {
   field: F;
-  /** The catalogue message to show. */
-  key: MessageKey;
+  /** The catalogue message to show; the entry pages use these rules, so it is an entry key. */
+  key: EntryKey;
 }
 
 /** Blank as COBOL sees it: spaces or nothing. */
 export const isBlank = (value: string): boolean => value.trim() === '';
-
-/** VAL-SGN-001, VAL-SGN-002. */
-export function checkSignOn(userId: string, password: string): FieldProblem<'userId' | 'password'> | null {
-  if (isBlank(userId)) return { field: 'userId', key: 'USER_ID_REQUIRED' };
-  if (isBlank(password)) return { field: 'password', key: 'PASSWORD_REQUIRED' };
-  return null;
-}
-
-export const NEW_PASSWORD_RULE =
-  '8 to 64 characters. Upper and lower case count, and spaces are allowed. It must differ from your current password and from your user ID.';
-
-/** D-SEC-07 in fixed mode, then the confirmation the web form adds. */
-export function checkPasswordChange(
-  userId: string,
-  currentPassword: string,
-  newPassword: string,
-  confirmPassword: string,
-): FieldProblem<'userId' | 'currentPassword' | 'newPassword' | 'confirmPassword'> | null {
-  if (isBlank(userId)) return { field: 'userId', key: 'USER_ID_REQUIRED' };
-  if (isBlank(currentPassword)) return { field: 'currentPassword', key: 'PASSWORD_REQUIRED' };
-  if (newPassword === '') return { field: 'newPassword', key: 'NEW_PASSWORD_REQUIRED' };
-  const length = [...newPassword].length;
-  if (length < 8 || length > 64) return { field: 'newPassword', key: 'NEW_PASSWORD_LENGTH_FIXED' };
-  if (newPassword === currentPassword) return { field: 'newPassword', key: 'NEW_PASSWORD_SAME' };
-  if (newPassword.toUpperCase() === userId.trim().toUpperCase()) return { field: 'newPassword', key: 'NEW_PASSWORD_IS_USER_ID' };
-  if (newPassword !== confirmPassword) return { field: 'confirmPassword', key: 'NEW_PASSWORD_MISMATCH' };
-  return null;
-}
 
 /**
  * The menu option field: right-justified and zero-filled to two characters

@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { identityApi, type SessionView } from '@/api/client';
 import { onSessionExpired, refreshSession, unwrap } from '@/api/http';
 import { sessionEndedNote } from '@/lib/messages';
-import { messages } from '@/messages';
+import { coreMessages } from '@/messages/core';
+import { clearCurrentAccount } from './currentAccount';
 
 export type SessionState =
   | { status: 'loading' }
@@ -93,6 +94,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const endAndGo = useCallback(
     async (to: '/sign-on' | '/signed-off', state: SignOnRouteState | SignedOffRouteState) => {
       queryClient.clear();
+      clearCurrentAccount();
       endingAt.current = to;
       setState({ status: 'ending' });
       await navigate(to, { replace: true, state });
@@ -122,7 +124,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOff = useCallback(
     async (target: SignOffTarget) => {
-      let text: string = messages.SIGNED_OFF.text;
+      let text: string = coreMessages.SIGNED_OFF.text;
       try {
         const { data } = await identityApi.POST('/api/auth/sign-off');
         if (data?.message) text = data.message;

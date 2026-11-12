@@ -1,14 +1,14 @@
 import { Button, Text, ThemeIcon } from '@mantine/core';
 import { Link, useLocation } from 'react-router';
 import { PageTitle } from '@/components/PageTitle';
-import { messages } from '@/messages';
+import { coreMessages } from '@/messages/core';
 import type { SignedOffRouteState } from '@/session/SessionProvider';
 import classes from './SignOnPage.module.css';
 
 /** After Exit or Sign out (FLOW-SGN-003): the thank-you message and a way back in. */
 export function SignedOffPage() {
   const location = useLocation();
-  const text = (location.state as SignedOffRouteState | null)?.message ?? messages.SIGNED_OFF.text;
+  const text = (location.state as SignedOffRouteState | null)?.message ?? coreMessages.SIGNED_OFF.text;
   return (
     <div className={classes.narrow}>
       <ThemeIcon size={44} radius="xl" variant="light" color="brand" mb="lg" aria-hidden="true">

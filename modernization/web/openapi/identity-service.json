@@ -1,7 +1,7 @@
 {
   "openapi" : "3.1.0",
   "info" : {
-    "description" : "Sign-on, password change, sessions and the JWKS of the CardDemo API.",
+    "description" : "Sign-on, password change, sessions, the JWKS and user administration of the CardDemo API.",
     "title" : "CardDemo identity-service",
     "version" : "1"
   },
@@ -54,6 +54,11 @@
             "description" : "UNAUTHENTICATED"
           }
         },
+        "security" : [ {
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
         "summary" : "The signed-on user",
         "tags" : [ "auth" ]
       }
@@ -180,6 +185,10 @@
             "description" : "CSRF_REJECTED"
           }
         },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "refreshCookie" : [ ]
+        } ],
         "summary" : "Use the refresh cookie once and get new cookies",
         "tags" : [ "auth" ]
       }
@@ -217,6 +226,13 @@
             "description" : "CSRF_REJECTED"
           }
         },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "refreshCookie" : [ ]
+        }, {
+          "csrfHeader" : [ ],
+          "sessionCookie" : [ ]
+        } ],
         "summary" : "End the session (FLOW-SGN-003)",
         "tags" : [ "auth" ]
       }
@@ -325,8 +341,923 @@
             "description" : "UNAUTHENTICATED"
           }
         },
+        "security" : [ {
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
         "summary" : "Installed modules, converted units and UI switches",
         "tags" : [ "features" ]
+      }
+    },
+    "/api/users" : {
+      "get" : {
+        "operationId" : "listUsers",
+        "parameters" : [ {
+          "description" : "Case-insensitive user ID prefix, as typed",
+          "in" : "query",
+          "name" : "start",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The same prefix in key form: base64url of its UTF-8 bytes, no padding",
+          "in" : "query",
+          "name" : "startKey",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "lastKey of the previous page: the next page",
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "firstKey of the current page: the previous page",
+          "in" : "query",
+          "name" : "before",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Rows, 1 to 10",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "default" : 10,
+            "maximum" : 10,
+            "minimum" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserPage"
+                }
+              }
+            },
+            "description" : "The page, with the message line when there is one"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_REQUEST (a bad startKey), UNSUPPORTED_CHARACTER, TOO_LONG, INVALID_PAGE_REQUEST, INVALID_PAGE_SIZE or INVALID_CURSOR"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED"
+          }
+        },
+        "security" : [ {
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "One page of active users in user ID order (COUSR00C)",
+        "tags" : [ "users" ]
+      },
+      "post" : {
+        "operationId" : "addUser",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NewUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SavedUser"
+                }
+              }
+            },
+            "description" : "Added",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              },
+              "Location" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_REQUEST, a *_EMPTY text, UNSUPPORTED_CHARACTER, TOO_LONG, USER_ID_INVALID, NEW_PASSWORD_LENGTH, NEW_PASSWORD_IS_USER_ID or USER_TYPE_INVALID"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator) or CSRF_REJECTED (the session cookie without X-XSRF-TOKEN)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_EXISTS"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ADD_FAILED"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW, with Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "Add a user (COUSR01C)",
+        "tags" : [ "users" ]
+      }
+    },
+    "/api/users/key/{userKey}" : {
+      "delete" : {
+        "operationId" : "deleteUserByKey",
+        "parameters" : [ {
+          "description" : "The user ID in key form: base64url (RFC 4648 section 5, no padding) of its UTF-8 bytes",
+          "in" : "path",
+          "name" : "userKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The version of the user the page showed, as its ETag",
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Notice"
+                }
+              }
+            },
+            "description" : "Deleted"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_REQUEST (a bad key), INVALID_IF_MATCH or a user ID rule"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator) or CSRF_REJECTED (the session cookie without X-XSRF-TOKEN)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "CANNOT_DELETE_SELF, LAST_ADMIN or RECORD_CHANGED"
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED or USER_DELETE_FAILED"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW, with Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "deleteUser with the user ID in key form, for any user ID",
+        "tags" : [ "users" ]
+      },
+      "get" : {
+        "operationId" : "getUserByKey",
+        "parameters" : [ {
+          "description" : "The user ID in key form: base64url (RFC 4648 section 5, no padding) of its UTF-8 bytes",
+          "in" : "path",
+          "name" : "userKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserView"
+                }
+              }
+            },
+            "description" : "The user",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_REQUEST (a bad key), USER_ID_EMPTY, UNSUPPORTED_CHARACTER, TOO_LONG or USER_ID_INVALID"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED"
+          }
+        },
+        "security" : [ {
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "getUser with the user ID in key form, for any user ID",
+        "tags" : [ "users" ]
+      },
+      "put" : {
+        "operationId" : "updateUserByKey",
+        "parameters" : [ {
+          "description" : "The user ID in key form: base64url (RFC 4648 section 5, no padding) of its UTF-8 bytes",
+          "in" : "path",
+          "name" : "userKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The version of the user the page showed, as its ETag",
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SavedUser"
+                }
+              }
+            },
+            "description" : "Saved",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_REQUEST (a bad key or body), INVALID_IF_MATCH, a *_EMPTY text, UNSUPPORTED_CHARACTER, TOO_LONG, USER_ID_INVALID, NEW_PASSWORD_LENGTH, NEW_PASSWORD_IS_USER_ID, NEW_PASSWORD_SAME, USER_TYPE_INVALID or NO_CHANGE"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator) or CSRF_REJECTED (the session cookie without X-XSRF-TOKEN)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED, with current and its ETag"
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED or USER_UPDATE_FAILED"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW, with Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "updateUser with the user ID in key form, for any user ID",
+        "tags" : [ "users" ]
+      }
+    },
+    "/api/users/{userId}" : {
+      "delete" : {
+        "operationId" : "deleteUser",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The version of the user the page showed, as its ETag",
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Notice"
+                }
+              }
+            },
+            "description" : "Deleted"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_IF_MATCH or a user ID rule"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator) or CSRF_REJECTED (the session cookie without X-XSRF-TOKEN)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "CANNOT_DELETE_SELF, LAST_ADMIN or RECORD_CHANGED"
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED or USER_DELETE_FAILED"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW, with Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "Delete a user, keeping its row and ID (COUSR03C, D-56)",
+        "tags" : [ "users" ]
+      },
+      "get" : {
+        "operationId" : "getUser",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserView"
+                }
+              }
+            },
+            "description" : "The user",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_EMPTY, UNSUPPORTED_CHARACTER, TOO_LONG or USER_ID_INVALID"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_NOT_FOUND"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED"
+          }
+        },
+        "security" : [ {
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "Fetch a user for update or delete (COUSR02C, COUSR03C)",
+        "tags" : [ "users" ]
+      },
+      "put" : {
+        "operationId" : "updateUser",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "The version of the user the page showed, as its ETag",
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SavedUser"
+                }
+              }
+            },
+            "description" : "Saved",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "INVALID_REQUEST, INVALID_IF_MATCH, a *_EMPTY text, UNSUPPORTED_CHARACTER, TOO_LONG, USER_ID_INVALID, NEW_PASSWORD_LENGTH, NEW_PASSWORD_IS_USER_ID, NEW_PASSWORD_SAME, USER_TYPE_INVALID or NO_CHANGE"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (not an administrator) or CSRF_REJECTED (the session cookie without X-XSRF-TOKEN)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_ID_NOT_FOUND"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED, with current and its ETag"
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "USER_LOOKUP_FAILED or USER_UPDATE_FAILED"
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiProblem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW, with Retry-After"
+          }
+        },
+        "security" : [ {
+          "csrfHeader" : [ ],
+          "sessionCookie" : [ ]
+        }, {
+          "bearerToken" : [ ]
+        } ],
+        "summary" : "Save a user's names, type and optionally a new password (COUSR02C)",
+        "tags" : [ "users" ]
       }
     }
   },
@@ -388,6 +1319,27 @@
         },
         "required" : [ "converted", "modules", "uiSwitches" ]
       },
+      "ListedUser" : {
+        "type" : "object",
+        "properties" : {
+          "firstName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "lastName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "userId" : {
+            "type" : "string",
+            "maxLength" : 8
+          },
+          "userType" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "firstName", "lastName", "userId", "userType" ]
+      },
       "Modules" : {
         "type" : "object",
         "properties" : {
@@ -399,6 +1351,45 @@
           }
         },
         "required" : [ "authorization", "transactionTypes" ]
+      },
+      "NewUserRequest" : {
+        "type" : "object",
+        "properties" : {
+          "firstName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "lastName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "password" : {
+            "type" : "string",
+            "maxLength" : 64
+          },
+          "userId" : {
+            "type" : "string",
+            "maxLength" : 8
+          },
+          "userType" : {
+            "type" : "string",
+            "enum" : [ "A", "U" ]
+          }
+        },
+        "required" : [ "firstName", "lastName", "password", "userId", "userType" ]
+      },
+      "Notice" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "success" ]
+          }
+        },
+        "required" : [ "message", "severity" ]
       },
       "PasswordRequest" : {
         "type" : "object",
@@ -418,6 +1409,22 @@
           }
         },
         "required" : [ "currentPassword", "newPassword" ]
+      },
+      "SavedUser" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "type" : "string",
+            "enum" : [ "success" ]
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserView"
+          }
+        },
+        "required" : [ "message", "severity", "user" ]
       },
       "SessionView" : {
         "type" : "object",
@@ -476,6 +1483,114 @@
           }
         },
         "required" : [ "password", "userId" ]
+      },
+      "UpdateUserRequest" : {
+        "type" : "object",
+        "properties" : {
+          "firstName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "lastName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "password" : {
+            "type" : [ "string", "null" ],
+            "description" : "Write-only; blank keeps the current password",
+            "maxLength" : 64
+          },
+          "userType" : {
+            "type" : "string",
+            "enum" : [ "A", "U" ]
+          }
+        },
+        "required" : [ "firstName", "lastName", "userType" ]
+      },
+      "UserPage" : {
+        "type" : "object",
+        "properties" : {
+          "firstKey" : {
+            "type" : [ "string", "null" ]
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "hasPrevious" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ListedUser"
+            }
+          },
+          "lastKey" : {
+            "type" : [ "string", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ],
+            "description" : "The message line, or null"
+          },
+          "severity" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "info" ]
+          }
+        },
+        "required" : [ "firstKey", "hasNext", "hasPrevious", "items", "lastKey", "message", "severity" ]
+      },
+      "UserView" : {
+        "type" : "object",
+        "properties" : {
+          "firstName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "lastName" : {
+            "type" : "string",
+            "maxLength" : 20
+          },
+          "userId" : {
+            "type" : "string",
+            "description" : "The canonical user ID",
+            "maxLength" : 8
+          },
+          "userType" : {
+            "type" : "string",
+            "description" : "A or U; a legacy-loaded user may hold another type"
+          },
+          "version" : {
+            "type" : "string",
+            "description" : "The row version, also sent as the ETag"
+          }
+        },
+        "required" : [ "firstName", "lastName", "userId", "userType", "version" ]
+      }
+    },
+    "securitySchemes" : {
+      "bearerToken" : {
+        "bearerFormat" : "JWT",
+        "description" : "The access token as Authorization: Bearer, for scripts. Without the session cookie no CSRF header is needed.",
+        "scheme" : "bearer",
+        "type" : "http"
+      },
+      "csrfHeader" : {
+        "description" : "The value of the XSRF-TOKEN cookie (double submit), on every POST, PUT and DELETE sent with the session cookie, and on refresh and sign-off.",
+        "in" : "header",
+        "name" : "X-XSRF-TOKEN",
+        "type" : "apiKey"
+      },
+      "refreshCookie" : {
+        "description" : "The refresh token cookie (path /api/auth) that sign-on, password change and refresh set. Refresh uses it once; sign-off ends its session.",
+        "in" : "cookie",
+        "name" : "cd_rt",
+        "type" : "apiKey"
+      },
+      "sessionCookie" : {
+        "description" : "The access token cookie that sign-on, password change and refresh set. With it, POST, PUT and DELETE also need X-XSRF-TOKEN.",
+        "in" : "cookie",
+        "name" : "cd_at",
+        "type" : "apiKey"
       }
     }
   }

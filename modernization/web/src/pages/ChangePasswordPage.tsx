@@ -10,11 +10,14 @@ import { message, type ScreenMessage } from '@/lib/messages';
 import { useFieldFocus } from '@/lib/useFieldFocus';
 import { forgetPasswordForChange, peekPasswordForChange } from '@/session/pendingPassword';
 import { useSession } from '@/session/SessionProvider';
-import { checkPasswordChange, NEW_PASSWORD_RULE } from '@/validation/rules';
+import { passwordChangeProblem } from '@/validation/authRules';
 import type { ChangePasswordRouteState } from './SignOnPage';
 import classes from './SignOnPage.module.css';
 
 type Field = 'userId' | 'currentPassword' | 'newPassword' | 'confirmPassword';
+
+const NEW_PASSWORD_RULE =
+  '8 to 64 characters. Upper and lower case count, and spaces are allowed. It must differ from your current password and from your user ID.';
 
 const SERVER_FIELDS: Record<string, Field> = {
   userId: 'userId',
@@ -33,6 +36,8 @@ export function ChangePasswordPage() {
   const location = useLocation();
   const routeState = (location.state ?? null) as ChangePasswordRouteState | null;
   const knownUser = routeState?.userId ?? '';
+  // Sign-on asks for a change only in fixed mode; reached any other way, the service's mode is unknown.
+  const fixedMode = routeState !== null;
 
   const [userId, setUserId] = useState(knownUser);
   const [currentPassword, setCurrentPassword] = useState(() => peekPasswordForChange(knownUser));
@@ -68,9 +73,9 @@ export function ChangePasswordPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
-    const problem = checkPasswordChange(userId, currentPassword, newPassword, confirmPassword);
+    const problem = passwordChangeProblem(fixedMode, { userId, currentPassword, newPassword, confirmPassword });
     if (problem) {
-      show(message(problem.key), problem.field);
+      show(problem.message, problem.field);
       return;
     }
     setBusy(true);
@@ -106,7 +111,6 @@ export function ChangePasswordPage() {
               label="User ID"
               value={userId}
               onChange={(event) => setUserId(event.currentTarget.value)}
-              maxLength={8}
               autoComplete="username"
               spellCheck={false}
               classNames={{ input: 'cd-mono' }}
@@ -119,9 +123,9 @@ export function ChangePasswordPage() {
             label="Current password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.currentTarget.value)}
-            maxLength={64}
             autoComplete="current-password"
             error={invalid('currentPassword')}
+            aria-invalid={invalid('currentPassword')}
             aria-describedby={describedBy('currentPassword')}
             data-testid="current-password"
           />
@@ -130,10 +134,10 @@ export function ChangePasswordPage() {
             label="New password"
             value={newPassword}
             onChange={(event) => setNewPassword(event.currentTarget.value)}
-            maxLength={64}
             autoComplete="new-password"
             description={<span id={ruleId}>{NEW_PASSWORD_RULE}</span>}
             error={invalid('newPassword')}
+            aria-invalid={invalid('newPassword')}
             aria-describedby={describedBy('newPassword', ruleId)}
             data-testid="new-password"
           />
@@ -142,9 +146,9 @@ export function ChangePasswordPage() {
             label="Repeat new password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.currentTarget.value)}
-            maxLength={64}
             autoComplete="new-password"
             error={invalid('confirmPassword')}
+            aria-invalid={invalid('confirmPassword')}
             aria-describedby={describedBy('confirmPassword')}
             data-testid="confirm-password"
           />

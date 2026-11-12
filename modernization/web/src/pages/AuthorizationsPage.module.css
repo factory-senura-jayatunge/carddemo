@@ -1,0 +1,219 @@
+.keepSpaces {
+  white-space: pre-wrap;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--cd-border);
+}
+
+.stat {
+  padding: 12px 14px;
+  border-radius: var(--mantine-radius-md);
+  background: var(--cd-surface-sunken);
+  border-left: 3px solid var(--mantine-color-green-7);
+}
+
+.stat[data-tone='declined'] {
+  border-left-color: var(--mantine-color-red-7);
+}
+
+.statLabel {
+  margin: 0;
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.statAmount {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.statCount {
+  margin: 2px 0 0;
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.listSection {
+  margin-top: 28px;
+}
+
+.listTitle {
+  margin: 0 0 12px;
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--cd-surface-card);
+}
+
+.table {
+  min-width: 760px;
+}
+
+.table thead th {
+  background: var(--cd-surface-sunken);
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.amountCol {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.actionsCol {
+  text-align: right;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 18px 16px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pageLabel {
+  min-width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.reason {
+  margin: 6px 0 0;
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 600;
+}
+
+.detailNav {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.card {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid var(--cd-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--cd-surface-card);
+}
+
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardLink {
+  color: var(--mantine-color-anchor);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+/* The focus ring goes round the card, which is what the link covers. */
+.cardLink:focus-visible {
+  outline: none;
+}
+
+.cardLink:focus-visible::after {
+  outline: 2px solid var(--mantine-color-brand-6);
+  outline-offset: 2px;
+}
+
+/* The whole card is the link's target, for a thumb rather than a pointer. */
+.cardLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cardAmount {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  margin: 4px 0 0;
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.cardCodes {
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.cardCodeLabel {
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cardCodeLabel:not(:first-child) {
+  margin-left: 8px;
+}
+
+.decision {
+  column-gap: 48px;
+}
+
+@media (max-width: 52em) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,10 +1,32 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import type { RouteObject } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import { MAIN_OPTIONS } from '@/pages/MenuPage';
+import { MAIN_OPTIONS, MenuPage, type MenuOption } from '@/pages/MenuPage';
+import { routes } from '@/router';
+import { RequireRole } from '@/session/RequireRole';
 import { renderApp } from '@/test/renderApp';
 
 const messageText = () => screen.queryByTestId('message-text')?.textContent ?? null;
 const field = () => screen.getByLabelText('Option number');
+
+/** The app's routes with the main menu showing `options` instead of MAIN_OPTIONS. */
+function withMainOptions(options: MenuOption[]): RouteObject[] {
+  const swap = (list: RouteObject[]): RouteObject[] =>
+    list.map((route) => {
+      if (route.index) {
+        return {
+          ...route,
+          element: (
+            <RequireRole allow="USER">
+              <MenuPage variant="main" options={options} />
+            </RequireRole>
+          ),
+        };
+      }
+      return route.children ? { ...route, children: swap(route.children) } : route;
+    });
+  return swap(routes);
+}
 
 async function openMenu(options: Parameters<typeof renderApp>[1] = {}) {
   const app = await renderApp('/', { signedOnAs: 'USER0001', ...options });
@@ -31,13 +53,48 @@ describe('Main menu (COMEN01C)', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/bill-pay'));
   });
 
-  it('@BR-MENU-005 MENU-S4: option 5 is coming soon, in green', async () => {
-    const { user } = await openMenu();
-    await user.type(field(), '5{Enter}');
-    expect(messageText()).toBe('This option Credit Card Update is coming soon ...');
+  it('@BR-MENU-002 @FLOW-MENU-003 MENU-S4: option 8 opens Transaction Add and option 9 Transaction Reports', async () => {
+    const { user, router } = await openMenu();
+    expect(screen.getByTestId('option-08')).toHaveAttribute('data-status', 'available');
+    expect(screen.getByTestId('option-09')).toHaveAttribute('data-status', 'available');
+    await user.type(field(), '8{Enter}');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/transactions/new'));
+    await screen.findByRole('heading', { name: 'Add a transaction' });
+    await act(() => router.navigate('/'));
+    await screen.findByRole('heading', { name: 'Main menu' });
+    await user.click(screen.getByTestId('option-09'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/reports/transactions'));
+    await screen.findByRole('heading', { name: 'Transaction report' });
+  });
+
+  it('@BR-MENU-005 an option without a page is coming soon, in green, and the menu stays', async () => {
+    const placeholder = MAIN_OPTIONS.map((option) => (option.number === 8 ? { number: 8, name: option.name } : option));
+    const { user, router } = await openMenu({ routes: withMainOptions(placeholder) });
+    expect(screen.getByTestId('option-08')).toHaveAttribute('data-status', 'coming-soon');
+    expect(screen.getByTestId('option-08')).toHaveTextContent('Coming soon');
+    await user.type(field(), '8{Enter}');
+    expect(messageText()).toBe('This option Transaction Add is coming soon ...');
     expect(screen.getByTestId('message')).toHaveAttribute('data-tone', 'success');
-    await user.click(screen.getByTestId('option-01'));
-    expect(messageText()).toBe('This option Account View is coming soon ...');
+    expect(field()).toHaveFocus();
+    expect(router.state.location.pathname).toBe('/');
+    await user.click(screen.getByTestId('option-08'));
+    expect(messageText()).toBe('This option Transaction Add is coming soon ...');
+    expect(router.state.location.pathname).toBe('/');
+  });
+
+  it.each([
+    ['1', '/accounts/view'],
+    ['2', '/accounts/edit'],
+    ['3', '/cards'],
+    ['4', '/cards/lookup'],
+    ['5', '/cards/edit'],
+    ['6', '/transactions'],
+    ['7', '/transactions/lookup'],
+  ])('options 1 to 7 are converted: %s opens %s', async (typed, path) => {
+    const { user, router } = await openMenu();
+    expect(screen.getByTestId(`option-0${typed}`)).toHaveAttribute('data-status', 'available');
+    await user.type(field(), `${typed}{Enter}`);
+    await waitFor(() => expect(router.state.location.pathname).toBe(path));
   });
 
   it('@VAL-MENU-001 @NUM-MENU-001 @DEF-MENU-001 MENU-S5: blank, 00, 12 and 99 are invalid', async () => {
@@ -102,15 +159,40 @@ describe('Main menu (COMEN01C)', () => {
 });
 
 describe('Admin menu stub (COADM01C)', () => {
-  it('@D-70 options 1 to 4 are coming soon; 5 and 6 are hidden and invalid', async () => {
-    const { user } = await renderApp('/admin', { signedOnAs: 'ADMIN001' });
+  it('@D-70 options 1 to 4 open the user pages; 5 and 6 are hidden and invalid; 7 is the read-only lookup (D-09)', async () => {
+    const { user, router } = await renderApp('/admin', { signedOnAs: 'ADMIN001' });
     await screen.findByRole('heading', { name: 'Admin menu' });
-    expect(screen.getAllByTestId(/^option-\d\d$/)).toHaveLength(4);
-    await user.click(screen.getByTestId('option-01'));
-    expect(messageText()).toBe('This option User List (Security) is coming soon ...');
-    await user.type(field(), '5{Enter}');
-    expect(messageText()).toBe('Please enter a valid option number...');
+    const tiles = screen.getAllByTestId(/^option-\d\d$/).map((tile) => tile.querySelector('span')?.textContent);
+    expect(tiles).toEqual([
+      '01. User List (Security)',
+      '02. User Add (Security)',
+      '03. User Update (Security)',
+      '04. User Delete (Security)',
+      '07. Account and Card View',
+    ]);
+    for (const n of ['01', '02', '03', '04', '07']) expect(screen.getByTestId(`option-${n}`)).toHaveAttribute('data-status', 'available');
+    for (const typed of ['5', '6', '8']) {
+      await user.clear(field());
+      await user.type(field(), `${typed}{Enter}`);
+      expect(messageText()).toBe('Please enter a valid option number...');
+    }
     expect(screen.getByTestId('screen-id')).toHaveTextContent('CA00 · COADM01C');
+    await user.clear(field());
+    await user.type(field(), '7{Enter}');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/lookup'));
+  });
+
+  it.each([
+    ['1', '/admin/users', null],
+    ['2', '/admin/users/new', null],
+    ['3', '/admin/users', 'update'],
+    ['4', '/admin/users', 'delete'],
+  ])('option %s opens %s', async (typed, path, intent) => {
+    const { user, router } = await renderApp('/admin', { signedOnAs: 'ADMIN001' });
+    await screen.findByRole('heading', { name: 'Admin menu' });
+    await user.type(field(), `${typed}{Enter}`);
+    await waitFor(() => expect(router.state.location.pathname).toBe(path));
+    expect((router.state.location.state as { intent?: string } | null)?.intent ?? null).toBe(intent);
   });
 
   it('a user who opens /admin goes to the main menu', async () => {

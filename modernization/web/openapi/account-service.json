@@ -1,0 +1,2046 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "description" : "Snapshot of the account-service OpenAPI document. The service's OpenApiExportTest fails when its export differs from this file.",
+    "title" : "account-service",
+    "version" : "0.1.0"
+  },
+  "servers" : [ {
+    "url" : "/"
+  } ],
+  "paths" : {
+    "/api/accounts/{acctId}" : {
+      "get" : {
+        "operationId" : "viewAccount",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountView"
+                }
+              }
+            },
+            "description" : "The account, its customer and card; or the account alone with NO_CARD_LINKED (information) when it has no card (D-61)."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCT_ID_REQUIRED or INVALID_ACCT_ID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND or CUSTOMER_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED or CUSTOMER_LOOKUP_FAILED."
+          }
+        }
+      },
+      "put" : {
+        "operationId" : "updateAccount",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AccountUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountUpdateResponse"
+                }
+              }
+            },
+            "description" : "Saved; the form read back.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ValidationProblem"
+                }
+              }
+            },
+            "description" : "ACCT_ID_REQUIRED, INVALID_ACCT_ID, INVALID_IF_MATCH, FIELD_NOT_EDITABLE, NO_CHANGE, or a field rule (with invalidFields)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND or CUSTOMER_NOT_FOUND."
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountConflictProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED (with current and a fresh ETag), ACCOUNT_LOCK_FAILED or CUSTOMER_LOCK_FAILED.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED, CUSTOMER_LOOKUP_FAILED, ACCOUNT_LOCK_FAILED, CUSTOMER_LOCK_FAILED or ACCOUNT_UPDATE_FAILED."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds.",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{acctId}/unmask" : {
+      "post" : {
+        "operationId" : "unmaskAccount",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UnmaskRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UnmaskResponse"
+                }
+              }
+            },
+            "description" : "The requested fields in clear; one ops.audit row written.",
+            "headers" : {
+              "Cache-Control" : {
+                "schema" : {
+                  "type" : "string",
+                  "examples" : [ "no-store" ]
+                },
+                "style" : "simple"
+              },
+              "Pragma" : {
+                "schema" : {
+                  "type" : "string",
+                  "examples" : [ "no-cache" ]
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCT_ID_REQUIRED, INVALID_ACCT_ID or INVALID_UNMASK_FIELD (ssn, dob, govtIssuedId, eftAccountId, cardNum)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (ADMIN only) or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED, CUSTOMER_LOOKUP_FAILED or UNMASK_AUDIT_FAILED."
+          }
+        }
+      }
+    },
+    "/api/accounts/{acctId}/update-form" : {
+      "get" : {
+        "operationId" : "fetchAccountForUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountUpdateForm"
+                }
+              }
+            },
+            "description" : "The form, PII masked.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCT_ID_REQUIRED or INVALID_ACCT_ID."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND or CUSTOMER_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED or CUSTOMER_LOOKUP_FAILED."
+          }
+        }
+      }
+    },
+    "/api/accounts/{acctId}/validate" : {
+      "post" : {
+        "operationId" : "validateAccountUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "acctId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AccountValidateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountValidateResponse"
+                }
+              }
+            },
+            "description" : "Changes validated; nothing written."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ValidationProblem"
+                }
+              }
+            },
+            "description" : "ACCT_ID_REQUIRED, INVALID_ACCT_ID, INVALID_IF_MATCH, FIELD_NOT_EDITABLE, NO_CHANGE, or a field rule (with invalidFields)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_NOT_FOUND or CUSTOMER_NOT_FOUND."
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountConflictProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED, with current and a fresh ETag.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED or CUSTOMER_LOOKUP_FAILED."
+          }
+        }
+      }
+    },
+    "/api/cards/lookup" : {
+      "post" : {
+        "operationId" : "lookupCard",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CardLookupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardView"
+                }
+              }
+            },
+            "description" : "The card of that account."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "NO_INPUT, ACCT_ID_REQUIRED, INVALID_ACCT_ID, CARD_NUM_REQUIRED or INVALID_CARD_NUM."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND (also for a card of another account, D-13)."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED."
+          }
+        }
+      }
+    },
+    "/api/cards/search" : {
+      "post" : {
+        "operationId" : "listCards",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CardSearchRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardPage"
+                }
+              }
+            },
+            "description" : "One page, with a notice (information) at the end of the list."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "INVALID_CURSOR, INVALID_PAGE_SIZE, INVALID_ACCT_FILTER or INVALID_CARD_FILTER."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LIST_FAILED."
+          }
+        }
+      }
+    },
+    "/api/cards/update-lookup" : {
+      "post" : {
+        "operationId" : "lookupCardForUpdate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CardLookupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardUpdateForm"
+                }
+              }
+            },
+            "description" : "The form.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "NO_INPUT, ACCT_ID_REQUIRED, INVALID_ACCT_ID, CARD_NUM_REQUIRED or INVALID_CARD_NUM."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED."
+          }
+        }
+      }
+    },
+    "/api/cards/{cardId}" : {
+      "get" : {
+        "operationId" : "viewCard",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardView"
+                }
+              }
+            },
+            "description" : "The card of a list row."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED."
+          }
+        }
+      },
+      "put" : {
+        "operationId" : "updateCard",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CardUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardUpdateResponse"
+                }
+              }
+            },
+            "description" : "Saved; the form read back.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ValidationProblem"
+                }
+              }
+            },
+            "description" : "INVALID_IF_MATCH, NO_CHANGE, or a field rule (with invalidFields)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND."
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardConflictProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED (with current and a fresh ETag) or CARD_LOCK_FAILED.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "428" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "PRECONDITION_REQUIRED."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED, CARD_LOCK_FAILED or CARD_UPDATE_FAILED."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "BATCH_WINDOW.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds.",
+                "schema" : {
+                  "type" : "integer"
+                },
+                "style" : "simple"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cards/{cardId}/unmask" : {
+      "post" : {
+        "operationId" : "unmaskCard",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UnmaskRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UnmaskResponse"
+                }
+              }
+            },
+            "description" : "The card number in clear; one ops.audit row written.",
+            "headers" : {
+              "Cache-Control" : {
+                "schema" : {
+                  "type" : "string",
+                  "examples" : [ "no-store" ]
+                },
+                "style" : "simple"
+              },
+              "Pragma" : {
+                "schema" : {
+                  "type" : "string",
+                  "examples" : [ "no-cache" ]
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "INVALID_UNMASK_FIELD (cardNum)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED (ADMIN only) or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED or UNMASK_AUDIT_FAILED."
+          }
+        }
+      }
+    },
+    "/api/cards/{cardId}/update-form" : {
+      "get" : {
+        "operationId" : "fetchCardForUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardUpdateForm"
+                }
+              }
+            },
+            "description" : "The form.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED."
+          }
+        }
+      }
+    },
+    "/api/cards/{cardId}/validate" : {
+      "post" : {
+        "operationId" : "validateCardUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "cardId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CardValidateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardValidateResponse"
+                }
+              }
+            },
+            "description" : "Changes validated; nothing written."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ValidationProblem"
+                }
+              }
+            },
+            "description" : "INVALID_IF_MATCH, NO_CHANGE, or a field rule (with invalidFields)."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "UNAUTHENTICATED."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "ACCESS_DENIED or CSRF."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_NOT_FOUND."
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CardConflictProblem"
+                }
+              }
+            },
+            "description" : "RECORD_CHANGED, with current and a fresh ETag.",
+            "headers" : {
+              "ETag" : {
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description" : "CARD_LOOKUP_FAILED."
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "AccountConflictProblem" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Problem"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "current" : {
+              "$ref" : "#/components/schemas/AccountUpdateForm",
+              "description" : "On RECORD_CHANGED: the stored values now, with the fresh ETag."
+            }
+          }
+        } ]
+      },
+      "AccountUpdateForm" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "examples" : [ "00000000001" ]
+          },
+          "activeStatus" : {
+            "type" : "string"
+          },
+          "addrLine1" : {
+            "type" : [ "string", "null" ]
+          },
+          "addrLine2" : {
+            "type" : [ "string", "null" ]
+          },
+          "cardId" : {
+            "type" : [ "string", "null" ],
+            "description" : "The card whose cross-reference row named the customer."
+          },
+          "cashCreditLimit" : {
+            "type" : "string"
+          },
+          "cashCreditLimitDisplay" : {
+            "type" : "string"
+          },
+          "city" : {
+            "type" : [ "string", "null" ]
+          },
+          "countryCd" : {
+            "type" : [ "string", "null" ],
+            "description" : "Read-only (BR-ACUP-008)."
+          },
+          "creditLimit" : {
+            "type" : "string",
+            "examples" : [ "2020.00" ]
+          },
+          "creditLimitDisplay" : {
+            "type" : "string",
+            "examples" : [ "+      2,020.00" ]
+          },
+          "currCycCredit" : {
+            "type" : "string",
+            "description" : "Read-only (D-08)."
+          },
+          "currCycCreditDisplay" : {
+            "type" : "string"
+          },
+          "currCycDebit" : {
+            "type" : "string",
+            "description" : "Read-only (D-08)."
+          },
+          "currCycDebitDisplay" : {
+            "type" : "string"
+          },
+          "currentBalance" : {
+            "type" : "string",
+            "description" : "Read-only (D-08)."
+          },
+          "currentBalanceDisplay" : {
+            "type" : "string"
+          },
+          "custId" : {
+            "type" : [ "string", "null" ]
+          },
+          "dob" : {
+            "type" : [ "string", "null" ],
+            "description" : "Masked; write-only through dobYear, dobMonth, dobDay."
+          },
+          "eftAccountId" : {
+            "type" : [ "string", "null" ],
+            "description" : "Masked; write-only."
+          },
+          "expiryDay" : {
+            "type" : "string"
+          },
+          "expiryMonth" : {
+            "type" : "string"
+          },
+          "expiryYear" : {
+            "type" : "string"
+          },
+          "ficoScore" : {
+            "type" : [ "string", "null" ]
+          },
+          "firstName" : {
+            "type" : [ "string", "null" ]
+          },
+          "govtIssuedId" : {
+            "type" : [ "string", "null" ],
+            "description" : "Masked; write-only."
+          },
+          "groupId" : {
+            "type" : "string",
+            "description" : "core.account.group_id (D-11)."
+          },
+          "lastName" : {
+            "type" : [ "string", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "middleName" : {
+            "type" : [ "string", "null" ]
+          },
+          "openDay" : {
+            "type" : "string",
+            "examples" : [ "20" ]
+          },
+          "openMonth" : {
+            "type" : "string",
+            "examples" : [ "11" ]
+          },
+          "openYear" : {
+            "type" : "string",
+            "examples" : [ "2014" ]
+          },
+          "phone1" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone1Area" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone1Line" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone1Prefix" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone2" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone2Area" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone2Line" : {
+            "type" : [ "string", "null" ]
+          },
+          "phone2Prefix" : {
+            "type" : [ "string", "null" ]
+          },
+          "priCardHolderInd" : {
+            "type" : [ "string", "null" ]
+          },
+          "reissueDay" : {
+            "type" : "string"
+          },
+          "reissueMonth" : {
+            "type" : "string"
+          },
+          "reissueYear" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Severity"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "ssn" : {
+            "type" : [ "string", "null" ],
+            "description" : "Masked; write-only through ssn1, ssn2, ssn3."
+          },
+          "stateCd" : {
+            "type" : [ "string", "null" ]
+          },
+          "version" : {
+            "type" : "string",
+            "description" : "Same value as the ETag, without quotes.",
+            "examples" : [ "00000000000007d1.00000000000007d2" ]
+          },
+          "zip" : {
+            "type" : [ "string", "null" ]
+          },
+          "zip5" : {
+            "type" : [ "string", "null" ]
+          },
+          "zipPlus4" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "acctId", "activeStatus", "addrLine1", "addrLine2", "cardId", "cashCreditLimit", "cashCreditLimitDisplay", "city", "countryCd", "creditLimit", "creditLimitDisplay", "currCycCredit", "currCycCreditDisplay", "currCycDebit", "currCycDebitDisplay", "currentBalance", "currentBalanceDisplay", "custId", "dob", "eftAccountId", "expiryDay", "expiryMonth", "expiryYear", "ficoScore", "firstName", "govtIssuedId", "groupId", "lastName", "message", "middleName", "openDay", "openMonth", "openYear", "phone1", "phone1Area", "phone1Line", "phone1Prefix", "phone2", "phone2Area", "phone2Line", "phone2Prefix", "priCardHolderInd", "reissueDay", "reissueMonth", "reissueYear", "severity", "ssn", "stateCd", "version", "zip", "zip5", "zipPlus4" ]
+      },
+      "AccountUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "changes" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "changes" ]
+      },
+      "AccountUpdateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "form" : {
+            "$ref" : "#/components/schemas/AccountUpdateForm"
+          },
+          "message" : {
+            "type" : "string",
+            "examples" : [ "Changes committed to database" ]
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          }
+        },
+        "required" : [ "form", "message", "severity" ]
+      },
+      "AccountValidateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "changes" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "changes", "version" ]
+      },
+      "AccountValidateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "changedFields" : {
+            "type" : "array",
+            "description" : "Changed fields in screen order, one entry per group (its first part).",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "message" : {
+            "type" : "string",
+            "examples" : [ "Changes validated.Press F5 to save" ]
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          }
+        },
+        "required" : [ "changedFields", "message", "severity" ]
+      },
+      "AccountView" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "examples" : [ "00000000001" ]
+          },
+          "activeStatus" : {
+            "type" : "string"
+          },
+          "cashCreditLimit" : {
+            "type" : "string"
+          },
+          "cashCreditLimitDisplay" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "NO_CARD_LINKED" ]
+          },
+          "creditLimit" : {
+            "type" : "string",
+            "description" : "Decimal string, scale 2.",
+            "examples" : [ "2020.00" ]
+          },
+          "creditLimitDisplay" : {
+            "type" : "string",
+            "description" : "Legacy edit +ZZZ,ZZZ,ZZZ.99, widened at a billion or more (NUM-ACVW-001).",
+            "examples" : [ "+      2,020.00" ]
+          },
+          "crossReference" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/CrossReference"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "currCycCredit" : {
+            "type" : "string"
+          },
+          "currCycCreditDisplay" : {
+            "type" : "string"
+          },
+          "currCycDebit" : {
+            "type" : "string"
+          },
+          "currCycDebitDisplay" : {
+            "type" : "string"
+          },
+          "currentBalance" : {
+            "type" : "string"
+          },
+          "currentBalanceDisplay" : {
+            "type" : "string"
+          },
+          "customer" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/CustomerView"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "expirationDate" : {
+            "type" : "string"
+          },
+          "field" : {
+            "type" : [ "string", "null" ]
+          },
+          "groupId" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "openDate" : {
+            "type" : "string",
+            "description" : "YYYY-MM-DD, or \"\" when not stored.",
+            "examples" : [ "2014-11-20" ]
+          },
+          "reissueDate" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Severity"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "required" : [ "acctId", "activeStatus", "cashCreditLimit", "cashCreditLimitDisplay", "code", "creditLimit", "creditLimitDisplay", "crossReference", "currCycCredit", "currCycCreditDisplay", "currCycDebit", "currCycDebitDisplay", "currentBalance", "currentBalanceDisplay", "customer", "expirationDate", "field", "groupId", "message", "openDate", "reissueDate", "severity" ]
+      },
+      "CardChanges" : {
+        "type" : "object",
+        "properties" : {
+          "activeStatus" : {
+            "type" : [ "string", "null" ]
+          },
+          "embossedName" : {
+            "type" : [ "string", "null" ]
+          },
+          "expiryMonth" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "03" ]
+          },
+          "expiryYear" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "2023" ]
+          }
+        }
+      },
+      "CardConflictProblem" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Problem"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "current" : {
+              "$ref" : "#/components/schemas/CardUpdateForm",
+              "description" : "On RECORD_CHANGED: the stored values now, with the fresh ETag."
+            }
+          }
+        } ]
+      },
+      "CardLookupRequest" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "00000000050" ]
+          },
+          "cardNum" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "0500024453765740" ]
+          }
+        }
+      },
+      "CardPage" : {
+        "type" : "object",
+        "properties" : {
+          "firstKey" : {
+            "type" : [ "string", "null" ]
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "hasPrevious" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CardRow"
+            }
+          },
+          "lastKey" : {
+            "type" : [ "string", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "NO MORE RECORDS TO SHOW" ]
+          },
+          "severity" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Severity"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "required" : [ "firstKey", "hasNext", "hasPrevious", "items", "lastKey", "message", "severity" ]
+      },
+      "CardRow" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "examples" : [ "00000000050" ]
+          },
+          "activeStatus" : {
+            "type" : "string",
+            "description" : "As stored (NUM-CRDL-003)."
+          },
+          "cardId" : {
+            "type" : "string",
+            "examples" : [ "1" ]
+          },
+          "cardNum" : {
+            "type" : "string",
+            "description" : "Masked (D-09).",
+            "examples" : [ "************5740" ]
+          }
+        },
+        "required" : [ "acctId", "activeStatus", "cardId", "cardNum" ]
+      },
+      "CardSearchRequest" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : [ "string", "null" ]
+          },
+          "after" : {
+            "type" : [ "string", "null" ],
+            "description" : "A lastKey: the next page."
+          },
+          "before" : {
+            "type" : [ "string", "null" ],
+            "description" : "A firstKey: the previous page."
+          },
+          "cardNum" : {
+            "type" : [ "string", "null" ]
+          },
+          "size" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Default 7, the screen's row count.",
+            "maximum" : 7,
+            "minimum" : 1
+          },
+          "start" : {
+            "type" : [ "string", "null" ],
+            "description" : "A firstKey of an earlier CardPage: refresh from that row."
+          }
+        }
+      },
+      "CardUpdateForm" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "description" : "Read-only (D-13).",
+            "examples" : [ "00000000050" ]
+          },
+          "activeStatus" : {
+            "type" : "string"
+          },
+          "cardId" : {
+            "type" : "string",
+            "examples" : [ "1" ]
+          },
+          "cardNum" : {
+            "type" : "string",
+            "description" : "Masked (D-09).",
+            "examples" : [ "************5740" ]
+          },
+          "embossedName" : {
+            "type" : "string",
+            "description" : "As stored, not upper-cased (D-51)."
+          },
+          "expiryMonth" : {
+            "type" : "string",
+            "examples" : [ "03" ]
+          },
+          "expiryYear" : {
+            "type" : "string",
+            "examples" : [ "2023" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "severity" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Severity"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "version" : {
+            "type" : "string",
+            "description" : "Same value as the ETag, without quotes.",
+            "examples" : [ "00000000000007d1" ]
+          }
+        },
+        "required" : [ "acctId", "activeStatus", "cardId", "cardNum", "embossedName", "expiryMonth", "expiryYear", "message", "severity", "version" ]
+      },
+      "CardUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "changes" : {
+            "$ref" : "#/components/schemas/CardChanges"
+          }
+        },
+        "required" : [ "changes" ]
+      },
+      "CardUpdateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "form" : {
+            "$ref" : "#/components/schemas/CardUpdateForm"
+          },
+          "message" : {
+            "type" : "string",
+            "examples" : [ "Changes committed to database" ]
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          }
+        },
+        "required" : [ "form", "message", "severity" ]
+      },
+      "CardValidateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "changes" : {
+            "$ref" : "#/components/schemas/CardChanges"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "changes", "version" ]
+      },
+      "CardValidateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "message" : {
+            "type" : "string",
+            "examples" : [ "Changes validated.Press F5 to save" ]
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          }
+        },
+        "required" : [ "message", "severity" ]
+      },
+      "CardView" : {
+        "type" : "object",
+        "properties" : {
+          "acctId" : {
+            "type" : "string",
+            "examples" : [ "00000000050" ]
+          },
+          "activeStatus" : {
+            "type" : "string",
+            "description" : "As stored (BR-CRDV-002)."
+          },
+          "cardId" : {
+            "type" : "string",
+            "examples" : [ "1" ]
+          },
+          "cardNum" : {
+            "type" : "string",
+            "description" : "Masked (D-09).",
+            "examples" : [ "************5740" ]
+          },
+          "embossedName" : {
+            "type" : "string"
+          },
+          "expiryMonth" : {
+            "type" : "string",
+            "examples" : [ "03" ]
+          },
+          "expiryYear" : {
+            "type" : "string",
+            "examples" : [ "2023" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ],
+            "examples" : [ "Displaying requested details" ]
+          },
+          "severity" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Severity"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "required" : [ "acctId", "activeStatus", "cardId", "cardNum", "embossedName", "expiryMonth", "expiryYear", "message", "severity" ]
+      },
+      "CrossReference" : {
+        "type" : "object",
+        "properties" : {
+          "cardId" : {
+            "type" : [ "string", "null" ],
+            "description" : "core.card.card_id; null when the card row is missing.",
+            "examples" : [ "1" ]
+          },
+          "cardNum" : {
+            "type" : "string",
+            "description" : "Masked to the last four digits (D-09).",
+            "examples" : [ "************3697" ]
+          },
+          "custId" : {
+            "type" : "string",
+            "examples" : [ "000000001" ]
+          }
+        },
+        "required" : [ "cardId", "cardNum", "custId" ]
+      },
+      "CustomerView" : {
+        "type" : "object",
+        "properties" : {
+          "addrLine1" : {
+            "type" : "string"
+          },
+          "addrLine2" : {
+            "type" : "string"
+          },
+          "city" : {
+            "type" : "string",
+            "description" : "addr_line_3."
+          },
+          "countryCd" : {
+            "type" : "string"
+          },
+          "custId" : {
+            "type" : "string",
+            "examples" : [ "000000001" ]
+          },
+          "dob" : {
+            "type" : "string",
+            "description" : "Masked; \"\" when not stored (D-09).",
+            "examples" : [ "****-06-08" ]
+          },
+          "eftAccountId" : {
+            "type" : "string",
+            "description" : "Masked (D-09)."
+          },
+          "ficoScore" : {
+            "type" : "string",
+            "examples" : [ "274" ]
+          },
+          "firstName" : {
+            "type" : "string"
+          },
+          "govtIssuedId" : {
+            "type" : "string",
+            "description" : "Masked (D-09)."
+          },
+          "lastName" : {
+            "type" : "string"
+          },
+          "middleName" : {
+            "type" : "string"
+          },
+          "phone1" : {
+            "type" : "string",
+            "description" : "Stored value, up to 15 characters (D-14).",
+            "examples" : [ "(908)119-8310" ]
+          },
+          "phone2" : {
+            "type" : "string"
+          },
+          "priCardHolderInd" : {
+            "type" : "string"
+          },
+          "ssn" : {
+            "type" : "string",
+            "description" : "Masked, display form nnn-nn-nnnn (D-09).",
+            "examples" : [ "***-**-3888" ]
+          },
+          "stateCd" : {
+            "type" : "string"
+          },
+          "zip" : {
+            "type" : "string",
+            "description" : "Stored value, up to 10 characters (D-14)."
+          }
+        },
+        "required" : [ "addrLine1", "addrLine2", "city", "countryCd", "custId", "dob", "eftAccountId", "ficoScore", "firstName", "govtIssuedId", "lastName", "middleName", "phone1", "phone2", "priCardHolderInd", "ssn", "stateCd", "zip" ]
+      },
+      "Problem" : {
+        "type" : "object",
+        "description" : "RFC 9457 problem details with the CardDemo fields. message is the exact catalogue text.",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "examples" : [ "ACCT_ID_REQUIRED" ]
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "field" : {
+            "type" : [ "string", "null" ],
+            "description" : "Field to focus, or null."
+          },
+          "instance" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "$ref" : "#/components/schemas/Severity"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "message", "severity" ]
+      },
+      "Severity" : {
+        "type" : "string",
+        "enum" : [ "error", "success", "info" ]
+      },
+      "UnmaskRequest" : {
+        "type" : "object",
+        "properties" : {
+          "fields" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "examples" : [ "ssn" ]
+            },
+            "minItems" : 1
+          }
+        },
+        "required" : [ "fields" ]
+      },
+      "UnmaskResponse" : {
+        "type" : "object",
+        "properties" : {
+          "fields" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : [ "string", "null" ]
+            },
+            "description" : "Field name to clear value, or null."
+          }
+        },
+        "required" : [ "fields" ]
+      },
+      "ValidationProblem" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Problem"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "invalidFields" : {
+              "type" : "array",
+              "description" : "On a field-rule failure: every field that failed, in screen order.",
+              "items" : {
+                "type" : "string"
+              }
+            }
+          }
+        } ]
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter } from 'react-router';
+import { createMemoryRouter, type RouteObject } from 'react-router';
 import { vi } from 'vitest';
 import { App } from '@/App';
 import { createMockServer, memoryStore, type MockSettings } from '@/mocks/server';
@@ -11,6 +11,8 @@ export interface AppOptions {
   signedOnAs?: string;
   settings?: Partial<MockSettings>;
   functionKeys?: boolean;
+  /** Routes in place of the app's, for a page rendered with props the app does not give it. */
+  routes?: RouteObject[];
 }
 
 /**
@@ -43,9 +45,9 @@ export async function renderApp(path: string, options: AppOptions = {}) {
       }),
     );
   }
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  const router = createMemoryRouter(options.routes ?? routes, { initialEntries: [path] });
   const user = userEvent.setup();
   render(<App router={router} />);
   const apiCalls = (path: string) => requests.filter((r) => new URL(r.url).pathname.startsWith(path));
-  return { router, requests, apiCalls, settings, user };
+  return { router, requests, apiCalls, settings, user, server };
 }

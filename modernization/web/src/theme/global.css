@@ -9,6 +9,11 @@ body {
   color: var(--cd-text);
 }
 
+/* Focus and anchor scrolling keep their target clear of the sticky header (WCAG 2.2 SC 2.4.11). */
+html {
+  scroll-padding-top: calc(var(--cd-header-height) + 16px);
+}
+
 body {
   font-feature-settings: 'cv11', 'ss01';
   text-rendering: optimizeLegibility;

@@ -22,8 +22,16 @@ function settings(): MockSettings {
   } catch {
     uiSwitches = {};
   }
+  let faults: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(read('faults') ?? '[]');
+    faults = Array.isArray(parsed) ? parsed.filter((f): f is string => typeof f === 'string') : [];
+  } catch {
+    faults = [];
+  }
   return {
     latencyMs: Number(read('latency') ?? 250),
+    faults,
     batchWindowOpen: read('batchWindow') === 'open',
     uiSwitches,
     authorizationInstalled: read('authorization') === 'installed',

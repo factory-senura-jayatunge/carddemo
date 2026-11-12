@@ -1,5 +1,4 @@
-import { Button, Group, Modal, Text } from '@mantine/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { sessionEndedNote } from '@/lib/messages';
 import { useSession, useUser } from './SessionProvider';
 
@@ -19,10 +18,8 @@ function mockOverride(): Partial<IdleTimings> {
   }
 }
 
-const formatRemaining = (ms: number) => {
-  const seconds = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-};
+// Rendered from the start, so its code is fetched right after sign-on and is ready long before a warning.
+const IdleWarningDialog = lazy(async () => ({ default: (await import('./IdleWarningDialog')).IdleWarningDialog }));
 
 /**
  * Warns two minutes before the idle timeout and signs the user off when it
@@ -77,30 +74,8 @@ export function IdleGuard({ timings }: { timings?: IdleTimings }) {
   };
 
   return (
-    <Modal
-      opened={remaining !== null}
-      onClose={() => void stay()}
-      title="Are you still there?"
-      centered
-      radius="lg"
-      closeOnClickOutside={false}
-      closeButtonProps={{ 'aria-label': 'Close' }}
-    >
-      <Text size="sm" mb="lg">
-        For your security you will be signed off in{' '}
-        <Text span fw={650} className="cd-num">
-          {formatRemaining(remaining ?? 0)}
-        </Text>{' '}
-        because there has been no activity for a while.
-      </Text>
-      <Group justify="flex-end" gap="sm">
-        <Button variant="default" onClick={() => void signOff({ to: 'signed-off' })}>
-          Sign out now
-        </Button>
-        <Button onClick={() => void stay()} data-autofocus>
-          Stay signed on
-        </Button>
-      </Group>
-    </Modal>
+    <Suspense fallback={null}>
+      <IdleWarningDialog remaining={remaining} onStay={() => void stay()} onSignOut={() => void signOff({ to: 'signed-off' })} />
+    </Suspense>
   );
 }

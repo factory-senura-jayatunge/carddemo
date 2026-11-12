@@ -11,6 +11,7 @@
     "dev": "vite",
     "dev:mock": "vite --mode mock",
     "gen:api": "node scripts/gen-api.mjs",
+    "gen:validation": "node scripts/gen-validation.mjs",
     "gen:messages": "node scripts/gen-messages.mjs",
     "check:messages": "node scripts/gen-messages.mjs --check --if-present",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -19,14 +20,15 @@
     "test:watch": "vitest",
     "build": "vite build",
     "budget": "node scripts/check-bundle.mjs",
-    "verify": "npm run gen:api && npm run check:messages && npm run typecheck && npm run lint && npm run test && npm run build && npm run budget",
+    "verify": "npm run gen:api && npm run gen:validation && npm run check:messages && npm run typecheck && npm run lint && npm run test && npm run build && npm run budget",
     "e2e": "playwright test",
     "screenshots": "playwright test --project=screenshots",
     "preview": "vite preview --host 127.0.0.1 --port 25173 --strictPort"
   },
   "bundleBudget": {
     "initialJsGzipKiB": 190,
-    "totalJsGzipKiB": 260,
+    "totalJsGzipKiB": 280,
+    "lazyRouteJsGzipKiB": 8,
     "totalCssGzipKiB": 40
   },
   "dependencies": {

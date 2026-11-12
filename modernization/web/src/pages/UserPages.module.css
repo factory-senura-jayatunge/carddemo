@@ -1,0 +1,130 @@
+.table {
+  min-width: 0;
+}
+
+.table thead th {
+  background: var(--cd-surface-sunken);
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.idCell {
+  font-family: var(--mantine-font-family-monospace);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.you {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+
+.nameCell {
+  overflow-wrap: anywhere;
+}
+
+.typeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.legacyType {
+  margin-top: 6px;
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.passwordToggle {
+  align-self: flex-start;
+}
+
+.lockedId {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lockedIdLabel {
+  color: var(--cd-text-muted);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+}
+
+.lockedIdValue {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.formStack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px 20px;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.danger {
+  border-color: var(--mantine-color-red-3);
+  background: var(--mantine-color-red-0);
+}
+
+.empty {
+  padding: 18px 16px;
+}
+
+@media (max-width: 40em) {
+  .formStack {
+    grid-template-columns: 1fr;
+  }
+
+  /* Narrow screens: each user is a small card instead of a table row. */
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--cd-border);
+  }
+
+  .table tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .table tbody td[data-cell='name'] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .table tbody td[data-cell='actions'] {
+    grid-column: 1 / -1;
+    text-align: left;
+    margin-top: 6px;
+  }
+
+  /* The selection code sits on its own line under the name, before the row's buttons. */
+  .table tbody td[data-cell='sel'] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 6px;
+  }
+}

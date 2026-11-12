@@ -2,7 +2,8 @@
  * Demo data for mock mode: the 50 sample accounts of app/data/ASCII/acctdata.txt
  * with their current balances, and the DUSRSECJ seed users with the public
  * demo password. Two extra accounts, 00000000098 (0.00) and 00000000099
- * (-25.50), exist only here, for the "nothing to pay" case (BILL-S6).
+ * (-25.50), exist only here, for the "nothing to pay" case (BILL-S6), and
+ * 00000000097 (0.00) for the authorization summary's display cuts.
  */
 const SAMPLE_BALANCES = [
   194, 158, 147, 40, 345, 218, 193, 605, 560, 159, 212, 176, 41, 15, 489, 733, 33, 144, 480, 369, 112, 55, 104, 400, 61,
@@ -17,6 +18,7 @@ export function initialAccounts(): Record<string, number> {
   });
   accounts['00000000098'] = 0;
   accounts['00000000099'] = -2550;
+  accounts['00000000097'] = 0;
   return accounts;
 }
 
@@ -28,6 +30,10 @@ export interface MockUser {
   mustChange: boolean;
   failedAttempts: number;
   lockedUntil: number;
+  /** The row version of user administration's If-Match; absent counts as 1. */
+  version?: number;
+  /** Logically deleted (D-56): kept, but absent for every read and for sign-on. */
+  deleted?: boolean;
 }
 
 const user = (firstName: string, lastName: string, type: string, password = 'PASSWORD', mustChange = false): MockUser => ({
@@ -44,9 +50,14 @@ export function initialUsers(): Record<string, MockUser> {
   return {
     ADMIN001: user('MARGARET', 'GOLD', 'A'),
     ADMIN002: user('RUSSELL', 'RUSSELL', 'A'),
+    ADMIN003: user('RAYMOND', 'WHITMORE', 'A'),
+    ADMIN004: user('EMMANUEL', 'CASGRAIN', 'A'),
+    ADMIN005: user('GRANVILLE', 'LACHAPELLE', 'A'),
     USER0001: user('LAWRENCE', 'THOMAS', 'U'),
     USER0002: user('AJITH', 'KUMAR', 'U'),
     USER0003: user('LAURITZ', 'ALME', 'U'),
+    USER0004: user('AVERARDO', 'MAZZI', 'U'),
+    USER0005: user('LEE', 'TING', 'U'),
     // The scenario users of SGN-S11, SGN-S13 and SGN-S14.
     TEST0001: user('TESSA', 'TEST', 'U', 'Secret12'),
     TYPEX001: user('XAVIER', 'TYPE', 'X'),

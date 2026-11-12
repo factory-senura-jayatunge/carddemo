@@ -33,6 +33,8 @@ export interface MockOptions {
   authorizationInstalled?: boolean;
   latency?: number;
   idle?: { timeoutMs: number; warnBeforeMs: number };
+  /** Database steps that fail (MockSettings.faults); setFaults changes them mid-test. */
+  faults?: string[];
 }
 
 export const test = base.extend<{ mock: (options: MockOptions) => Promise<void> }>({
@@ -44,12 +46,18 @@ export const test = base.extend<{ mock: (options: MockOptions) => Promise<void> 
         if (o.switches) sessionStorage.setItem('carddemo.mock.switches', JSON.stringify(o.switches));
         if (o.authorizationInstalled) sessionStorage.setItem('carddemo.mock.authorization', 'installed');
         if (o.idle) sessionStorage.setItem('carddemo.mock.idle', JSON.stringify(o.idle));
+        if (o.faults) sessionStorage.setItem('carddemo.mock.faults', JSON.stringify(o.faults));
       }, options);
     });
   },
 });
 
 export { expect };
+
+/** Makes these database steps fail from the next call on (mock target only). */
+export async function setFaults(page: Page, faults: string[]) {
+  await page.evaluate((f) => sessionStorage.setItem('carddemo.mock.faults', JSON.stringify(f)), faults);
+}
 
 export const message = (page: Page) => page.getByTestId('message-text');
 export const messageBox = (page: Page) => page.getByTestId('message');
@@ -93,7 +101,7 @@ export interface ApiAnswer {
  */
 export async function callApi(
   page: Page,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   path: string,
   options: { body?: unknown; headers?: Record<string, string> } = {},
 ): Promise<ApiAnswer> {

@@ -26,7 +26,7 @@ const MAIN = [
 
 test.beforeEach(async ({ mock }) => mock({ latency: 0 }));
 
-test('@DEF-MENU-003 @DEF-MENU-005 @DEF-SGN-012 MENU-S1: without a session / goes to sign-on', async ({ page }) => {
+test('@FLOW-MENU-001 @DEF-MENU-003 @DEF-MENU-005 MENU-S1: without a session / goes to sign-on', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-on$/);
   await expectNoMessage(page);
@@ -53,13 +53,16 @@ test('@BR-MENU-002 @FLOW-MENU-003 MENU-S3: option 10 and Enter open Bill Pay', a
   await expect(page.getByRole('heading', { name: 'Bill payment' })).toBeVisible();
 });
 
-test('@BR-MENU-005 MENU-S4: option 5 is coming soon, in green', async ({ page }) => {
+test('@BR-MENU-002 @FLOW-MENU-003 MENU-S4: option 8 opens Transaction Add and option 9 Transaction Reports', async ({ page }) => {
   await signOnAsUser(page);
-  await typeOption(page, '5');
-  await expectMessage(page, 'This option Credit Card Update is coming soon ...', 'success');
-  await page.getByTestId('option-07').click();
-  await expectMessage(page, 'This option Transaction View is coming soon ...', 'success');
-  await expectAccessible(page);
+  await typeOption(page, '8');
+  await expect(page).toHaveURL(/\/transactions\/new$/);
+  await expect(page.getByRole('heading', { name: 'Add a transaction' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
+  await page.getByTestId('option-09').click();
+  await expect(page).toHaveURL(/\/reports\/transactions$/);
+  await expect(page.getByRole('heading', { name: 'Transaction report' })).toBeVisible();
 });
 
 test('@VAL-MENU-001 @NUM-MENU-001 @DEF-MENU-001 MENU-S5: blank, 00, 12 and 99 are not valid options and go nowhere', async ({ page }) => {
@@ -100,20 +103,37 @@ test('@VAL-MENU-002 @FLOW-MENU-005 MENU-S9: F7 with the function keys on is an i
   await expectNoMessage(page);
 });
 
-test('@BR-SGN-004 MENU-S10: ADMIN001 who opens / goes to the admin menu', async ({ page }) => {
+test('@BR-SGN-004 @BR-MENU-003 MENU-S10: ADMIN001 who opens / goes to the admin menu', async ({ page }) => {
   await signOn(page, 'ADMIN001');
   await expect(page).toHaveURL(/\/admin$/);
   await page.goto('/');
   await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole('heading', { name: 'Admin menu' })).toBeVisible();
 });
 
-test('@D-70 admin menu stub: options 1 to 4 are coming soon, 5 and 6 are hidden', async ({ page }) => {
+test('@BR-MENU-003 MENU-S11: USER0001 who opens /admin goes to the main menu', async ({ page }) => {
+  await signOnAsUser(page);
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Main menu' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Admin menu' })).toHaveCount(0);
+  const me = await callApi(page, 'GET', '/api/auth/me');
+  expect(me.body).toMatchObject({ userId: 'USER0001', role: 'USER' });
+});
+
+test('@DEF-SGN-012 MENU-S12: /admin without a session goes to sign-on', async ({ page }) => {
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/sign-on$/);
+  await expect(page.getByRole('heading', { name: 'Admin menu' })).toHaveCount(0);
+  await expectNoMessage(page);
+});
+
+test('@D-70 @D-09 admin menu: options 1 to 4 open the user pages, 5 and 6 are hidden, 7 is the read-only lookup', async ({ page }) => {
   await signOn(page, 'ADMIN001');
   await expect(page.getByRole('heading', { name: 'Admin menu' })).toBeVisible();
   const tiles = page.getByRole('list', { name: 'Admin menu options' }).getByRole('button');
-  await expect(tiles).toHaveCount(4);
-  await page.getByTestId('option-01').click();
-  await expectMessage(page, 'This option User List (Security) is coming soon ...', 'success');
+  await expect(tiles).toHaveCount(5);
+  await expect(tiles.nth(4)).toContainText('07. Account and Card View');
   for (const value of ['5', '6']) {
     await typeOption(page, value);
     await expectMessage(page, 'Please enter a valid option number...', 'error');
@@ -121,5 +141,29 @@ test('@D-70 admin menu stub: options 1 to 4 are coming soon, 5 and 6 are hidden'
   await expectHeader(page, 'CA00 · COADM01C');
   await expectAccessible(page);
   await page.goto('/bill-pay');
+  await expect(page).toHaveURL(/\/admin$/);
+  await typeOption(page, '7');
+  await expect(page).toHaveURL(/\/admin\/lookup$/);
+  await page.goto('/admin');
+  await page.getByTestId('option-01').click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+});
+
+test('@D-09 admin lookup: links to the read-only pages, and Back from them returns here', async ({ page }) => {
+  await signOn(page, 'ADMIN001');
+  await page.getByTestId('option-07').click();
+  await expect(page.getByRole('heading', { name: 'Account and card view' })).toBeVisible();
+  await expectHeader(page, 'CA00 · COADM01C');
+  await expectAccessible(page);
+  await page.getByTestId('lookup-transaction').click();
+  await expect(page).toHaveURL(/\/transactions\/lookup$/);
+  await page.getByTestId('back').click();
+  await expect(page).toHaveURL(/\/admin\/lookup$/);
+  await page.getByTestId('lookup-account').click();
+  await expect(page.getByRole('heading', { name: 'Account view' })).toBeVisible();
+  await page.getByRole('button', { name: /^Back/ }).click();
+  await expect(page).toHaveURL(/\/admin\/lookup$/);
+  await page.getByRole('button', { name: /^Back/ }).click();
   await expect(page).toHaveURL(/\/admin$/);
 });

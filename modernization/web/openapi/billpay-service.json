@@ -201,7 +201,7 @@
                 }
               }
             },
-            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED, TRAN_LOOKUP_FAILED, TRAN_ADD_FAILED or ACCOUNT_UPDATE_FAILED."
+            "description" : "ACCOUNT_LOOKUP_FAILED, XREF_LOOKUP_FAILED, TRAN_LOOKUP_FAILED, TRAN_ADD_FAILED, TRAN_ID_EXHAUSTED or ACCOUNT_UPDATE_FAILED."
           },
           "503" : {
             "content" : {

@@ -1,0 +1,38 @@
+.searchField {
+  width: 260px;
+}
+
+.table {
+  min-width: 680px;
+}
+
+.amountCol {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--cd-border);
+}
+
+.amount {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .searchField {
+    width: 100%;
+  }
+}

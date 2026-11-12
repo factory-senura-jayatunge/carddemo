@@ -70,8 +70,9 @@ export default defineConfig({
   testDir: 'e2e',
   // e2e/*.test.ts are Vitest tests of the helpers here.
   testMatch: '**/*.spec.ts',
-  // Playwright empties its output folder on every run; a subfolder keeps Vitest's report beside it.
-  outputDir: 'test-results/e2e',
+  // Traces and error-context snapshots hold filled form values, so they stay out of what CI
+  // uploads: test-results/ (Vitest's report, web job) and playwright-report/ (the Playwright jobs).
+  outputDir: 'e2e-output/results',
   fullyParallel: target === 'mock',
   workers: target === 'mock' ? 4 : 1,
   forbidOnly: Boolean(process.env.CI),

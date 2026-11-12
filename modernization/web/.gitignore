@@ -2,6 +2,7 @@ node_modules/
 dist/
 src/api/generated/
 test-results/
+e2e-output/
 playwright-report/
 blob-report/
 *.tsbuildinfo

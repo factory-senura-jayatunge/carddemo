@@ -186,3 +186,89 @@ describe('Sign-on page (COSGN00C)', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin'));
   });
 });
+
+describe('Sign-on and password change: raw input reaches the service', () => {
+  const EMOJI_33 = '\u{1F600}'.repeat(33);
+
+  it('@VAL-SGN-001 no length cap on User ID: USER0001 with two trailing spaces is sent exactly as typed and signs on', async () => {
+    const app = await openSignOn();
+    expect(userId()).not.toHaveAttribute('maxlength');
+    await signOn(app, 'USER0001  ', 'PASSWORD');
+    await waitFor(() => expect(app.router.state.location.pathname).toBe('/'));
+    expect(await app.apiCalls('/api/auth/sign-on')[0]?.json()).toEqual({ userId: 'USER0001  ', password: 'PASSWORD' });
+  });
+
+  it('@VAL-SGN-001 USER00012 and a leading space are left to the service, which answers on User ID', async () => {
+    const app = await openSignOn();
+    for (const typed of ['USER00012', ' USER0001']) {
+      await app.user.clear(userId());
+      await app.user.type(userId(), typed);
+      await app.user.clear(password());
+      await app.user.type(password(), 'PASSWORD{Enter}');
+      await waitFor(() => expect(messageText()).toBe('Please enter User ID ...'));
+      expect(userId()).toHaveAttribute('aria-invalid', 'true');
+    }
+    const sent = await Promise.all(app.apiCalls('/api/auth/sign-on').map((r) => r.json() as Promise<{ userId: string }>));
+    expect(sent.map((b) => b.userId)).toEqual(['USER00012', ' USER0001']);
+  });
+
+  it('@VAL-SGN-002 a password over 64 code points after the pad is refused on Password, without a call', async () => {
+    const app = await openSignOn();
+    await app.user.type(userId(), 'USER0001');
+    await app.user.click(password());
+    await app.user.paste('\u{1F600}'.repeat(65));
+    await app.user.click(screen.getByRole('button', { name: 'Sign on' }));
+    expect(messageText()).toBe('Please enter Password ...');
+    expect(password()).toHaveFocus();
+    expect(password()).toHaveAttribute('aria-invalid', 'true');
+    expect(app.apiCalls('/api/auth/sign-on')).toHaveLength(0);
+  });
+
+  it('@D-SEC-07 reached without a sign-on, the change leaves the length rules to the service', async () => {
+    const app = await renderApp('/sign-on/change-password');
+    await screen.findByRole('heading', { name: 'Change your password' });
+    await app.user.type(userId(), 'CHANGE01');
+    await app.user.type(screen.getByTestId('current-password'), 'PASSWORD');
+    await app.user.type(screen.getByTestId('new-password'), 'short');
+    await app.user.type(screen.getByTestId('confirm-password'), 'short');
+    await app.user.click(screen.getByRole('button', { name: 'Change password' }));
+    await waitFor(() => expect(messageText()).toBe('New Password must be 8 to 64 characters ...'));
+    expect(app.apiCalls('/api/auth/password')).toHaveLength(1);
+    expect(screen.getByTestId('new-password')).toHaveFocus();
+  });
+
+  it('@VAL-SGN-002 a 9-character ID with a blank password is PASSWORD_REQUIRED, without a call', async () => {
+    const app = await openSignOn();
+    await signOn(app, 'USER00012', '');
+    expect(messageText()).toBe('Please enter Password ...');
+    expect(password()).toHaveFocus();
+    expect(app.apiCalls('/api/auth/sign-on')).toHaveLength(0);
+  });
+
+  it('@D-SEC-07 33 emoji can be typed into every password field; the forced change keeps the raw ID and signs on', async () => {
+    const app = await openSignOn();
+    expect(password()).not.toHaveAttribute('maxlength');
+    await app.user.click(password());
+    await app.user.paste(EMOJI_33);
+    expect(password()).toHaveValue(EMOJI_33);
+    await app.user.clear(password());
+    await signOn(app, 'change01  ', 'PASSWORD');
+    await waitFor(() => expect(app.router.state.location.pathname).toBe('/sign-on/change-password'));
+    await screen.findByRole('heading', { name: 'Change your password' });
+    // The password held for the change matches the raw ID it was typed with.
+    const current = screen.getByTestId('current-password');
+    expect(current).toHaveValue('PASSWORD');
+    const next = screen.getByTestId('new-password');
+    const repeat = screen.getByTestId('confirm-password');
+    for (const field of [current, next, repeat]) expect(field).not.toHaveAttribute('maxlength');
+    await app.user.click(next);
+    await app.user.paste(EMOJI_33);
+    await app.user.click(repeat);
+    await app.user.paste(EMOJI_33);
+    expect(next).toHaveValue(EMOJI_33);
+    expect(repeat).toHaveValue(EMOJI_33);
+    await app.user.click(screen.getByRole('button', { name: 'Change password' }));
+    await waitFor(() => expect(app.router.state.location.pathname).toBe('/'));
+    expect(await app.apiCalls('/api/auth/password')[0]?.json()).toEqual({ userId: 'change01  ', currentPassword: 'PASSWORD', newPassword: EMOJI_33 });
+  });
+});
